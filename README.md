@@ -123,7 +123,7 @@ fly deploy --app sheerluck-staging
 
 ## Attribution
 
-Sheerluck logo made by Martin Yrjölä.
+Sheerluck logo made by Martin Yrjölä using [Inkscape](https://inkscape.org/).
 
 Images was created with the assistance of [DALL·E 2](https://openai.com/dall-e-2)
 and [DALL·E 3](https://openai.com/dall-e-3).
