@@ -3,8 +3,8 @@ package e2etest
 import (
 	"context"
 	"fmt"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/logging"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/logging"
 	"io"
 	"log/slog"
 )

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"net/http"
 )

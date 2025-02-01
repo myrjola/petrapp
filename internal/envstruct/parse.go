@@ -1,7 +1,7 @@
 package envstruct
 
 import (
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"reflect"
 )

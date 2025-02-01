@@ -2,7 +2,7 @@ package sqlite
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/stretchr/testify/require"
 	"io"
 	"log/slog"

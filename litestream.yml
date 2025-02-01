@@ -1,5 +1,5 @@
 dbs:
-  - path: ${SHEERLUCK_SQLITE_URL}
+  - path: ${PETRAPP_SQLITE_URL}
     replicas:
       - type: ${LITESTREAM_REPLICA_TYPE}
         path: ${LITESTREAM_REPLICA_PATH}

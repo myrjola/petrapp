@@ -1,7 +1,7 @@
 package broker_test
 
 import (
-	"github.com/myrjola/sheerluck/internal/broker"
+	"github.com/myrjola/petrapp/internal/broker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sync/atomic"

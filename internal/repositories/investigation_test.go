@@ -2,9 +2,9 @@ package repositories_test
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/models"
-	"github.com/myrjola/sheerluck/internal/repositories"
-	"github.com/myrjola/sheerluck/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/models"
+	"github.com/myrjola/petrapp/internal/repositories"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"
@@ -34,7 +34,7 @@ func TestInvestigationRepository_Get(t *testing.T) {
 					Name:      "Rue Morgue Murder Scene",
 					ShortName: "Rue Morgue",
 					Type:      models.InvestigationTargetTypeScene,
-					ImagePath: "https://myrjola.twic.pics/sheerluck/rue-morgue.webp",
+					ImagePath: "https://myrjola.twic.pics/petrapp/rue-morgue.webp",
 				},
 				Completions: nil,
 			},
@@ -50,7 +50,7 @@ func TestInvestigationRepository_Get(t *testing.T) {
 					Name:      "Adolphe Le Bon",
 					ShortName: "Adolphe",
 					Type:      models.InvestigationTargetTypePerson,
-					ImagePath: "https://myrjola.twic.pics/sheerluck/adolphe_le-bon.webp",
+					ImagePath: "https://myrjola.twic.pics/petrapp/adolphe_le-bon.webp",
 				},
 				Completions: []models.Completion{
 					{
@@ -85,7 +85,7 @@ func TestInvestigationRepository_Get(t *testing.T) {
 					Name:      "Rue Morgue Murder Scene",
 					ShortName: "Rue Morgue",
 					Type:      models.InvestigationTargetTypeScene,
-					ImagePath: "https://myrjola.twic.pics/sheerluck/rue-morgue.webp",
+					ImagePath: "https://myrjola.twic.pics/petrapp/rue-morgue.webp",
 				},
 				Completions: nil,
 			},

@@ -24,9 +24,9 @@ ci: init build lint test sec
 
 build:
 	@echo "Building..."
-	go build -o bin/sheerluck github.com/myrjola/sheerluck/cmd/web
-	go build -o bin/smoketest github.com/myrjola/sheerluck/cmd/smoketest
-	go build -o bin/migratetest github.com/myrjola/sheerluck/cmd/migratetest
+	go build -o bin/petrapp github.com/myrjola/petrapp/cmd/web
+	go build -o bin/smoketest github.com/myrjola/petrapp/cmd/smoketest
+	go build -o bin/migratetest github.com/myrjola/petrapp/cmd/migratetest
 
 test:
 	@echo "Running tests..."
@@ -38,23 +38,23 @@ lint:
 
 dev:
 	@echo "Running dev server with debug build..."
-	go build -gcflags="all=-N -l" -o bin/sheerluck github.com/myrjola/sheerluck/cmd/web
-	./bin/sheerluck
+	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
+	./bin/petrapp
 
 cross-compile:
 	@echo "Cross-compiling..."
-	docker build --tag sheerluck-bin --file cross-compile.Dockerfile .
-	docker create --name sheerluck-bin-extract sheerluck-bin
-	docker cp sheerluck-bin-extract:/dist/sheerluck.linux_amd64 ./bin/sheerluck.linux_amd64
-	docker rm sheerluck-bin-extract
+	docker build --tag petrapp-bin --file cross-compile.Dockerfile .
+	docker create --name petrapp-bin-extract petrapp-bin
+	docker cp petrapp-bin-extract:/dist/petrapp.linux_amd64 ./bin/petrapp.linux_amd64
+	docker rm petrapp-bin-extract
 
 build-docker:
 	@echo "Building Docker image..."
-	docker build --tag sheerluck .
+	docker build --tag petrapp .
 
 fly-sqlite3:
 	@echo "Connecting to sqlite3 database on deployed Fly machine"
-	fly ssh console --pty --user sheerluck -C "/usr/bin/sqlite3 /data/sheerluck.sqlite3"
+	fly ssh console --pty --user petrapp -C "/usr/bin/sqlite3 /data/petrapp.sqlite3"
 
 clean:
 	@echo "Cleaning up..."

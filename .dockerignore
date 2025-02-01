@@ -8,7 +8,7 @@
 !**/*.go
 !**/*.sql
 !ui
-!bin/sheerluck.linux_amd64
+!bin/petrapp.linux_amd64
 
 # Ignore temporary or OS-generated files
 .DS_Store

@@ -4,14 +4,14 @@ import (
 	"context"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
-	"github.com/myrjola/sheerluck/internal/ai"
-	"github.com/myrjola/sheerluck/internal/envstruct"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/logging"
-	"github.com/myrjola/sheerluck/internal/pprofserver"
-	"github.com/myrjola/sheerluck/internal/repositories"
-	"github.com/myrjola/sheerluck/internal/sqlite"
-	"github.com/myrjola/sheerluck/internal/webauthnhandler"
+	"github.com/myrjola/petrapp/internal/ai"
+	"github.com/myrjola/petrapp/internal/envstruct"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/pprofserver"
+	"github.com/myrjola/petrapp/internal/repositories"
+	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/webauthnhandler"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -31,17 +31,17 @@ type application struct {
 
 type config struct {
 	// Addr is the address to listen on. It's possible to choose the address dynamically with localhost:0.
-	Addr string `env:"SHEERLUCK_ADDR" envDefault:"localhost:4000"`
+	Addr string `env:"PETRAPP_ADDR" envDefault:"localhost:4000"`
 	// FQDN is the fully qualified domain name of the server used for WebAuthn Relying Party configuration.
-	FQDN string `env:"SHEERLUCK_FQDN" envDefault:"localhost"`
+	FQDN string `env:"PETRAPP_FQDN" envDefault:"localhost"`
 	// FlyAppName is the name of the Fly application. It's used to override the FQDN.
 	FlyAppName string `env:"FLY_APP_NAME" envDefault:""`
 	// SqliteURL is the URL to the SQLite database. You can use ":memory:" for an ethereal in-memory database.
-	SqliteURL string `env:"SHEERLUCK_SQLITE_URL" envDefault:"./sheerluck.sqlite3"`
+	SqliteURL string `env:"PETRAPP_SQLITE_URL" envDefault:"./petrapp.sqlite3"`
 	// PProfAddr is the optional address to listen on for the pprof server.
-	PProfAddr string `env:"SHEERLUCK_PPROF_ADDR" envDefault:""`
+	PProfAddr string `env:"PETRAPP_PPROF_ADDR" envDefault:""`
 	// TemplatePath is the path to the directory containing the HTML templates.
-	TemplatePath string `env:"SHEERLUCK_TEMPLATE_PATH" envDefault:""`
+	TemplatePath string `env:"PETRAPP_TEMPLATE_PATH" envDefault:""`
 }
 
 func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (string, bool)) error {

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -10,9 +10,9 @@ import (
 
 func testLookupEnv(key string) (string, bool) {
 	switch key {
-	case "SHEERLUCK_SQLITE_URL":
+	case "PETRAPP_SQLITE_URL":
 		return ":memory:", true
-	case "SHEERLUCK_ADDR":
+	case "PETRAPP_ADDR":
 		return "localhost:0", true
 	default:
 		return "", false

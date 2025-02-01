@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 )
 

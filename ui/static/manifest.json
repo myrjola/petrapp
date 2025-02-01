@@ -1,9 +1,9 @@
 {
-  "name": "Sheerluck",
-  "short_name": "Sheerluck",
+  "name": "Petrapp",
+  "short_name": "Petrapp",
   "start_url": "/",
   "icons": [{
-    "src": "https://myrjola.twic.pics/sheerluck/google-touch-icon.png",
+    "src": "https://myrjola.twic.pics/petrapp/google-touch-icon.png",
     "sizes": "512x512",
     "type": "image/png",
     "purpose": "any maskable"

@@ -4,7 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/myrjola/sheerluck/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"os"
 	"testing"

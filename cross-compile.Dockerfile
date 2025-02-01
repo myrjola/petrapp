@@ -26,4 +26,4 @@ RUN go mod download
 RUN go mod verify
 
 # Build a statically linked binary.
-RUN go build -ldflags='-s -w -extldflags "-static"' -o /dist/sheerluck.linux_amd64 ./cmd/web
+RUN go build -ldflags='-s -w -extldflags "-static"' -o /dist/petrapp.linux_amd64 ./cmd/web

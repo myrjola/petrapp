@@ -2,7 +2,7 @@ package random
 
 import (
 	"crypto/rand"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"math/big"
 )
 

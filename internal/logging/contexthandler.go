@@ -2,7 +2,7 @@ package logging
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 )
 

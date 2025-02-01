@@ -1,7 +1,7 @@
 package envstruct_test
 
 import (
-	"github.com/myrjola/sheerluck/internal/envstruct"
+	"github.com/myrjola/petrapp/internal/envstruct"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"

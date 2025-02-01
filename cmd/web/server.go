@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/e2etest"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"net"
 	"net/http"

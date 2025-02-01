@@ -1,7 +1,7 @@
 package e2etest
 
 import (
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"

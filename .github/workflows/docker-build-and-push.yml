@@ -46,7 +46,7 @@ jobs:
           CGO_ENABLED: 1
           GOOS: linux
           GOARCH: amd64
-        run: go build -ldflags='-s -w -extldflags "-static"' -o bin/sheerluck.linux_amd64 ./cmd/web
+        run: go build -ldflags='-s -w -extldflags "-static"' -o bin/petrapp.linux_amd64 ./cmd/web
 
       - uses: superfly/flyctl-actions/setup-flyctl@63da3ecc5e2793b98a3f2519b3d75d4f4c11cec2
       - run: flyctl deploy --app ${{ inputs.fly_app }} --remote-only --build-only --push --image-label ${{ inputs.docker_tag }}

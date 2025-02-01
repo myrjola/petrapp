@@ -6,7 +6,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/descope/virtualwebauthn"
 	"github.com/justinas/nosurf"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -33,7 +33,7 @@ func NewClient(url, rpID, rpOrigin string) (*Client, error) {
 	return &Client{
 		client:        &http.Client{Jar: jar},
 		url:           url,
-		rp:            virtualwebauthn.RelyingParty{Name: "Sheerluck", ID: rpID, Origin: rpOrigin},
+		rp:            virtualwebauthn.RelyingParty{Name: "Petrapp", ID: rpID, Origin: rpOrigin},
 		authenticator: virtualwebauthn.NewAuthenticator(),
 	}, nil
 }

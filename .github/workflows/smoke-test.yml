@@ -5,7 +5,7 @@ on:
   workflow_call:
     inputs:
       hostname:
-        description: The hostname of the app to smoke test e.g. "sheerluck.fly.dev".
+        description: The hostname of the app to smoke test e.g. "petrapp.fly.dev".
         required: true
         type: string
 

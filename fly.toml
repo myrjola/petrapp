@@ -3,7 +3,7 @@
 primary_region = "arn"
 
 [env]
-SHEERLUCK_SQLITE_URL = "/data/sheerluck.sqlite3"
+PETRAPP_SQLITE_URL = "/data/petrapp.sqlite3"
 LITESTREAM_REPLICA_TYPE = "s3"
 
 [build]

@@ -1,7 +1,7 @@
 package random_test
 
 import (
-	"github.com/myrjola/sheerluck/internal/random"
+	"github.com/myrjola/petrapp/internal/random"
 	"testing"
 )
 

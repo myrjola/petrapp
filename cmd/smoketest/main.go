@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/e2etest"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/logging"
-	"github.com/myrjola/sheerluck/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
 	"os"
 	"time"

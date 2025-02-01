@@ -1,7 +1,7 @@
 package testhelpers
 
 import (
-	"github.com/myrjola/sheerluck/internal/logging"
+	"github.com/myrjola/petrapp/internal/logging"
 	"io"
 	"log/slog"
 )

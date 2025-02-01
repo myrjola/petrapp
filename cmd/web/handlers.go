@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/myrjola/sheerluck/internal/contexthelpers"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/errors"
 	"html/template"
 	"log/slog"
 	"net/http"

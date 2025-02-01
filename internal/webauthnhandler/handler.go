@@ -8,9 +8,9 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/ptr"
-	"github.com/myrjola/sheerluck/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/ptr"
+	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -50,7 +50,7 @@ func New(
 
 	var webauthnConfig = &webauthn.Config{
 		RPID:          fqdn,
-		RPDisplayName: "Sheerluck",
+		RPDisplayName: "Petrapp",
 		RPOrigins:     rpOrigins,
 
 		// Top origins are to my understanding used for cross-origin Passkeys. We don't need it here.

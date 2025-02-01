@@ -16,7 +16,7 @@ RUN adduser \
   --shell "/sbin/nologin" \
   --no-create-home \
   --uid 65532 \
-  sheerluck
+  petrapp
 
 WORKDIR /workspace/
 
@@ -52,19 +52,19 @@ COPY --from=sqlite3 /usr/bin/sqlite3 /usr/bin/sqlite3
 COPY --from=sqlite3 /usr/lib/libz.so.1 /usr/lib/libz.so.1
 COPY --from=sqlite3 /lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1
 
-USER sheerluck:sheerluck
+USER petrapp:petrapp
 
 ENV TZ=Europe/Helsinki
-ENV SHEERLUCK_ADDR=":4000"
+ENV PETRAPP_ADDR=":4000"
 # pprof only available from internal network
-ENV SHEERLUCK_PPROF_ADDR=":6060"
-ENV SHEERLUCK_TEMPLATE_PATH="/dist/ui/templates"
+ENV PETRAPP_PPROF_ADDR=":6060"
+ENV PETRAPP_TEMPLATE_PATH="/dist/ui/templates"
 
 EXPOSE 4000 6060 9090
 
 WORKDIR /dist
 
 # Copy the cross-compiled binary created with 'make cross-compile' or other means.
-COPY /bin/sheerluck.linux_amd64 sheerluck
+COPY /bin/petrapp.linux_amd64 petrapp
 
-ENTRYPOINT [ "./litestream", "replicate", "-exec", "./sheerluck" ]
+ENTRYPOINT [ "./litestream", "replicate", "-exec", "./petrapp" ]

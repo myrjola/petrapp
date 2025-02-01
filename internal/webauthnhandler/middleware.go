@@ -3,9 +3,9 @@ package webauthnhandler
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/myrjola/sheerluck/internal/contexthelpers"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/logging"
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
 	"net/http"
 )

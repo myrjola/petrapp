@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/sqlite"
-	"github.com/myrjola/sheerluck/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
 	"os"
 	"time"
@@ -23,8 +23,8 @@ func main() {
 	ctx = context.Background()
 	ctx, cancel = context.WithTimeout(ctx, 5*time.Second) //nolint:mnd // 5 seconds
 
-	if sqliteURL, ok = os.LookupEnv("SHEERLUCK_SQLITE_URL"); !ok {
-		logger.LogAttrs(ctx, slog.LevelError, "SHEERLUCK_SQLITE_URL not set")
+	if sqliteURL, ok = os.LookupEnv("PETRAPP_SQLITE_URL"); !ok {
+		logger.LogAttrs(ctx, slog.LevelError, "PETRAPP_SQLITE_URL not set")
 		os.Exit(1)
 	}
 

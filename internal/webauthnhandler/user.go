@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"time"
 )
 

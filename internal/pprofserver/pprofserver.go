@@ -2,7 +2,7 @@ package pprofserver
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"net/http"
 	"net/http/pprof"

@@ -3,8 +3,8 @@ package errors_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/myrjola/sheerluck/internal/errors"
-	"github.com/myrjola/sheerluck/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/errors"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/stretchr/testify/require"
 	"log/slog"
 	"testing"

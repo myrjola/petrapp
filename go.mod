@@ -1,6 +1,6 @@
-module github.com/myrjola/sheerluck
+module github.com/myrjola/petrapp
 
-go 1.23.4
+go 1.23.5
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.1

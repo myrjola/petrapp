@@ -1,6 +1,6 @@
-# Sheerluck
+# Petrapp
 
-AI-powered murder mystery game
+Personal trainer app
 
 ## Quickstart
 
@@ -32,7 +32,7 @@ Error: the config for your app is missing an app name, add an app field to the f
 Then, you need to select the fly app you have deployed:
 
 ```
-export FLY_APP=sheerluck
+export FLY_APP=petrapp
 ```
 
 ### Deploying
@@ -58,13 +58,13 @@ command.
 
 ```
 # list databases
-fly ssh console --user sheerluck -C "/dist/litestream databases"
+fly ssh console --user petrapp -C "/dist/litestream databases"
 # list snapshot generations of selected database
-fly ssh console --user sheerluck -C "/dist/litestream snapshots /data/sheerluck.sqlite3"
-# restore latest snapshot to /data/sheerluck4.sqlite
-fly ssh console --user sheerluck -C "/dist/litestream restore -o /data/sheerluck4.sqlite -generation db5b998e60a203a3 /data/sheerluck.sqlite3"
+fly ssh console --user petrapp -C "/dist/litestream snapshots /data/petrapp.sqlite3"
+# restore latest snapshot to /data/petrapp4.sqlite
+fly ssh console --user petrapp -C "/dist/litestream restore -o /data/petrapp4.sqlite -generation db5b998e60a203a3 /data/petrapp.sqlite3"
 
-# Edit fly.toml env SHEERLUCK_SQLITE_URL = "/data/sheerluck.sqlite3" before deploying to take new database into use
+# Edit fly.toml env PETRAPP_SQLITE_URL = "/data/petrapp.sqlite3" before deploying to take new database into use
 vim fly.toml
 
 # Deploy the new configuration
@@ -104,30 +104,23 @@ Prerequisite: Ensure you have [Fly](https://fly.io/docs/) set up correctly with 
 Create a new app with a globally unique name.
 
 ```sh
-fly apps create sheerluck-staging
+fly apps create petrapp-staging
 ```
 
 Create a bucket for the database backups. This should configure the secrets automatically matching the configuration in
 litestream.yml.
 
 ```sh
-fly storage create --app sheerluck-staging --name sheerluck-staging-backup
+fly storage create --app petrapp-staging --name petrapp-staging-backup
 ```
 
 Now we are ready to deploy the app.
 
 ```sh
 make cross-compile # required for the docker build.
-fly deploy --app sheerluck-staging
+fly deploy --app petrapp-staging
 ```
 
 ## Attribution
 
-Sheerluck logo made by Martin Yrjölä using [Inkscape](https://inkscape.org/).
-
-Images was created with the assistance of [DALL·E 2](https://openai.com/dall-e-2)
-and [DALL·E 3](https://openai.com/dall-e-3).
-
-HeroIcons made by [steveschoger](https://twitter.com/steveschoger). Available on https://heroicons.dev/.
-
-Game Icons made by [Delapouite](https://delapouite.com/) and Skoll. Available on https://game-icons.net.
+Petrapp logo made by Martin Yrjölä using [Inkscape](https://inkscape.org/).

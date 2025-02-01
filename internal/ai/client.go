@@ -2,7 +2,7 @@ package ai
 
 import (
 	"context"
-	"github.com/myrjola/sheerluck/internal/errors"
+	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/sashabaranov/go-openai"
 	"os"
 )

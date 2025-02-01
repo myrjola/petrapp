@@ -5,10 +5,10 @@ ON CONFLICT(id) DO UPDATE SET name       = excluded.name,
                               image_path = excluded.image_path;
 
 INSERT INTO investigation_targets(id, name, short_name, type, image_path, case_id)
-VALUES ('le-bon', 'Adolphe Le Bon', 'Adolphe', 'person', 'https://myrjola.twic.pics/sheerluck/adolphe_le-bon.webp',
+VALUES ('le-bon', 'Adolphe Le Bon', 'Adolphe', 'person', 'https://myrjola.twic.pics/petrapp/adolphe_le-bon.webp',
         'rue-morgue'),
        ('rue-morgue', 'Rue Morgue Murder Scene', 'Rue Morgue', 'scene',
-        'https://myrjola.twic.pics/sheerluck/rue-morgue.webp', 'rue-morgue')
+        'https://myrjola.twic.pics/petrapp/rue-morgue.webp', 'rue-morgue')
 ON CONFLICT (id) DO UPDATE SET name       = excluded.name,
                                short_name = excluded.short_name,
                                case_id    = excluded.case_id,
