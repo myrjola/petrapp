@@ -9,7 +9,6 @@ import (
 	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
-	"github.com/myrjola/petrapp/internal/repositories"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/webauthnhandler"
 	"io/fs"
@@ -25,7 +24,6 @@ type application struct {
 	aiClient        ai.Client
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
-	investigations  *repositories.InvestigationRepository
 	templateFS      fs.FS
 }
 
@@ -84,14 +82,11 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return errors.Wrap(err, "new webauthn handler")
 	}
 
-	investigations := repositories.NewInvestigationRepository(db, logger)
-
 	app := application{
 		logger:          logger,
 		aiClient:        ai.NewClient(),
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
-		investigations:  investigations,
 		templateFS:      os.DirFS(htmlTemplatePath),
 	}
 

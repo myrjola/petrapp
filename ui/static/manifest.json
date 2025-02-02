@@ -2,13 +2,5 @@
   "name": "Petrapp",
   "short_name": "Petrapp",
   "start_url": "/",
-  "icons": [{
-    "src": "https://myrjola.twic.pics/petrapp/google-touch-icon.png",
-    "sizes": "512x512",
-    "type": "image/png",
-    "purpose": "any maskable"
-  }],
-  "background_color": "#111827",
-  "theme_color": "#111827",
   "display": "fullscreen"
 }
