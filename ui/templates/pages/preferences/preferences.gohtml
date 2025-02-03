@@ -121,34 +121,12 @@
                             }
                         </style>
                         {{ csrf }}
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="monday" name="monday" value="true" {{ if .Preferences.Monday }}checked{{ end }}>
-                            <label for="monday">Monday</label>
-                        </div>
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="tuesday" name="tuesday" value="true" {{ if .Preferences.Tuesday }}checked{{ end }}>
-                            <label for="tuesday">Tuesday</label>
-                        </div>
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="wednesday" name="wednesday" value="true" {{ if .Preferences.Wednesday }}checked{{ end }}>
-                            <label for="wednesday">Wednesday</label>
-                        </div>
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="thursday" name="thursday" value="true" {{ if .Preferences.Thursday }}checked{{ end }}>
-                            <label for="thursday">Thursday</label>
-                        </div>
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="friday" name="friday" value="true" {{ if .Preferences.Friday }}checked{{ end }}>
-                            <label for="friday">Friday</label>
-                        </div>
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="saturday" name="saturday" value="true" {{ if .Preferences.Saturday }}checked{{ end }}>
-                            <label for="saturday">Saturday</label>
-                        </div>
-                        <div class="weekday-toggle">
-                            <input type="checkbox" id="sunday" name="sunday" value="true" {{ if .Preferences.Sunday }}checked{{ end }}>
-                            <label for="sunday">Sunday</label>
-                        </div>
+                        {{ range .Weekdays }}
+                            <div class="weekday-toggle">
+                                <input type="checkbox" id="{{ .ID }}" name="{{ .ID }}" value="true" {{ if .Checked }}checked{{ end }}>
+                                <label for="{{ .ID }}">{{ .Name }}</label>
+                            </div>
+                        {{ end }}
                         <button type="submit">Save</button>
                     </form>
                 </div>
