@@ -2,6 +2,7 @@ package workout
 
 import (
 	"context"
+	"database/sql"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -40,6 +41,18 @@ func (s *Service) GetUserPreferences(ctx context.Context) (WorkoutPreferences, e
 		&prefs.Saturday,
 		&prefs.Sunday,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		// If no preferences are found, return default preferences
+		return WorkoutPreferences{
+			Monday:    false,
+			Tuesday:   false,
+			Wednesday: false,
+			Thursday:  false,
+			Friday:    false,
+			Saturday:  false,
+			Sunday:    false,
+		}, nil
+	}
 	if err != nil {
 		return WorkoutPreferences{}, errors.Wrap(err, "query workout preferences")
 	}
