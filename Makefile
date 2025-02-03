@@ -1,4 +1,4 @@
-.PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec cross-compile migratetest
+.PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec cross-compile migratetest repomix
 
 GOTOOLCHAIN=auto
 
@@ -68,3 +68,6 @@ migratetest: build
 	litestream restore --config litestream.yml restored.sqlite3
 	@echo "Running migration test..."
 	bin/migratetest
+
+repomix:
+	 npx repomix --include "**/*.go,**/*.gohtml,**/*.js,**/*.css,**/*.sql"

@@ -47,3 +47,4 @@ node_modules
 /custom-gcl
 /bin/
 /dockerdata
+/repomix-output.txt
