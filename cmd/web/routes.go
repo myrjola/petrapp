@@ -16,7 +16,8 @@ func (app *application) routes() http.Handler {
 
 	mux.Handle("GET /{$}", session.ThenFunc(app.home))
 
-	mux.Handle("GET /preferences", mustSession.ThenFunc(app.preferences))
+	mux.Handle("GET /preferences", mustSession.ThenFunc(app.preferencesGET))
+	mux.Handle("POST /preferences", mustSession.ThenFunc(app.preferencesPOST))
 
 	mux.Handle("POST /api/registration/start", session.ThenFunc(app.beginRegistration))
 	mux.Handle("POST /api/registration/finish", session.ThenFunc(app.finishRegistration))

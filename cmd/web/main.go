@@ -11,6 +11,7 @@ import (
 	"github.com/myrjola/petrapp/internal/pprofserver"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/webauthnhandler"
+	"github.com/myrjola/petrapp/internal/workout"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -25,6 +26,7 @@ type application struct {
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
+	workoutService  *workout.Service
 }
 
 type config struct {
@@ -88,6 +90,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
+		workoutService:  workout.NewService(db, logger),
 	}
 
 	if err = app.configureAndStartServer(ctx, cfg.Addr); err != nil {
