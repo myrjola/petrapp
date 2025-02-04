@@ -345,7 +345,10 @@ func (c *Client) Logout(ctx context.Context) (*goquery.Document, error) {
 		doc *goquery.Document
 		err error
 	)
-	if doc, err = c.SubmitForm(ctx, "/", "/api/logout"); err != nil {
+	if doc, err = c.GetDoc(ctx, "/"); err != nil {
+		return nil, errors.Wrap(err, "get document")
+	}
+	if doc, err = c.SubmitForm(ctx, doc, "/api/logout", nil); err != nil {
 		return nil, errors.Wrap(err, "submit form")
 	}
 	return doc, nil
@@ -361,28 +364,26 @@ func (c *Client) extractCSRFToken(doc *goquery.Document, formActionURLPath strin
 	return csrfToken, nil
 }
 
-// SubmitForm submits a form at formUrlPath with action formActionUrlPath and returns the response document.
+// SubmitForm submits a form in the doc identified with action formActionUrlPath and returns the response document.
 func (c *Client) SubmitForm(
 	ctx context.Context,
-	formURLPath string,
+	doc *goquery.Document,
 	formActionURLPath string,
+	formData neturl.Values,
 ) (*goquery.Document, error) {
-	var (
-		doc *goquery.Document
-		err error
-	)
-	if doc, err = c.GetDoc(ctx, formURLPath); err != nil {
-		return nil, errors.Wrap(err, "get document")
-	}
-
 	// Extract CSRF token from the form.
-	var csrfToken string
+	var (
+		csrfToken string
+		err       error
+	)
 	if csrfToken, err = c.extractCSRFToken(doc, formActionURLPath); err != nil {
 		return nil, errors.Wrap(err, "extract CSRF token")
 	}
 
 	// Build form data
-	formData := neturl.Values{}
+	if formData == nil {
+		formData = neturl.Values{}
+	}
 	formData.Add("csrf_token", csrfToken)
 	data := strings.NewReader(formData.Encode())
 
