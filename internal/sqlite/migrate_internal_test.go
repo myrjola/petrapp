@@ -3,12 +3,12 @@ package sqlite
 import (
 	"context"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"github.com/stretchr/testify/require"
 	"io"
 	"log/slog"
 	"testing"
 )
 
+//nolint:gocognit // This test is inherently complex due to the nature of the tested function.
 func TestDatabase_migrate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -117,25 +117,39 @@ func TestDatabase_migrate(t *testing.T) {
 			wantErr:     false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			logger := testhelpers.NewLogger(io.Discard)
 			db, err := connect(":memory:", logger)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("Failed to connect to database: %v", err)
+			}
+			defer func(db *Database) {
+				err = db.Close()
+				if err != nil {
+					t.Errorf("Failed to close database: %v", err)
+				}
+			}(db)
+
 			for _, schemaDefinition := range tt.schemaDefinitions {
 				logger.LogAttrs(ctx, slog.LevelInfo, "migrating", slog.String("schema", schemaDefinition))
 				err = db.migrateTo(ctx, schemaDefinition)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatalf("Failed to migrate: %v", err)
+				}
 			}
+
 			for _, query := range tt.testQueries {
 				logger.LogAttrs(ctx, slog.LevelInfo, "executing", slog.String("query", query))
 				_, err = db.ReadWrite.ExecContext(ctx, query)
-				if tt.wantErr {
-					require.Error(t, err)
-				} else {
-					require.NoError(t, err)
+				if tt.wantErr && err == nil {
+					t.Errorf("Expected error for query %q, but got none", query)
+				}
+				if !tt.wantErr && err != nil {
+					t.Errorf("Unexpected error for query %q: %v", query, err)
 				}
 			}
 		})

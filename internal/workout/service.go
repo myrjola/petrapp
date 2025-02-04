@@ -25,10 +25,10 @@ func NewService(db *sqlite.Database, logger *slog.Logger) *Service {
 }
 
 // GetUserPreferences retrieves the workout preferences for a user.
-func (s *Service) GetUserPreferences(ctx context.Context) (WorkoutPreferences, error) {
+func (s *Service) GetUserPreferences(ctx context.Context) (Preferences, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	// TODO: Implement repository pattern and move SQL to repository
-	var prefs WorkoutPreferences
+	var prefs Preferences
 	err := s.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday 
 		FROM workout_preferences 
@@ -43,7 +43,7 @@ func (s *Service) GetUserPreferences(ctx context.Context) (WorkoutPreferences, e
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		// If no preferences are found, return default preferences
-		return WorkoutPreferences{
+		return Preferences{
 			Monday:    false,
 			Tuesday:   false,
 			Wednesday: false,
@@ -54,13 +54,13 @@ func (s *Service) GetUserPreferences(ctx context.Context) (WorkoutPreferences, e
 		}, nil
 	}
 	if err != nil {
-		return WorkoutPreferences{}, errors.Wrap(err, "query workout preferences")
+		return Preferences{}, errors.Wrap(err, "query workout preferences")
 	}
 	return prefs, nil
 }
 
 // SaveUserPreferences saves the workout preferences for a user.
-func (s *Service) SaveUserPreferences(ctx context.Context, prefs WorkoutPreferences) error {
+func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	_, err := s.db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO workout_preferences (
@@ -90,16 +90,19 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs WorkoutPreferen
 }
 
 // GenerateWorkout creates a new workout plan based on user preferences and history.
-func (s *Service) generateWorkout(ctx context.Context, date time.Time) (WorkoutSession, error) {
+func (s *Service) generateWorkout(_ context.Context, date time.Time) (Session, error) {
 	// TODO: Implement smart workout generation logic
 	// This should:
 	// 1. Check if it's a workout day based on preferences
 	// 2. Determine workout type (full body vs split) based on consecutive days
 	// 3. Select appropriate exercises
 	// 4. Calculate proper sets/reps/weights based on history
-	return WorkoutSession{
-		WorkoutDate: date,
-		Status:      WorkoutStatusPlanned,
+	return Session{
+		WorkoutDate:      date,
+		Status:           StatusPlanned,
+		DifficultyRating: nil,
+		StartedAt:        nil,
+		CompletedAt:      nil,
 		ExerciseSets: []ExerciseSet{
 			{
 				Exercise: Exercise{
@@ -113,6 +116,7 @@ func (s *Service) generateWorkout(ctx context.Context, date time.Time) (WorkoutS
 						AdjustedWeightKg: 20,
 						MinReps:          8,
 						MaxReps:          12,
+						CompletedReps:    nil,
 					},
 				},
 			},
@@ -121,13 +125,13 @@ func (s *Service) generateWorkout(ctx context.Context, date time.Time) (WorkoutS
 }
 
 // ResolveWeeklySchedule retrieves the workout schedule for a week.
-func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]WorkoutSession, error) {
+func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) {
 	// TODO: Implement weekly schedule retrieval
 	// This should:
 	// 1. Get all sessions for the week
 	// 2. Fill in rest days and planned workouts based on preferences
 	// 3. Return complete 7-day schedule
-	workouts := make([]WorkoutSession, 7)
+	workouts := make([]Session, 7)
 	// Get the current date
 	now := time.Now()
 

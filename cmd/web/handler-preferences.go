@@ -7,6 +7,8 @@ import (
 	"net/http"
 )
 
+const TRUE = "true"
+
 type weekdayPreference struct {
 	ID      string // lowercase ID for form field name
 	Name    string // Display name
@@ -18,7 +20,7 @@ type preferencesTemplateData struct {
 	Weekdays []weekdayPreference
 }
 
-func preferencesToWeekdays(prefs workout.WorkoutPreferences) []weekdayPreference {
+func preferencesToWeekdays(prefs workout.Preferences) []weekdayPreference {
 	return []weekdayPreference{
 		{ID: "monday", Name: "Monday", Checked: prefs.Monday},
 		{ID: "tuesday", Name: "Tuesday", Checked: prefs.Tuesday},
@@ -30,15 +32,15 @@ func preferencesToWeekdays(prefs workout.WorkoutPreferences) []weekdayPreference
 	}
 }
 
-func weekdaysToPreferences(r *http.Request) workout.WorkoutPreferences {
-	return workout.WorkoutPreferences{
-		Monday:    r.Form.Get("monday") == "true",
-		Tuesday:   r.Form.Get("tuesday") == "true",
-		Wednesday: r.Form.Get("wednesday") == "true",
-		Thursday:  r.Form.Get("thursday") == "true",
-		Friday:    r.Form.Get("friday") == "true",
-		Saturday:  r.Form.Get("saturday") == "true",
-		Sunday:    r.Form.Get("sunday") == "true",
+func weekdaysToPreferences(r *http.Request) workout.Preferences {
+	return workout.Preferences{
+		Monday:    r.Form.Get("monday") == TRUE,
+		Tuesday:   r.Form.Get("tuesday") == TRUE,
+		Wednesday: r.Form.Get("wednesday") == TRUE,
+		Thursday:  r.Form.Get("thursday") == TRUE,
+		Friday:    r.Form.Get("friday") == TRUE,
+		Saturday:  r.Form.Get("saturday") == TRUE,
+		Sunday:    r.Form.Get("sunday") == TRUE,
 	}
 }
 

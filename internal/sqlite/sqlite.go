@@ -131,3 +131,8 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 		logger:    logger,
 	}, nil
 }
+
+// Close closes the database connections.
+func (db *Database) Close() error {
+	return errors.Join(db.ReadOnly.Close(), db.ReadWrite.Close())
+}

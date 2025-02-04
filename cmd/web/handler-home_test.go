@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 )
@@ -20,37 +20,66 @@ func testLookupEnv(key string) (string, bool) {
 }
 
 func Test_application_home(t *testing.T) {
-	ctx := context.Background()
+	var (
+		ctx = context.Background()
+		doc *goquery.Document
+	)
 	server, err := e2etest.StartServer(context.Background(), os.Stdout, testLookupEnv, run)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
 	client := server.Client()
-	doc, err := client.GetDoc(ctx, "/")
-	require.NoError(t, err)
-	require.Equal(t, 1, doc.Find("button:contains('Sign in')").Length())
-	require.Equal(t, 1, doc.Find("button:contains('Register')").Length())
-	require.Equal(t, 0, doc.Find("button:contains('Log out')").Length())
 
-	doc, err = client.Register(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 0, doc.Find("button:contains('Sign in')").Length())
-	require.Equal(t, 0, doc.Find("button:contains('Register')").Length())
-	require.Equal(t, 1, doc.Find("button:contains('Log out')").Length())
+	t.Run("Initial state", func(t *testing.T) {
+		doc, err = client.GetDoc(ctx, "/")
+		if err != nil {
+			t.Fatalf("Failed to get document: %v", err)
+		}
 
-	// Log out and log back in
-	doc, err = client.Logout(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 1, doc.Find("button:contains('Sign in')").Length())
-	require.Equal(t, 1, doc.Find("button:contains('Register')").Length())
-	require.Equal(t, 0, doc.Find("button:contains('Log out')").Length())
+		checkButtonPresence(t, doc, "Sign in", 1)
+		checkButtonPresence(t, doc, "Register", 1)
+		checkButtonPresence(t, doc, "Log out", 0)
+	})
 
-	doc, err = client.Login(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 0, doc.Find("button:contains('Sign in')").Length())
-	require.Equal(t, 0, doc.Find("button:contains('Register')").Length())
-	require.Equal(t, 1, doc.Find("button:contains('Log out')").Length())
-	// TODOs for nicer test setup:
-	// - http client with
-	//     - html assertion helper
-	//     - form submission helper
-	// - webauthn glue for setting up users for tests
+	t.Run("After registration", func(t *testing.T) {
+		doc, err = client.Register(ctx)
+		if err != nil {
+			t.Fatalf("Failed to register: %v", err)
+		}
+
+		checkButtonPresence(t, doc, "Sign in", 0)
+		checkButtonPresence(t, doc, "Register", 0)
+		checkButtonPresence(t, doc, "Log out", 1)
+	})
+
+	t.Run("After logout", func(t *testing.T) {
+		doc, err = client.Logout(ctx)
+		if err != nil {
+			t.Fatalf("Failed to logout: %v", err)
+		}
+
+		checkButtonPresence(t, doc, "Sign in", 1)
+		checkButtonPresence(t, doc, "Register", 1)
+		checkButtonPresence(t, doc, "Log out", 0)
+	})
+
+	t.Run("After login", func(t *testing.T) {
+		doc, err = client.Login(ctx)
+		if err != nil {
+			t.Fatalf("Failed to login: %v", err)
+		}
+
+		checkButtonPresence(t, doc, "Sign in", 0)
+		checkButtonPresence(t, doc, "Register", 0)
+		checkButtonPresence(t, doc, "Log out", 1)
+	})
+}
+
+func checkButtonPresence(t *testing.T, doc *goquery.Document, buttonText string, expectedCount int) {
+	t.Helper()
+	count := doc.Find("button:contains('" + buttonText + "')").Length()
+	if count != expectedCount {
+		t.Errorf("Expected %d '%s' button(s), but found %d", expectedCount, buttonText, count)
+	}
 }
