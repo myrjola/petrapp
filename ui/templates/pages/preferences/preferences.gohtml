@@ -58,5 +58,23 @@
             {{ end }}
             <button type="submit">Save</button>
         </form>
+        <footer>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        margin-top: var(--size-4);
+                        display: flex;
+                        justify-content: center;
+                        gap: var(--size-4);
+                    }
+                }
+            </style>
+            <form action="/api/logout" method="post">
+                {{ csrf }}
+                <button type="submit">
+                    <span>Log out</span>
+                </button>
+            </form>
+        </footer>
     </main>
 {{ end }}

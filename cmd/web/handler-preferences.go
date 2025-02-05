@@ -74,5 +74,5 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
