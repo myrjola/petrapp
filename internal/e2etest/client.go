@@ -365,36 +365,55 @@ func (c *Client) extractCSRFToken(doc *goquery.Document, formActionURLPath strin
 }
 
 // SubmitForm submits a form in the doc identified with action formActionUrlPath and returns the response document.
+// formFields is a map of label text to value. The function will find the input by label and set its value.
 func (c *Client) SubmitForm(
 	ctx context.Context,
 	doc *goquery.Document,
 	formActionURLPath string,
-	formData neturl.Values,
+	formFields map[string]string,
 ) (*goquery.Document, error) {
-	// Extract CSRF token from the form.
-	var (
-		csrfToken string
-		err       error
-	)
-	if csrfToken, err = c.extractCSRFToken(doc, formActionURLPath); err != nil {
+	// Extract CSRF token from the form
+	csrfToken, err := c.extractCSRFToken(doc, formActionURLPath)
+	if err != nil {
 		return nil, errors.Wrap(err, "extract CSRF token")
 	}
 
 	// Build form data
-	if formData == nil {
-		formData = neturl.Values{}
-	}
+	formData := neturl.Values{}
 	formData.Add("csrf_token", csrfToken)
-	data := strings.NewReader(formData.Encode())
+
+	var form *goquery.Selection
+	if form, err = FindForm(doc, formActionURLPath); err != nil {
+		return nil, errors.Wrap(err, "find form")
+	}
+
+	// Find form inputs based on their labels
+	for labelText, value := range formFields {
+		var input *goquery.Selection
+		if input, err = FindInputForLabel(form, labelText); err != nil {
+			return nil, errors.Wrap(err, "find input for label")
+		}
+
+		name, exists := input.Attr("name")
+		if !exists {
+			return nil, errors.New("input has no name attribute",
+				slog.String("label", labelText),
+				slog.String("form_action", formActionURLPath))
+		}
+
+		formData.Add(name, value)
+	}
 
 	// Submit the form
-	var req *http.Request
-	if req, err = c.newRequestWithContext(ctx, http.MethodPost, formActionURLPath, data); err != nil {
+	data := strings.NewReader(formData.Encode())
+	req, err := c.newRequestWithContext(ctx, http.MethodPost, formActionURLPath, data)
+	if err != nil {
 		return nil, errors.Wrap(err, "new request with context")
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	var resp *http.Response
-	if resp, err = c.client.Do(req); err != nil {
+
+	resp, err := c.client.Do(req)
+	if err != nil {
 		return nil, errors.Wrap(err, "do request")
 	}
 	defer func() {
@@ -405,8 +424,9 @@ func (c *Client) SubmitForm(
 	}
 
 	// Parse the response
-	if doc, err = goquery.NewDocumentFromReader(resp.Body); err != nil {
+	newDoc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
 		return nil, errors.Wrap(err, "create document from reader")
 	}
-	return doc, nil
+	return newDoc, nil
 }
