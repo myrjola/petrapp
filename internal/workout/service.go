@@ -156,3 +156,88 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 
 	return workouts, nil
 }
+
+// GetSession retrieves a workout session for a specific date.
+func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	// First check if there's an existing session
+	var session Session
+	err := s.db.ReadOnly.QueryRowContext(ctx, `
+        SELECT workout_date, difficulty_rating, started_at, completed_at
+        FROM workout_sessions 
+        WHERE user_id = ? AND workout_date = ?`,
+		userID, date.Format("2006-01-02")).
+		Scan(&session.WorkoutDate, &session.DifficultyRating, &session.StartedAt, &session.CompletedAt)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		// If no session exists, generate a new one
+		return s.generateWorkout(ctx, date)
+	}
+	if err != nil {
+		return Session{}, errors.Wrap(err, "query workout session")
+	}
+
+	// Load exercise sets
+	rows, err := s.db.ReadOnly.QueryContext(ctx, `
+        SELECT e.id, e.name, e.category, 
+               es.set_number, es.weight_kg, es.adjusted_weight_kg,
+               es.min_reps, es.max_reps, es.completed_reps
+        FROM exercise_sets es
+        JOIN exercises e ON e.id = es.exercise_id
+        WHERE es.workout_user_id = ? AND es.workout_date = ?
+        ORDER BY es.exercise_id, es.set_number`,
+		userID, date.Format("2006-01-02"))
+	if err != nil {
+		return Session{}, errors.Wrap(err, "query exercise sets")
+	}
+	defer rows.Close()
+
+	var currentExercise *ExerciseSet
+	for rows.Next() {
+		var (
+			exercise Exercise
+			set      Set
+			setNum   int
+		)
+
+		err := rows.Scan(
+			&exercise.ID, &exercise.Name, &exercise.Category,
+			&setNum, &set.WeightKg, &set.AdjustedWeightKg,
+			&set.MinReps, &set.MaxReps, &set.CompletedReps)
+		if err != nil {
+			return Session{}, errors.Wrap(err, "scan exercise set")
+		}
+
+		// If this is a new exercise or the first one
+		if currentExercise == nil || currentExercise.Exercise.ID != exercise.ID {
+			if currentExercise != nil {
+				session.ExerciseSets = append(session.ExerciseSets, *currentExercise)
+			}
+			currentExercise = &ExerciseSet{
+				Exercise: exercise,
+				Sets:     []Set{},
+			}
+		}
+
+		currentExercise.Sets = append(currentExercise.Sets, set)
+	}
+
+	// Add the last exercise if it exists
+	if currentExercise != nil {
+		session.ExerciseSets = append(session.ExerciseSets, *currentExercise)
+	}
+
+	if err = rows.Err(); err != nil {
+		return Session{}, errors.Wrap(err, "rows error")
+	}
+
+	// Determine status
+	if session.CompletedAt != nil {
+		session.Status = StatusDone
+	} else {
+		session.Status = StatusPlanned
+	}
+
+	return session, nil
+}
