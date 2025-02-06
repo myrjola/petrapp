@@ -39,7 +39,6 @@ func Test_application_home(t *testing.T) {
 
 		checkButtonPresence(t, doc, "Sign in", 1)
 		checkButtonPresence(t, doc, "Register", 1)
-		checkButtonPresence(t, doc, "Log out", 0)
 	})
 
 	t.Run("After registration", func(t *testing.T) {
@@ -50,7 +49,6 @@ func Test_application_home(t *testing.T) {
 
 		checkButtonPresence(t, doc, "Sign in", 0)
 		checkButtonPresence(t, doc, "Register", 0)
-		checkButtonPresence(t, doc, "Log out", 1)
 	})
 
 	t.Run("After logout", func(t *testing.T) {
@@ -61,7 +59,6 @@ func Test_application_home(t *testing.T) {
 
 		checkButtonPresence(t, doc, "Sign in", 1)
 		checkButtonPresence(t, doc, "Register", 1)
-		checkButtonPresence(t, doc, "Log out", 0)
 	})
 
 	t.Run("After login", func(t *testing.T) {
@@ -72,7 +69,6 @@ func Test_application_home(t *testing.T) {
 
 		checkButtonPresence(t, doc, "Sign in", 0)
 		checkButtonPresence(t, doc, "Register", 0)
-		checkButtonPresence(t, doc, "Log out", 1)
 	})
 }
 

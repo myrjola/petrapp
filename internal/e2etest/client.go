@@ -345,7 +345,7 @@ func (c *Client) Logout(ctx context.Context) (*goquery.Document, error) {
 		doc *goquery.Document
 		err error
 	)
-	if doc, err = c.GetDoc(ctx, "/"); err != nil {
+	if doc, err = c.GetDoc(ctx, "/preferences"); err != nil {
 		return nil, errors.Wrap(err, "get document")
 	}
 	if doc, err = c.SubmitForm(ctx, doc, "/api/logout", nil); err != nil {
@@ -428,5 +428,6 @@ func (c *Client) SubmitForm(
 	if err != nil {
 		return nil, errors.Wrap(err, "create document from reader")
 	}
+	newDoc.Url = resp.Request.URL
 	return newDoc, nil
 }

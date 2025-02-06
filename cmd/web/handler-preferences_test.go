@@ -71,9 +71,14 @@ func Test_application_preferences(t *testing.T) {
 		t.Fatalf("Failed to submit form: %v", err)
 	}
 
-	// After submission, are still on preferences page
-	if doc.Find("h1").Text() != "Weekly Schedule" {
-		t.Error("Expected to stay on preferences page after submission")
+	// After submission, we go to the home page.
+	if doc.Url.Path != "/" {
+		t.Errorf("Expected to be on home page, got %q", doc.Url.Path)
+	}
+
+	// Navigate to preferences again
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
 	}
 
 	weekdays = map[string]bool{
@@ -88,12 +93,12 @@ func Test_application_preferences(t *testing.T) {
 	verifyChecked(t, doc, weekdays)
 
 	// First logout
-	if doc, err = client.Logout(ctx); err != nil {
+	if _, err = client.Logout(ctx); err != nil {
 		t.Fatalf("Failed to logout: %v", err)
 	}
 
 	// Then login again
-	if doc, err = client.Login(ctx); err != nil {
+	if _, err = client.Login(ctx); err != nil {
 		t.Fatalf("Failed to login: %v", err)
 	}
 
