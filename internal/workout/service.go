@@ -356,9 +356,8 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
 
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	result, err := s.db.ReadWrite.ExecContext(ctx, `
-        UPDATE workout_sessions 
-        SET difficulty_rating = ?
-        WHERE user_id = ? AND workout_date = ? AND completed_at IS NOT NULL`,
+		SELECT * FROM workout_sessions
+        WHERE user_id = ? AND workout_date = ?`,
 		difficulty, userID, date.Format("2006-01-02"))
 	if err != nil {
 		return errors.Wrap(err, "save difficulty rating")

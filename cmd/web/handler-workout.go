@@ -17,7 +17,13 @@ type workoutTemplateData struct {
 
 type workoutCompletionTemplateData struct {
 	BaseTemplateData
-	Date time.Time
+	Date         time.Time
+	Difficulties []difficultyOption
+}
+
+type difficultyOption struct {
+	Value int
+	Label string
 }
 
 func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +38,13 @@ func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Requ
 	data := workoutCompletionTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
+		Difficulties: []difficultyOption{
+			{Value: 1, Label: "Too easy"},
+			{Value: 2, Label: "I could do more"},
+			{Value: 3, Label: "Just right"},
+			{Value: 4, Label: "Very hard"},
+			{Value: 5, Label: "Impossible"},
+		},
 	}
 
 	app.render(w, r, http.StatusOK, "workout-completion", data)
@@ -47,7 +60,7 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// First mark the workout as completed
-	if err := app.workoutService.CompleteSession(r.Context(), date); err != nil {
+	if err = app.workoutService.CompleteSession(r.Context(), date); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -109,13 +122,8 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse form data
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse form"))
-		return
-	}
-
-	difficultyStr := r.PostForm.Get("difficulty")
+	// Parse difficulty from URL path
+	difficultyStr := r.PathValue("difficulty")
 	difficulty, err := strconv.Atoi(difficultyStr)
 	if err != nil {
 		app.serverError(w, r, errors.Wrap(err, "parse difficulty rating"))
@@ -123,7 +131,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Save the feedback
-	if err := app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
+	if err = app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

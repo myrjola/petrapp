@@ -30,7 +30,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /workouts/{date}/start", mustSession(http.HandlerFunc(app.workoutStartPOST)))
 	mux.Handle("POST /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletePOST)))
 	mux.Handle("GET /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletionGET)))
-	mux.Handle("POST /workouts/{date}/feedback", mustSession(http.HandlerFunc(app.workoutFeedbackPOST)))
+	mux.Handle("POST /workouts/{date}/feedback/{difficulty}", mustSession(http.HandlerFunc(app.workoutFeedbackPOST)))
 
 	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
 	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
