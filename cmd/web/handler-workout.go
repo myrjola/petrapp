@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/workout"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -11,6 +13,47 @@ type workoutTemplateData struct {
 	BaseTemplateData
 	Date    time.Time
 	Session workout.Session
+}
+
+type workoutCompletionTemplateData struct {
+	BaseTemplateData
+	Date time.Time
+}
+
+func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	data := workoutCompletionTemplateData{
+		BaseTemplateData: newBaseTemplateData(r),
+		Date:             date,
+	}
+
+	app.render(w, r, http.StatusOK, "workout-completion", data)
+}
+
+func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// First mark the workout as completed
+	if err := app.workoutService.CompleteSession(r.Context(), date); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Redirect to the completion form
+	http.Redirect(w, r, fmt.Sprintf("/workouts/%s/complete", dateStr), http.StatusSeeOther)
 }
 
 func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request) {
@@ -55,4 +98,36 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.render(w, r, http.StatusOK, "workout", data)
+}
+
+func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		app.serverError(w, r, errors.Wrap(err, "parse form"))
+		return
+	}
+
+	difficultyStr := r.PostForm.Get("difficulty")
+	difficulty, err := strconv.Atoi(difficultyStr)
+	if err != nil {
+		app.serverError(w, r, errors.Wrap(err, "parse difficulty rating"))
+		return
+	}
+
+	// Save the feedback
+	if err := app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Redirect back to the home page
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

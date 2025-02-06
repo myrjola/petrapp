@@ -320,3 +320,57 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 
 	return nil
 }
+
+// CompleteSession marks a workout session as completed.
+func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	completedAt := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	result, err := s.db.ReadWrite.ExecContext(ctx, `
+        UPDATE workout_sessions 
+        SET completed_at = ?
+        WHERE user_id = ? AND workout_date = ? AND completed_at IS NULL`,
+		completedAt, userID, date.Format("2006-01-02"))
+	if err != nil {
+		return errors.Wrap(err, "complete workout session")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "get rows affected")
+	}
+	if rows == 0 {
+		return errors.New("workout session not found or already completed")
+	}
+
+	return nil
+}
+
+// SaveFeedback saves the difficulty rating for a completed workout session.
+func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty int) error {
+	if difficulty < 1 || difficulty > 5 {
+		return errors.New("invalid difficulty rating",
+			slog.Int("difficulty", difficulty),
+			slog.String("date", date.Format("2006-01-02")))
+	}
+
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	result, err := s.db.ReadWrite.ExecContext(ctx, `
+        UPDATE workout_sessions 
+        SET difficulty_rating = ?
+        WHERE user_id = ? AND workout_date = ? AND completed_at IS NOT NULL`,
+		difficulty, userID, date.Format("2006-01-02"))
+	if err != nil {
+		return errors.Wrap(err, "save difficulty rating")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "get rows affected")
+	}
+	if rows == 0 {
+		return errors.New("workout session not found or not completed")
+	}
+
+	return nil
+}

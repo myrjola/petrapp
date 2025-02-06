@@ -1,0 +1,113 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.workoutCompletionTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+            }
+        </style>
+
+        <div>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        text-align: center;
+                        gap: var(--size-2);
+
+                        > h1 {
+                            font-size: var(--font-size-6);
+                            font-weight: var(--font-weight-7);
+                        }
+
+                        > h2 {
+                            font-size: var(--font-size-4);
+                            font-weight: var(--font-weight-4);
+                            color: var(--gray-7);
+                        }
+                    }
+                }
+            </style>
+            <h1>Well done!</h1>
+            <h2>How did it feel today?</h2>
+        </div>
+
+        <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/feedback">
+            {{ csrf }}
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+
+                        fieldset {
+                            border: none;
+                            padding: 0;
+                            margin: 0;
+                        }
+
+                        label {
+                            display: flex;
+                            justify-content: center;
+                            width: 100%;
+                            padding: var(--size-4);
+                            border: var(--border-size-1) solid var(--gray-3);
+                            border-radius: var(--radius-2);
+                            cursor: pointer;
+                        }
+
+                        label:has(input:checked) {
+                            background-color: var(--sky-1);
+                            border-color: var(--sky-7);
+                            color: var(--sky-9);
+                        }
+
+                        input[type="radio"] {
+                            position: absolute;
+                            opacity: 0;
+                            width: 0;
+                            height: 0;
+                        }
+
+                        button[type="submit"] {
+                            margin-top: var(--size-3);
+                            width: 100%;
+                        }
+                    }
+                }
+            </style>
+            <fieldset>
+                <label>
+                    <input type="radio" name="difficulty" value="1">
+                    <span>Too easy</span>
+                </label>
+                <label>
+                    <input type="radio" name="difficulty" value="2">
+                    <span>I could do more</span>
+                </label>
+                <label>
+                    <input type="radio" name="difficulty" value="3">
+                    <span>Just right</span>
+                </label>
+                <label>
+                    <input type="radio" name="difficulty" value="4">
+                    <span>Very hard</span>
+                </label>
+                <label>
+                    <input type="radio" name="difficulty" value="5">
+                    <span>Impossible</span>
+                </label>
+            </fieldset>
+            <button type="submit">Save feedback</button>
+        </form>
+    </main>
+{{ end }}
