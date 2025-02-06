@@ -162,13 +162,38 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
 	// First check if there's an existing session
-	var session Session
+	var (
+		session                      Session
+		startedAtStr, completedAtStr sql.NullString
+		workoutDateStr               string
+	)
 	err := s.db.ReadOnly.QueryRowContext(ctx, `
         SELECT workout_date, difficulty_rating, started_at, completed_at
         FROM workout_sessions 
         WHERE user_id = ? AND workout_date = ?`,
 		userID, date.Format("2006-01-02")).
-		Scan(&session.WorkoutDate, &session.DifficultyRating, &session.StartedAt, &session.CompletedAt)
+		Scan(&workoutDateStr, &session.DifficultyRating, &startedAtStr, &completedAtStr)
+
+	if err == nil {
+		// Parse timestamps
+		session.WorkoutDate = date // Use the input date since we know it matches
+
+		if startedAtStr.Valid {
+			parsedTime, err := time.Parse(time.RFC3339, startedAtStr.String)
+			if err != nil {
+				return Session{}, errors.Wrap(err, "parse started_at")
+			}
+			session.StartedAt = &parsedTime
+		}
+
+		if completedAtStr.Valid {
+			parsedTime, err := time.Parse(time.RFC3339, completedAtStr.String)
+			if err != nil {
+				return Session{}, errors.Wrap(err, "parse completed_at")
+			}
+			session.CompletedAt = &parsedTime
+		}
+	}
 
 	if errors.Is(err, sql.ErrNoRows) {
 		// If no session exists, generate a new one
@@ -240,4 +265,58 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
 	}
 
 	return session, nil
+}
+
+// StartSession starts a new workout session or returns an error if one already exists.
+func (s *Service) StartSession(ctx context.Context, date time.Time) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	dateStr := date.Format("2006-01-02")
+	startedAt := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	// Start a transaction since we need to insert multiple rows
+	tx, err := s.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "begin transaction")
+	}
+	defer tx.Rollback()
+
+	// First create the session
+	_, err = tx.ExecContext(ctx, `
+        INSERT INTO workout_sessions (user_id, workout_date, started_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT (user_id, workout_date) DO UPDATE SET
+            started_at = COALESCE(workout_sessions.started_at, ?)`,
+		userID, dateStr, startedAt, startedAt)
+	if err != nil {
+		return errors.Wrap(err, "insert workout session")
+	}
+
+	// Generate workout if it doesn't exist
+	session, err := s.generateWorkout(ctx, date)
+	if err != nil {
+		return errors.Wrap(err, "generate workout")
+	}
+
+	// Insert exercise sets
+	for _, exerciseSet := range session.ExerciseSets {
+		for i, set := range exerciseSet.Sets {
+			_, err = tx.ExecContext(ctx, `
+                INSERT INTO exercise_sets (
+                    workout_user_id, workout_date, exercise_id, set_number,
+                    weight_kg, adjusted_weight_kg, min_reps, max_reps
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workout_user_id, workout_date, exercise_id, set_number) DO NOTHING`,
+				userID, dateStr, exerciseSet.Exercise.ID, i+1,
+				set.WeightKg, set.AdjustedWeightKg, set.MinReps, set.MaxReps)
+			if err != nil {
+				return errors.Wrap(err, "insert exercise set")
+			}
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "commit transaction")
+	}
+
+	return nil
 }

@@ -27,6 +27,7 @@ func (app *application) routes() http.Handler {
 	// Routes
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
 	mux.Handle("GET /workouts/{date}", mustSession(http.HandlerFunc(app.workoutGET)))
+	mux.Handle("POST /workouts/{date}/start", mustSession(http.HandlerFunc(app.workoutStartPOST)))
 
 	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
 	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
