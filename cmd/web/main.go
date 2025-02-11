@@ -31,7 +31,7 @@ type application struct {
 
 type config struct {
 	// Addr is the address to listen on. It's possible to choose the address dynamically with localhost:0.
-	Addr string `env:"PETRAPP_ADDR" envDefault:"localhost:4000"`
+	Addr string `env:"PETRAPP_ADDR" envDefault:"localhost:8081"`
 	// FQDN is the fully qualified domain name of the server used for WebAuthn Relying Party configuration.
 	FQDN string `env:"PETRAPP_FQDN" envDefault:"localhost"`
 	// FlyAppName is the name of the Fly application. It's used to override the FQDN.
