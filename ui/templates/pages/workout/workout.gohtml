@@ -34,14 +34,26 @@
                             color: var(--gray-9);
                             font-weight: var(--font-weight-6);
                         }
+
+                        a.exercise {
+                            text-decoration: none;
+                            background: var(--gray-1);
+                            border-radius: var(--radius-2);
+                            transition: background-color 0.2s;
+
+                            &:hover {
+                                background: var(--gray-2);
+                            }
+                        }
                     }
                 }
             </style>
 
             {{ range .Session.ExerciseSets }}
-                <div class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}">
+                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
+                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}">
                     {{ .Exercise.Name }}
-                </div>
+                </a>
             {{ end }}
         </div>
 

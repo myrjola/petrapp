@@ -1,0 +1,193 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+            }
+        </style>
+
+        <header>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: center;
+
+                        a {
+                            color: var(--gray-7);
+                            text-decoration: none;
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            padding: var(--size-2);
+                            border-radius: var(--radius-2);
+
+                            &:hover {
+                                background: var(--gray-1);
+                            }
+                        }
+
+                        h1 {
+                            font-size: var(--font-size-4);
+                            font-weight: var(--font-weight-6);
+                        }
+                    }
+                }
+            </style>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}">← Back</a>
+            <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
+        </header>
+
+        <div class="sets">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-4);
+
+                        .set {
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-3);
+                            padding: var(--size-3);
+                            background: var(--gray-1);
+                            border-radius: var(--radius-2);
+
+                            &.completed {
+                                color: var(--gray-5);
+                                text-decoration: line-through;
+                            }
+
+                            .weight {
+                                font-weight: var(--font-weight-6);
+                            }
+
+                            .reps {
+                                color: var(--gray-7);
+                            }
+
+                            form {
+                                margin-left: auto;
+                            }
+
+                            button {
+                                background: none;
+                                border: var(--border-size-1) solid var(--gray-3);
+                                color: var(--gray-7);
+                                font-weight: var(--font-weight-5);
+
+                                &:hover {
+                                    background: var(--gray-2);
+                                }
+
+                                &.edit {
+                                    padding: var(--size-1) var(--size-2);
+                                }
+
+                                &.done {
+                                    padding: var(--size-2) var(--size-4);
+                                }
+                            }
+                        }
+                    }
+                }
+            </style>
+
+            {{ range $index, $set := .ExerciseSet.Sets }}
+                <div class="set{{ if $set.CompletedReps }} completed{{ end }}">
+                    <span class="weight">{{ $set.WeightKg }} kg</span>
+                    {{ if $set.CompletedReps }}
+                        <span class="reps">{{ $set.CompletedReps }} reps</span>
+                    {{ else }}
+                        <span class="reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
+                        {{ if eq $index 0 }}
+                            <div class="edit-controls">
+                                <style {{ nonce }}>
+                                    @scope {
+                                        :scope {
+                                            display: flex;
+                                            gap: var(--size-2);
+
+                                            input {
+                                                width: 4rem;
+                                                padding: var(--size-1);
+                                                border: var(--border-size-1) solid var(--gray-3);
+                                                border-radius: var(--radius-2);
+                                                text-align: right;
+                                            }
+                                        }
+                                    }
+                                </style>
+                                <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/edit">
+                                    {{ csrf }}
+                                    <input type="number" name="weight" value="{{ $set.WeightKg }}" step="0.5" min="0" required>
+                                    <button type="submit" class="edit">Update</button>
+                                </form>
+                            </div>
+                        {{ else }}
+                            <div class="complete-controls">
+                                <style {{ nonce }}>
+                                    @scope {
+                                        :scope {
+                                            display: flex;
+                                            gap: var(--size-2);
+
+                                            input {
+                                                width: 4rem;
+                                                padding: var(--size-1);
+                                                border: var(--border-size-1) solid var(--gray-3);
+                                                border-radius: var(--radius-2);
+                                                text-align: right;
+                                            }
+                                        }
+                                    }
+                                </style>
+                                <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/done">
+                                    {{ csrf }}
+                                    <input type="number" name="reps" placeholder="Reps" min="{{ $set.MinReps }}" max="{{ $set.MaxReps }}" required>
+                                    <button type="submit" class="done">Done!</button>
+                                </form>
+                            </div>
+                        {{ end }}
+                    {{ end }}
+                </div>
+            {{ end }}
+        </div>
+
+        <div class="remaining">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        h2 {
+                            font-size: var(--font-size-2);
+                            color: var(--gray-6);
+                            margin-bottom: var(--size-3);
+                        }
+
+                        .set {
+                            color: var(--gray-5);
+                        }
+                    }
+                }
+            </style>
+            <h2>Remaining sets</h2>
+            {{ range .ExerciseSet.Sets }}
+                {{ if not .CompletedReps }}
+                    <div class="set">
+                        <span class="weight">{{ .WeightKg }} kg</span>
+                        <span class="reps">{{ .MinReps }}-{{ .MaxReps }} reps</span>
+                    </div>
+                {{ end }}
+            {{ end }}
+        </div>
+    </main>
+{{ end }}

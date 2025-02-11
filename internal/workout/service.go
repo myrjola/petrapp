@@ -373,3 +373,82 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
 
 	return nil
 }
+
+// UpdateSetWeight updates the weight for a specific set in a workout
+func (s *Service) UpdateSetWeight(ctx context.Context, date time.Time, exerciseID int, setIndex int, newWeight float64) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	dateStr := date.Format("2006-01-02")
+
+	result, err := s.db.ReadWrite.ExecContext(ctx, `
+        UPDATE exercise_sets 
+        SET weight_kg = ?,
+            adjusted_weight_kg = ?
+        WHERE workout_user_id = ? 
+        AND workout_date = ? 
+        AND exercise_id = ?
+        AND set_number = ?`,
+		newWeight, newWeight, userID, dateStr, exerciseID, setIndex+1)
+	if err != nil {
+		return errors.Wrap(err, "UPDATE set weight")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "get rows affected")
+	}
+	if rows == 0 {
+		return errors.New("set not found")
+	}
+
+	return nil
+}
+
+// CompleteSet marks a specific set as completed with the given number of reps
+func (s *Service) CompleteSet(ctx context.Context, date time.Time, exerciseID int, setIndex int, completedReps int) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	dateStr := date.Format("2006-01-02")
+
+	// First verify the reps are within the target range
+	var minReps, maxReps int
+	err := s.db.ReadOnly.QueryRowContext(ctx, `
+        SELECT min_reps, max_reps
+        FROM exercise_sets
+        WHERE workout_user_id = ?
+        AND workout_date = ?
+        AND exercise_id = ?
+        AND set_number = ?`,
+		userID, dateStr, exerciseID, setIndex+1).Scan(&minReps, &maxReps)
+	if err != nil {
+		return errors.Wrap(err, "get set rep range")
+	}
+
+	// Allow completing with reps outside the target range, but log it
+	if completedReps < minReps || completedReps > maxReps {
+		s.logger.LogAttrs(ctx, slog.LevelInfo, "completed reps outside target range",
+			slog.Int("completed_reps", completedReps),
+			slog.Int("min_reps", minReps),
+			slog.Int("max_reps", maxReps))
+	}
+
+	result, err := s.db.ReadWrite.ExecContext(ctx, `
+        UPDATE exercise_sets
+        SET completed_reps = ?
+        WHERE workout_user_id = ?
+        AND workout_date = ?
+        AND exercise_id = ?
+        AND set_number = ?`,
+		completedReps, userID, dateStr, exerciseID, setIndex+1)
+	if err != nil {
+		return errors.Wrap(err, "complete set")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "get rows affected")
+	}
+	if rows == 0 {
+		return errors.New("set not found")
+	}
+
+	return nil
+}
