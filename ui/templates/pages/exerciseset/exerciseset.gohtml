@@ -56,7 +56,7 @@
 
                         .set {
                             display: flex;
-                            align-items: center;
+                            flex-direction: column;
                             gap: var(--size-3);
                             padding: var(--size-3);
                             background: var(--gray-1);
@@ -64,7 +64,12 @@
 
                             &.completed {
                                 color: var(--gray-5);
-                                text-decoration: line-through;
+                            }
+
+                            .info {
+                                display: flex;
+                                align-items: center;
+                                gap: var(--size-3);
                             }
 
                             .weight {
@@ -76,25 +81,38 @@
                             }
 
                             form {
-                                margin-left: auto;
-                            }
+                                display: flex;
+                                gap: var(--size-3);
+                                align-items: center;
 
-                            button {
-                                background: none;
-                                border: var(--border-size-1) solid var(--gray-3);
-                                color: var(--gray-7);
-                                font-weight: var(--font-weight-5);
-
-                                &:hover {
-                                    background: var(--gray-2);
+                                .inputs {
+                                    display: flex;
+                                    gap: var(--size-3);
+                                    flex: 1;
                                 }
 
-                                &.edit {
-                                    padding: var(--size-1) var(--size-2);
+                                .field {
+                                    display: flex;
+                                    flex-direction: column;
+                                    gap: var(--size-1);
+
+                                    label {
+                                        font-size: var(--font-size-0);
+                                        color: var(--gray-6);
+                                    }
+
+                                    input {
+                                        width: 5rem;
+                                        padding: var(--size-2);
+                                        border: var(--border-size-1) solid var(--gray-3);
+                                        border-radius: var(--radius-2);
+                                        text-align: right;
+                                    }
                                 }
 
-                                &.done {
+                                button {
                                     padding: var(--size-2) var(--size-4);
+                                    margin-left: auto;
                                 }
                             }
                         }
@@ -104,60 +122,46 @@
 
             {{ range $index, $set := .ExerciseSet.Sets }}
                 <div class="set{{ if $set.CompletedReps }} completed{{ end }}">
-                    <span class="weight">{{ $set.WeightKg }} kg</span>
-                    {{ if $set.CompletedReps }}
-                        <span class="reps">{{ $set.CompletedReps }} reps</span>
-                    {{ else }}
-                        <span class="reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
-                        {{ if eq $index 0 }}
-                            <div class="edit-controls">
-                                <style {{ nonce }}>
-                                    @scope {
-                                        :scope {
-                                            display: flex;
-                                            gap: var(--size-2);
-
-                                            input {
-                                                width: 4rem;
-                                                padding: var(--size-1);
-                                                border: var(--border-size-1) solid var(--gray-3);
-                                                border-radius: var(--radius-2);
-                                                text-align: right;
-                                            }
-                                        }
-                                    }
-                                </style>
-                                <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/edit">
-                                    {{ csrf }}
-                                    <input type="number" name="weight" value="{{ $set.WeightKg }}" step="0.5" min="0" required>
-                                    <button type="submit" class="edit">Update</button>
-                                </form>
-                            </div>
+                    <div class="info">
+                        <span class="weight">{{ $set.WeightKg }} kg</span>
+                        {{ if $set.CompletedReps }}
+                            <span class="reps">{{ $set.CompletedReps }} reps</span>
                         {{ else }}
-                            <div class="complete-controls">
-                                <style {{ nonce }}>
-                                    @scope {
-                                        :scope {
-                                            display: flex;
-                                            gap: var(--size-2);
-
-                                            input {
-                                                width: 4rem;
-                                                padding: var(--size-1);
-                                                border: var(--border-size-1) solid var(--gray-3);
-                                                border-radius: var(--radius-2);
-                                                text-align: right;
-                                            }
-                                        }
-                                    }
-                                </style>
-                                <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/done">
-                                    {{ csrf }}
-                                    <input type="number" name="reps" placeholder="Reps" min="{{ $set.MinReps }}" max="{{ $set.MaxReps }}" required>
-                                    <button type="submit" class="done">Done!</button>
-                                </form>
-                            </div>
+                            <span class="reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
                         {{ end }}
+                    </div>
+
+                    {{ if and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index) }}
+                        <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/done">
+                            {{ csrf }}
+                            <div class="inputs">
+                                <div class="field">
+                                    <label for="weight-{{ $index }}">Weight</label>
+                                    <input
+                                            id="weight-{{ $index }}"
+                                            type="number"
+                                            name="weight"
+                                            value="{{ $set.WeightKg }}"
+                                            step="0.5"
+                                            min="0"
+                                            required
+                                    >
+                                </div>
+                                <div class="field">
+                                    <label for="reps-{{ $index }}">Reps</label>
+                                    <input
+                                            id="reps-{{ $index }}"
+                                            type="number"
+                                            name="reps"
+                                            placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
+                                            min="{{ $set.MinReps }}"
+                                            max="{{ $set.MaxReps }}"
+                                            required
+                                    >
+                                </div>
+                            </div>
+                            <button type="submit" class="done">Done!</button>
+                        </form>
                     {{ end }}
                 </div>
             {{ end }}
@@ -175,6 +179,9 @@
 
                         .set {
                             color: var(--gray-5);
+                            display: flex;
+                            gap: var(--size-3);
+                            padding: var(--size-2);
                         }
                     }
                 }

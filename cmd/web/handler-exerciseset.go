@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/workout"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,8 +11,18 @@ import (
 
 type exerciseSetTemplateData struct {
 	BaseTemplateData
-	Date        time.Time
-	ExerciseSet workout.ExerciseSet
+	Date                 time.Time
+	ExerciseSet          workout.ExerciseSet
+	FirstIncompleteIndex int
+}
+
+func getFirstIncompleteIndex(sets []workout.Set) int {
+	for i, set := range sets {
+		if set.CompletedReps == nil {
+			return i
+		}
+	}
+	return len(sets)
 }
 
 func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
@@ -52,62 +63,13 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := exerciseSetTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Date:             date,
-		ExerciseSet:      exerciseSet,
+		BaseTemplateData:     newBaseTemplateData(r),
+		Date:                 date,
+		ExerciseSet:          exerciseSet,
+		FirstIncompleteIndex: getFirstIncompleteIndex(exerciseSet.Sets),
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)
-}
-
-func (app *application) exerciseSetEditPOST(w http.ResponseWriter, r *http.Request) {
-	// Parse URL parameters
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	setIndexStr := r.PathValue("setIndex")
-	setIndex, err := strconv.Atoi(setIndexStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Parse form for weight update
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse form"))
-		return
-	}
-
-	weightStr := r.PostForm.Get("weight")
-	if weightStr == "" {
-		app.serverError(w, r, errors.New("weight not provided"))
-		return
-	}
-
-	weight, err := strconv.ParseFloat(weightStr, 64)
-	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse weight"))
-		return
-	}
-
-	// Update the weight
-	if err := app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "UPDATE set weight"))
-		return
-	}
-
-	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
 }
 
 func (app *application) exerciseSetDonePOST(w http.ResponseWriter, r *http.Request) {
@@ -133,9 +95,21 @@ func (app *application) exerciseSetDonePOST(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse form for completed reps
+	// Parse form for weight and reps
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, errors.Wrap(err, "parse form"))
+		return
+	}
+
+	weightStr := r.PostForm.Get("weight")
+	if weightStr == "" {
+		app.serverError(w, r, errors.New("weight not provided"))
+		return
+	}
+
+	weight, err := strconv.ParseFloat(weightStr, 64)
+	if err != nil {
+		app.serverError(w, r, errors.Wrap(err, "parse weight"))
 		return
 	}
 
@@ -151,11 +125,24 @@ func (app *application) exerciseSetDonePOST(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Mark the set as completed
+	// First update the weight if it has changed
+	if err := app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
+		app.serverError(w, r, errors.Wrap(err, "UPDATE set weight"))
+		return
+	}
+
+	// Then mark the set as completed with the given reps
 	if err := app.workoutService.CompleteSet(r.Context(), date, exerciseID, setIndex, reps); err != nil {
 		app.serverError(w, r, errors.Wrap(err, "complete set"))
 		return
 	}
+
+	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "completed set",
+		slog.String("date", dateStr),
+		slog.Int("exercise_id", exerciseID),
+		slog.Int("set_index", setIndex),
+		slog.Float64("weight", weight),
+		slog.Int("reps", reps))
 
 	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
 }
