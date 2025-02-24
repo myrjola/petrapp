@@ -21,8 +21,13 @@ func secureHeaders(next http.Handler) http.Handler {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		csp := fmt.Sprintf(`script-src 'nonce-%s' 'strict-dynamic' https: http:;
-style-src 'nonce-%s' 'strict-dynamic' https: http:;
+		csp := fmt.Sprintf(`default-src 'none';
+script-src 'nonce-%s' 'strict-dynamic' https: http:;
+connect-src 'self';
+img-src 'self';
+style-src 'nonce-%s' 'self';
+frame-ancestors 'self';
+form-action 'self';
 object-src 'none';
 base-uri 'none';`, cspNonce, cspNonce)
 
@@ -104,8 +109,12 @@ func commonContext(next http.Handler) http.Handler {
 }
 
 // noSurf implements CSRF protection using https://github.com/justinas/nosurf
-func noSurf(next http.Handler) http.Handler {
+func (app *application) noSurf(next http.Handler) http.Handler {
 	csrfHandler := nosurf.New(next)
+	csrfHandler.SetFailureHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "csrf token validation failed")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	}))
 	csrfHandler.SetBaseCookie(http.Cookie{
 		HttpOnly: true,
 		Path:     "/",

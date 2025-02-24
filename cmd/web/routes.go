@@ -9,7 +9,7 @@ func (app *application) routes() http.Handler {
 
 	// Define middleware chain functions
 	common := func(next http.Handler) http.Handler {
-		return app.recoverPanic(app.logRequest(secureHeaders(noSurf(commonContext(timeout(next))))))
+		return app.recoverPanic(app.logRequest(secureHeaders(app.noSurf(commonContext(timeout(next))))))
 	}
 
 	session := func(next http.Handler) http.Handler {
@@ -31,7 +31,8 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletePOST)))
 	mux.Handle("GET /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletionGET)))
 	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}", mustSession(http.HandlerFunc(app.exerciseSetGET)))
-	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/sets/{setIndex}/done", mustSession(http.HandlerFunc(app.exerciseSetDonePOST)))
+	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/sets/{setIndex}/done",
+		mustSession(http.HandlerFunc(app.exerciseSetDonePOST)))
 	mux.Handle("POST /workouts/{date}/feedback/{difficulty}", mustSession(http.HandlerFunc(app.workoutFeedbackPOST)))
 
 	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
