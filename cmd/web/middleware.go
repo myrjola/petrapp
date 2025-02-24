@@ -29,6 +29,7 @@ style-src 'nonce-%s' 'self';
 frame-ancestors 'self';
 form-action 'self';
 object-src 'none';
+manifest-src 'self';
 base-uri 'none';`, cspNonce, cspNonce)
 
 		w.Header().Set("Content-Security-Policy", csp)
@@ -116,9 +117,10 @@ func (app *application) noSurf(next http.Handler) http.Handler {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}))
 	csrfHandler.SetBaseCookie(http.Cookie{
-		HttpOnly: true,
 		Path:     "/",
 		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	})
 	return csrfHandler
 }
