@@ -12,6 +12,34 @@
                 }
             }
         </style>
+        
+        <script {{ nonce }}>
+            document.addEventListener("DOMContentLoaded", function() {
+                {{ if $.IsEditing }}
+                    const form = document.getElementById(`form-{{ $.EditingIndex }}`);
+                    if (form) {
+                        const repsInput = form.querySelector('.reps-input');
+                        const doneButton = form.querySelector('.done');
+                        
+                        if (repsInput) {
+                            // Enable the reps input
+                            repsInput.disabled = false;
+                            
+                            // Focus and select the text
+                            setTimeout(() => {
+                                repsInput.focus();
+                                repsInput.select();
+                            }, 100);
+                        }
+                        
+                        if (doneButton) {
+                            // Show the done button
+                            doneButton.style.display = 'block';
+                        }
+                    }
+                {{ end }}
+            });
+        </script>
 
         <header>
             <style {{ nonce }}>
@@ -114,6 +142,18 @@
                                     padding: var(--size-2) var(--size-4);
                                     margin-left: auto;
                                 }
+                                
+                                .edit-button {
+                                    margin-left: var(--size-2);
+                                    padding: var(--size-1) var(--size-2);
+                                    background: var(--gray-2);
+                                    border: 1px solid var(--gray-3);
+                                    border-radius: var(--radius-1);
+                                    font-size: var(--font-size-0);
+                                    cursor: pointer;
+                                    text-decoration: none;
+                                    color: var(--gray-7);
+                                }
                             }
                         }
                     }
@@ -126,13 +166,14 @@
                         <span class="weight">{{ $set.WeightKg }} kg</span>
                         {{ if $set.CompletedReps }}
                             <span class="reps">{{ $set.CompletedReps }} reps</span>
+                            <a href="?edit={{ $index }}" class="edit-button">Edit</a>
                         {{ else }}
                             <span class="reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
                         {{ end }}
                     </div>
 
-                    {{ if and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index) }}
-                        <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/done">
+                    {{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }}
+                        <form method="post" action="{{ if $set.CompletedReps }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ else }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/done{{ end }}" id="form-{{ $index }}">
                             {{ csrf }}
                             <div class="inputs">
                                 <div class="field">
@@ -154,13 +195,16 @@
                                             type="number"
                                             name="reps"
                                             placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
+                                            value="{{ $set.CompletedReps }}"
                                             min="{{ $set.MinReps }}"
                                             max="{{ $set.MaxReps }}"
                                             required
+                                            {{ if $set.CompletedReps }}disabled{{ end }}
+                                            class="reps-input"
                                     >
                                 </div>
                             </div>
-                            <button type="submit" class="done">Done!</button>
+                            <button type="submit" class="done" {{ if $set.CompletedReps }}style="display: none;"{{ end }}>Done!</button>
                         </form>
                     {{ end }}
                 </div>

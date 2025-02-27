@@ -452,3 +452,58 @@ func (s *Service) CompleteSet(ctx context.Context, date time.Time, exerciseID in
 
 	return nil
 }
+
+// UpdateCompletedReps updates a previously completed set with new rep count
+func (s *Service) UpdateCompletedReps(ctx context.Context, date time.Time, exerciseID int, setIndex int, completedReps int) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	dateStr := date.Format("2006-01-02")
+
+	// First verify the set exists and is already completed
+	var minReps, maxReps int
+	var currentReps sql.NullInt64
+	err := s.db.ReadOnly.QueryRowContext(ctx, `
+        SELECT min_reps, max_reps, completed_reps
+        FROM exercise_sets
+        WHERE workout_user_id = ?
+        AND workout_date = ?
+        AND exercise_id = ?
+        AND set_number = ?`,
+		userID, dateStr, exerciseID, setIndex+1).Scan(&minReps, &maxReps, &currentReps)
+	if err != nil {
+		return errors.Wrap(err, "get set rep range")
+	}
+
+	if !currentReps.Valid {
+		return errors.New("cannot update a set that is not already completed")
+	}
+
+	// Allow updating with reps outside the target range, but log it
+	if completedReps < minReps || completedReps > maxReps {
+		s.logger.LogAttrs(ctx, slog.LevelInfo, "updated reps outside target range",
+			slog.Int("completed_reps", completedReps),
+			slog.Int("min_reps", minReps),
+			slog.Int("max_reps", maxReps))
+	}
+
+	result, err := s.db.ReadWrite.ExecContext(ctx, `
+        UPDATE exercise_sets
+        SET completed_reps = ?
+        WHERE workout_user_id = ?
+        AND workout_date = ?
+        AND exercise_id = ?
+        AND set_number = ?`,
+		completedReps, userID, dateStr, exerciseID, setIndex+1)
+	if err != nil {
+		return errors.Wrap(err, "update completed reps")
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "get rows affected")
+	}
+	if rows == 0 {
+		return errors.New("set not found")
+	}
+
+	return nil
+}
