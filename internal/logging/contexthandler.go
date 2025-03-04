@@ -2,7 +2,7 @@ package logging
 
 import (
 	"context"
-	"github.com/myrjola/petrapp/internal/errors"
+	"fmt"
 	"log/slog"
 )
 
@@ -29,7 +29,7 @@ func (h ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	if err := h.Handler.Handle(ctx, r); err != nil {
-		return errors.Wrap(err, "handle log record")
+		return fmt.Errorf("handle log record: %w", err)
 	}
 	return nil
 }
