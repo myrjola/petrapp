@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/workout"
 	"net/http"
 	"strconv"
@@ -134,7 +133,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	difficultyStr := r.PathValue("difficulty")
 	difficulty, err := strconv.Atoi(difficultyStr)
 	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse difficulty rating"))
+		app.serverError(w, r, fmt.Errorf("parse difficulty rating: %w", err))
 		return
 	}
 

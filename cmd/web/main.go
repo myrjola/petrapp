@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/ai"
 	"github.com/myrjola/petrapp/internal/envstruct"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -55,7 +55,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	var cfg config
 	if err = envstruct.Populate(&cfg, lookupEnv); err != nil {
-		return errors.Wrap(err, "populate config")
+		return fmt.Errorf("populate config: %w", err)
 	}
 
 	if cfg.PProfAddr != "" {
@@ -64,12 +64,12 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	var htmlTemplatePath string
 	if htmlTemplatePath, err = resolveAndVerifyTemplatePath(cfg.TemplatePath); err != nil {
-		return errors.Wrap(err, "resolve template path")
+		return fmt.Errorf("resolve template path: %w", err)
 	}
 
 	db, err := sqlite.NewDatabase(ctx, cfg.SqliteURL, logger)
 	if err != nil {
-		return errors.Wrap(err, "open db", slog.String("url", cfg.SqliteURL))
+		return fmt.Errorf("open db (url: %s): %w", cfg.SqliteURL, err)
 	}
 	logger.LogAttrs(ctx, slog.LevelInfo, "connected to db")
 
@@ -81,7 +81,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 	var webAuthnHandler *webauthnhandler.WebAuthnHandler
 	if webAuthnHandler, err = webauthnhandler.New(cfg.Addr, fqdn, logger, sessionManager, db); err != nil {
-		return errors.Wrap(err, "new webauthn handler")
+		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
 	app := application{
@@ -94,7 +94,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 
 	if err = app.configureAndStartServer(ctx, cfg.Addr); err != nil {
-		return errors.Wrap(err, "start server")
+		return fmt.Errorf("start server: %w", err)
 	}
 	return nil
 }
@@ -119,7 +119,7 @@ func main() {
 	}))
 	logger := slog.New(loggerHandler)
 	if err := run(ctx, logger, os.LookupEnv); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", errors.SlogError(err))
+		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", slog.Any("error", err))
 		os.Exit(1)
 	}
 }

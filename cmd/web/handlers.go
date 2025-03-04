@@ -5,9 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/errors"
 	"html/template"
-	"log/slog"
 	"net/http"
 )
 
@@ -26,7 +24,7 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 			panic("not implemented")
 		},
 	}).ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
-		return nil, errors.Wrap(err, "new template")
+		return nil, fmt.Errorf("new template: %w", err)
 	}
 	return t, nil
 }
@@ -38,7 +36,7 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 	)
 
 	if t, err = app.pageTemplate(file); err != nil {
-		return nil, errors.Wrap(err, "retrieve page template", slog.String("page", file))
+		return nil, fmt.Errorf("retrieve page template %s: %w", file, err)
 	}
 
 	buf := new(bytes.Buffer)
@@ -53,7 +51,7 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 		},
 	})
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {
-		return nil, errors.Wrap(err, "execute template", slog.String("page", file))
+		return nil, fmt.Errorf("execute template %s: %w", file, err)
 	}
 
 	return buf, nil

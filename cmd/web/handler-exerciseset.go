@@ -1,8 +1,8 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
@@ -114,7 +114,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	// Parse form for weight and reps
 	if err = r.ParseForm(); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse form"))
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
 	}
 
@@ -126,7 +126,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	weight, err := strconv.ParseFloat(weightStr, 64)
 	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse weight"))
+		app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
 		return
 	}
 
@@ -138,19 +138,19 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	reps, err := strconv.Atoi(repsStr)
 	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse reps"))
+		app.serverError(w, r, fmt.Errorf("parse reps: %w", err))
 		return
 	}
 
 	// First update the weight
 	if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "UPDATE set weight"))
+		app.serverError(w, r, fmt.Errorf("UPDATE set weight: %w", err))
 		return
 	}
 
 	// Then update the completed reps
 	if err = app.workoutService.UpdateCompletedReps(r.Context(), date, exerciseID, setIndex, reps); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "update completed reps"))
+		app.serverError(w, r, fmt.Errorf("update completed reps: %w", err))
 		return
 	}
 

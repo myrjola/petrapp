@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/myrjola/petrapp/internal/errors"
+	"fmt"
 	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
@@ -48,7 +48,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	prefs, err := app.workoutService.GetUserPreferences(ctx)
 	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "get user preferences"))
+		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
 	}
 
@@ -62,15 +62,15 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse form"))
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
 	}
 
 	prefs := weekdaysToPreferences(r)
 
 	if err := app.workoutService.SaveUserPreferences(r.Context(), prefs); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "save user preferences",
-			slog.Any("preferences", prefs)))
+		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))
+		app.logger.LogAttrs(r.Context(), slog.LevelDebug, "preferences details", slog.Any("preferences", prefs))
 		return
 	}
 
