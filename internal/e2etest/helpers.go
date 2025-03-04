@@ -3,8 +3,6 @@ package e2etest
 import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/myrjola/petrapp/internal/errors"
-	"log/slog"
 )
 
 // FindInputForLabel finds the input element associated with a label in the given form.
@@ -12,7 +10,7 @@ func FindInputForLabel(form *goquery.Selection, labelText string) (*goquery.Sele
 	// Find the label with matching text
 	label := form.Find(fmt.Sprintf("label:contains(%s)", labelText))
 	if label.Length() == 0 {
-		return nil, errors.New("label not found", slog.String("label", labelText))
+		return nil, fmt.Errorf("label not found: %s", labelText)
 	}
 
 	// Get the associated input's name attribute
@@ -26,7 +24,7 @@ func FindInputForLabel(form *goquery.Selection, labelText string) (*goquery.Sele
 	}
 
 	if input.Length() == 0 {
-		return nil, errors.New("input not found for label", slog.String("label", labelText))
+		return nil, fmt.Errorf("input not found for label: %s", labelText)
 	}
 
 	return input, nil
@@ -36,8 +34,7 @@ func FindInputForLabel(form *goquery.Selection, labelText string) (*goquery.Sele
 func FindForm(doc *goquery.Document, formActionURLPath string) (*goquery.Selection, error) {
 	form := doc.Find(fmt.Sprintf("form[action='%s']", formActionURLPath))
 	if form.Length() == 0 {
-		return nil, errors.New("form not found",
-			slog.String("form_action", formActionURLPath))
+		return nil, fmt.Errorf("form not found: %s", formActionURLPath)
 	}
 	return form, nil
 }

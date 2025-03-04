@@ -2,13 +2,12 @@ package e2etest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/descope/virtualwebauthn"
 	"github.com/justinas/nosurf"
-	"github.com/myrjola/petrapp/internal/errors"
 	"io"
-	"log/slog"
 	"net/http"
 	neturl "net/url"
 	"strings"
@@ -28,7 +27,7 @@ type Client struct {
 func NewClient(url, rpID, rpOrigin string) (*Client, error) {
 	jar, err := newUnsafeCookieJar()
 	if err != nil {
-		return nil, errors.Wrap(err, "create unsafe cookie jar")
+		return nil, fmt.Errorf("create unsafe cookie jar: %w", err)
 	}
 	return &Client{
 		client:        &http.Client{Jar: jar},
@@ -55,23 +54,23 @@ func (c *Client) WaitForReady(ctx context.Context, urlPath string) error {
 			c.url+urlPath,
 			nil,
 		); err != nil {
-			return errors.Wrap(err, "create request")
+			return fmt.Errorf("create request: %w", err)
 		}
 
 		if resp, err = c.client.Do(req); err == nil {
 			if resp.StatusCode == http.StatusOK {
 				if err = resp.Body.Close(); err != nil {
-					return errors.Wrap(err, "close response body")
+					return fmt.Errorf("close response body: %w", err)
 				}
 				return nil
 			}
 			if err = resp.Body.Close(); err != nil {
-				return errors.Wrap(err, "close response body")
+				return fmt.Errorf("close response body: %w", err)
 			}
 		}
 		select {
 		case <-ctx.Done():
-			return errors.Wrap(ctx.Err(), "context cancelled")
+			return fmt.Errorf("context cancelled: %w", ctx.Err())
 		default:
 			if time.Since(startTime) >= timeout {
 				return errors.New("timeout waiting for endpoint to be ready")
@@ -89,10 +88,10 @@ func (c *Client) Get(ctx context.Context, urlPath string) (*http.Response, error
 		resp *http.Response
 	)
 	if req, err = c.newRequestWithContext(ctx, http.MethodGet, urlPath, nil); err != nil {
-		return nil, errors.Wrap(err, "create request with context")
+		return nil, fmt.Errorf("create request with context: %w", err)
 	}
 	if resp, err = c.client.Do(req); err != nil {
-		return nil, errors.Wrap(err, "do request")
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 	return resp, nil
 }
@@ -105,16 +104,16 @@ func (c *Client) GetDoc(ctx context.Context, urlPath string) (*goquery.Document,
 		doc  *goquery.Document
 	)
 	if resp, err = c.Get(ctx, urlPath); err != nil {
-		return nil, errors.Wrap(err, "client get")
+		return nil, fmt.Errorf("client get: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 	if http.StatusOK != resp.StatusCode {
-		return nil, errors.New("unexpected status code", slog.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	if doc, err = goquery.NewDocumentFromReader(resp.Body); err != nil {
-		return nil, errors.Wrap(err, "create document from reader")
+		return nil, fmt.Errorf("create document from reader: %w", err)
 	}
 	return doc, nil
 }
@@ -130,7 +129,7 @@ func (c *Client) newRequestWithContext(
 		err error
 	)
 	if req, err = http.NewRequest(method, c.url+urlPath, body); err != nil {
-		return nil, errors.Wrap(err, "create request")
+		return nil, fmt.Errorf("create request: %w", err)
 	}
 	return req.WithContext(ctx), nil
 }
@@ -139,7 +138,7 @@ func (c *Client) newRequestWithContext(
 func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 	doc, err := c.GetDoc(ctx, "/")
 	if err != nil {
-		return nil, errors.Wrap(err, "get document")
+		return nil, fmt.Errorf("get document: %w", err)
 	}
 
 	var (
@@ -147,16 +146,16 @@ func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 		csrfToken                string
 	)
 	if csrfToken, err = c.extractCSRFToken(doc, registrationStartURLPath); err != nil {
-		return nil, errors.Wrap(err, "extract CSRF token")
+		return nil, fmt.Errorf("extract CSRF token: %w", err)
 	}
 	var attOpts *virtualwebauthn.AttestationOptions
 	if attOpts, err = c.startRegistration(ctx, registrationStartURLPath, csrfToken); err != nil {
-		return nil, errors.Wrap(err, "start registration")
+		return nil, fmt.Errorf("start registration: %w", err)
 	}
 
 	var credential *virtualwebauthn.Credential
 	if credential, err = c.finishRegistration(ctx, attOpts, csrfToken); err != nil {
-		return nil, errors.Wrap(err, "finish registration")
+		return nil, fmt.Errorf("finish registration: %w", err)
 	}
 
 	// At this point, our credential is ready for logging in.
@@ -165,7 +164,7 @@ func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 	c.authenticator.Options.UserHandle = []byte(attOpts.UserID)
 
 	if doc, err = c.GetDoc(ctx, "/"); err != nil {
-		return nil, errors.Wrap(err, "get document after registration")
+		return nil, fmt.Errorf("get document after registration: %w", err)
 	}
 	return doc, nil
 }
@@ -188,19 +187,19 @@ func (c *Client) finishRegistration(
 		"/api/registration/finish",
 		strings.NewReader(attestationResponse),
 	); err != nil {
-		return nil, errors.Wrap(err, "new request with context")
+		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
-		return nil, errors.Wrap(err, "do request")
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 	if err = resp.Body.Close(); err != nil {
-		return nil, errors.Wrap(err, "close response body")
+		return nil, fmt.Errorf("close response body: %w", err)
 	}
 	if http.StatusOK != resp.StatusCode {
-		return nil, errors.New("unexpected status code", slog.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	return &credential, nil
 }
@@ -216,27 +215,27 @@ func (c *Client) startRegistration(
 		req *http.Request
 	)
 	if req, err = c.newRequestWithContext(ctx, http.MethodPost, registrationStartURLPath, nil); err != nil {
-		return nil, errors.Wrap(err, "new request with context")
+		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
-		return nil, errors.Wrap(err, "do request")
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 	if http.StatusOK != resp.StatusCode {
-		return nil, errors.New("unexpected status code", slog.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	var bodyBytes []byte
 	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
-		return nil, errors.Wrap(err, "read body bytes")
+		return nil, fmt.Errorf("read body bytes: %w", err)
 	}
 	if err = resp.Body.Close(); err != nil {
-		return nil, errors.Wrap(err, "close response body")
+		return nil, fmt.Errorf("close response body: %w", err)
 	}
 	var attOpts *virtualwebauthn.AttestationOptions
 	if attOpts, err = virtualwebauthn.ParseAttestationOptions(string(bodyBytes)); err != nil {
-		return nil, errors.Wrap(err, "parse attestation options")
+		return nil, fmt.Errorf("parse attestation options: %w", err)
 	}
 	return attOpts, nil
 }
@@ -248,7 +247,7 @@ func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
 		err error
 	)
 	if doc, err = c.GetDoc(ctx, "/"); err != nil {
-		return nil, errors.Wrap(err, "get document")
+		return nil, fmt.Errorf("get document: %w", err)
 	}
 
 	var (
@@ -256,20 +255,20 @@ func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
 		csrfToken         string
 	)
 	if csrfToken, err = c.extractCSRFToken(doc, loginStartURLPath); err != nil {
-		return nil, errors.Wrap(err, "extract CSRF token")
+		return nil, fmt.Errorf("extract CSRF token: %w", err)
 	}
 
 	var asOpts *virtualwebauthn.AssertionOptions
 	if asOpts, err = c.startLogin(ctx, loginStartURLPath, csrfToken); err != nil {
-		return nil, errors.Wrap(err, "start login")
+		return nil, fmt.Errorf("start login: %w", err)
 	}
 
 	if err = c.finishLogin(ctx, asOpts, csrfToken); err != nil {
-		return nil, errors.Wrap(err, "finish login")
+		return nil, fmt.Errorf("finish login: %w", err)
 	}
 
 	if doc, err = c.GetDoc(ctx, "/"); err != nil {
-		return nil, errors.Wrap(err, "get document after login")
+		return nil, fmt.Errorf("get document after login: %w", err)
 	}
 	return doc, nil
 }
@@ -285,27 +284,27 @@ func (c *Client) startLogin(
 		err error
 	)
 	if req, err = c.newRequestWithContext(ctx, http.MethodPost, loginStartURLPath, nil); err != nil {
-		return nil, errors.Wrap(err, "new request with context")
+		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
-		return nil, errors.Wrap(err, "do request")
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 	if http.StatusOK != resp.StatusCode {
-		return nil, errors.New("unexpected status code", slog.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	var bodyBytes []byte
 	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
-		return nil, errors.Wrap(err, "read body bytes")
+		return nil, fmt.Errorf("read body bytes: %w", err)
 	}
 	if err = resp.Body.Close(); err != nil {
-		return nil, errors.Wrap(err, "close response body")
+		return nil, fmt.Errorf("close response body: %w", err)
 	}
 	var asOpts *virtualwebauthn.AssertionOptions
 	if asOpts, err = virtualwebauthn.ParseAssertionOptions(string(bodyBytes)); err != nil {
-		return nil, errors.Wrap(err, "parse assertion options")
+		return nil, fmt.Errorf("parse assertion options: %w", err)
 	}
 	return asOpts, nil
 }
@@ -323,19 +322,19 @@ func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.Assert
 		"/api/login/finish",
 		strings.NewReader(asResp),
 	); err != nil {
-		return errors.Wrap(err, "new request with context")
+		return fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
-		return errors.Wrap(err, "do request")
+		return fmt.Errorf("do request: %w", err)
 	}
 	if err = resp.Body.Close(); err != nil {
-		return errors.Wrap(err, "close response body")
+		return fmt.Errorf("close response body: %w", err)
 	}
 	if http.StatusOK != resp.StatusCode {
-		return errors.New("unexpected status code", slog.Int("status", resp.StatusCode))
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	return nil
 }
@@ -346,10 +345,10 @@ func (c *Client) Logout(ctx context.Context) (*goquery.Document, error) {
 		err error
 	)
 	if doc, err = c.GetDoc(ctx, "/preferences"); err != nil {
-		return nil, errors.Wrap(err, "get document")
+		return nil, fmt.Errorf("get document: %w", err)
 	}
 	if doc, err = c.SubmitForm(ctx, doc, "/api/logout", nil); err != nil {
-		return nil, errors.Wrap(err, "submit form")
+		return nil, fmt.Errorf("submit form: %w", err)
 	}
 	return doc, nil
 }
@@ -375,7 +374,7 @@ func (c *Client) SubmitForm(
 	// Extract CSRF token from the form
 	csrfToken, err := c.extractCSRFToken(doc, formActionURLPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "extract CSRF token")
+		return nil, fmt.Errorf("extract CSRF token: %w", err)
 	}
 
 	// Build form data
@@ -384,21 +383,20 @@ func (c *Client) SubmitForm(
 
 	var form *goquery.Selection
 	if form, err = FindForm(doc, formActionURLPath); err != nil {
-		return nil, errors.Wrap(err, "find form")
+		return nil, fmt.Errorf("find form: %w", err)
 	}
 
 	// Find form inputs based on their labels
 	for labelText, value := range formFields {
 		var input *goquery.Selection
 		if input, err = FindInputForLabel(form, labelText); err != nil {
-			return nil, errors.Wrap(err, "find input for label")
+			return nil, fmt.Errorf("find input for label: %w", err)
 		}
 
 		name, exists := input.Attr("name")
 		if !exists {
-			return nil, errors.New("input has no name attribute",
-				slog.String("label", labelText),
-				slog.String("form_action", formActionURLPath))
+			return nil, fmt.Errorf("input has no name attribute (label: %s, form_action: %s)",
+				labelText, formActionURLPath)
 		}
 
 		formData.Add(name, value)
@@ -408,25 +406,25 @@ func (c *Client) SubmitForm(
 	data := strings.NewReader(formData.Encode())
 	req, err := c.newRequestWithContext(ctx, http.MethodPost, formActionURLPath, data)
 	if err != nil {
-		return nil, errors.Wrap(err, "new request with context")
+		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "do request")
+		return nil, fmt.Errorf("do request: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 	if http.StatusOK != resp.StatusCode {
-		return nil, errors.New("unexpected status code", slog.Int("status", resp.StatusCode))
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	// Parse the response
 	newDoc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "create document from reader")
+		return nil, fmt.Errorf("create document from reader: %w", err)
 	}
 	newDoc.Url = resp.Request.URL
 	return newDoc, nil
