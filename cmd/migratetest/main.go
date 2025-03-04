@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
@@ -31,7 +30,7 @@ func main() {
 	var db *sqlite.Database
 	if db, err = sqlite.NewDatabase(ctx, sqliteURL, logger); err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "error creating database",
-			slog.String("url", sqliteURL), errors.SlogError(err))
+			slog.String("url", sqliteURL), slog.Any("error", err))
 		os.Exit(1)
 	}
 
@@ -39,7 +38,7 @@ func main() {
 	row := db.ReadWrite.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`)
 	var count int
 	if err = row.Scan(&count); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "error fetching user count", errors.SlogError(err))
+		logger.LogAttrs(ctx, slog.LevelError, "error fetching user count", slog.Any("error", err))
 		os.Exit(1)
 	}
 	if count == 0 {
