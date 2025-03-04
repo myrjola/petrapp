@@ -1,4 +1,6 @@
-.PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec cross-compile migratetest repomix
+
+.PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
+        cross-compile migratetest repomix repomix-clipboard
 
 GOTOOLCHAIN=auto
 
@@ -70,4 +72,8 @@ migratetest: build
 	bin/migratetest
 
 repomix:
-	 npx repomix --include "**/*.go,**/*.gohtml,**/*.js,**/*.css,**/*.sql"
+	npx repomix --include "**/*.go,**/*.gohtml,**/*.js,**/*.css,**/*.sql" --output repomix-output.txt
+
+repomix-clipboard: repomix
+	cat repomix-output.txt | pbcopy
+
