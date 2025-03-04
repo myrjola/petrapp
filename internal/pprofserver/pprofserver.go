@@ -2,6 +2,7 @@ package pprofserver
 
 import (
 	"context"
+	"fmt"
 	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"net/http"
@@ -37,7 +38,7 @@ func listenAndServe(addr string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrap(err, "pprof listen and serve")
+		return fmt.Errorf("pprof listen and serve: %w", err)
 	}
 	return nil
 }
@@ -46,7 +47,7 @@ func Launch(ctx context.Context, addr string, logger *slog.Logger) {
 	go func() {
 		logger.LogAttrs(ctx, slog.LevelInfo, "starting pprof server", slog.String("addr", addr))
 		if err := listenAndServe(addr); err != nil {
-			logger.LogAttrs(ctx, slog.LevelError, "failed starting pprof server", errors.SlogError(err))
+			logger.LogAttrs(ctx, slog.LevelError, "failed starting pprof server", slog.Any("error", err))
 		}
 	}()
 }
