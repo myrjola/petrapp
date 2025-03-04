@@ -6,10 +6,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/justinas/nosurf"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 )
 
 func secureHeaders(next http.Handler) http.Handler {
@@ -76,7 +76,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if excp := recover(); excp != nil {
-				err := errors.DecoratePanic(excp)
+				err := fmt.Errorf("panic: %v\n%s", excp, string(debug.Stack()))
 				app.serverError(w, r, err)
 			}
 		}()

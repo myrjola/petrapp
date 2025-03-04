@@ -2,8 +2,8 @@ package pprofserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
