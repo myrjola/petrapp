@@ -14,5 +14,5 @@ func (app *application) serverError(w http.ResponseWriter, r *http.Request, err 
 
 	app.logger.LogAttrs(r.Context(), slog.LevelError, "server error",
 		slog.String("method", method), slog.String("uri", uri), errors.SlogError(err))
-	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	app.render(w, r, http.StatusInternalServerError, "error", nil)
 }

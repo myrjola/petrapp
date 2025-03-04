@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/errors"
@@ -30,19 +31,17 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 	return t, nil
 }
 
-func (app *application) render(w http.ResponseWriter, r *http.Request, status int, file string, data any) {
+func (app *application) renderToBuf(ctx context.Context, file string, data any) (*bytes.Buffer, error) {
 	var (
 		err error
 		t   *template.Template
 	)
 
 	if t, err = app.pageTemplate(file); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse template", slog.String("template", file)))
-		return
+		return nil, errors.Wrap(err, "retrieve page template", slog.String("page", file))
 	}
 
 	buf := new(bytes.Buffer)
-	ctx := r.Context()
 	nonce := fmt.Sprintf("nonce=\"%s\"", contexthelpers.CSPNonce(ctx))
 	csrf := fmt.Sprintf("<input type=\"hidden\" name=\"csrf_token\" value=\"%s\"/>", contexthelpers.CSRFToken(ctx))
 	t.Funcs(template.FuncMap{
@@ -54,7 +53,20 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 		},
 	})
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "execute template", slog.String("template", file)))
+		return nil, errors.Wrap(err, "execute template", slog.String("page", file))
+	}
+
+	return buf, nil
+}
+
+func (app *application) render(w http.ResponseWriter, r *http.Request, status int, file string, data any) {
+	var (
+		buf *bytes.Buffer
+		err error
+	)
+
+	if buf, err = app.renderToBuf(r.Context(), file, data); err != nil {
+		app.serverError(w, r, err)
 		return
 	}
 
