@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/justinas/nosurf"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/logging"
@@ -56,7 +55,7 @@ func (app *application) logRequest(next http.Handler) http.Handler {
 		)
 
 		ctx := r.Context()
-		requestID := uuid.New()
+		requestID := rand.Text()
 		ctx = logging.WithAttrs(
 			ctx,
 			slog.Any("request_id", requestID),
