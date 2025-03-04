@@ -44,7 +44,7 @@ func TestPopulate(t *testing.T) {
 			}{},
 			lookupEnv: func(_ string) (string, bool) { return "", false },
 			want:      nil,
-			wantErr:   envstruct.ErrEnvNotSet,
+			wantErr:   envstruct.ErrEnvNotSe,
 		},
 		{
 			name: "env is set",
