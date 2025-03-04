@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
 	"net/http"
@@ -25,7 +24,7 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 		exists, err := h.userExists(ctx, userID)
 		if err != nil {
 			h.logger.LogAttrs(r.Context(), slog.LevelError, "server error",
-				slog.String("method", r.Method), slog.String("uri", r.URL.RequestURI()), errors.SlogError(err))
+				slog.String("method", r.Method), slog.String("uri", r.URL.RequestURI()), slog.Any("error", err))
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
