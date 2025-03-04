@@ -34,7 +34,7 @@ func Test_application_preferences(t *testing.T) {
 
 	// Shows default preferences
 	// First register to get authenticated
-	if doc, err = client.Register(ctx); err != nil {
+	if _, err = client.Register(ctx); err != nil {
 		t.Fatalf("Failed to register: %v", err)
 	}
 

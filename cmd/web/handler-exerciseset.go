@@ -50,7 +50,8 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	isEditing := false
 	editIndexStr := r.URL.Query().Get("edit")
 	if editIndexStr != "" {
-		if idx, err := strconv.Atoi(editIndexStr); err == nil {
+		var idx int
+		if idx, err = strconv.Atoi(editIndexStr); err == nil {
 			editingIndex = idx
 			isEditing = true
 		}
@@ -88,83 +89,6 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "exerciseset", data)
 }
 
-func (app *application) exerciseSetDonePOST(w http.ResponseWriter, r *http.Request) {
-	// Parse URL parameters
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	setIndexStr := r.PathValue("setIndex")
-	setIndex, err := strconv.Atoi(setIndexStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Parse form for weight and reps
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse form"))
-		return
-	}
-
-	weightStr := r.PostForm.Get("weight")
-	if weightStr == "" {
-		app.serverError(w, r, errors.New("weight not provided"))
-		return
-	}
-
-	weight, err := strconv.ParseFloat(weightStr, 64)
-	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse weight"))
-		return
-	}
-
-	repsStr := r.PostForm.Get("reps")
-	if repsStr == "" {
-		app.serverError(w, r, errors.New("reps not provided"))
-		return
-	}
-
-	reps, err := strconv.Atoi(repsStr)
-	if err != nil {
-		app.serverError(w, r, errors.Wrap(err, "parse reps"))
-		return
-	}
-
-	// First update the weight if it has changed
-	if err := app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "UPDATE set weight"))
-		return
-	}
-
-	// Then mark the set as completed with the given reps
-	if err := app.workoutService.CompleteSet(r.Context(), date, exerciseID, setIndex, reps); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "complete set"))
-		return
-	}
-
-	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "completed set",
-		slog.String("date", dateStr),
-		slog.Int("exercise_id", exerciseID),
-		slog.Int("set_index", setIndex),
-		slog.Float64("weight", weight),
-		slog.Int("reps", reps))
-
-	// Redirect to the clean URL (without the edit query parameter)
-	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-}
-
 func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Request) {
 	// Parse URL parameters
 	dateStr := r.PathValue("date")
@@ -189,7 +113,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	}
 
 	// Parse form for weight and reps
-	if err := r.ParseForm(); err != nil {
+	if err = r.ParseForm(); err != nil {
 		app.serverError(w, r, errors.Wrap(err, "parse form"))
 		return
 	}
@@ -219,13 +143,13 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	}
 
 	// First update the weight
-	if err := app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-		app.serverError(w, r, errors.Wrap(err, "update set weight"))
+	if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
+		app.serverError(w, r, errors.Wrap(err, "UPDATE set weight"))
 		return
 	}
 
 	// Then update the completed reps
-	if err := app.workoutService.UpdateCompletedReps(r.Context(), date, exerciseID, setIndex, reps); err != nil {
+	if err = app.workoutService.UpdateCompletedReps(r.Context(), date, exerciseID, setIndex, reps); err != nil {
 		app.serverError(w, r, errors.Wrap(err, "update completed reps"))
 		return
 	}

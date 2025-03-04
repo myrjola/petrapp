@@ -1,14 +1,12 @@
 package sqlite
 
 import (
-	"context"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"io"
 	"log/slog"
 	"testing"
 )
 
-//nolint:gocognit // This test is inherently complex due to the nature of the tested function.
 func TestDatabase_migrate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -121,7 +119,7 @@ func TestDatabase_migrate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctx := context.Background()
+			ctx := t.Context()
 			logger := testhelpers.NewLogger(io.Discard)
 			db, err := connect(":memory:", logger)
 			if err != nil {

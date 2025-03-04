@@ -80,6 +80,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 		url = fmt.Sprintf("file:%s", randomID)
 		inMemoryConfig = "mode=memory&cache=shared"
 	}
+	//nolint:godox // temporary todo
 	// TODO: Many of these don't work. Would need a connection hook instead.
 	//       See https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Connection_Hook
 	//       and https://github.com/mattn/go-sqlite3/issues/1248#issuecomment-2227586113

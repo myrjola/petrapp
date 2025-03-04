@@ -26,6 +26,14 @@ type difficultyOption struct {
 	Label string
 }
 
+const (
+	difficultyTooEasy = iota + 1
+	difficultyICouldDoMore
+	difficultyJustRight
+	difficultyVeryHard
+	difficultyImpossible
+)
+
 func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
 	dateStr := r.PathValue("date")
@@ -39,11 +47,11 @@ func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Requ
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
 		Difficulties: []difficultyOption{
-			{Value: 1, Label: "Too easy"},
-			{Value: 2, Label: "I could do more"},
-			{Value: 3, Label: "Just right"},
-			{Value: 4, Label: "Very hard"},
-			{Value: 5, Label: "Impossible"},
+			{Value: difficultyTooEasy, Label: "Too easy"},
+			{Value: difficultyICouldDoMore, Label: "I could do more"},
+			{Value: difficultyJustRight, Label: "Just right"},
+			{Value: difficultyVeryHard, Label: "Very hard"},
+			{Value: difficultyImpossible, Label: "Impossible"},
 		},
 	}
 
@@ -79,7 +87,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Start the workout session
-	if err := app.workoutService.StartSession(r.Context(), date); err != nil {
+	if err = app.workoutService.StartSession(r.Context(), date); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

@@ -361,3 +361,6 @@ issues:
         - gosec
         - noctx
         - wrapcheck
+        - gocognit
+        - gocyclo
+        - cyclop
