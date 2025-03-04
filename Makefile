@@ -2,7 +2,7 @@
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
         cross-compile migratetest repomix repomix-clipboard
 
-GOTOOLCHAIN=auto
+export GOTOOLCHAIN := auto
 
 init: gomod custom-gcl
 	@echo "Dependencies installed"
