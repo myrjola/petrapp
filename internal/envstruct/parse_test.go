@@ -1,9 +1,9 @@
 package envstruct_test
 
 import (
+	"errors"
 	"github.com/google/go-cmp/cmp"
 	"github.com/myrjola/petrapp/internal/envstruct"
-	"github.com/myrjola/petrapp/internal/errors"
 	"strings"
 	"testing"
 )

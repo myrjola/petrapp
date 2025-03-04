@@ -1,14 +1,14 @@
 package envstruct
 
 import (
-	"github.com/myrjola/petrapp/internal/errors"
-	"log/slog"
+	"errors"
+	"fmt"
 	"reflect"
 )
 
 var (
-	ErrEnvNotSet    = errors.NewSentinel("environment variable not set")
-	ErrInvalidValue = errors.NewSentinel("v must be a pointer to a struct")
+	ErrEnvNotSet    = errors.New("environment variable not set")
+	ErrInvalidValue = errors.New("v must be a pointer to a struct")
 )
 
 // Populate populates the fields of the pointer to struct v with values from the environment.
@@ -20,11 +20,11 @@ var (
 func Populate(v any, lookupEnv func(string) (string, bool)) error {
 	ptrRef := reflect.ValueOf(v)
 	if ptrRef.Kind() != reflect.Ptr {
-		return errors.Wrap(ErrInvalidValue, "not pointer", slog.Any("v", v))
+		return fmt.Errorf("%w: not pointer: %v", ErrInvalidValue, v)
 	}
 	ref := ptrRef.Elem()
 	if ref.Kind() != reflect.Struct {
-		return errors.Wrap(ErrInvalidValue, "not struct", slog.Any("v", v))
+		return fmt.Errorf("%w: not struct: %v", ErrInvalidValue, v)
 	}
 
 	refType := ref.Type()
@@ -43,17 +43,14 @@ func Populate(v any, lookupEnv func(string) (string, bool)) error {
 		envVarName, ok = tag.Lookup("env")
 		if ok {
 			if !refField.CanSet() {
-				errorList = append(errorList, errors.Wrap(ErrInvalidValue, "cannot set field",
-					slog.String("fieldName", refTypeField.Name)))
+				errorList = append(errorList, fmt.Errorf("%w: cannot set field: %s",
+					ErrInvalidValue, refTypeField.Name))
 				continue
 			}
 
 			if refField.Kind() != reflect.String {
-				errorList = append(errorList, errors.Wrap(ErrInvalidValue, "only strings are supported",
-					slog.String("envVarName", envVarName),
-					slog.String("fieldType", refField.Kind().String()),
-					slog.String("fieldName", refTypeField.Name),
-				))
+				errorList = append(errorList, fmt.Errorf("%w: only strings are supported - field: %s, type: %s, env: %s",
+					ErrInvalidValue, refTypeField.Name, refField.Kind().String(), envVarName))
 				continue
 			}
 
@@ -84,7 +81,7 @@ func envLookupWithFallback(
 	if !ok {
 		envVarValue, ok = tag.Lookup("envDefault")
 		if !ok {
-			return "", errors.Wrap(ErrEnvNotSet, "environment variable not set", slog.String("envVarName", envVarName))
+			return "", fmt.Errorf("%w: environment variable not set: %s", ErrEnvNotSet, envVarName)
 		}
 	}
 	return envVarValue, nil
