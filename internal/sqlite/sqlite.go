@@ -3,8 +3,8 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/random"
 	"log/slog"
 	"strings"
@@ -39,16 +39,16 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 	)
 
 	if db, err = connect(url, logger); err != nil {
-		return nil, errors.Wrap(err, "connect")
+		return nil, fmt.Errorf("connect: %w", err)
 	}
 
 	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
-		return nil, errors.Wrap(err, "migrateTo")
+		return nil, fmt.Errorf("migrateTo: %w", err)
 	}
 
 	// Apply fixtures.
 	if _, err = db.ReadWrite.ExecContext(ctx, fixtures); err != nil {
-		return nil, errors.Wrap(err, "apply fixtures")
+		return nil, fmt.Errorf("apply fixtures: %w", err)
 	}
 
 	go db.startDatabaseOptimizer(ctx)
@@ -75,7 +75,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 			dbNameLength uint = 20
 		)
 		if randomID, err = random.Letters(dbNameLength); err != nil {
-			return nil, errors.Wrap(err, "generate random ID")
+			return nil, fmt.Errorf("generate random ID: %w", err)
 		}
 		url = fmt.Sprintf("file:%s", randomID)
 		inMemoryConfig = "mode=memory&cache=shared"
@@ -112,7 +112,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readWriteConfig := fmt.Sprintf("file:%s?mode=rwc&_txlock=immediate&%s&%s", url, commonConfig, inMemoryConfig)
 
 	if readWriteDB, err = sql.Open("sqlite3", readWriteConfig); err != nil {
-		return nil, errors.Wrap(err, "open read-write database")
+		return nil, fmt.Errorf("open read-write database: %w", err)
 	}
 
 	readWriteDB.SetMaxOpenConns(1)
@@ -121,7 +121,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readWriteDB.SetConnMaxIdleTime(time.Hour)
 
 	if readDB, err = sql.Open("sqlite3", readConfig); err != nil {
-		return nil, errors.Wrap(err, "open read database")
+		return nil, fmt.Errorf("open read database: %w", err)
 	}
 
 	maxReadConns := 10

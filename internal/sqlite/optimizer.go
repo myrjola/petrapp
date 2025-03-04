@@ -2,7 +2,7 @@ package sqlite
 
 import (
 	"context"
-	"github.com/myrjola/petrapp/internal/errors"
+	"fmt"
 	"log/slog"
 	"time"
 )
@@ -12,8 +12,8 @@ func (db *Database) startDatabaseOptimizer(ctx context.Context) {
 	for {
 		start := time.Now()
 		if _, err := db.ReadWrite.ExecContext(ctx, "PRAGMA optimize;"); err != nil {
-			err = errors.Wrap(err, "optimize database")
-			db.logger.LogAttrs(ctx, slog.LevelError, "failed to optimize database", errors.SlogError(err))
+			err = fmt.Errorf("optimize database: %w", err)
+			db.logger.LogAttrs(ctx, slog.LevelError, "failed to optimize database", slog.Any("error", err))
 		} else {
 			db.logger.LogAttrs(ctx, slog.LevelInfo, "optimized database",
 				slog.Duration("duration", time.Since(start)))
