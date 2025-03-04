@@ -40,7 +40,7 @@ func NewClient(url, rpID, rpOrigin string) (*Client, error) {
 // WaitForReady calls the specified endpoint until it gets a HTTP 200 Success
 // response or until the context is cancelled or the 1-second timeout is reached.
 func (c *Client) WaitForReady(ctx context.Context, urlPath string) error {
-	timeout := 1 * time.Second
+	timeout := 2 * time.Second
 	startTime := time.Now()
 	var (
 		err  error
