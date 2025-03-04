@@ -2,7 +2,7 @@ package ai
 
 import (
 	"context"
-	"github.com/myrjola/petrapp/internal/errors"
+	"fmt"
 	"github.com/sashabaranov/go-openai"
 	"os"
 )
@@ -29,7 +29,7 @@ func (c *Client) SyncCompletion(messages []openai.ChatCompletionMessage) (openai
 		},
 	)
 	if err != nil {
-		return openai.ChatCompletionResponse{}, errors.Wrap(err, "create chat completion")
+		return openai.ChatCompletionResponse{}, fmt.Errorf("create chat completion: %w", err)
 	}
 	return completion, nil
 }
@@ -43,7 +43,7 @@ func (c *Client) StreamCompletion(messages []openai.ChatCompletionMessage) (*ope
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "create chat completion stream")
+		return nil, fmt.Errorf("create chat completion stream: %w", err)
 	}
 	return completion, nil
 }
