@@ -12,6 +12,9 @@ env:
   FLY_STAGING_APP_NAME: ${{ vars.FLY_APP_NAME }}-staging
 
 jobs:
+  test:
+    uses: ./.github/workflows/pull-request.yml
+
   build_and_push:
     uses: ./.github/workflows/docker-build-and-push.yml
     with:
@@ -29,7 +32,7 @@ jobs:
       docker_image_uri: ${{ needs.build_and_push.outputs.docker_image_uri }}
 
   prod:
-    needs: [ build_and_push, staging ]
+    needs: [ build_and_push, staging, test ]
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
     with:
