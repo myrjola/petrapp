@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/errors"
 	"log/slog"
 	"net"
 	"net/http"
@@ -41,19 +42,19 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		shutdownContext, cancel = context.WithTimeout(context.Background(), defaultTimeout)
 		defer cancel()
 		if err = srv.Shutdown(shutdownContext); err != nil {
-			err = errors.Wrap(err, "shutdown server")
-			app.logger.LogAttrs(ctx, slog.LevelError, "error shutting down server", errors.SlogError(err))
+			err = fmt.Errorf("shutdown server: %w", err)
+			app.logger.LogAttrs(ctx, slog.LevelError, "error shutting down server", slog.Any("error", err))
 		}
 		close(shutdownComplete)
 	}()
 
 	var listener net.Listener
 	if listener, err = net.Listen("tcp", addr); err != nil {
-		return errors.Wrap(err, "TCP listen")
+		return fmt.Errorf("TCP listen: %w", err)
 	}
 	app.logger.LogAttrs(ctx, slog.LevelInfo, "starting server", slog.Any(e2etest.LogAddrKey, listener.Addr().String()))
 	if err = srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
-		return errors.Wrap(err, "server serve")
+		return fmt.Errorf("server serve: %w", err)
 	}
 	<-shutdownComplete
 

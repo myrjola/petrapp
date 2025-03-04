@@ -1,0 +1,78 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.workoutCompletionTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+            }
+        </style>
+
+        <div>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        text-align: center;
+                        gap: var(--size-2);
+
+                        > h1 {
+                            font-size: var(--font-size-6);
+                            font-weight: var(--font-weight-7);
+                        }
+
+                        > h2 {
+                            font-size: var(--font-size-4);
+                            font-weight: var(--font-weight-4);
+                            color: var(--gray-7);
+                        }
+                    }
+                }
+            </style>
+            <h1>Well done!</h1>
+            <h2>How did it feel today?</h2>
+        </div>
+
+        <div class="difficulty-choices">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+
+                        button {
+                            width: 100%;
+                            justify-content: center;
+                            padding: var(--size-4);
+                            font-size: var(--font-size-3);
+                            background-color: var(--white);
+                            color: var(--gray-9);
+                            border: var(--border-size-1) solid var(--gray-3);
+
+                            &:hover {
+                                background-color: var(--sky-1);
+                                border-color: var(--sky-7);
+                                color: var(--sky-9);
+                            }
+                        }
+                    }
+                }
+            </style>
+
+            {{ range .Difficulties }}
+                <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/feedback/{{ .Value }}">
+                    {{ csrf }}
+                    <button type="submit">{{ .Label }}</button>
+                </form>
+            {{ end }}
+        </div>
+    </main>
+{{ end }}

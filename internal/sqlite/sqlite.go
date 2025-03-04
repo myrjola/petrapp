@@ -2,10 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/errors"
-	"github.com/myrjola/petrapp/internal/random"
 	"log/slog"
 	"strings"
 	"time"
@@ -39,16 +39,16 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 	)
 
 	if db, err = connect(url, logger); err != nil {
-		return nil, errors.Wrap(err, "connect")
+		return nil, fmt.Errorf("connect: %w", err)
 	}
 
 	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
-		return nil, errors.Wrap(err, "migrateTo")
+		return nil, fmt.Errorf("migrateTo: %w", err)
 	}
 
 	// Apply fixtures.
 	if _, err = db.ReadWrite.ExecContext(ctx, fixtures); err != nil {
-		return nil, errors.Wrap(err, "apply fixtures")
+		return nil, fmt.Errorf("apply fixtures: %w", err)
 	}
 
 	go db.startDatabaseOptimizer(ctx)
@@ -70,16 +70,14 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	isInMemory := strings.Contains(url, ":memory:")
 	inMemoryConfig := ""
 	if isInMemory {
-		var (
-			randomID     string
-			dbNameLength uint = 20
-		)
-		if randomID, err = random.Letters(dbNameLength); err != nil {
-			return nil, errors.Wrap(err, "generate random ID")
-		}
-		url = fmt.Sprintf("file:%s", randomID)
+		url = fmt.Sprintf("file:%s", rand.Text())
 		inMemoryConfig = "mode=memory&cache=shared"
 	}
+	//nolint:godox // temporary todo
+	// TODO: Many of these don't work. Would need a connection hook instead.
+	//       See https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Connection_Hook
+	//       and https://github.com/mattn/go-sqlite3/issues/1248#issuecomment-2227586113
+	//       also consider adding a logging or duration hook.
 	commonConfig := strings.Join([]string{
 		// Write-ahead logging enables higher performance and concurrent readers.
 		"_journal_mode=wal",
@@ -107,7 +105,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readWriteConfig := fmt.Sprintf("file:%s?mode=rwc&_txlock=immediate&%s&%s", url, commonConfig, inMemoryConfig)
 
 	if readWriteDB, err = sql.Open("sqlite3", readWriteConfig); err != nil {
-		return nil, errors.Wrap(err, "open read-write database")
+		return nil, fmt.Errorf("open read-write database: %w", err)
 	}
 
 	readWriteDB.SetMaxOpenConns(1)
@@ -116,7 +114,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readWriteDB.SetConnMaxIdleTime(time.Hour)
 
 	if readDB, err = sql.Open("sqlite3", readConfig); err != nil {
-		return nil, errors.Wrap(err, "open read database")
+		return nil, fmt.Errorf("open read database: %w", err)
 	}
 
 	maxReadConns := 10
@@ -130,4 +128,9 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 		ReadOnly:  readDB,
 		logger:    logger,
 	}, nil
+}
+
+// Close closes the database connections.
+func (db *Database) Close() error {
+	return errors.Join(db.ReadOnly.Close(), db.ReadWrite.Close())
 }

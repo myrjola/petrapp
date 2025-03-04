@@ -5,9 +5,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/petrapp/internal/errors"
-	"log/slog"
 )
 
 func (h *WebAuthnHandler) upsertUser(ctx context.Context, user webauthn.User) error {
@@ -16,12 +15,10 @@ func (h *WebAuthnHandler) upsertUser(ctx context.Context, user webauthn.User) er
 VALUES (:id, :display_name)
 ON CONFLICT (id) DO UPDATE SET display_name = :display_name`
 	if _, err = h.database.ReadWrite.ExecContext(ctx, stmt, user.WebAuthnID(), user.WebAuthnDisplayName()); err != nil {
-		return errors.Wrap(
-			err,
-			"db upsert",
-			slog.String("display_name", user.WebAuthnDisplayName()),
-			slog.Any("user_id", hex.EncodeToString(user.WebAuthnID())),
-		)
+		return fmt.Errorf("db upsert user %s (id: %s): %w",
+			user.WebAuthnDisplayName(),
+			hex.EncodeToString(user.WebAuthnID()),
+			err)
 	}
 	return nil
 }
@@ -35,7 +32,7 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, id []byte) (*user, error)
 	stmt := `SELECT id, display_name FROM users WHERE id = ?`
 	var user user
 	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, id).Scan(&user.id, &user.displayName); err != nil {
-		return nil, errors.Wrap(err, "read user")
+		return nil, fmt.Errorf("read user: %w", err)
 	}
 
 	// scan credentials
@@ -54,12 +51,12 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, id []byte) (*user, error)
 FROM credentials
 WHERE user_id = ?`
 	if rows, err = h.database.ReadOnly.QueryContext(ctx, stmt, id); err != nil {
-		return nil, errors.Wrap(err, "query credentials")
+		return nil, fmt.Errorf("query credentials: %w", err)
 	}
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			h.logger.Error("could not close rows", "err", errors.Wrap(err, "close rows"))
+			h.logger.Error("could not close rows", "err", fmt.Errorf("close rows: %w", err))
 		}
 	}()
 
@@ -82,16 +79,16 @@ WHERE user_id = ?`
 			&credential.Authenticator.CloneWarning,
 			&credential.Authenticator.Attachment,
 		); err != nil {
-			return nil, errors.Wrap(err, "scan credential")
+			return nil, fmt.Errorf("scan credential: %w", err)
 		}
 		if err = json.Unmarshal(transport, &credential.Transport); err != nil {
-			return nil, errors.Wrap(err, "JSON decode transport")
+			return nil, fmt.Errorf("JSON decode transport: %w", err)
 		}
 		user.credentials = append(user.credentials, credential)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, errors.Wrap(err, "check rows error")
+		return nil, fmt.Errorf("check rows error: %w", err)
 	}
 
 	return &user, nil
@@ -128,7 +125,7 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
 	var encodedTransport []byte
 	encodedTransport, err = json.Marshal(credential.Transport)
 	if err != nil {
-		return errors.Wrap(err, "JSON encode transport")
+		return fmt.Errorf("JSON encode transport: %w", err)
 	}
 	_, err = h.database.ReadWrite.ExecContext(
 		ctx,
@@ -148,10 +145,10 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
 		credential.Authenticator.Attachment,
 	)
 	if err != nil {
-		return errors.Wrap(err, "db upsert credential",
-			slog.String("user_id", hex.EncodeToString(userID)),
-			slog.String("credential_id", hex.EncodeToString(credential.ID)),
-		)
+		return fmt.Errorf("db upsert credential (user_id: %s, credential_id: %s): %w",
+			hex.EncodeToString(userID),
+			hex.EncodeToString(credential.ID),
+			err)
 	}
 	return nil
 }
@@ -160,7 +157,7 @@ func (h *WebAuthnHandler) userExists(ctx context.Context, userID []byte) (bool, 
 	stmt := `SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`
 	var exists bool
 	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, userID).Scan(&exists); err != nil {
-		return false, errors.Wrap(err, "query user exists")
+		return false, fmt.Errorf("query user exists: %w", err)
 	}
 	return exists, nil
 }

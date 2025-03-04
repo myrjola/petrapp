@@ -8,7 +8,6 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/ptr"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
@@ -83,7 +82,7 @@ func New(
 
 	var webAuthn *webauthn.WebAuthn
 	if webAuthn, err = webauthn.New(webauthnConfig); err != nil {
-		return nil, errors.Wrap(err, "new webauthn")
+		return nil, fmt.Errorf("new webauthn: %w", err)
 	}
 
 	return &WebAuthnHandler{
@@ -100,7 +99,7 @@ func (h *WebAuthnHandler) BeginRegistration(ctx context.Context) ([]byte, error)
 		err  error
 	)
 	if user, err = newRandomUser(); err != nil {
-		return nil, errors.Wrap(err, "new user")
+		return nil, fmt.Errorf("new user: %w", err)
 	}
 
 	authSelect := protocol.AuthenticatorSelection{
@@ -115,17 +114,17 @@ func (h *WebAuthnHandler) BeginRegistration(ctx context.Context) ([]byte, error)
 		webauthn.WithAuthenticatorSelection(authSelect),
 		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired))
 	if err != nil {
-		return nil, errors.Wrap(err, "begin registration")
+		return nil, fmt.Errorf("begin registration: %w", err)
 	}
 
 	h.sessionManager.Put(ctx, string(webAuthnSessionKey), *session)
 	if err = h.upsertUser(ctx, user); err != nil {
-		return nil, errors.Wrap(err, "upsert user")
+		return nil, fmt.Errorf("upsert user: %w", err)
 	}
 
 	var out []byte
 	if out, err = json.Marshal(opts); err != nil {
-		return nil, errors.Wrap(err, "JSON encode")
+		return nil, fmt.Errorf("JSON encode: %w", err)
 	}
 	return out, nil
 }
@@ -138,7 +137,7 @@ func (h *WebAuthnHandler) parseWebAuthnSession(ctx context.Context) (webauthn.Se
 	)
 	ses := h.sessionManager.Get(ctx, string(webAuthnSessionKey))
 	if session, ok = ses.(webauthn.SessionData); !ok {
-		err = errors.New("could not parse webauthn.SessionData", slog.Any("data", ses))
+		err = fmt.Errorf("could not parse webauthn.SessionData (data: %v)", ses)
 	}
 	return session, err
 }
@@ -151,26 +150,26 @@ func (h *WebAuthnHandler) FinishRegistration(r *http.Request) error {
 	)
 
 	if session, err = h.parseWebAuthnSession(ctx); err != nil {
-		return errors.Wrap(err, "parse webauthn session")
+		return fmt.Errorf("parse webauthn session: %w", err)
 	}
 
 	var user webauthn.User
 	if user, err = h.getUser(ctx, session.UserID); err != nil {
-		return errors.Wrap(err, "get user")
+		return fmt.Errorf("get user: %w", err)
 	}
 
 	var credential *webauthn.Credential
 	if credential, err = h.webAuthn.FinishRegistration(user, session, r); err != nil {
-		return errors.Wrap(err, "finish webauthn registration")
+		return fmt.Errorf("finish webauthn registration: %w", err)
 	}
 
 	if err = h.upsertCredential(ctx, user.WebAuthnID(), credential); err != nil {
-		return errors.Wrap(err, "upsert webauthn credential")
+		return fmt.Errorf("upsert webauthn credential: %w", err)
 	}
 
 	// Log in the newly registered user
 	if err = h.sessionManager.RenewToken(r.Context()); err != nil {
-		return errors.Wrap(err, "renew session token")
+		return fmt.Errorf("renew session token: %w", err)
 	}
 	h.sessionManager.Put(r.Context(), string(userIDSessionKey), user.WebAuthnID())
 
@@ -180,7 +179,7 @@ func (h *WebAuthnHandler) FinishRegistration(r *http.Request) error {
 func (h *WebAuthnHandler) BeginLogin(w http.ResponseWriter, r *http.Request) ([]byte, error) {
 	options, session, err := h.webAuthn.BeginDiscoverableLogin()
 	if err != nil {
-		return nil, errors.Wrap(err, "begin discoverable webauthn login")
+		return nil, fmt.Errorf("begin discoverable webauthn login: %w", err)
 	}
 
 	h.sessionManager.Put(r.Context(), string(webAuthnSessionKey), *session)
@@ -188,7 +187,7 @@ func (h *WebAuthnHandler) BeginLogin(w http.ResponseWriter, r *http.Request) ([]
 	w.Header().Set("Content-Type", "application/json")
 	var out []byte
 	if out, err = json.Marshal(options); err != nil {
-		return nil, errors.Wrap(err, "json marshal webauthn options")
+		return nil, fmt.Errorf("json marshal webauthn options: %w", err)
 	}
 	return out, nil
 }
@@ -207,25 +206,25 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 		ctx     = r.Context()
 	)
 	if session, err = h.parseWebAuthnSession(ctx); err != nil {
-		return errors.Wrap(err, "parse webauthn session")
+		return fmt.Errorf("parse webauthn session: %w", err)
 	}
 
 	parsedResponse, err := protocol.ParseCredentialRequestResponse(r)
 	if err != nil {
-		return errors.Wrap(err, "parse credential request response")
+		return fmt.Errorf("parse credential request response: %w", err)
 	}
 	user, credential, err := h.webAuthn.ValidatePasskeyLogin(h.findUserHandler(ctx), session, parsedResponse)
 	if err != nil {
-		return errors.Wrap(err, "validate Passkey login")
+		return fmt.Errorf("validate Passkey login: %w", err)
 	}
 
 	if err = h.upsertCredential(ctx, user.WebAuthnID(), credential); err != nil {
-		return errors.Wrap(err, "upsert webauthn credential")
+		return fmt.Errorf("upsert webauthn credential: %w", err)
 	}
 
 	// Set userID in session
 	if err = h.sessionManager.RenewToken(r.Context()); err != nil {
-		return errors.Wrap(err, "renew session token")
+		return fmt.Errorf("renew session token: %w", err)
 	}
 	h.sessionManager.Put(r.Context(), string(userIDSessionKey), user.WebAuthnID())
 
@@ -234,7 +233,7 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 
 func (h *WebAuthnHandler) Logout(ctx context.Context) error {
 	if err := h.sessionManager.RenewToken(ctx); err != nil {
-		return errors.Wrap(err, "renew session token")
+		return fmt.Errorf("renew session token: %w", err)
 	}
 	h.sessionManager.Remove(ctx, string(userIDSessionKey))
 	return nil

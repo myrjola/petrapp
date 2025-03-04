@@ -1,7 +1,7 @@
 package e2etest
 
 import (
-	"github.com/myrjola/petrapp/internal/errors"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -15,7 +15,7 @@ type unsafeCookieJar struct {
 func newUnsafeCookieJar() (*unsafeCookieJar, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "new cookie jar")
+		return nil, fmt.Errorf("new cookie jar: %w", err)
 	}
 
 	return &unsafeCookieJar{jar: jar}, nil

@@ -1,29 +1,30 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/justinas/nosurf"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
-	"github.com/myrjola/petrapp/internal/random"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 )
 
 func secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate a random nonce for use in CSP and set it in the context so that it can be added to the script tags.
-		var nonceLength uint = 24
-		cspNonce, err := random.Letters(nonceLength)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		csp := fmt.Sprintf(`script-src 'nonce-%s' 'strict-dynamic' https: http:;
-style-src 'nonce-%s' 'strict-dynamic' https: http:;
+		cspNonce := rand.Text()
+		csp := fmt.Sprintf(`default-src 'none';
+script-src 'nonce-%s' 'strict-dynamic' https: http:;
+connect-src 'self';
+img-src 'self';
+style-src 'nonce-%s' 'self';
+frame-ancestors 'self';
+form-action 'self';
 object-src 'none';
+manifest-src 'self';
 base-uri 'none';`, cspNonce, cspNonce)
 
 		w.Header().Set("Content-Security-Policy", csp)
@@ -75,7 +76,7 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if excp := recover(); excp != nil {
-				err := errors.DecoratePanic(excp)
+				err := fmt.Errorf("panic: %v\n%s", excp, string(debug.Stack()))
 				app.serverError(w, r, err)
 			}
 		}()
@@ -104,12 +105,17 @@ func commonContext(next http.Handler) http.Handler {
 }
 
 // noSurf implements CSRF protection using https://github.com/justinas/nosurf
-func noSurf(next http.Handler) http.Handler {
+func (app *application) noSurf(next http.Handler) http.Handler {
 	csrfHandler := nosurf.New(next)
+	csrfHandler.SetFailureHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "csrf token validation failed")
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	}))
 	csrfHandler.SetBaseCookie(http.Cookie{
-		HttpOnly: true,
 		Path:     "/",
 		Secure:   true,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	})
 	return csrfHandler
 }

@@ -1,9 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/errors"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,7 +26,7 @@ func findModuleDir() (string, error) {
 	)
 	dir, err = os.Getwd()
 	if err != nil {
-		return "", errors.Wrap(err, "get working directory")
+		return "", fmt.Errorf("get working directory: %w", err)
 	}
 
 	for {
@@ -53,16 +52,16 @@ func resolveAndVerifyTemplatePath(templatePath string) (string, error) {
 	if templatePath == "" {
 		var modulePath string
 		if modulePath, err = findModuleDir(); err != nil {
-			return "", errors.Wrap(err, "find module dir")
+			return "", fmt.Errorf("find module dir: %w", err)
 		}
 		templatePath = filepath.Join(modulePath, "ui", "templates")
 	}
 	var stat os.FileInfo
 	if stat, err = os.Stat(templatePath); err != nil {
-		return "", errors.Wrap(err, "template path not found", slog.String("path", templatePath))
+		return "", fmt.Errorf("template path not found %s: %w", templatePath, err)
 	}
 	if !stat.IsDir() {
-		return "", errors.New("template path is not a directory", slog.String("path", templatePath))
+		return "", fmt.Errorf("template path is not a directory: %s", templatePath)
 	}
 	return templatePath, nil
 }

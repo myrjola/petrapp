@@ -1,0 +1,80 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.preferencesTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                }
+            }
+        </style>
+
+        <h1>Weekly Schedule</h1>
+        <p>On which days are you planning to go to gym?</p>
+
+        <form method="post" action="/preferences">
+            {{ csrf }}
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        label {
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-3);
+                            padding-block: var(--size-3);
+
+                            &:hover {
+                                background-color: var(--gray-0);
+                            }
+
+                            input[type="checkbox"] {
+                                width: var(--size-5);
+                                height: var(--size-5);
+                                margin: 0;
+                            }
+                        }
+
+                        button[type="submit"] {
+                            margin-top: var(--size-4);
+                            width: 100%;
+                        }
+                    }
+                }
+            </style>
+            {{ range .Weekdays }}
+                <label>
+                    <input
+                            type="checkbox"
+                            name="{{ .ID }}"
+                            value="true"
+                            {{ if .Checked }}checked{{ end }}
+                    >
+                    <span>
+                            {{ .Name }}
+                        </span>
+                </label>
+                </div>
+            {{ end }}
+            <button type="submit">Save</button>
+        </form>
+        <footer>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        margin-top: var(--size-4);
+                        display: flex;
+                        justify-content: center;
+                        gap: var(--size-4);
+                    }
+                }
+            </style>
+            <form action="/api/logout" method="post">
+                {{ csrf }}
+                <button type="submit">
+                    <span>Log out</span>
+                </button>
+            </form>
+        </footer>
+    </main>
+{{ end }}

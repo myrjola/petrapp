@@ -11,7 +11,7 @@ const timeoutBody = `<html lang="en">
 <h1>Timeout</h1>
 <div>
     <button type="button">
-        <span>Retry</span>
+        <span>Retry (does not work without nonce in place)</span>
         <script>
           document.currentScript.parentElement.addEventListener('click', function () {
             location.reload();

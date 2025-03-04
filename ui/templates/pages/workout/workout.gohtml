@@ -1,0 +1,85 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.workoutTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                }
+            }
+        </style>
+
+        <div class="exercise-list">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+
+                        .exercise {
+                            display: flex;
+                            align-items: center;
+                            padding: var(--size-3);
+                            text-decoration: line-through;
+                            color: var(--gray-5);
+                        }
+
+                        .exercise.active {
+                            text-decoration: none;
+                            color: var(--gray-9);
+                            font-weight: var(--font-weight-6);
+                        }
+
+                        a.exercise {
+                            text-decoration: none;
+                            background: var(--gray-1);
+                            border-radius: var(--radius-2);
+                            transition: background-color 0.2s;
+
+                            &:hover {
+                                background: var(--gray-2);
+                            }
+                        }
+                    }
+                }
+            </style>
+
+            {{ range .Session.ExerciseSets }}
+                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
+                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}">
+                    {{ .Exercise.Name }}
+                </a>
+            {{ end }}
+        </div>
+
+        <div class="complete-workout">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        padding: var(--size-4);
+                        position: sticky;
+                        bottom: 0;
+                        background: var(--white);
+                        box-shadow: 0 -1px 2px 0 rgb(0 0 0 / 0.05);
+
+                        button {
+                            width: 100%;
+                            justify-content: center;
+                            font-size: var(--font-size-2);
+                            padding: var(--size-3);
+                        }
+                    }
+                }
+            </style>
+            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/complete">
+                {{ csrf }}
+                <button type="submit">Complete workout</button>
+            </form>
+        </div>
+    </main>
+{{ end }}

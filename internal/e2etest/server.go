@@ -3,7 +3,6 @@ package e2etest
 import (
 	"context"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"io"
 	"log/slog"
@@ -51,7 +50,7 @@ func StartServer(
 	}()
 	select {
 	case <-ctx.Done():
-		return nil, errors.Wrap(context.Cause(ctx), "context cancelled")
+		return nil, fmt.Errorf("context cancelled: %w", context.Cause(ctx))
 	case addr := <-addrCh:
 		var (
 			err    error
@@ -59,10 +58,10 @@ func StartServer(
 		)
 		serverURL := fmt.Sprintf("http://%s", addr)
 		if client, err = NewClient(serverURL, "localhost", "http://localhost:0"); err != nil {
-			return nil, errors.Wrap(err, "new client")
+			return nil, fmt.Errorf("new client: %w", err)
 		}
 		if err = client.WaitForReady(ctx, "/api/healthy"); err != nil {
-			return nil, errors.Wrap(err, "wait for ready")
+			return nil, fmt.Errorf("wait for ready: %w", err)
 		}
 		return &Server{
 			url:    serverURL,

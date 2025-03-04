@@ -2,15 +2,16 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/ai"
 	"github.com/myrjola/petrapp/internal/envstruct"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/webauthnhandler"
+	"github.com/myrjola/petrapp/internal/workout"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -25,11 +26,12 @@ type application struct {
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
+	workoutService  *workout.Service
 }
 
 type config struct {
 	// Addr is the address to listen on. It's possible to choose the address dynamically with localhost:0.
-	Addr string `env:"PETRAPP_ADDR" envDefault:"localhost:4000"`
+	Addr string `env:"PETRAPP_ADDR" envDefault:"localhost:8081"`
 	// FQDN is the fully qualified domain name of the server used for WebAuthn Relying Party configuration.
 	FQDN string `env:"PETRAPP_FQDN" envDefault:"localhost"`
 	// FlyAppName is the name of the Fly application. It's used to override the FQDN.
@@ -53,7 +55,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	var cfg config
 	if err = envstruct.Populate(&cfg, lookupEnv); err != nil {
-		return errors.Wrap(err, "populate config")
+		return fmt.Errorf("populate config: %w", err)
 	}
 
 	if cfg.PProfAddr != "" {
@@ -62,12 +64,12 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	var htmlTemplatePath string
 	if htmlTemplatePath, err = resolveAndVerifyTemplatePath(cfg.TemplatePath); err != nil {
-		return errors.Wrap(err, "resolve template path")
+		return fmt.Errorf("resolve template path: %w", err)
 	}
 
 	db, err := sqlite.NewDatabase(ctx, cfg.SqliteURL, logger)
 	if err != nil {
-		return errors.Wrap(err, "open db", slog.String("url", cfg.SqliteURL))
+		return fmt.Errorf("open db (url: %s): %w", cfg.SqliteURL, err)
 	}
 	logger.LogAttrs(ctx, slog.LevelInfo, "connected to db")
 
@@ -79,7 +81,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 	var webAuthnHandler *webauthnhandler.WebAuthnHandler
 	if webAuthnHandler, err = webauthnhandler.New(cfg.Addr, fqdn, logger, sessionManager, db); err != nil {
-		return errors.Wrap(err, "new webauthn handler")
+		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
 	app := application{
@@ -88,10 +90,11 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
+		workoutService:  workout.NewService(db, logger),
 	}
 
 	if err = app.configureAndStartServer(ctx, cfg.Addr); err != nil {
-		return errors.Wrap(err, "start server")
+		return fmt.Errorf("start server: %w", err)
 	}
 	return nil
 }
@@ -116,7 +119,7 @@ func main() {
 	}))
 	logger := slog.New(loggerHandler)
 	if err := run(ctx, logger, os.LookupEnv); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", errors.SlogError(err))
+		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", slog.Any("error", err))
 		os.Exit(1)
 	}
 }

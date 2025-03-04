@@ -1,30 +1,49 @@
 package main
 
 import (
-	"github.com/justinas/alice"
 	"net/http"
 )
 
 func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
-	common := alice.New(app.recoverPanic, app.logRequest, secureHeaders, noSurf, commonContext, timeout)
-	session := alice.New(common.Then, app.sessionManager.LoadAndSave, app.webAuthnHandler.AuthenticateMiddleware)
-	mustSession := alice.New(session.Then, app.mustAuthenticate)
 
+	// Define middleware chain functions
+	common := func(next http.Handler) http.Handler {
+		return app.recoverPanic(app.logRequest(secureHeaders(app.noSurf(commonContext(timeout(next))))))
+	}
+
+	session := func(next http.Handler) http.Handler {
+		return common(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(next)))
+	}
+
+	mustSession := func(next http.Handler) http.Handler {
+		return session(app.mustAuthenticate(next))
+	}
+
+	// File server
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("/", common.Then(cacheForeverHeaders(fileServer)))
+	mux.Handle("/", common(cacheForeverHeaders(fileServer)))
 
-	mux.Handle("GET /{$}", session.ThenFunc(app.home))
+	// Routes
+	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
+	mux.Handle("GET /workouts/{date}", mustSession(http.HandlerFunc(app.workoutGET)))
+	mux.Handle("POST /workouts/{date}/start", mustSession(http.HandlerFunc(app.workoutStartPOST)))
+	mux.Handle("POST /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletePOST)))
+	mux.Handle("GET /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletionGET)))
+	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}", mustSession(http.HandlerFunc(app.exerciseSetGET)))
+	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/sets/{setIndex}/update",
+		mustSession(http.HandlerFunc(app.exerciseSetUpdatePOST)))
+	mux.Handle("POST /workouts/{date}/feedback/{difficulty}", mustSession(http.HandlerFunc(app.workoutFeedbackPOST)))
 
-	mux.Handle("GET /preferences", mustSession.ThenFunc(app.preferences))
+	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
+	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
 
-	mux.Handle("POST /api/registration/start", session.ThenFunc(app.beginRegistration))
-	mux.Handle("POST /api/registration/finish", session.ThenFunc(app.finishRegistration))
-	mux.Handle("POST /api/login/start", session.ThenFunc(app.beginLogin))
-	mux.Handle("POST /api/login/finish", session.ThenFunc(app.finishLogin))
-	mux.Handle("POST /api/logout", session.ThenFunc(app.logout))
-
-	mux.Handle("GET /api/healthy", session.ThenFunc(app.healthy))
+	mux.Handle("POST /api/registration/start", session(http.HandlerFunc(app.beginRegistration)))
+	mux.Handle("POST /api/registration/finish", session(http.HandlerFunc(app.finishRegistration)))
+	mux.Handle("POST /api/login/start", session(http.HandlerFunc(app.beginLogin)))
+	mux.Handle("POST /api/login/finish", session(http.HandlerFunc(app.finishLogin)))
+	mux.Handle("POST /api/logout", session(http.HandlerFunc(app.logout)))
+	mux.Handle("GET /api/healthy", session(http.HandlerFunc(app.healthy)))
 
 	return mux
 }

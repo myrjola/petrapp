@@ -1,7 +1,11 @@
+---------------------------------
+-- Authentication and sessions --
+---------------------------------
+
 CREATE TABLE sessions
 (
-    token  TEXT PRIMARY KEY CHECK (length(token) < 256),
-    data   BLOB NOT NULL CHECK (length(data) < 2056),
+    token  TEXT PRIMARY KEY CHECK (LENGTH(token) < 256),
+    data   BLOB NOT NULL CHECK (LENGTH(data) < 2056),
     expiry REAL NOT NULL
 ) WITHOUT ROWID, STRICT;
 
@@ -9,11 +13,12 @@ CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 CREATE TABLE users
 (
-    id           BLOB PRIMARY KEY CHECK (length(id) < 256),
-    display_name TEXT NOT NULL CHECK (length(display_name) < 64),
-
-    created      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ')) CHECK (length(created) < 256),
-    updated      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ')) CHECK (length(updated) < 256)
+    id           BLOB PRIMARY KEY CHECK (LENGTH(id) < 256),
+    display_name TEXT NOT NULL CHECK (LENGTH(display_name) < 64),
+    created      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created) = created),
+    updated      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated)
 ) WITHOUT ROWID, STRICT;
 
 CREATE TRIGGER users_updated_timestamp
@@ -25,22 +30,22 @@ END;
 
 CREATE TABLE credentials
 (
-    id                          BLOB PRIMARY KEY CHECK (length(id) < 256),
-    public_key                  BLOB    NOT NULL CHECK (length(public_key) < 256),
-    attestation_type            TEXT    NOT NULL CHECK (length(attestation_type) < 256),
-    transport                   TEXT    NOT NULL CHECK (length(transport) < 256),
+    id                          BLOB PRIMARY KEY CHECK (LENGTH(id) < 256),
+    public_key                  BLOB    NOT NULL CHECK (LENGTH(public_key) < 256),
+    attestation_type            TEXT    NOT NULL CHECK (LENGTH(attestation_type) < 256),
+    transport                   TEXT    NOT NULL CHECK (LENGTH(transport) < 256),
     flag_user_present           INTEGER NOT NULL CHECK (flag_user_present IN (0, 1)),
     flag_user_verified          INTEGER NOT NULL CHECK (flag_user_verified IN (0, 1)),
     flag_backup_eligible        INTEGER NOT NULL CHECK (flag_backup_eligible IN (0, 1)),
     flag_backup_state           INTEGER NOT NULL CHECK (flag_backup_state IN (0, 1)),
-    authenticator_aaguid        BLOB    NOT NULL CHECK (length(authenticator_aaguid) < 256),
+    authenticator_aaguid        BLOB    NOT NULL CHECK (LENGTH(authenticator_aaguid) < 256),
     authenticator_sign_count    INTEGER NOT NULL,
     authenticator_clone_warning INTEGER NOT NULL CHECK (authenticator_clone_warning IN (0, 1)),
-    authenticator_attachment    TEXT    NOT NULL CHECK (length(authenticator_attachment) < 256),
-
-    created                     TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ')) CHECK (length(created) < 256),
-    updated                     TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ')) CHECK (length(updated) < 256),
-
+    authenticator_attachment    TEXT    NOT NULL CHECK (LENGTH(authenticator_attachment) < 256),
+    created                     TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created) = created),
+    updated                     TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated),
     user_id                     BLOB    NOT NULL REFERENCES users (id) ON DELETE CASCADE
 ) WITHOUT ROWID, STRICT;
 
@@ -50,3 +55,54 @@ CREATE TRIGGER credentials_updated_timestamp
 BEGIN
     UPDATE credentials SET updated = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE id = old.id;
 END;
+
+----------------------
+-- Workout planning --
+----------------------
+
+CREATE TABLE workout_preferences
+(
+    user_id   BLOB PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    monday    INTEGER NOT NULL DEFAULT 0 CHECK (monday IN (0, 1)),
+    tuesday   INTEGER NOT NULL DEFAULT 0 CHECK (tuesday IN (0, 1)),
+    wednesday INTEGER NOT NULL DEFAULT 0 CHECK (wednesday IN (0, 1)),
+    thursday  INTEGER NOT NULL DEFAULT 0 CHECK (thursday IN (0, 1)),
+    friday    INTEGER NOT NULL DEFAULT 0 CHECK (friday IN (0, 1)),
+    saturday  INTEGER NOT NULL DEFAULT 0 CHECK (saturday IN (0, 1)),
+    sunday    INTEGER NOT NULL DEFAULT 0 CHECK (sunday IN (0, 1))
+) WITHOUT ROWID, STRICT;
+
+CREATE TABLE exercises
+(
+    id       INTEGER PRIMARY KEY,
+    name     TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
+    category TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower'))
+) STRICT;
+
+CREATE TABLE workout_sessions
+(
+    user_id           BLOB NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    workout_date      TEXT NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
+                                           DATE(workout_date, '+0 days') IS workout_date),
+    difficulty_rating INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
+    started_at        TEXT CHECK (started_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', started_at) = started_at),
+    completed_at      TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+
+    PRIMARY KEY (user_id, workout_date)
+) WITHOUT ROWID, STRICT;
+
+CREATE TABLE exercise_sets
+(
+    workout_user_id    BLOB    NOT NULL,
+    workout_date       TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
+    exercise_id        INTEGER NOT NULL REFERENCES exercises (id),
+    set_number         INTEGER NOT NULL CHECK (set_number > 0),
+    weight_kg          REAL    NOT NULL CHECK (weight_kg >= 0),
+    adjusted_weight_kg REAL    NOT NULL CHECK (adjusted_weight_kg >= 0),
+    min_reps           INTEGER NOT NULL CHECK (min_reps > 0),
+    max_reps           INTEGER NOT NULL CHECK (max_reps >= min_reps),
+    completed_reps     INTEGER,
+
+    PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
+    FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE
+) WITHOUT ROWID, STRICT;

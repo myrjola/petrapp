@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/petrapp/internal/errors"
 	"time"
 )
 
@@ -20,7 +19,7 @@ const webauthnIDSize = 64
 func newRandomUser() (user, error) {
 	id := make([]byte, webauthnIDSize)
 	if _, err := rand.Read(id); err != nil {
-		return user{}, errors.Wrap(err, "generate user id")
+		return user{}, fmt.Errorf("generate user id: %w", err)
 	}
 
 	return user{
