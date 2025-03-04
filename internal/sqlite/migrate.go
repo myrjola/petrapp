@@ -2,10 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/random"
 	"log/slog"
 	"os"
 	"strings"
@@ -92,15 +92,8 @@ func (db *Database) migrateTo(ctx context.Context, schemaDefinition string) erro
 // a function to detach the database that must be called after the migration.
 func (db *Database) attachSchemaTargetDatabase(ctx context.Context, schemaDefinition string) (func(), error) {
 	// Create schema against a temporary database so that we know what has changed.
-	var (
-		randomID     string
-		dbNameLength uint = 20
-		err          error
-	)
-	if randomID, err = random.Letters(dbNameLength); err != nil {
-		return nil, fmt.Errorf("generate random ID: %w", err)
-	}
-	schemaTargetDataSourceName := fmt.Sprintf("file:%s?mode=memory&cache=shared", randomID)
+	var err error
+	schemaTargetDataSourceName := fmt.Sprintf("file:%s?mode=memory&cache=shared", rand.Text())
 	schemaTargetDatabase, err := sql.Open("sqlite3", schemaTargetDataSourceName)
 	if err != nil {
 		return nil, fmt.Errorf("open schema target database: %w", err)
@@ -149,7 +142,7 @@ func (db *Database) migrateTables(ctx context.Context, tx *sql.Tx) error {
 	for _, table := range deletedTables {
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "dropping table", slog.String("table", table))
 		if _, err = tx.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s", table)); err != nil {
-			return fmt.Errorf("drop table %s: %w", table, err)
+			return fmt.Errorf("DROP TABLE %s: %w", table, err)
 		}
 	}
 

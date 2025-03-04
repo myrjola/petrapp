@@ -2,10 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/random"
 	"log/slog"
 	"strings"
 	"time"
@@ -70,14 +70,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	isInMemory := strings.Contains(url, ":memory:")
 	inMemoryConfig := ""
 	if isInMemory {
-		var (
-			randomID     string
-			dbNameLength uint = 20
-		)
-		if randomID, err = random.Letters(dbNameLength); err != nil {
-			return nil, fmt.Errorf("generate random ID: %w", err)
-		}
-		url = fmt.Sprintf("file:%s", randomID)
+		url = fmt.Sprintf("file:%s", rand.Text())
 		inMemoryConfig = "mode=memory&cache=shared"
 	}
 	//nolint:godox // temporary todo

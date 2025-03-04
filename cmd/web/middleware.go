@@ -1,13 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/justinas/nosurf"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
-	"github.com/myrjola/petrapp/internal/random"
 	"log/slog"
 	"net/http"
 )
@@ -15,12 +15,7 @@ import (
 func secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate a random nonce for use in CSP and set it in the context so that it can be added to the script tags.
-		var nonceLength uint = 24
-		cspNonce, err := random.Letters(nonceLength)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
+		cspNonce := rand.Text()
 		csp := fmt.Sprintf(`default-src 'none';
 script-src 'nonce-%s' 'strict-dynamic' https: http:;
 connect-src 'self';
