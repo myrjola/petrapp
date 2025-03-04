@@ -4,7 +4,7 @@ Personal trainer app
 
 ## Quickstart
 
-### Install dependencies and configure linting
+### Install dependencies, configure linting, and install git hooks
 
 ```
 make init

@@ -17,6 +17,7 @@ if [ $? -ne 0 ]; then
     echo "Verification failed. Push aborted."
     exit 1
 fi
+EOL
 
 # Make hooks executable
 chmod +x .githooks/pre-push
@@ -25,4 +26,3 @@ chmod +x .githooks/pre-push
 git config core.hooksPath .githooks
 
 echo "Git hooks for Petrapp have been set up successfully!"
-EOL
