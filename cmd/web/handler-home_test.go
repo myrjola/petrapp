@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"os"
@@ -21,10 +20,10 @@ func testLookupEnv(key string) (string, bool) {
 
 func Test_application_home(t *testing.T) {
 	var (
-		ctx = context.Background()
+		ctx = t.Context()
 		doc *goquery.Document
 	)
-	server, err := e2etest.StartServer(context.Background(), os.Stdout, testLookupEnv, run)
+	server, err := e2etest.StartServer(t.Context(), os.Stdout, testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

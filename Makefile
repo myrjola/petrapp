@@ -1,8 +1,10 @@
 
+.DEFAULT_GOAL := ci
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
         cross-compile migratetest repomix repomix-clipboard
 
 export GOTOOLCHAIN := auto
+GOLANGCI_LINT_VERSION := v1.64.6
 
 init: gomod custom-gcl
 	@echo "Dependencies installed"
@@ -15,7 +17,7 @@ gomod:
 
 custom-gcl:
 	@echo "Installing golangci-lint and building custom version for nilaway plugin to ./custom-gcl"
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.63.4
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 	bin/golangci-lint custom
 
 sec:

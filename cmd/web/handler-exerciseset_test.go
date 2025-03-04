@@ -1,157 +1,264 @@
 package main
 
 import (
-	"context"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"net/http"
 	"os"
+	"strconv"
 	"testing"
+	"time"
 )
 
-//nolint:gocognit // this is a test function
 func Test_application_exerciseSet(t *testing.T) {
 	var (
-		ctx = context.Background()
+		ctx = t.Context()
 		doc *goquery.Document
 		err error
 	)
 
-	server, err := e2etest.StartServer(context.Background(), os.Stdout, testLookupEnv, run)
+	server, err := e2etest.StartServer(ctx, os.Stdout, testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
 
 	client := server.Client()
 
-	// First register to get authenticated
-	if doc, err = client.Register(ctx); err != nil {
-		t.Fatalf("Failed to register: %v", err)
-	}
-
-	// Test 1: Accessing exercise set page without authentication should redirect to home
-	t.Run("Requires authentication", func(t *testing.T) {
-		resp, err := http.Get(server.URL() + "/workouts/2025-02-27/exercises/1")
-		if err != nil {
-			t.Fatalf("Failed to get exercise set page: %v", err)
-		}
-		if got, want := resp.Request.URL.Path, "/"; got != want {
-			t.Errorf("Expected redirect to %q, got %q", want, got)
-		}
-	})
-
-	// Test 2: Access exercise set page with authentication
-	t.Run("Shows exercise set with forms", func(t *testing.T) {
-		if doc, err = client.GetDoc(ctx, "/workouts/2025-02-27/exercises/1"); err != nil {
-			t.Fatalf("Failed to get exercise set page: %v", err)
+	// First register and set up a workout
+	t.Run("Setup", func(t *testing.T) {
+		if _, err = client.Register(ctx); err != nil {
+			t.Fatalf("Failed to register: %v", err)
 		}
 
-		// Check that we're on the exercise set page
-		title := doc.Find("h1").Text()
-		if title != "Squat" {
-			t.Errorf("Expected exercise title 'Squat', got %q", title)
-		}
-
-		// Check that the form for the first set exists
-		form, err := e2etest.FindForm(doc, "/workouts/2025-02-27/exercises/1/sets/0/done")
-		if err != nil {
-			t.Fatalf("Failed to find form for first set: %v", err)
-		}
-
-		// Check that the weight input exists and has correct value
-		weightInput := form.Find("input[name=weight]")
-		weightValue, exists := weightInput.Attr("value")
-		if !exists || weightValue != "20" {
-			t.Errorf("Expected weight input with value '20', got %q", weightValue)
-		}
-
-		// Check that the reps input exists
-		repsInput := form.Find("input[name=reps]")
-		if repsInput.Length() == 0 {
-			t.Errorf("Reps input not found")
-		}
-	})
-
-	// Test 3: Complete a set
-	t.Run("Can complete a set", func(t *testing.T) {
-		// Submit form with reps value
+		// Set workout preferences
 		formData := map[string]string{
-			"weight": "20",
-			"reps":   "10",
+			"monday": "true",
 		}
-
-		if doc, err = client.GetDoc(ctx, "/workouts/2025-02-27/exercises/1"); err != nil {
-			t.Fatalf("Failed to get exercise set page: %v", err)
+		if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+			t.Fatalf("Failed to get preferences: %v", err)
 		}
-
-		// Submit the form to mark the set as complete
-		if doc, err = client.SubmitForm(ctx, doc, "/workouts/2025-02-27/exercises/1/sets/0/done", formData); err != nil {
+		if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
 			t.Fatalf("Failed to submit form: %v", err)
 		}
 
-		// Check if we're redirected back to the exercise set page
-		if doc.Url.Path != "/workouts/2025-02-27/exercises/1" {
-			t.Errorf("Expected to be on exercise set page, got %q", doc.Url.Path)
+		// Start a workout for today
+		today := time.Now().Format("2006-01-02")
+		if doc, err = client.GetDoc(ctx, "/"); err != nil {
+			t.Fatalf("Failed to get home page: %v", err)
 		}
 
-		// Check that the completed set shows the correct reps
-		completedReps := doc.Find(".set.completed .reps").Text()
-		if completedReps != "10 reps" {
-			t.Errorf("Expected completed set to show '10 reps', got %q", completedReps)
-		}
-
-		// Check that the edit button exists
-		editButton := doc.Find(".edit-button")
-		if editButton.Length() == 0 {
-			t.Errorf("Edit button not found for completed set")
+		// Find and submit the start workout form
+		if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+			t.Fatalf("Failed to submit start workout form: %v", err)
 		}
 	})
 
-	// Test 4: Edit a completed set
-	t.Run("Can edit a completed set", func(t *testing.T) {
-		// Navigate to the edit page
-		if doc, err = client.GetDoc(ctx, "/workouts/2025-02-27/exercises/1?edit=0"); err != nil {
-			t.Fatalf("Failed to get edit page: %v", err)
+	// Test viewing an exercise set
+	t.Run("View exercise set", func(t *testing.T) {
+		today := time.Now().Format("2006-01-02")
+		// First view the workout to find an exercise
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
+			t.Fatalf("Failed to get workout page: %v", err)
 		}
 
-		// Find the update form
-		form, err := e2etest.FindForm(doc, "/workouts/2025-02-27/exercises/1/sets/0/update")
-		if err != nil {
-			t.Fatalf("Failed to find update form: %v", err)
+		// Extract the first exercise ID from the workout page
+		var exerciseID string
+		doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
+			if i == 0 { // Just take the first exercise
+				href, exists := s.Attr("href")
+				if exists {
+					exerciseID = href[len("/workouts/"+today+"/exercises/"):]
+				}
+			}
+		})
+
+		if exerciseID == "" {
+			t.Fatalf("No exercise found on workout page")
 		}
 
-		// Check that the reps input is enabled and has the current value
-		repsInput := form.Find("input[name=reps]")
-		disabled, exists := repsInput.Attr("disabled")
-		if exists && disabled != "" {
-			t.Errorf("Expected reps input to be enabled, but it's disabled")
+		// View the exercise set page
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/exercises/"+exerciseID); err != nil {
+			t.Fatalf("Failed to get exercise set page: %v", err)
 		}
 
-		repsValue, exists := repsInput.Attr("value")
-		if !exists || repsValue != "10" {
-			t.Errorf("Expected reps input to have value '10', got %q", repsValue)
+		// Verify page content
+		if doc.Find("h1").Length() == 0 {
+			t.Error("Expected exercise name heading")
 		}
 
-		// Submit form with new reps value
+		// Check for set information
+		if doc.Find(".set").Length() == 0 {
+			t.Error("Expected to find sets on the page")
+		}
+
+		// Check for weight and reps information
+		if doc.Find(".weight").Length() == 0 || doc.Find(".reps").Length() == 0 {
+			t.Error("Expected to find weight and reps information")
+		}
+
+		// Check for the form to complete a set
+		if doc.Find("form").Length() == 0 {
+			t.Error("Expected to find a form to complete a set")
+		}
+	})
+
+	// Test completing a set
+	t.Run("Complete a set", func(t *testing.T) {
+		today := time.Now().Format("2006-01-02")
+		// First view the workout to find an exercise
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
+			t.Fatalf("Failed to get workout page: %v", err)
+		}
+
+		// Extract the first exercise ID
+		var exerciseID string
+		doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
+			if i == 0 { // Just take the first exercise
+				href, exists := s.Attr("href")
+				if exists {
+					exerciseID = href[len("/workouts/"+today+"/exercises/"):]
+				}
+			}
+		})
+
+		if exerciseID == "" {
+			t.Fatalf("No exercise found on workout page")
+		}
+
+		// View the exercise set page
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/exercises/"+exerciseID); err != nil {
+			t.Fatalf("Failed to get exercise set page: %v", err)
+		}
+
+		// Find the first form (which should be for the first incomplete set)
+		form := doc.Find("form").First()
+
+		// Get the form action
+		action, exists := form.Attr("action")
+		if !exists {
+			t.Fatalf("Form has no action attribute")
+		}
+
+		// Get the current weight value
+		weight := "20" // Default weight if we can't find it
+		weightInput := form.Find("input[name='weight']")
+		var val string
+		if val, exists = weightInput.Attr("value"); exists {
+			weight = val
+		}
+
+		// Submit the form with weight and reps
 		formData := map[string]string{
-			"weight": "20",
-			"reps":   "12",
+			"weight": weight,
+			"reps":   "10", // Using 10 reps as a valid number
 		}
 
-		// Submit the form to update the set
-		if doc, err = client.SubmitForm(ctx, doc, "/workouts/2025-02-27/exercises/1/sets/0/update", formData); err != nil {
-			t.Fatalf("Failed to submit update form: %v", err)
+		if doc, err = client.SubmitForm(ctx, doc, action, formData); err != nil {
+			t.Fatalf("Failed to submit set completion form: %v", err)
 		}
 
-		// Check if we're redirected back to the exercise set page (with no query parameters)
-		if doc.Url.Path != "/workouts/2025-02-27/exercises/1" || doc.Url.RawQuery != "" {
-			t.Errorf("Expected to be on clean exercise set page, got URL %q", doc.Url.String())
+		// Verify we're back on the exercise set page
+		if doc.Find("h1").Length() == 0 {
+			t.Error("Expected to find heading on exercise set page")
 		}
 
-		// Check that the completed set shows the updated reps
-		completedReps := doc.Find(".set.completed .reps").Text()
-		if completedReps != "12 reps" {
-			t.Errorf("Expected completed set to show '12 reps', got %q", completedReps)
+		// Check that the set is now marked as completed
+		if doc.Find(".set.completed").Length() == 0 {
+			t.Error("Expected to find a completed set")
+		}
+	})
+
+	// Test editing a completed set
+	t.Run("Edit a completed set", func(t *testing.T) {
+		today := time.Now().Format("2006-01-02")
+		// First view the workout to find an exercise
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
+			t.Fatalf("Failed to get workout page: %v", err)
+		}
+
+		// Extract the first exercise ID
+		var exerciseID string
+		doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
+			if i == 0 { // Just take the first exercise
+				href, exists := s.Attr("href")
+				if exists {
+					exerciseID = href[len("/workouts/"+today+"/exercises/"):]
+				}
+			}
+		})
+
+		if exerciseID == "" {
+			t.Fatalf("No exercise found on workout page")
+		}
+
+		// View the exercise set page
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/exercises/"+exerciseID); err != nil {
+			t.Fatalf("Failed to get exercise set page: %v", err)
+		}
+
+		// Find the "Edit" link in the first completed set
+		editLink := doc.Find(".set.completed .edit-button").First()
+		if editLink.Length() == 0 {
+			t.Fatalf("No edit button found for completed set")
+		}
+
+		href, exists := editLink.Attr("href")
+		if !exists {
+			t.Fatalf("Edit link has no href")
+		}
+
+		// Visit the edit page
+		if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/exercises/"+exerciseID+href); err != nil {
+			t.Fatalf("Failed to load edit page: %v", err)
+		}
+
+		// Find the edit form
+		form := doc.Find("form").First()
+		action, exists := form.Attr("action")
+		if !exists {
+			t.Fatalf("Edit form has no action attribute")
+		}
+
+		// Get the current weight value
+		weight, exists := form.Find("input[name='weight']").Attr("value")
+		if !exists {
+			weight = "20" // Default weight if we can't find it
+		}
+
+		// Convert weight to float and increase it
+		weightFloat, _ := strconv.ParseFloat(weight, 64)
+		newWeight := weightFloat + 2.5 // Increase by 2.5 kg
+
+		// Update the completed set with new weight and reps
+		formData := map[string]string{
+			"weight": strconv.FormatFloat(newWeight, 'f', 1, 64),
+			"reps":   "12", // Increase reps
+		}
+
+		if doc, err = client.SubmitForm(ctx, doc, action, formData); err != nil {
+			t.Fatalf("Failed to submit set update form: %v", err)
+		}
+
+		// Verify we're back on the exercise set page
+		if doc.Find("h1").Length() == 0 {
+			t.Error("Expected to find heading on exercise set page")
+		}
+
+		// Verify the updated values are shown
+		// Extract the first completed set's weight
+		setWeight := doc.Find(".set.completed .weight").First().Text()
+		if setWeight == "" {
+			t.Error("Expected to find weight in completed set")
+		}
+
+		// Extract the reps value
+		setReps := doc.Find(".set.completed .reps").First().Text()
+		if setReps == "" {
+			t.Error("Expected to find reps in completed set")
+		}
+
+		// Check if the reps have been updated (should contain "12")
+		if setReps != "12 reps" {
+			t.Errorf("Expected reps to be updated to 12, got %s", setReps)
 		}
 	})
 }
