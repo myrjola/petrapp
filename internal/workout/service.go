@@ -3,8 +3,9 @@ package workout
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"time"
@@ -55,7 +56,7 @@ func (s *Service) GetUserPreferences(ctx context.Context) (Preferences, error) {
 		}, nil
 	}
 	if err != nil {
-		return Preferences{}, errors.Wrap(err, "query workout preferences")
+		return Preferences{}, fmt.Errorf("query workout preferences: %w", err)
 	}
 	return prefs, nil
 }
@@ -85,7 +86,7 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 		prefs.Sunday,
 	)
 	if err != nil {
-		return errors.Wrap(err, "save workout preferences")
+		return fmt.Errorf("save workout preferences: %w", err)
 	}
 	return nil
 }
@@ -155,7 +156,7 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 		day := monday.AddDate(0, 0, i)
 		workout, err := s.generateWorkout(ctx, day)
 		if err != nil {
-			return nil, errors.Wrap(err, "generate workout")
+			return nil, fmt.Errorf("generate workout: %w", err)
 		}
 		workouts[i] = workout
 	}
@@ -185,19 +186,19 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
 		return s.generateWorkout(ctx, date)
 	}
 	if err != nil {
-		return Session{}, errors.Wrap(err, "query workout session")
+		return Session{}, fmt.Errorf("query workout session: %w", err)
 	}
 	// Parse timestamps
 	session.WorkoutDate = date // Use the input date since we know it matches
 
 	var startedAt, completedAt *time.Time
 	if startedAt, err = parseTimestamp(startedAtStr); err != nil {
-		return Session{}, errors.Wrap(err, "parse started_at")
+		return Session{}, fmt.Errorf("parse started_at: %w", err)
 	}
 	session.StartedAt = startedAt
 
 	if completedAt, err = parseTimestamp(completedAtStr); err != nil {
-		return Session{}, errors.Wrap(err, "parse completed_at")
+		return Session{}, fmt.Errorf("parse completed_at: %w", err)
 	}
 	session.CompletedAt = completedAt
 
@@ -212,7 +213,7 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
         ORDER BY es.exercise_id, es.set_number`,
 		userID, date.Format("2006-01-02"))
 	if err != nil {
-		return Session{}, errors.Wrap(err, "query exercise sets")
+		return Session{}, fmt.Errorf("query exercise sets: %w", err)
 	}
 	defer rows.Close()
 
@@ -229,7 +230,7 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
 			&setNum, &set.WeightKg, &set.AdjustedWeightKg,
 			&set.MinReps, &set.MaxReps, &set.CompletedReps)
 		if err != nil {
-			return Session{}, errors.Wrap(err, "scan exercise set")
+			return Session{}, fmt.Errorf("scan exercise set: %w", err)
 		}
 
 		// If this is a new exercise or the first one
@@ -252,7 +253,7 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
 	}
 
 	if err = rows.Err(); err != nil {
-		return Session{}, errors.Wrap(err, "rows error")
+		return Session{}, fmt.Errorf("rows error: %w", err)
 	}
 
 	// Determine status
@@ -269,7 +270,7 @@ func parseTimestamp(timestampStr sql.NullString) (*time.Time, error) {
 	if timestampStr.Valid {
 		parsedTime, err := time.Parse(time.RFC3339, timestampStr.String)
 		if err != nil {
-			return nil, errors.Wrap(err, "parse RFC3339")
+			return nil, fmt.Errorf("parse RFC3339: %w", err)
 		}
 		return &parsedTime, nil
 	}
@@ -285,12 +286,12 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	// Start a transaction since we need to insert multiple rows
 	tx, err := s.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
-		return errors.Wrap(err, "begin transaction")
+		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func(tx *sql.Tx) {
 		err = tx.Rollback()
 		if err != nil {
-			s.logger.LogAttrs(ctx, slog.LevelError, "rollback transaction", errors.SlogError(err))
+			s.logger.LogAttrs(ctx, slog.LevelError, "rollback transaction", slog.Any("error", err))
 		}
 	}(tx)
 
@@ -302,13 +303,13 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
             started_at = COALESCE(workout_sessions.started_at, ?)`,
 		userID, dateStr, startedAt, startedAt)
 	if err != nil {
-		return errors.Wrap(err, "insert workout session")
+		return fmt.Errorf("insert workout session: %w", err)
 	}
 
 	// Generate workout if it doesn't exist
 	session, err := s.generateWorkout(ctx, date)
 	if err != nil {
-		return errors.Wrap(err, "generate workout")
+		return fmt.Errorf("generate workout: %w", err)
 	}
 
 	// Insert exercise sets
@@ -323,13 +324,13 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 				userID, dateStr, exerciseSet.Exercise.ID, i+1,
 				set.WeightKg, set.AdjustedWeightKg, set.MinReps, set.MaxReps)
 			if err != nil {
-				return errors.Wrap(err, "insert exercise set")
+				return fmt.Errorf("insert exercise set: %w", err)
 			}
 		}
 	}
 
 	if err = tx.Commit(); err != nil {
-		return errors.Wrap(err, "commit transaction")
+		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return nil
@@ -346,12 +347,12 @@ func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
         WHERE user_id = ? AND workout_date = ? AND completed_at IS NULL`,
 		completedAt, userID, date.Format("2006-01-02"))
 	if err != nil {
-		return errors.Wrap(err, "complete workout session")
+		return fmt.Errorf("complete workout session: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "get rows affected")
+		return fmt.Errorf("get rows affected: %w", err)
 	}
 	if rows == 0 {
 		return errors.New("workout session not found or already completed")
@@ -363,9 +364,8 @@ func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
 // SaveFeedback saves the difficulty rating for a completed workout session.
 func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty int) error {
 	if difficulty < 1 || difficulty > 5 {
-		return errors.New("invalid difficulty rating",
-			slog.Int("difficulty", difficulty),
-			slog.String("date", date.Format("2006-01-02")))
+		return fmt.Errorf("invalid difficulty rating (difficulty: %d, date: %s)",
+			difficulty, date.Format("2006-01-02"))
 	}
 
 	userID := contexthelpers.AuthenticatedUserID(ctx)
@@ -374,12 +374,12 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
         WHERE user_id = ? AND workout_date = ?`,
 		difficulty, userID, date.Format("2006-01-02"))
 	if err != nil {
-		return errors.Wrap(err, "save difficulty rating")
+		return fmt.Errorf("save difficulty rating: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "get rows affected")
+		return fmt.Errorf("get rows affected: %w", err)
 	}
 	if rows == 0 {
 		return errors.New("workout session not found or not completed")
@@ -409,12 +409,12 @@ func (s *Service) UpdateSetWeight(
         AND set_number = ?`,
 		newWeight, newWeight, userID, dateStr, exerciseID, setIndex+1)
 	if err != nil {
-		return errors.Wrap(err, "UPDATE set weight")
+		return fmt.Errorf("UPDATE set weight: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "get rows affected")
+		return fmt.Errorf("get rows affected: %w", err)
 	}
 	if rows == 0 {
 		return errors.New("set not found")
@@ -445,7 +445,7 @@ func (s *Service) CompleteSet(
         AND set_number = ?`,
 		userID, dateStr, exerciseID, setIndex+1).Scan(&minReps, &maxReps)
 	if err != nil {
-		return errors.Wrap(err, "get set rep range")
+		return fmt.Errorf("get set rep range: %w", err)
 	}
 
 	// Allow completing with reps outside the target range, but log it
@@ -465,12 +465,12 @@ func (s *Service) CompleteSet(
         AND set_number = ?`,
 		completedReps, userID, dateStr, exerciseID, setIndex+1)
 	if err != nil {
-		return errors.Wrap(err, "complete set")
+		return fmt.Errorf("complete set: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "get rows affected")
+		return fmt.Errorf("get rows affected: %w", err)
 	}
 	if rows == 0 {
 		return errors.New("set not found")
@@ -502,7 +502,7 @@ func (s *Service) UpdateCompletedReps(
         AND set_number = ?`,
 		userID, dateStr, exerciseID, setIndex+1).Scan(&minReps, &maxReps, &currentReps)
 	if err != nil {
-		return errors.Wrap(err, "get set rep range")
+		return fmt.Errorf("get set rep range: %w", err)
 	}
 
 	// Allow updating with reps outside the target range, but log it
@@ -522,12 +522,12 @@ func (s *Service) UpdateCompletedReps(
         AND set_number = ?`,
 		completedReps, userID, dateStr, exerciseID, setIndex+1)
 	if err != nil {
-		return errors.Wrap(err, "update completed reps")
+		return fmt.Errorf("update completed reps: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "get rows affected")
+		return fmt.Errorf("get rows affected: %w", err)
 	}
 	if rows == 0 {
 		return errors.New("set not found")
