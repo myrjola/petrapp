@@ -1,12 +1,12 @@
 
 .DEFAULT_GOAL := ci
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
-        cross-compile migratetest repomix repomix-clipboard
+        cross-compile migratetest repomix repomix-clipboard setup-git-hooks
 
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v1.64.6
 
-init: gomod custom-gcl
+init: gomod custom-gcl setup-git-hooks
 	@echo "Dependencies installed"
 
 gomod:
@@ -79,3 +79,5 @@ repomix:
 repomix-clipboard: repomix
 	cat repomix-output.txt | pbcopy
 
+setup-git-hooks:
+	./scripts/setup-git-hooks.sh
