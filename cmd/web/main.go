@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
-	"github.com/myrjola/petrapp/internal/ai"
 	"github.com/myrjola/petrapp/internal/envstruct"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
@@ -22,7 +21,6 @@ import (
 
 type application struct {
 	logger          *slog.Logger
-	aiClient        ai.Client
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
@@ -86,7 +84,6 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	app := application{
 		logger:          logger,
-		aiClient:        ai.NewClient(),
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
