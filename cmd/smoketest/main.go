@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/errors"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
@@ -18,13 +18,13 @@ func TestAuth(client *e2etest.Client) error {
 	var err error
 
 	if _, err = client.Register(ctx); err != nil {
-		return errors.Wrap(err, "register user")
+		return fmt.Errorf("register user: %w", err)
 	}
 	if _, err = client.Logout(ctx); err != nil {
-		return errors.Wrap(err, "logout user")
+		return fmt.Errorf("logout user: %w", err)
 	}
 	if _, err = client.Login(ctx); err != nil {
-		return errors.Wrap(err, "login user")
+		return fmt.Errorf("login user: %w", err)
 	}
 	return nil
 }
@@ -48,15 +48,15 @@ func main() {
 	ctx = logging.WithAttrs(ctx, slog.String("hostname", url))
 
 	if client, err = e2etest.NewClient(url, hostname, url); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "error creating client", errors.SlogError(err))
+		logger.LogAttrs(ctx, slog.LevelError, "error creating client", slog.Any("error", err))
 		os.Exit(1)
 	}
 	if err = client.WaitForReady(ctx, "/api/healthy"); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "server not ready in time", errors.SlogError(err))
+		logger.LogAttrs(ctx, slog.LevelError, "server not ready in time", slog.Any("error", err))
 		os.Exit(1)
 	}
 	if err = TestAuth(client); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "error testing auth", errors.SlogError(err))
+		logger.LogAttrs(ctx, slog.LevelError, "error testing auth", slog.Any("error", err))
 		os.Exit(1)
 	}
 
