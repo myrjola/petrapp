@@ -16,7 +16,6 @@ make ci           # Run init, build, lint, test, sec
 ## Code Style
 - Standard Go formatting with 100-line function limit
 - Error types must be suffixed with "Error", sentinel errors with "Err" prefix
-- Always wrap errors with context using `errors.Wrap()`
 - Strongly typed with exhaustive enum checking
 - No global loggers or init functions
 - Comments must end with a period
