@@ -14,6 +14,7 @@ env:
 jobs:
   test:
     uses: ./.github/workflows/pull-request.yml
+    secrets: inherit
 
   build_and_push:
     uses: ./.github/workflows/docker-build-and-push.yml
@@ -26,6 +27,8 @@ jobs:
     needs: [ build_and_push ]
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
+    concurrency:
+        group: deploy-${{ vars.FLY_APP_NAME }}-staging
     with:
       env: staging
       fly_app: ${{ vars.FLY_APP_NAME }}-staging
@@ -35,6 +38,8 @@ jobs:
     needs: [ build_and_push, staging, test ]
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
+    concurrency:
+      group: deploy-${{ vars.FLY_APP_NAME }}-staging
     with:
       env: prod
       fly_app: ${{ vars.FLY_APP_NAME }}
