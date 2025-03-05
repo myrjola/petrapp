@@ -88,12 +88,92 @@ func (r *sqliteRepository) saveUserPreferences(ctx context.Context, userID []byt
 
 // getSession retrieves a workout session for a specific date.
 func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date time.Time) (Session, error) {
-	var (
-		session                      Session
-		startedAtStr, completedAtStr sql.NullString
-		workoutDateStr               string
-	)
+	session, err := r.queryWorkoutSession(ctx, userID, date)
+	if err != nil {
+		return Session{}, fmt.Errorf("query workout session: %w", err)
+	}
 
+	// Load exercise sets.
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+        SELECT e.id, e.name, e.category, 
+               es.set_number, es.weight_kg, es.adjusted_weight_kg,
+               es.min_reps, es.max_reps, es.completed_reps
+        FROM exercise_sets es
+        JOIN exercises e ON e.id = es.exercise_id
+        WHERE es.workout_user_id = ? AND es.workout_date = ?
+        ORDER BY es.exercise_id, es.set_number`,
+		userID, date.Format("2006-01-02"))
+	if err != nil {
+		return Session{}, fmt.Errorf("query exercise sets: %w", err)
+	}
+	defer rows.Close()
+
+	var currentExerciseSet *ExerciseSet
+	for rows.Next() {
+		var (
+			exercise Exercise
+			set      Set
+			setNum   int
+		)
+
+		err = rows.Scan(
+			&exercise.ID, &exercise.Name, &exercise.Category,
+			&setNum, &set.WeightKg, &set.AdjustedWeightKg,
+			&set.MinReps, &set.MaxReps, &set.CompletedReps)
+		if err != nil {
+			return Session{}, fmt.Errorf("scan exercise set: %w", err)
+		}
+
+		// If this is a new exercise or the first one.
+		if currentExerciseSet == nil || currentExerciseSet.Exercise.ID != exercise.ID {
+			if currentExerciseSet != nil {
+				session.ExerciseSets = append(session.ExerciseSets, *currentExerciseSet)
+			}
+
+			// Load muscle groups for the exercise.
+			var primaryMuscleGroups, secondaryMuscleGroups []string
+			primaryMuscleGroups, secondaryMuscleGroups, err = r.fetchExerciseMuscleGroups(ctx, exercise.ID)
+			if err != nil {
+				return Session{}, fmt.Errorf("fetch muscle groups for exercise %d: %w", exercise.ID, err)
+			}
+			exercise.PrimaryMuscleGroups = primaryMuscleGroups
+			exercise.SecondaryMuscleGroups = secondaryMuscleGroups
+
+			currentExerciseSet = &ExerciseSet{
+				Exercise: exercise,
+				Sets:     []Set{},
+			}
+		}
+
+		currentExerciseSet.Sets = append(currentExerciseSet.Sets, set)
+	}
+
+	// Add the last exercise if it exists.
+	if currentExerciseSet != nil {
+		session.ExerciseSets = append(session.ExerciseSets, *currentExerciseSet)
+	}
+
+	if err = rows.Err(); err != nil {
+		return Session{}, fmt.Errorf("rows error: %w", err)
+	}
+
+	// Determine status.
+	if session.CompletedAt != nil {
+		session.Status = StatusDone
+	} else {
+		session.Status = StatusPlanned
+	}
+
+	return session, nil
+}
+
+func (r *sqliteRepository) queryWorkoutSession(ctx context.Context, userID []byte, date time.Time) (Session, error) {
+	var (
+		workoutDateStr string
+		session        Session
+		startedAtStr   sql.NullString
+		completedAtStr sql.NullString
+	)
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
         SELECT workout_date, difficulty_rating, started_at, completed_at
         FROM workout_sessions 
@@ -101,10 +181,6 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
 		userID, date.Format("2006-01-02")).
 		Scan(&workoutDateStr, &session.DifficultyRating, &startedAtStr, &completedAtStr)
 
-	if errors.Is(err, sql.ErrNoRows) {
-		// We'll handle the case where no session exists in the service layer
-		return Session{}, sql.ErrNoRows
-	}
 	if err != nil {
 		return Session{}, fmt.Errorf("query workout session: %w", err)
 	}
@@ -122,68 +198,6 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
 		return Session{}, fmt.Errorf("parse completed_at: %w", err)
 	}
 	session.CompletedAt = completedAt
-
-	// Load exercise sets.
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-        SELECT e.id, e.name, e.category, 
-               es.set_number, es.weight_kg, es.adjusted_weight_kg,
-               es.min_reps, es.max_reps, es.completed_reps
-        FROM exercise_sets es
-        JOIN exercises e ON e.id = es.exercise_id
-        WHERE es.workout_user_id = ? AND es.workout_date = ?
-        ORDER BY es.exercise_id, es.set_number`,
-		userID, date.Format("2006-01-02"))
-	if err != nil {
-		return Session{}, fmt.Errorf("query exercise sets: %w", err)
-	}
-	defer rows.Close()
-
-	var currentExercise *ExerciseSet
-	for rows.Next() {
-		var (
-			exercise Exercise
-			set      Set
-			setNum   int
-		)
-
-		err = rows.Scan(
-			&exercise.ID, &exercise.Name, &exercise.Category,
-			&setNum, &set.WeightKg, &set.AdjustedWeightKg,
-			&set.MinReps, &set.MaxReps, &set.CompletedReps)
-		if err != nil {
-			return Session{}, fmt.Errorf("scan exercise set: %w", err)
-		}
-
-		// If this is a new exercise or the first one.
-		if currentExercise == nil || currentExercise.Exercise.ID != exercise.ID {
-			if currentExercise != nil {
-				session.ExerciseSets = append(session.ExerciseSets, *currentExercise)
-			}
-			currentExercise = &ExerciseSet{
-				Exercise: exercise,
-				Sets:     []Set{},
-			}
-		}
-
-		currentExercise.Sets = append(currentExercise.Sets, set)
-	}
-
-	// Add the last exercise if it exists.
-	if currentExercise != nil {
-		session.ExerciseSets = append(session.ExerciseSets, *currentExercise)
-	}
-
-	if err = rows.Err(); err != nil {
-		return Session{}, fmt.Errorf("rows error: %w", err)
-	}
-
-	// Determine status.
-	if session.CompletedAt != nil {
-		session.Status = StatusDone
-	} else {
-		session.Status = StatusPlanned
-	}
-
 	return session, nil
 }
 
@@ -337,7 +351,7 @@ func (r *sqliteRepository) updateSetWeight(
         AND set_number = ?`,
 		newWeight, newWeight, userID, dateStr, exerciseID, setIndex+1)
 	if err != nil {
-		return fmt.Errorf("UPDATE set weight: %w", err)
+		return fmt.Errorf("update exercise set: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
@@ -418,4 +432,108 @@ func parseTimestamp(timestampStr sql.NullString) (*time.Time, error) {
 		return &parsedTime, nil
 	}
 	return nil, nil //nolint:nilnil // nil time.Time is expected when the string is NULL.
+}
+
+// muscleGroupAssociation represents a muscle group associated with an exercise.
+type muscleGroupAssociation struct {
+	// muscleGroup represents the muscle group name.
+	muscleGroup string
+	// isPrimary indicates whether this is a primary muscle for the exercise.
+	isPrimary bool
+}
+
+// fetchExercisePool loads all exercises with their muscle group associations.
+func (r *sqliteRepository) fetchExercisePool(ctx context.Context) ([]Exercise, error) {
+	// Fetch basic exercise data first
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+        SELECT id, name, category
+        FROM exercises
+        ORDER BY id
+    `)
+	if err != nil {
+		return nil, fmt.Errorf("query exercises: %w", err)
+	}
+	defer rows.Close()
+
+	// Process results into exercise objects
+	var exercises []Exercise
+	for rows.Next() {
+		var (
+			id          int
+			name        string
+			categoryStr string
+		)
+
+		if err = rows.Scan(&id, &name, &categoryStr); err != nil {
+			return nil, fmt.Errorf("scan exercise row: %w", err)
+		}
+
+		category := CategoryFullBody
+		if categoryStr == "upper" {
+			category = CategoryUpper
+		} else if categoryStr == "lower" {
+			category = CategoryLower
+		}
+
+		var primaryMuscleGroups, secondaryMuscleGroups []string
+		primaryMuscleGroups, secondaryMuscleGroups, err = r.fetchExerciseMuscleGroups(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("fetch muscle groups for exercise %d: %w", id, err)
+		}
+
+		exercises = append(exercises, Exercise{
+			ID:                    id,
+			Name:                  name,
+			Category:              category,
+			PrimaryMuscleGroups:   primaryMuscleGroups,
+			SecondaryMuscleGroups: secondaryMuscleGroups,
+		})
+	}
+
+	// Check for errors from iterating over rows
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate exercise rows: %w", err)
+	}
+	return exercises, nil
+}
+
+// fetchExerciseMuscleGroups retrieves the muscle groups associated with an exercise.
+func (r *sqliteRepository) fetchExerciseMuscleGroups(ctx context.Context, exerciseID int) ([]string, []string, error) {
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+        SELECT mg.name, emg.is_primary
+        FROM exercise_muscle_groups emg
+        JOIN muscle_groups mg ON emg.muscle_group_name = mg.name
+        WHERE emg.exercise_id = ?
+    `, exerciseID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("query muscle groups: %w", err)
+	}
+	defer rows.Close()
+
+	var primaryMuscleGroups []string
+	var secondaryMuscleGroups []string
+
+	for rows.Next() {
+		var (
+			name      string
+			isPrimary bool
+		)
+
+		if err = rows.Scan(&name, &isPrimary); err != nil {
+			return nil, nil, fmt.Errorf("scan muscle group row: %w", err)
+		}
+
+		if isPrimary {
+			primaryMuscleGroups = append(primaryMuscleGroups, name)
+		} else {
+			secondaryMuscleGroups = append(secondaryMuscleGroups, name)
+		}
+	}
+
+	// Check for errors from iterating over rows
+	if err = rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("iterate muscle group rows: %w", err)
+	}
+
+	return primaryMuscleGroups, secondaryMuscleGroups, nil
 }

@@ -74,7 +74,7 @@ migratetest: build
 	bin/migratetest
 
 repomix:
-	npx repomix --include "**/*.go,**/*.gohtml,**/*.js,**/*.css,**/*.sql" --output repomix-output.txt
+	npx repomix --include "**/*.go,**/*.gohtml,**/*.js,**/*.css,**/schema.sql" --output repomix-output.txt
 
 repomix-clipboard: repomix
 	cat repomix-output.txt | pbcopy

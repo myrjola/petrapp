@@ -65,9 +65,11 @@ func (s *Service) generateWorkout(_ context.Context, date time.Time) (Session, e
 		ExerciseSets: []ExerciseSet{
 			{
 				Exercise: Exercise{
-					ID:       2001,
-					Name:     "Squat",
-					Category: CategoryLower,
+					ID:                    2001,
+					Name:                  "Squat",
+					Category:              CategoryLower,
+					PrimaryMuscleGroups:   nil,
+					SecondaryMuscleGroups: nil,
 				},
 				Sets: []Set{
 					{
@@ -95,9 +97,11 @@ func (s *Service) generateWorkout(_ context.Context, date time.Time) (Session, e
 			},
 			{
 				Exercise: Exercise{
-					ID:       1000,
-					Name:     "Bench Press",
-					Category: CategoryUpper,
+					ID:                    1000,
+					Name:                  "Bench Press",
+					Category:              CategoryUpper,
+					PrimaryMuscleGroups:   nil,
+					SecondaryMuscleGroups: nil,
 				},
 				Sets: []Set{
 					{

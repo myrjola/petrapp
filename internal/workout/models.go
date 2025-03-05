@@ -15,9 +15,11 @@ const (
 
 // Exercise represents a single exercise type, e.g. Squat, Bench Press, etc.
 type Exercise struct {
-	ID       int
-	Name     string
-	Category Category
+	ID                    int
+	Name                  string
+	Category              Category
+	PrimaryMuscleGroups   []string
+	SecondaryMuscleGroups []string
 }
 
 // Set represents a single set of an exercise with target and actual performance.
