@@ -65,9 +65,9 @@ func (s *Service) generateWorkout(_ context.Context, date time.Time) (Session, e
 		ExerciseSets: []ExerciseSet{
 			{
 				Exercise: Exercise{
-					ID:       1,
+					ID:       2001,
 					Name:     "Squat",
-					Category: CategoryFullBody,
+					Category: CategoryLower,
 				},
 				Sets: []Set{
 					{
@@ -95,7 +95,7 @@ func (s *Service) generateWorkout(_ context.Context, date time.Time) (Session, e
 			},
 			{
 				Exercise: Exercise{
-					ID:       101,
+					ID:       1000,
 					Name:     "Bench Press",
 					Category: CategoryUpper,
 				},

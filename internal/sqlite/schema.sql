@@ -106,3 +106,17 @@ CREATE TABLE exercise_sets
     PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE
 ) WITHOUT ROWID, STRICT;
+
+CREATE TABLE muscle_groups
+(
+    name TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 64) PRIMARY KEY
+) WITHOUT ROWID, STRICT;
+
+CREATE TABLE exercise_muscle_groups
+(
+    exercise_id       INTEGER NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
+    muscle_group_name TEXT    NOT NULL REFERENCES muscle_groups (name) ON DELETE CASCADE,
+    is_primary        INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+
+    PRIMARY KEY (exercise_id, muscle_group_name)
+) WITHOUT ROWID, STRICT;
