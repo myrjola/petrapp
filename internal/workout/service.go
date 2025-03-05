@@ -3,11 +3,13 @@ package workout
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
+	"math"
 	"time"
 )
 
@@ -45,90 +47,72 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 }
 
 // generateWorkout creates a new workout plan based on user preferences and history.
-func (s *Service) generateWorkout(_ context.Context, date time.Time) (Session, error) {
-	//nolint:godox // temporary todo
-	//TODO: Implement smart workout generation logic
-	// This should:
-	// 1. Check if it's a workout day based on preferences
-	// 2. Determine workout type (full body vs split) based on consecutive days
-	// 3. Select appropriate exercises
-	// 4. Calculate proper sets/reps/weights based on history
+func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	s.logger.LogAttrs(ctx, slog.LevelInfo, "generating workout",
+		slog.Time("date", date),
+		slog.String("user_id", hex.EncodeToString(userID)))
 
-	// For now, we'll just create a simple workout
-	//nolint:mnd // magic numbers are okay
-	return Session{
+	// Step 1: Determine workout type (upper/lower/full body)
+	category, err := s.determineWorkoutType(ctx, date)
+	if err != nil {
+		return Session{}, fmt.Errorf("determine workout type: %w", err)
+	}
+
+	s.logger.LogAttrs(ctx, slog.LevelDebug, "workout type determined",
+		slog.String("category", string(category)))
+
+	// Step 2: Select appropriate exercises with balanced muscle groups
+	plannedExercises, err := s.selectExercisesForWorkout(ctx, category, date)
+	if err != nil {
+		return Session{}, fmt.Errorf("select exercises: %w", err)
+	}
+
+	s.logger.LogAttrs(ctx, slog.LevelDebug, "exercise selection complete",
+		slog.Int("exercise_count", len(plannedExercises)))
+
+	// Step 3: Convert to Session format with ExerciseSets
+	var exerciseSets = make([]ExerciseSet, len(plannedExercises))
+	for i, pe := range plannedExercises {
+		var sets []Set
+		for _, ps := range pe.sets {
+			sets = append(sets, Set{
+				WeightKg:         ps.weightKg,
+				AdjustedWeightKg: ps.weightKg, // Initially same as base weight
+				MinReps:          ps.targetMinReps,
+				MaxReps:          ps.targetMaxReps,
+				CompletedReps:    nil, // Not completed yet
+			})
+		}
+
+		exerciseSets[i] = ExerciseSet{
+			Exercise: pe.exercise,
+			Sets:     sets,
+		}
+	}
+
+	// Step 4: Create the complete Session object
+	session := Session{
 		WorkoutDate:      date,
+		DifficultyRating: nil, // Not rated yet
+		StartedAt:        nil, // Not started yet
+		CompletedAt:      nil, // Not completed yet
+		ExerciseSets:     exerciseSets,
 		Status:           StatusPlanned,
-		DifficultyRating: nil,
-		StartedAt:        nil,
-		CompletedAt:      nil,
-		ExerciseSets: []ExerciseSet{
-			{
-				Exercise: Exercise{
-					ID:                    2001,
-					Name:                  "Squat",
-					Category:              CategoryLower,
-					PrimaryMuscleGroups:   nil,
-					SecondaryMuscleGroups: nil,
-				},
-				Sets: []Set{
-					{
-						WeightKg:         20,
-						AdjustedWeightKg: 20,
-						MinReps:          8,
-						MaxReps:          12,
-						CompletedReps:    nil,
-					},
-					{
-						WeightKg:         20,
-						AdjustedWeightKg: 20,
-						MinReps:          8,
-						MaxReps:          12,
-						CompletedReps:    nil,
-					},
-					{
-						WeightKg:         20,
-						AdjustedWeightKg: 20,
-						MinReps:          8,
-						MaxReps:          12,
-						CompletedReps:    nil,
-					},
-				},
-			},
-			{
-				Exercise: Exercise{
-					ID:                    1000,
-					Name:                  "Bench Press",
-					Category:              CategoryUpper,
-					PrimaryMuscleGroups:   nil,
-					SecondaryMuscleGroups: nil,
-				},
-				Sets: []Set{
-					{
-						WeightKg:         15,
-						AdjustedWeightKg: 15,
-						MinReps:          8,
-						MaxReps:          12,
-						CompletedReps:    nil,
-					},
-					{
-						WeightKg:         15,
-						AdjustedWeightKg: 15,
-						MinReps:          8,
-						MaxReps:          12,
-						CompletedReps:    nil,
-					},
-					{
-						WeightKg:         15,
-						AdjustedWeightKg: 15,
-						MinReps:          8,
-						MaxReps:          12,
-						CompletedReps:    nil,
-					},
-				},
-			},
-		},
-	}, nil
+	}
+
+	// Log information about the generated workout
+	exerciseNames := make([]string, len(exerciseSets))
+	for i, es := range exerciseSets {
+		exerciseNames[i] = es.Exercise.Name
+	}
+
+	s.logger.LogAttrs(ctx, slog.LevelInfo, "workout generated successfully",
+		slog.Time("date", date),
+		slog.String("category", string(category)),
+		slog.Any("exercises", exerciseNames))
+
+	return session, nil
 }
 
 // ResolveWeeklySchedule retrieves the workout schedule for a week.
@@ -297,4 +281,296 @@ func (s *Service) determineWorkoutType(ctx context.Context, date time.Time) (Cat
 
 	// End with upper body workout with the assumption that yesterday was lower body.
 	return CategoryUpper, nil
+}
+
+// selectExercisesForWorkout chooses appropriate exercises with balanced muscle groups.
+//
+//nolint:gocognit,gocyclo,cyclop,funlen // This function is complex by design to handle exercise selection log
+func (s *Service) selectExercisesForWorkout(
+	ctx context.Context,
+	category Category,
+	date time.Time,
+) ([]plannedExercise, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	// Target exercise counts by category
+	targetCounts := map[Category]int{
+		CategoryFullBody: 6, //nolint:mnd // 6 exercises for full-body
+		CategoryUpper:    5, //nolint:mnd // 5 exercises for upper body
+		CategoryLower:    5, //nolint:mnd // 5 exercises for lower body
+	}
+
+	// 1. Get all exercises matching the category
+	allExercises, err := s.repo.getExercisesByCategory(ctx, category)
+	if err != nil {
+		return nil, fmt.Errorf("get exercises by category: %w", err)
+	}
+
+	// Filter exercises for specific category needs
+	var candidateExercises []Exercise
+	for _, ex := range allExercises {
+		if category == CategoryFullBody {
+			// For full body, include a mix of exercises
+			candidateExercises = append(candidateExercises, ex)
+		} else if ex.Category == category {
+			// For upper/lower, only include matching exercises
+			candidateExercises = append(candidateExercises, ex)
+		}
+	}
+
+	if len(candidateExercises) == 0 {
+		return nil, fmt.Errorf("no exercises found for category %s", category)
+	}
+
+	// 2. Get recently used exercises (last 14 days)
+	lookbackPeriod := date.AddDate(0, 0, -14) // 2 weeks ago
+	recentExercises, err := s.repo.getRecentExercises(ctx, userID, lookbackPeriod)
+	if err != nil {
+		return nil, fmt.Errorf("get recent exercises: %w", err)
+	}
+
+	// 3. Select exercises based on workout category and recency
+	targetCount := targetCounts[category]
+	var selectedExercises []Exercise
+
+	// First, identify primary muscle groups we want to target
+	var targetMuscleGroups []string
+	switch {
+	case category == CategoryUpper:
+		targetMuscleGroups = []string{"Chest", "Back", "Shoulders", "Biceps", "Triceps"}
+	case category == CategoryLower:
+		targetMuscleGroups = []string{"Quadriceps", "Hamstrings", "Glutes", "Calves"}
+	default:
+		targetMuscleGroups = []string{"Chest", "Back", "Shoulders", "Quadriceps", "Hamstrings", "Glutes"}
+	}
+
+	// Divide exercises into recent and non-recent
+	var recentExercisesList, nonRecentExercisesList []Exercise
+	for _, ex := range candidateExercises {
+		_, isRecent := recentExercises[ex.ID]
+		if isRecent {
+			recentExercisesList = append(recentExercisesList, ex)
+		} else {
+			nonRecentExercisesList = append(nonRecentExercisesList, ex)
+		}
+	}
+
+	// Track selected muscle groups to ensure balance
+	selectedMuscleGroups := make(map[string]bool)
+
+	// First, try to select exercises for each target muscle group from non-recent exercises
+	for _, muscleGroup := range targetMuscleGroups {
+		if len(selectedExercises) >= targetCount {
+			break
+		}
+
+		// Find an exercise that targets this muscle group
+		for _, ex := range nonRecentExercisesList {
+			// Skip if already selected
+			alreadySelected := false
+			for _, selected := range selectedExercises {
+				if selected.ID == ex.ID {
+					alreadySelected = true
+					break
+				}
+			}
+			if alreadySelected {
+				continue
+			}
+
+			// Check if this exercise targets the muscle group
+			targetsMuscle := false
+			for _, group := range ex.PrimaryMuscleGroups {
+				if group == muscleGroup {
+					targetsMuscle = true
+					break
+				}
+			}
+
+			if targetsMuscle {
+				selectedExercises = append(selectedExercises, ex)
+				selectedMuscleGroups[muscleGroup] = true
+				break
+			}
+		}
+	}
+
+	// If we still need more exercises, pick from non-recent first, then recent if needed
+	remainingCount := targetCount - len(selectedExercises)
+
+	if remainingCount > 0 && len(nonRecentExercisesList) > 0 {
+		// Filter out already selected exercises
+		var availableNonRecent []Exercise
+		for _, ex := range nonRecentExercisesList {
+			alreadySelected := false
+			for _, selected := range selectedExercises {
+				if selected.ID == ex.ID {
+					alreadySelected = true
+					break
+				}
+			}
+			if !alreadySelected {
+				availableNonRecent = append(availableNonRecent, ex)
+			}
+		}
+
+		// Add additional non-recent exercises
+		for i := 0; i < remainingCount && i < len(availableNonRecent); i++ {
+			selectedExercises = append(selectedExercises, availableNonRecent[i])
+		}
+	}
+
+	// If we still need more, use recent exercises
+	remainingCount = targetCount - len(selectedExercises)
+	if remainingCount > 0 && len(recentExercisesList) > 0 {
+		// Filter out already selected exercises
+		var availableRecent []Exercise
+		for _, ex := range recentExercisesList {
+			alreadySelected := false
+			for _, selected := range selectedExercises {
+				if selected.ID == ex.ID {
+					alreadySelected = true
+					break
+				}
+			}
+			if !alreadySelected {
+				availableRecent = append(availableRecent, ex)
+			}
+		}
+
+		// Add additional recent exercises
+		for i := 0; i < remainingCount && i < len(availableRecent); i++ {
+			selectedExercises = append(selectedExercises, availableRecent[i])
+		}
+	}
+
+	// 4. Generate appropriate sets for each selected exercise
+	var plannedExercises = make([]plannedExercise, len(selectedExercises))
+	for i, ex := range selectedExercises {
+		var history exerciseHistory
+		if history, err = s.repo.getExercisePerformanceHistory(ctx, userID, ex); err != nil {
+			return nil, fmt.Errorf("get exercise history for %s: %w", ex.Name, err)
+		}
+
+		plannedExercises[i] = plannedExercise{
+			exercise: ex,
+			sets:     s.generateSetsForExercise(history),
+		}
+	}
+
+	return plannedExercises, nil
+}
+
+// generateSetsForExercise creates sets with appropriate progression based on history.
+func (s *Service) generateSetsForExercise(history exerciseHistory) []plannedSet {
+	// Default configuration
+	defaultWeight := 20.0 // Default starting weight (kg)
+	if history.exercise.Category == CategoryLower {
+		defaultWeight = 30.0 // Heavier for lower body
+	}
+	defaultSets := 3       // Default number of sets
+	defaultMinReps := 8    // Default minimum reps
+	defaultMaxReps := 12   // Default maximum reps
+	weightIncrement := 2.5 // Minimum weight increment (kg)
+
+	// Create planned sets.
+	var sets = make([]plannedSet, defaultSets)
+
+	// If no history or incomplete history, use defaults.
+	if len(history.performanceData) == 0 {
+		for i := range defaultSets {
+			sets[i] = plannedSet{
+				weightKg:      defaultWeight,
+				targetMinReps: defaultMinReps,
+				targetMaxReps: defaultMaxReps,
+				isWarmup:      i == 0, // First set is warmup
+			}
+		}
+		return sets
+	}
+
+	// Calculate average weight and completion success from history.
+	var totalWeight float64
+	var totalCompletedReps, totalTargetReps, completedSets int
+
+	for _, perf := range history.performanceData {
+		totalWeight += perf.weightKg
+		totalTargetReps += perf.targetReps
+
+		// Only count completed sets.
+		if perf.completedReps > 0 {
+			totalCompletedReps += perf.completedReps
+			completedSets++
+		}
+	}
+
+	// Determine base weight for this exercise.
+	var baseWeight float64
+	if completedSets > 0 {
+		averageWeight := totalWeight / float64(len(history.performanceData))
+		averageCompletion := float64(totalCompletedReps) / float64(totalTargetReps)
+
+		// Apply progression logic.
+		weightIncreaseCompletion := .9
+		noWeightIncreaseCompletion := .7
+		switch {
+		case averageCompletion >= weightIncreaseCompletion:
+			baseWeight = averageWeight + weightIncrement
+		case averageCompletion >= noWeightIncreaseCompletion:
+			baseWeight = averageWeight
+		default:
+			weightReductionFactor := .95
+			baseWeight = math.Max(averageWeight*weightReductionFactor, averageWeight-weightIncrement)
+		}
+	} else {
+		// No completed sets, use the historical weight
+		baseWeight = totalWeight / float64(len(history.performanceData))
+	}
+
+	// Ensure minimum weight
+	if baseWeight < 1.0 {
+		baseWeight = defaultWeight
+	}
+
+	// Generate sets with the determined weight
+	for i := range defaultSets {
+		// Warmup set uses lighter weight
+		setWeight := baseWeight
+		if i == 0 { // First set is warmup
+			warmupProportion := .8
+			setWeight = math.Max(baseWeight*warmupProportion, baseWeight-weightIncrement)
+		}
+
+		// Round to nearest weight increment
+		setWeight = math.Round(setWeight/weightIncrement) * weightIncrement
+
+		sets = append(sets, plannedSet{
+			weightKg:      setWeight,
+			targetMinReps: defaultMinReps,
+			targetMaxReps: defaultMaxReps,
+			isWarmup:      i == 0,
+		})
+	}
+
+	return sets
+}
+
+// plannedExercise represents an exercise selected for a workout.
+type plannedExercise struct {
+	// exercise contains the exercise details (name, category, etc.)
+	exercise Exercise
+	// sets contains the planned sets for this exercise
+	sets []plannedSet
+}
+
+// plannedSet represents a single set to be performed.
+type plannedSet struct {
+	// weightKg is the weight in kilograms for this set
+	weightKg float64
+	// targetMinReps is the minimum number of reps to aim for
+	targetMinReps int
+	// targetMaxReps is the maximum number of reps to aim for
+	targetMaxReps int
+	// isWarmup indicates whether this is a warmup set (lower weight)
+	isWarmup bool
 }

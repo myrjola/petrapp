@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+const timestampFormat = "2006-01-02T15:04:05.000Z"
+const dateFormat = time.DateOnly
+
 // sqliteRepository handles database operations for workouts.
 type sqliteRepository struct {
 	db     *sqlite.Database
@@ -102,7 +105,7 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
         JOIN exercises e ON e.id = es.exercise_id
         WHERE es.workout_user_id = ? AND es.workout_date = ?
         ORDER BY es.exercise_id, es.set_number`,
-		userID, date.Format("2006-01-02"))
+		userID, date.Format(dateFormat))
 	if err != nil {
 		return Session{}, fmt.Errorf("query exercise sets: %w", err)
 	}
@@ -178,7 +181,7 @@ func (r *sqliteRepository) queryWorkoutSession(ctx context.Context, userID []byt
         SELECT workout_date, difficulty_rating, started_at, completed_at
         FROM workout_sessions 
         WHERE user_id = ? AND workout_date = ?`,
-		userID, date.Format("2006-01-02")).
+		userID, date.Format(dateFormat)).
 		Scan(&workoutDateStr, &session.DifficultyRating, &startedAtStr, &completedAtStr)
 
 	if err != nil {
@@ -203,7 +206,7 @@ func (r *sqliteRepository) queryWorkoutSession(ctx context.Context, userID []byt
 
 // startSession starts a new workout session or returns an error if one already exists.
 func (r *sqliteRepository) startSession(ctx context.Context, userID []byte, date time.Time) error {
-	dateStr := date.Format("2006-01-02")
+	dateStr := date.Format(dateFormat)
 	startedAt := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	// Start a transaction since we need to insert multiple rows
@@ -242,7 +245,7 @@ func (r *sqliteRepository) saveExerciseSets(
 	date time.Time,
 	exerciseSets []ExerciseSet,
 ) error {
-	dateStr := date.Format("2006-01-02")
+	dateStr := date.Format(dateFormat)
 
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
@@ -281,13 +284,13 @@ func (r *sqliteRepository) saveExerciseSets(
 
 // completeSession marks a workout session as completed.
 func (r *sqliteRepository) completeSession(ctx context.Context, userID []byte, date time.Time) error {
-	completedAt := time.Now().UTC().Format(time.RFC3339)
+	completedAt := time.Now().UTC().Format(timestampFormat)
 
 	result, err := r.db.ReadWrite.ExecContext(ctx, `
         UPDATE workout_sessions 
         SET completed_at = ?
         WHERE user_id = ? AND workout_date = ? AND completed_at IS NULL`,
-		completedAt, userID, date.Format("2006-01-02"))
+		completedAt, userID, date.Format(dateFormat))
 	if err != nil {
 		return fmt.Errorf("complete workout session: %w", err)
 	}
@@ -307,14 +310,14 @@ func (r *sqliteRepository) completeSession(ctx context.Context, userID []byte, d
 func (r *sqliteRepository) saveFeedback(ctx context.Context, userID []byte, date time.Time, difficulty int) error {
 	if difficulty < 1 || difficulty > 5 {
 		return fmt.Errorf("invalid difficulty rating (difficulty: %d, date: %s)",
-			difficulty, date.Format("2006-01-02"))
+			difficulty, date.Format(dateFormat))
 	}
 
 	result, err := r.db.ReadWrite.ExecContext(ctx, `
 		UPDATE workout_sessions
         SET difficulty_rating = ?
         WHERE user_id = ? AND workout_date = ?`,
-		difficulty, userID, date.Format("2006-01-02"))
+		difficulty, userID, date.Format(dateFormat))
 	if err != nil {
 		return fmt.Errorf("save difficulty rating: %w", err)
 	}
@@ -339,7 +342,7 @@ func (r *sqliteRepository) updateSetWeight(
 	setIndex int,
 	newWeight float64,
 ) error {
-	dateStr := date.Format("2006-01-02")
+	dateStr := date.Format(dateFormat)
 
 	result, err := r.db.ReadWrite.ExecContext(ctx, `
         UPDATE exercise_sets 
@@ -374,7 +377,7 @@ func (r *sqliteRepository) updateCompletedReps(
 	setIndex int,
 	completedReps int,
 ) error {
-	dateStr := date.Format("2006-01-02")
+	dateStr := date.Format(dateFormat)
 
 	// First verify the set exists and is already completed
 	var minReps, maxReps int
@@ -422,71 +425,16 @@ func (r *sqliteRepository) updateCompletedReps(
 	return nil
 }
 
-// parseTimestamp parses an RFC3339 timestamp from a nullable database string.
+// parseTimestamp parses a timestamp from a nullable database string.
 func parseTimestamp(timestampStr sql.NullString) (*time.Time, error) {
 	if timestampStr.Valid {
-		parsedTime, err := time.Parse(time.RFC3339, timestampStr.String)
+		parsedTime, err := time.Parse(timestampFormat, timestampStr.String)
 		if err != nil {
-			return nil, fmt.Errorf("parse RFC3339: %w", err)
+			return nil, fmt.Errorf("parse timestamp format: %w", err)
 		}
 		return &parsedTime, nil
 	}
 	return nil, nil //nolint:nilnil // nil time.Time is expected when the string is NULL.
-}
-
-// fetchExercisePool loads all exercises with their muscle group associations.
-func (r *sqliteRepository) fetchExercisePool(ctx context.Context) ([]Exercise, error) {
-	// Fetch basic exercise data first
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-        SELECT id, name, category
-        FROM exercises
-        ORDER BY id
-    `)
-	if err != nil {
-		return nil, fmt.Errorf("query exercises: %w", err)
-	}
-	defer rows.Close()
-
-	// Process results into exercise objects
-	var exercises []Exercise
-	for rows.Next() {
-		var (
-			id          int
-			name        string
-			categoryStr string
-		)
-
-		if err = rows.Scan(&id, &name, &categoryStr); err != nil {
-			return nil, fmt.Errorf("scan exercise row: %w", err)
-		}
-
-		category := CategoryFullBody
-		if categoryStr == "upper" {
-			category = CategoryUpper
-		} else if categoryStr == "lower" {
-			category = CategoryLower
-		}
-
-		var primaryMuscleGroups, secondaryMuscleGroups []string
-		primaryMuscleGroups, secondaryMuscleGroups, err = r.fetchExerciseMuscleGroups(ctx, id)
-		if err != nil {
-			return nil, fmt.Errorf("fetch muscle groups for exercise %d: %w", id, err)
-		}
-
-		exercises = append(exercises, Exercise{
-			ID:                    id,
-			Name:                  name,
-			Category:              category,
-			PrimaryMuscleGroups:   primaryMuscleGroups,
-			SecondaryMuscleGroups: secondaryMuscleGroups,
-		})
-	}
-
-	// Check for errors from iterating over rows
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate exercise rows: %w", err)
-	}
-	return exercises, nil
 }
 
 // fetchExerciseMuscleGroups retrieves the muscle groups associated with an exercise.
@@ -528,4 +476,222 @@ func (r *sqliteRepository) fetchExerciseMuscleGroups(ctx context.Context, exerci
 	}
 
 	return primaryMuscleGroups, secondaryMuscleGroups, nil
+}
+
+// getExercisesByCategory fetches exercises matching the given category or compatible with it.
+func (r *sqliteRepository) getExercisesByCategory(ctx context.Context, category Category) ([]Exercise, error) {
+	var query string
+	var args []interface{}
+
+	if category == CategoryFullBody {
+		// For full body, we can use exercises from any category
+		query = `SELECT id, name, category FROM exercises`
+	} else {
+		// For upper/lower, we want exercises specifically for that category
+		query = `SELECT id, name, category FROM exercises WHERE category = ?`
+		args = append(args, string(category))
+	}
+
+	rows, err := r.db.ReadOnly.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query exercises by category: %w", err)
+	}
+	defer rows.Close()
+
+	var exercises []Exercise
+	for rows.Next() {
+		var (
+			id          int
+			name        string
+			categoryStr string
+		)
+
+		if err = rows.Scan(&id, &name, &categoryStr); err != nil {
+			return nil, fmt.Errorf("scan exercise row: %w", err)
+		}
+
+		var cat Category
+		// Map category string to enum
+		switch categoryStr {
+		case "upper":
+			cat = CategoryUpper
+		case "lower":
+			cat = CategoryLower
+		default:
+			cat = CategoryFullBody
+		}
+
+		// Fetch muscle groups for this exercise
+		var primaryMuscleGroups, secondaryMuscleGroups []string
+		primaryMuscleGroups, secondaryMuscleGroups, err = r.fetchExerciseMuscleGroups(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("fetch muscle groups for exercise %d: %w", id, err)
+		}
+
+		ex := Exercise{
+			ID:                    id,
+			Name:                  name,
+			Category:              cat,
+			PrimaryMuscleGroups:   primaryMuscleGroups,
+			SecondaryMuscleGroups: secondaryMuscleGroups,
+		}
+
+		exercises = append(exercises, ex)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate exercise rows: %w", err)
+	}
+
+	return exercises, nil
+}
+
+// getRecentExercises retrieves exercises used within the specified time period.
+func (r *sqliteRepository) getRecentExercises(
+	ctx context.Context,
+	userID []byte,
+	since time.Time,
+) (map[int]time.Time, error) {
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+        SELECT DISTINCT exercise_id, MAX(workout_date) AS last_used
+        FROM exercise_sets
+        WHERE workout_user_id = ? AND workout_date >= ?
+        GROUP BY exercise_id
+    `, userID, since.Format(dateFormat))
+
+	if err != nil {
+		return nil, fmt.Errorf("query recent exercises: %w", err)
+	}
+	defer rows.Close()
+
+	recentExercises := make(map[int]time.Time)
+	for rows.Next() {
+		var (
+			id      int
+			dateStr string
+		)
+
+		if err = rows.Scan(&id, &dateStr); err != nil {
+			return nil, fmt.Errorf("scan recent exercise row: %w", err)
+		}
+
+		var date time.Time
+		date, err = time.Parse(dateFormat, dateStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse exercise date: %w", err)
+		}
+
+		recentExercises[id] = date
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recent exercise rows: %w", err)
+	}
+
+	return recentExercises, nil
+}
+
+// getExercisePerformanceHistory retrieves the performance history for a specific exercise.
+func (r *sqliteRepository) getExercisePerformanceHistory(
+	ctx context.Context,
+	userID []byte,
+	exercise Exercise,
+) (exerciseHistory, error) {
+	// First get the last workout date that included this exercise
+	var lastWorkoutDateStr sql.NullString
+	err := r.db.ReadOnly.QueryRowContext(ctx, `
+        SELECT MAX(workout_date)
+        FROM exercise_sets
+        WHERE workout_user_id = ? AND exercise_id = ?
+    `, userID, exercise.ID).Scan(&lastWorkoutDateStr)
+
+	if err != nil {
+		return exerciseHistory{}, fmt.Errorf("query last workout date: %w", err)
+	}
+
+	history := exerciseHistory{
+		exercise:        exercise,
+		lastPerformed:   time.Time{},
+		performanceData: nil,
+	}
+
+	// If the exercise has never been performed, return empty history
+	if !lastWorkoutDateStr.Valid {
+		return history, nil
+	}
+
+	// Parse the last performed date
+	lastPerformed, err := time.Parse(dateFormat, lastWorkoutDateStr.String)
+	if err != nil {
+		return exerciseHistory{}, fmt.Errorf("parse last workout date: %w", err)
+	}
+
+	history.lastPerformed = lastPerformed
+
+	// Get the performance data from the last workout
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+        SELECT weight_kg, min_reps, max_reps, completed_reps
+        FROM exercise_sets
+        WHERE workout_user_id = ? AND exercise_id = ? AND workout_date = ?
+        ORDER BY set_number
+    `, userID, exercise.ID, lastWorkoutDateStr.String)
+
+	if err != nil {
+		return exerciseHistory{}, fmt.Errorf("query exercise sets: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			weightKg         float64
+			minReps, maxReps int
+			completedReps    sql.NullInt32
+		)
+
+		if err = rows.Scan(&weightKg, &minReps, &maxReps, &completedReps); err != nil {
+			return exerciseHistory{}, fmt.Errorf("scan set performance: %w", err)
+		}
+
+		var reps = 0
+		if completedReps.Valid {
+			reps = int(completedReps.Int32)
+		}
+
+		perf := setPerformance{
+			date:          lastPerformed,
+			weightKg:      weightKg,
+			targetReps:    maxReps, // Using max as the target
+			completedReps: reps,
+		}
+
+		history.performanceData = append(history.performanceData, perf)
+	}
+
+	if err = rows.Err(); err != nil {
+		return exerciseHistory{}, fmt.Errorf("iterate set performance rows: %w", err)
+	}
+
+	return history, nil
+}
+
+// exerciseHistory represents performance history for a specific exercise.
+type exerciseHistory struct {
+	// exercise contains the exercise details
+	exercise Exercise
+	// lastPerformed is the date when this exercise was last done
+	lastPerformed time.Time
+	// performanceData contains historical set performance data
+	performanceData []setPerformance
+}
+
+// setPerformance tracks the performance of a set.
+type setPerformance struct {
+	// date is when this set was performed
+	date time.Time
+	// weightKg is the weight used
+	weightKg float64
+	// targetReps is how many reps were planned
+	targetReps int
+	// completedReps is how many reps were actually completed
+	completedReps int
 }
