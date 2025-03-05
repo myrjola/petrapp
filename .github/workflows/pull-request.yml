@@ -1,7 +1,9 @@
 name: Pull Request Build
 permissions:
   contents: read
-on: [ pull_request ]
+on:
+  - pull_request
+  - workflow_call
 jobs:
   build:
     runs-on: ubuntu-latest
