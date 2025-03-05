@@ -434,14 +434,6 @@ func parseTimestamp(timestampStr sql.NullString) (*time.Time, error) {
 	return nil, nil //nolint:nilnil // nil time.Time is expected when the string is NULL.
 }
 
-// muscleGroupAssociation represents a muscle group associated with an exercise.
-type muscleGroupAssociation struct {
-	// muscleGroup represents the muscle group name.
-	muscleGroup string
-	// isPrimary indicates whether this is a primary muscle for the exercise.
-	isPrimary bool
-}
-
 // fetchExercisePool loads all exercises with their muscle group associations.
 func (r *sqliteRepository) fetchExercisePool(ctx context.Context) ([]Exercise, error) {
 	// Fetch basic exercise data first

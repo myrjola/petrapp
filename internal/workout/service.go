@@ -232,7 +232,7 @@ func (s *Service) UpdateSetWeight(
 ) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	if err := s.repo.updateSetWeight(ctx, userID, date, exerciseID, setIndex, newWeight); err != nil {
-		return fmt.Errorf("UPDATE set weight: %w", err)
+		return fmt.Errorf("set weight: %w", err)
 	}
 	return nil
 }
@@ -250,4 +250,51 @@ func (s *Service) UpdateCompletedReps(
 		return fmt.Errorf("update completed reps: %w", err)
 	}
 	return nil
+}
+
+// determineWorkoutType decides what type of workout to generate based on user preferences and training history.
+func (s *Service) determineWorkoutType(ctx context.Context, date time.Time) (Category, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	// 1. Check if tomorrow is a preferred workout day.
+	tomorrow := date.AddDate(0, 0, 1)
+	tomorrowWeekday := tomorrow.Weekday()
+
+	preferences, err := s.repo.getUserPreferences(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("get user preferences: %w", err)
+	}
+
+	isTomorrowWorkoutDay := false
+	switch tomorrowWeekday {
+	case time.Monday:
+		isTomorrowWorkoutDay = preferences.Monday
+	case time.Tuesday:
+		isTomorrowWorkoutDay = preferences.Tuesday
+	case time.Wednesday:
+		isTomorrowWorkoutDay = preferences.Wednesday
+	case time.Thursday:
+		isTomorrowWorkoutDay = preferences.Thursday
+	case time.Friday:
+		isTomorrowWorkoutDay = preferences.Friday
+	case time.Saturday:
+		isTomorrowWorkoutDay = preferences.Saturday
+	case time.Sunday:
+		isTomorrowWorkoutDay = preferences.Sunday
+	}
+
+	// Start with lower body workout.
+	if isTomorrowWorkoutDay {
+		return CategoryLower, nil
+	}
+
+	yesterday := date.AddDate(0, 0, -1)
+	_, err = s.repo.getSession(ctx, userID, yesterday)
+	if errors.Is(err, sql.ErrNoRows) {
+		// If no session exists, default to full body workout
+		return CategoryFullBody, nil
+	}
+
+	// End with upper body workout with the assumption that yesterday was lower body.
+	return CategoryUpper, nil
 }
