@@ -45,6 +45,9 @@
         const fromUrl = navigation.activation.from.url
         const entryUrl = navigation.activation.entry.url
         depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
+        if (depthDifference === 0) {
+          e.viewTransition.skipTransition()
+        }
         document.documentElement.dataset.direction = depthDifference > 0 ? 'backward' : 'forward'
         await e.viewTransition.finished
         delete document.documentElement.dataset.direction
