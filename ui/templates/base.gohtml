@@ -32,6 +32,23 @@
       function me() {
         return document.currentScript.parentElement
       }
+
+      /**
+       * View transition handler for sliding animations for sliding left when we are going deeper in URL hierarchy and
+       * sliding right when we are going shallower.
+       */
+      window.addEventListener('pagereveal', async (e) => {
+        if (!e.viewTransition) {
+          return
+        }
+
+        const fromUrl = navigation.activation.from.url
+        const entryUrl = navigation.activation.entry.url
+        depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
+        document.documentElement.dataset.direction = depthDifference > 0 ? 'backward' : 'forward'
+        await e.viewTransition.finished
+        delete document.documentElement.dataset.direction
+      })
     </script>
     {{ template "page" . }}
     </body>
