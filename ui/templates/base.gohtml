@@ -42,6 +42,12 @@
           return
         }
 
+        // This has been set in the 'navigate' event listener below.
+        if (window.sessionStorage.getItem("hasUAVisualTransition")) {
+          window.sessionStorage.removeItem("hasUAVisualTransition")
+          return
+        }
+
         const fromUrl = navigation.activation.from.url
         const entryUrl = navigation.activation.entry.url
         depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
@@ -51,6 +57,16 @@
         document.documentElement.dataset.direction = depthDifference > 0 ? 'backward' : 'forward'
         await e.viewTransition.finished
         delete document.documentElement.dataset.direction
+      })
+
+      navigation.addEventListener('navigate', (e) => {
+        // The user agent already provided us with a visual transition, e.g., swipe gesture,
+        // there is no need to do one ourselves.
+        //
+        // Follow https://github.com/whatwg/html/issues/10831 for updates on the standardization.
+        if (e.hasUAVisualTransition) {
+          window.sessionStorage.setItem("hasUAVisualTransition", "true")
+        }
       })
     </script>
     {{ template "page" . }}
