@@ -37,5 +37,5 @@ jobs:
           AWS_ENDPOINT_URL_S3: https://fly.storage.tigris.dev
           AWS_ENDPOINT_URL_IAM: https://fly.iam.storage.tigris.dev
           AWS_REGION: auto
-          BUCKET_NAME: petrapp-backup
+          BUCKET_NAME: petrapp-prod-backup
         run: make migratetest
