@@ -1,7 +1,7 @@
 # --------------------------------------------------------------------------------
 #  Build stage for compiling the binary and preparing files for the scratch image.
 # --------------------------------------------------------------------------------
-FROM --platform=linux/amd64 golang:1.23.4-alpine3.21
+FROM --platform=linux/amd64 golang:1.24.1-alpine3.21
 
 ENV CGO_ENABLED=1
 ENV GOOS=linux
