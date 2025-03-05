@@ -99,9 +99,9 @@ Petrapp is a minimalist, privacy-focused mobile web application that automatical
 
 ### Phase 1: Core Functionality (Current)
 - [x] User authentication
-- [ ] Weekly schedule management
-- [ ] Basic workout generation
-- [ ] Set tracking
+- [X] Weekly schedule management
+- [X] Basic workout generation
+- [X] Set tracking
 - [ ] Progress tracking
 
 ### Phase 2: Enhancement

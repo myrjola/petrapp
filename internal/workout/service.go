@@ -284,8 +284,6 @@ func (s *Service) determineWorkoutType(ctx context.Context, date time.Time) (Cat
 }
 
 // selectExercisesForWorkout chooses appropriate exercises with balanced muscle groups.
-//
-//nolint:gocognit,gocyclo,cyclop,funlen // This function is complex by design to handle exercise selection log
 func (s *Service) selectExercisesForWorkout(
 	ctx context.Context,
 	category Category,
@@ -293,27 +291,50 @@ func (s *Service) selectExercisesForWorkout(
 ) ([]plannedExercise, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
-	// Target exercise counts by category
-	targetCounts := map[Category]int{
-		CategoryFullBody: 6, //nolint:mnd // 6 exercises for full-body
-		CategoryUpper:    5, //nolint:mnd // 5 exercises for upper body
-		CategoryLower:    5, //nolint:mnd // 5 exercises for lower body
+	// 1. Get exercise target count for this category
+	targetCount := s.getTargetExerciseCount(category)
+
+	// 2. Get candidate exercises for this category
+	candidateExercises, err := s.getCandidateExercises(ctx, category)
+	if err != nil {
+		return nil, err
 	}
 
-	// 1. Get all exercises matching the category
+	// 3. Categorize exercises by recency
+	recentList, nonRecentList, err := s.categorizeByRecency(ctx, userID, candidateExercises, date)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Select exercises using our selection strategy
+	selectedExercises := s.selectExercisesWithStrategy(category, nonRecentList, recentList, targetCount)
+
+	// 5. Convert to planned exercises with appropriate sets
+	return s.createPlannedExercises(ctx, userID, selectedExercises)
+}
+
+// getTargetExerciseCount returns the ideal number of exercises for a workout category.
+func (s *Service) getTargetExerciseCount(category Category) int {
+	fullBodySets := 6
+	upperLowerSets := 5
+	targetCounts := map[Category]int{
+		CategoryFullBody: fullBodySets,
+		CategoryUpper:    upperLowerSets,
+		CategoryLower:    upperLowerSets,
+	}
+	return targetCounts[category]
+}
+
+// getCandidateExercises retrieves and filters exercises suitable for the given category.
+func (s *Service) getCandidateExercises(ctx context.Context, category Category) ([]Exercise, error) {
 	allExercises, err := s.repo.getExercisesByCategory(ctx, category)
 	if err != nil {
 		return nil, fmt.Errorf("get exercises by category: %w", err)
 	}
 
-	// Filter exercises for specific category needs
 	var candidateExercises []Exercise
 	for _, ex := range allExercises {
-		if category == CategoryFullBody {
-			// For full body, include a mix of exercises
-			candidateExercises = append(candidateExercises, ex)
-		} else if ex.Category == category {
-			// For upper/lower, only include matching exercises
+		if category == CategoryFullBody || ex.Category == category {
 			candidateExercises = append(candidateExercises, ex)
 		}
 	}
@@ -322,133 +343,168 @@ func (s *Service) selectExercisesForWorkout(
 		return nil, fmt.Errorf("no exercises found for category %s", category)
 	}
 
-	// 2. Get recently used exercises (last 14 days)
+	return candidateExercises, nil
+}
+
+// categorizeByRecency divides exercises into recent and non-recent lists.
+func (s *Service) categorizeByRecency(
+	ctx context.Context,
+	userID []byte,
+	exercises []Exercise,
+	date time.Time,
+) ([]Exercise, []Exercise, error) {
 	lookbackPeriod := date.AddDate(0, 0, -14) // 2 weeks ago
+
 	recentExercises, err := s.repo.getRecentExercises(ctx, userID, lookbackPeriod)
 	if err != nil {
-		return nil, fmt.Errorf("get recent exercises: %w", err)
+		return nil, nil, fmt.Errorf("get recent exercises: %w", err)
 	}
 
-	// 3. Select exercises based on workout category and recency
-	targetCount := targetCounts[category]
-	var selectedExercises []Exercise
-
-	// First, identify primary muscle groups we want to target
-	var targetMuscleGroups []string
-	switch {
-	case category == CategoryUpper:
-		targetMuscleGroups = []string{"Chest", "Back", "Shoulders", "Biceps", "Triceps"}
-	case category == CategoryLower:
-		targetMuscleGroups = []string{"Quadriceps", "Hamstrings", "Glutes", "Calves"}
-	default:
-		targetMuscleGroups = []string{"Chest", "Back", "Shoulders", "Quadriceps", "Hamstrings", "Glutes"}
-	}
-
-	// Divide exercises into recent and non-recent
-	var recentExercisesList, nonRecentExercisesList []Exercise
-	for _, ex := range candidateExercises {
+	var recentList, nonRecentList []Exercise
+	for _, ex := range exercises {
 		_, isRecent := recentExercises[ex.ID]
 		if isRecent {
-			recentExercisesList = append(recentExercisesList, ex)
+			recentList = append(recentList, ex)
 		} else {
-			nonRecentExercisesList = append(nonRecentExercisesList, ex)
+			nonRecentList = append(nonRecentList, ex)
 		}
 	}
 
-	// Track selected muscle groups to ensure balance
+	return recentList, nonRecentList, nil
+}
+
+// selectExercisesWithStrategy implements the core selection algorithm.
+func (s *Service) selectExercisesWithStrategy(
+	category Category,
+	nonRecentExercises []Exercise,
+	recentExercises []Exercise,
+	targetCount int,
+) []Exercise {
+	// Step 1: Get target muscle groups for this category
+	targetMuscleGroups := s.getTargetMuscleGroups(category)
+
+	// Step 2: Select by muscle groups first
+	selectedExercises := s.selectByMuscleGroups(targetMuscleGroups, nonRecentExercises, targetCount)
+
+	// Step 3: Fill any remaining slots
+	return s.fillRemainingSlots(selectedExercises, nonRecentExercises, recentExercises, targetCount)
+}
+
+// getTargetMuscleGroups returns the primary muscle groups to target based on workout category.
+func (s *Service) getTargetMuscleGroups(category Category) []string {
+	switch category {
+	case CategoryUpper:
+		return []string{"Chest", "Back", "Shoulders", "Biceps", "Triceps"}
+	case CategoryLower:
+		return []string{"Quadriceps", "Hamstrings", "Glutes", "Calves"}
+	case CategoryFullBody:
+		return []string{"Chest", "Back", "Shoulders", "Quadriceps", "Hamstrings", "Glutes"}
+	}
+	return []string{}
+}
+
+// selectByMuscleGroups selects exercises to cover targeted muscle groups.
+func (s *Service) selectByMuscleGroups(
+	targetMuscleGroups []string,
+	candidates []Exercise,
+	targetCount int,
+) []Exercise {
+	selectedExercises := []Exercise{}
+	selectedIDs := make(map[int]bool)
 	selectedMuscleGroups := make(map[string]bool)
 
-	// First, try to select exercises for each target muscle group from non-recent exercises
 	for _, muscleGroup := range targetMuscleGroups {
 		if len(selectedExercises) >= targetCount {
 			break
 		}
 
-		// Find an exercise that targets this muscle group
-		for _, ex := range nonRecentExercisesList {
+		for _, ex := range candidates {
 			// Skip if already selected
-			alreadySelected := false
-			for _, selected := range selectedExercises {
-				if selected.ID == ex.ID {
-					alreadySelected = true
-					break
-				}
-			}
-			if alreadySelected {
+			if selectedIDs[ex.ID] {
 				continue
 			}
 
 			// Check if this exercise targets the muscle group
-			targetsMuscle := false
-			for _, group := range ex.PrimaryMuscleGroups {
-				if group == muscleGroup {
-					targetsMuscle = true
-					break
-				}
-			}
-
-			if targetsMuscle {
+			if s.exerciseTargetsMuscleGroup(ex, muscleGroup) {
 				selectedExercises = append(selectedExercises, ex)
+				selectedIDs[ex.ID] = true
 				selectedMuscleGroups[muscleGroup] = true
 				break
 			}
 		}
 	}
 
-	// If we still need more exercises, pick from non-recent first, then recent if needed
-	remainingCount := targetCount - len(selectedExercises)
+	return selectedExercises
+}
 
-	if remainingCount > 0 && len(nonRecentExercisesList) > 0 {
-		// Filter out already selected exercises
-		var availableNonRecent []Exercise
-		for _, ex := range nonRecentExercisesList {
-			alreadySelected := false
-			for _, selected := range selectedExercises {
-				if selected.ID == ex.ID {
-					alreadySelected = true
-					break
-				}
-			}
-			if !alreadySelected {
-				availableNonRecent = append(availableNonRecent, ex)
-			}
+// exerciseTargetsMuscleGroup checks if an exercise primarily targets a muscle group.
+func (s *Service) exerciseTargetsMuscleGroup(exercise Exercise, muscleGroup string) bool {
+	for _, group := range exercise.PrimaryMuscleGroups {
+		if group == muscleGroup {
+			return true
 		}
+	}
+	return false
+}
 
-		// Add additional non-recent exercises
-		for i := 0; i < remainingCount && i < len(availableNonRecent); i++ {
-			selectedExercises = append(selectedExercises, availableNonRecent[i])
+// fillRemainingSlots adds more exercises to reach the target count.
+func (s *Service) fillRemainingSlots(
+	selected []Exercise,
+	nonRecentCandidates []Exercise,
+	recentCandidates []Exercise,
+	targetCount int,
+) []Exercise {
+	// Create a copy of selected exercises
+	var result []Exercise
+	copy(result, selected)
+
+	// Create a map for quick lookup
+	selectedIDs := make(map[int]bool)
+	for _, ex := range result {
+		selectedIDs[ex.ID] = true
+	}
+
+	// Helper to filter and select additional exercises
+	addMore := func(candidates []Exercise, count int) {
+		added := 0
+		for _, ex := range candidates {
+			if added >= count {
+				break
+			}
+
+			if !selectedIDs[ex.ID] {
+				result = append(result, ex)
+				selectedIDs[ex.ID] = true
+				added++
+			}
 		}
 	}
 
-	// If we still need more, use recent exercises
-	remainingCount = targetCount - len(selectedExercises)
-	if remainingCount > 0 && len(recentExercisesList) > 0 {
-		// Filter out already selected exercises
-		var availableRecent []Exercise
-		for _, ex := range recentExercisesList {
-			alreadySelected := false
-			for _, selected := range selectedExercises {
-				if selected.ID == ex.ID {
-					alreadySelected = true
-					break
-				}
-			}
-			if !alreadySelected {
-				availableRecent = append(availableRecent, ex)
-			}
-		}
-
-		// Add additional recent exercises
-		for i := 0; i < remainingCount && i < len(availableRecent); i++ {
-			selectedExercises = append(selectedExercises, availableRecent[i])
-		}
+	// First try to add non-recent exercises
+	remainingCount := targetCount - len(result)
+	if remainingCount > 0 {
+		addMore(nonRecentCandidates, remainingCount)
 	}
 
-	// 4. Generate appropriate sets for each selected exercise
+	// If needed, add recent exercises
+	remainingCount = targetCount - len(result)
+	if remainingCount > 0 {
+		addMore(recentCandidates, remainingCount)
+	}
+
+	return result
+}
+
+// createPlannedExercises adds appropriate sets to each selected exercise.
+func (s *Service) createPlannedExercises(
+	ctx context.Context,
+	userID []byte,
+	selectedExercises []Exercise,
+) ([]plannedExercise, error) {
 	var plannedExercises = make([]plannedExercise, len(selectedExercises))
 	for i, ex := range selectedExercises {
-		var history exerciseHistory
-		if history, err = s.repo.getExercisePerformanceHistory(ctx, userID, ex); err != nil {
+		history, err := s.repo.getExercisePerformanceHistory(ctx, userID, ex)
+		if err != nil {
 			return nil, fmt.Errorf("get exercise history for %s: %w", ex.Name, err)
 		}
 
@@ -457,7 +513,6 @@ func (s *Service) selectExercisesForWorkout(
 			sets:     s.generateSetsForExercise(history),
 		}
 	}
-
 	return plannedExercises, nil
 }
 
