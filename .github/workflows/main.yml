@@ -39,7 +39,7 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
     concurrency:
-      group: deploy-${{ vars.FLY_APP_NAME }}-staging
+      group: deploy-${{ vars.FLY_APP_NAME }}-prod
     with:
       env: prod
       fly_app: ${{ vars.FLY_APP_NAME }}
