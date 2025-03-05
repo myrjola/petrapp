@@ -45,7 +45,7 @@
         // This has been set in the 'navigate' event listener below.
         if (window.sessionStorage.getItem("hasUAVisualTransition")) {
           window.sessionStorage.removeItem("hasUAVisualTransition")
-          return
+          e.viewTransition.skipTransition()
         }
 
         const fromUrl = navigation.activation.from.url
