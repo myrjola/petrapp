@@ -71,7 +71,10 @@ func TestGenerate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create generator with test data
-			gen := generator.NewGenerator(tc.preferences, tc.history, tc.pool)
+			gen, err := generator.NewGenerator(tc.preferences, tc.history, tc.pool)
+			if err != nil {
+				t.Fatalf("Failed to create generator: %v", err)
+			}
 
 			// Generate a workout
 			session, err := gen.Generate(tc.date)
@@ -100,17 +103,12 @@ func TestGenerateErrorHandling(t *testing.T) {
 	emptyHistory := []workout.Session{}
 	emptyPool := []workout.Exercise{}
 
-	gen := generator.NewGenerator(emptyPreferences, emptyHistory, emptyPool)
-
-	// Should return an error when there are no exercises available
-	session, err := gen.Generate(time.Now())
-
+	gen, err := generator.NewGenerator(emptyPreferences, emptyHistory, emptyPool)
 	if err == nil {
-		t.Error("Expected an error when generating a workout with an empty exercise pool, but got nil")
+		t.Error("Expected an error when creating a generator with an empty exercise pool, but got nil")
 	}
-
-	if session.WorkoutDate.IsZero() == false {
-		t.Error("Expected empty session when error occurred, but got a populated session")
+	if gen != nil {
+		t.Errorf("Expected generator to be nil when error occurred, got %v", gen)
 	}
 }
 
@@ -473,7 +471,10 @@ func TestProgressionOverTime(t *testing.T) {
 	initialHistory := []workout.Session{}
 
 	// Create initial generator
-	gen := generator.NewGenerator(preferences, initialHistory, exercises)
+	gen, err := generator.NewGenerator(preferences, initialHistory, exercises)
+	if err != nil {
+		t.Fatalf("Failed to create generator: %v", err)
+	}
 
 	// Generate a series of workouts over time and complete them
 	// to simulate progressive overload
@@ -488,7 +489,8 @@ func TestProgressionOverTime(t *testing.T) {
 			workoutDate := startDate.AddDate(0, 0, weekIndex*7+dayOffset)
 
 			// Generate workout
-			session, err := gen.Generate(workoutDate)
+			var session workout.Session
+			session, err = gen.Generate(workoutDate)
 			if err != nil {
 				t.Fatalf("Failed to generate workout for week %d, day %d: %v", weekIndex+1, dayOffset, err)
 			}
@@ -500,7 +502,10 @@ func TestProgressionOverTime(t *testing.T) {
 			history = append(history, completedSession)
 
 			// Create a new generator with updated history for next workout
-			gen = generator.NewGenerator(preferences, history, exercises)
+			gen, err = generator.NewGenerator(preferences, history, exercises)
+			if err != nil {
+				t.Fatalf("Failed to create generator for week %d, day %d: %v", weekIndex+1, dayOffset, err)
+			}
 		}
 	}
 
@@ -526,14 +531,18 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 	// Generate several workouts across different weeks on the same weekday
 	history := []workout.Session{}
 	numWeeks := 3
-	gen := generator.NewGenerator(preferences, history, exercises)
+	gen, err := generator.NewGenerator(preferences, history, exercises)
+	if err != nil {
+		t.Fatalf("Failed to create generator: %v", err)
+	}
 
 	mondaySessions := make([]workout.Session, numWeeks)
 
 	// Generate Monday workouts for several weeks
 	for weekIndex := range numWeeks {
 		date := time.Date(2023, 1, 2+weekIndex*7, 0, 0, 0, 0, time.UTC) // Mondays
-		session, err := gen.Generate(date)
+		var session workout.Session
+		session, err = gen.Generate(date)
 		if err != nil {
 			t.Fatalf("Failed to generate workout for week %d: %v", weekIndex+1, err)
 		}
@@ -544,7 +553,10 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 		mondaySessions[weekIndex] = completedSession
 
 		// Update generator with new history
-		gen = generator.NewGenerator(preferences, history, exercises)
+		gen, err = generator.NewGenerator(preferences, history, exercises)
+		if err != nil {
+			t.Fatalf("Failed to create generator: %v", err)
+		}
 	}
 
 	// Verify continuity between weeks
@@ -567,7 +579,10 @@ func TestUserFeedbackIntegration(t *testing.T) {
 
 	// Create initial workout and add to history
 	initialDate := time.Date(2023, 1, 3, 0, 0, 0, 0, time.UTC) // Tuesday
-	gen := generator.NewGenerator(preferences, nil, exercises)
+	gen, err := generator.NewGenerator(preferences, nil, exercises)
+	if err != nil {
+		t.Fatalf("Failed to create generator: %v", err)
+	}
 
 	initialSession, err := gen.Generate(initialDate)
 	if err != nil {
@@ -588,7 +603,10 @@ func TestUserFeedbackIntegration(t *testing.T) {
 	// For each feedback level
 	for _, rating := range []int{1, 3, 5} { // Too easy, Optimal, Too difficult
 		// Generate workout with initial history
-		gen = generator.NewGenerator(preferences, initialHistory, exercises)
+		gen, err = generator.NewGenerator(preferences, initialHistory, exercises)
+		if err != nil {
+			t.Fatalf("Failed to create generator for feedback %d: %v", rating, err)
+		}
 
 		testDate := initialDate.AddDate(0, 0, 2) // Thursday
 		session, genErr := gen.Generate(testDate)
@@ -612,7 +630,11 @@ func TestUserFeedbackIntegration(t *testing.T) {
 
 		// Create a new history with initial session and current completed session
 		var updatedHistory = append(initialHistory, completedSession)
-		updatedGen := generator.NewGenerator(preferences, updatedHistory, exercises)
+		var updatedGen *generator.Generator
+		updatedGen, err = generator.NewGenerator(preferences, updatedHistory, exercises)
+		if err != nil {
+			t.Fatalf("Failed to create generator for feedback %d: %v", rating, err)
+		}
 
 		// Generate next workout
 		nextDate := initialDate.AddDate(0, 0, 7) // Next Tuesday
