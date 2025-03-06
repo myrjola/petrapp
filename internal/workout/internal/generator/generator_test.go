@@ -807,8 +807,6 @@ func verifyContinuityBetweenWeeks(t *testing.T, sessions []workout.Session) {
 		if continuityPercentage < 60 {
 			t.Errorf("Continuity between weeks %d and %d is too low: %.1f%% (expected ~80%%)",
 				i, i+1, continuityPercentage)
-		} else {
-			t.Logf("Continuity between weeks %d and %d: %.1f%%", i, i+1, continuityPercentage)
 		}
 	}
 }
@@ -835,10 +833,6 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 		prevWeight := getAverageWeight(pair.previous)
 		nextWeight := getAverageWeight(pair.next)
 
-		// Log exercise details for debugging
-		t.Logf("Exercise %s (ID: %d): Previous weight: %.1f, Next weight: %.1f",
-			pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight)
-
 		switch rating {
 		case 1: // Too easy
 			// Should see weight increase after 'too easy' feedback
@@ -852,10 +846,6 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 					t.Errorf("Expected weight increase after 'too easy' feedback for %s (ID: %d), but got %.1f -> %.1f",
 						pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight)
 				}
-			} else if prevWeight == 0 && nextWeight == 0 {
-				// If weights are still at 0, that's okay for the first workout since user needs to select weight
-				t.Logf("Weight remains at 0 for %s after 'too easy' feedback - this is expected for initial workouts",
-					pair.previous.Exercise.Name)
 			}
 		case 5: // Too difficult
 			// Should see weight decrease or volume reduction
@@ -869,7 +859,7 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 					pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight, prevSets, nextSets)
 			} else if prevWeight == 0 && nextSets >= prevSets {
 				// If weight is already 0, we should at least reduce volume
-				t.Logf("Weight already at 0 for %s after 'too difficult' feedback - expected volume reduction",
+				t.Errorf("Weight already at 0 for %s after 'too difficult' feedback - expected volume reduction",
 					pair.previous.Exercise.Name)
 			}
 		default: // Optimal (2-4)

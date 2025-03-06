@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"os"
+	"io"
 	"strconv"
 	"testing"
 	"time"
@@ -16,7 +16,7 @@ func Test_application_exerciseSet(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(ctx, os.Stdout, testLookupEnv, run)
+	server, err := e2etest.StartServer(ctx, io.Discard, testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
