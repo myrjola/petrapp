@@ -743,15 +743,10 @@ func verifyWorkoutProgression(t *testing.T, history []workout.Session) {
 	// If we didn't find progression but did find non-zero weights, that's a problem
 	if !progressionFound && nonZeroWeightsFound {
 		t.Error("No exercise showed weight progression over time despite having non-zero weights")
-	} else if !progressionFound && !nonZeroWeightsFound {
-		// If all weights are zero, we can't expect progression, so just log it
-		t.Log("All exercises have zero weights, so progression could not be verified - this is expected for initial workouts")
-	} else if progressionFound {
-		t.Log("Weight progression confirmed in at least one exercise")
 	}
 }
 
-// Verify appropriate continuity between workouts on the same day of the week
+// Verify appropriate continuity between workouts on the same day of the week.
 func verifyContinuityBetweenWeeks(t *testing.T, sessions []workout.Session) {
 	t.Helper()
 

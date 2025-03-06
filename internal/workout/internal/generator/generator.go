@@ -4,18 +4,51 @@ package generator
 import (
 	"fmt"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"sort"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/workout"
 )
 
+// Workout type constants.
+const (
+	workoutTypeStrength    = "strength"
+	workoutTypeHypertrophy = "hypertrophy"
+	workoutTypeEndurance   = "endurance"
+)
+
+// Progression model constants.
+const (
+	continuityPercentage               = 0.8
+	standardWeightIncrementKg          = 2.5
+	largerWeightIncrementKg            = 5.0
+	weightReductionFactor              = 0.1
+	maxConsecutiveCompletions          = 2
+	hypertrophyToEnduranceWeightFactor = 0.8
+	strengthToHypertrophyWeightFactor  = 0.85
+	enduranceToStrengthWeightFactor    = 1.3
+	minCompoundMovementMuscleGroups    = 2
+	beginnerPeriodDays                 = 90
+	hypertrophyMinReps                 = 8
+	hypertrophyMaxReps                 = 12
+	enduranceMinReps                   = 12
+	enduranceMaxReps                   = 15
+	strengthMinReps                    = 3
+	strengthMaxReps                    = 6
+)
+
+// Feedback rating constants.
+const (
+	feedbackTooEasy      = 1
+	feedbackTooDifficult = 5
+)
+
 // Generator generates workout sessions.
 type Generator struct {
 	// preferences provided by the user
 	preferences workout.Preferences
-	// history of workouts from previous 3 months.
+	// history of workouts from previous 6 months.
 	history []workout.Session
 	// pool of available exercises.
 	pool []workout.Exercise
@@ -43,9 +76,12 @@ func (g *Generator) Generate(t time.Time) (workout.Session, error) {
 
 	// Create the workout session
 	session := workout.Session{
-		WorkoutDate:  t,
-		ExerciseSets: exerciseSets,
-		Status:       workout.StatusPlanned,
+		WorkoutDate:      t,
+		ExerciseSets:     exerciseSets,
+		Status:           workout.StatusPlanned,
+		DifficultyRating: nil,
+		StartedAt:        nil,
+		CompletedAt:      nil,
 	}
 
 	return session, nil
@@ -190,8 +226,8 @@ func (g *Generator) selectExercisesWithContinuity(
 		return g.selectRandomExercises(pool, count)
 	}
 
-	// Calculate how many exercises to keep from previous workout (~80%)
-	continuityCount := int(math.Ceil(float64(count) * 0.8))
+	// Calculate how many exercises to keep from previous workout
+	continuityCount := int(math.Ceil(float64(count) * continuityPercentage))
 	if continuityCount > count {
 		continuityCount = count
 	}
@@ -262,8 +298,7 @@ func (g *Generator) selectRandomExercises(pool []workout.Exercise, count int) []
 	copy(shuffled, pool)
 
 	// Shuffle the pool
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(shuffled), func(i, j int) {
+	rand.Shuffle(len(shuffled), func(i, j int) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
 
@@ -273,7 +308,7 @@ func (g *Generator) selectRandomExercises(pool []workout.Exercise, count int) []
 
 // isCompoundMovement determines if an exercise is a compound movement.
 func isCompoundMovement(ex workout.Exercise) bool {
-	return len(ex.PrimaryMuscleGroups) >= 2
+	return len(ex.PrimaryMuscleGroups) >= minCompoundMovementMuscleGroups
 }
 
 // containsExercise checks if an exercise is in a slice.
@@ -300,17 +335,18 @@ func filterOutExercises(pool, toFilter []workout.Exercise) []workout.Exercise {
 // determineSetsRepsWeight determines sets, reps, and weights for an exercise.
 func (g *Generator) determineSetsRepsWeight(
 	exercise workout.Exercise,
-	lastWorkout *workout.Session,
+	_ *workout.Session, // Unused parameter, renamed with underscore
 ) []workout.Set {
 	// Find most recent occurrence of this exercise in workout history
 	lastExerciseSet := g.findMostRecentExerciseSet(exercise.ID)
 
 	// No history - start with 3 sets of 8 reps
 	if lastExerciseSet == nil {
+		const defaultReps = 8
 		return []workout.Set{
-			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: 8, MaxReps: 8},
-			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: 8, MaxReps: 8},
-			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: 8, MaxReps: 8},
+			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
+			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
+			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
 		}
 	}
 
@@ -318,16 +354,16 @@ func (g *Generator) determineSetsRepsWeight(
 	feedback := g.getMostRecentFeedback(exercise.ID)
 
 	// Check if we have a "too easy" feedback, which should override progression
-	if feedback != nil && *feedback == 1 {
+	if feedback != nil && *feedback == feedbackTooEasy {
 		// For "too easy", just increase weight directly
-		return increaseWeight(lastExerciseSet.Sets, 5.0)
+		return increaseWeight(lastExerciseSet.Sets, largerWeightIncrementKg)
 	}
 
 	// Has history - determine progression
 	sets := g.progressSets(*lastExerciseSet)
 
 	// Apply other feedback types
-	if feedback != nil && *feedback != 1 {
+	if feedback != nil && *feedback != feedbackTooEasy {
 		sets = g.integrateUserFeedback(sets, feedback)
 	}
 
@@ -380,7 +416,7 @@ func (g *Generator) isBeginnerUser() bool {
 	duration := time.Since(oldestWorkout.WorkoutDate)
 
 	// Check if it's less than 3 months
-	return duration < 90*24*time.Hour
+	return duration < beginnerPeriodDays*24*time.Hour
 }
 
 // progressSets determines the new sets based on the previous performance.
@@ -413,10 +449,10 @@ func (g *Generator) progressSetsLinear(lastExerciseSet workout.ExerciseSet) []wo
 	// Determine if we should increase, maintain, or decrease weight
 	if anyFailed {
 		// If any set failed, reduce weight by 5-10%
-		return reduceWeight(lastExerciseSet.Sets, 0.1)
+		return reduceWeight(lastExerciseSet.Sets, weightReductionFactor)
 	} else if allCompleted {
 		// If all sets completed successfully, increase weight
-		return increaseWeight(lastExerciseSet.Sets, 2.5) // Add 2.5kg
+		return increaseWeight(lastExerciseSet.Sets, standardWeightIncrementKg)
 	}
 	// If sets partially complete, keep weight the same
 	return copySetWithoutCompletion(lastExerciseSet.Sets)
@@ -431,66 +467,73 @@ func (g *Generator) progressSetsUndulating(lastExerciseSet workout.ExerciseSet) 
 	allCompletedAtMax := allSetsCompletedAtMax(lastExerciseSet.Sets)
 
 	// Count consecutive workouts with all sets at max reps
-	consecutiveMaxCompletions := 0
-	if allCompletedAtMax {
-		consecutiveMaxCompletions = 1 // Current workout counts as one
-		exerciseID := lastExerciseSet.Exercise.ID
+	consecutiveMaxCompletions := g.countConsecutiveMaxCompletions(lastExerciseSet, allCompletedAtMax)
 
-		// Look at previous workouts for this exercise
-		for i := len(g.history) - 1; i >= 0; i-- {
-			session := g.history[i]
-			for _, es := range session.ExerciseSets {
-				if es.Exercise.ID == exerciseID {
-					if allSetsCompletedAtMax(es.Sets) {
-						consecutiveMaxCompletions++
-						if consecutiveMaxCompletions >= 2 {
-							break
-						}
-					} else {
-						// Break at first non-max completion
-						break
-					}
-				}
-			}
-			if consecutiveMaxCompletions >= 2 {
-				break
-			}
-		}
-	}
-
-	// Progress to next workout type if completed at max for 2 consecutive workouts
-	if consecutiveMaxCompletions >= 2 {
+	// Progress to next workout type if completed at max for consecutive workouts
+	if consecutiveMaxCompletions >= maxConsecutiveCompletions {
 		return createSetsForNextWorkoutType(currentType, lastExerciseSet.Sets[0].WeightKg)
 	}
 
 	// Otherwise, keep same workout type with adjusted weight
 	if allCompletedAtMax {
 		// If all sets completed at max, increase weight slightly
-		return increaseWeight(lastExerciseSet.Sets, 2.5)
+		return increaseWeight(lastExerciseSet.Sets, standardWeightIncrementKg)
 	}
+
 	// Otherwise keep the same weight and rep ranges
 	return copySetWithoutCompletion(lastExerciseSet.Sets)
+}
+
+// countConsecutiveMaxCompletions counts how many consecutive workouts had all sets completed at max reps.
+func (g *Generator) countConsecutiveMaxCompletions(lastExerciseSet workout.ExerciseSet, currentIsMax bool) int {
+	if !currentIsMax {
+		return 0
+	}
+
+	count := 1 // Current workout counts as one
+	exerciseID := lastExerciseSet.Exercise.ID
+
+	// Look at previous workouts for this exercise
+	for i := len(g.history) - 1; i >= 0; i-- {
+		session := g.history[i]
+		for _, es := range session.ExerciseSets {
+			if es.Exercise.ID == exerciseID {
+				if allSetsCompletedAtMax(es.Sets) {
+					count++
+					if count >= maxConsecutiveCompletions {
+						return count
+					}
+				} else {
+					// Break at first non-max completion
+					return count
+				}
+			}
+		}
+	}
+
+	return count
 }
 
 // determineWorkoutType identifies the type of workout based on rep ranges.
 func determineWorkoutType(sets []workout.Set) string {
 	if len(sets) == 0 {
-		return "hypertrophy" // Default
+		return workoutTypeHypertrophy // Default
 	}
 
 	// Check the rep range of the first set
 	minReps := sets[0].MinReps
 	maxReps := sets[0].MaxReps
 
-	if minReps >= 3 && maxReps <= 6 {
-		return "strength"
-	} else if minReps >= 8 && maxReps <= 12 {
-		return "hypertrophy"
-	} else if minReps >= 12 && maxReps <= 15 {
-		return "endurance"
+	switch {
+	case minReps >= strengthMinReps && maxReps <= strengthMaxReps:
+		return workoutTypeStrength
+	case minReps >= hypertrophyMinReps && maxReps <= hypertrophyMaxReps:
+		return workoutTypeHypertrophy
+	case minReps >= enduranceMinReps && maxReps <= enduranceMaxReps:
+		return workoutTypeEndurance
+	default:
+		return workoutTypeHypertrophy
 	}
-
-	return "hypertrophy" // Default
 }
 
 // allSetsCompletedAtMax checks if all sets were completed at maximum reps.
@@ -506,36 +549,108 @@ func allSetsCompletedAtMax(sets []workout.Set) bool {
 // createSetsForNextWorkoutType creates sets for the next workout type in the cycle.
 func createSetsForNextWorkoutType(currentType string, lastWeight float64) []workout.Set {
 	switch currentType {
-	case "strength":
+	case workoutTypeStrength:
 		// Progress from strength to hypertrophy (with adjusted weight factor)
-		adjustedWeight := lastWeight * 0.85 // Reduced the drop to 15% instead of 20%
+		adjustedWeight := lastWeight * strengthToHypertrophyWeightFactor
 		return []workout.Set{
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 8, MaxReps: 12},
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 8, MaxReps: 12},
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 8, MaxReps: 12},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          hypertrophyMinReps,
+				MaxReps:          hypertrophyMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          hypertrophyMinReps,
+				MaxReps:          hypertrophyMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          hypertrophyMinReps,
+				MaxReps:          hypertrophyMaxReps,
+				CompletedReps:    nil,
+			},
 		}
-	case "hypertrophy":
+	case workoutTypeHypertrophy:
 		// Progress from hypertrophy to endurance (with adjusted weight factor)
-		adjustedWeight := lastWeight * 0.8 // Reduced the drop to 20% instead of 30%
+		adjustedWeight := lastWeight * hypertrophyToEnduranceWeightFactor
 		return []workout.Set{
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 12, MaxReps: 15},
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 12, MaxReps: 15},
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 12, MaxReps: 15},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          enduranceMinReps,
+				MaxReps:          enduranceMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          enduranceMinReps,
+				MaxReps:          enduranceMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          enduranceMinReps,
+				MaxReps:          enduranceMaxReps,
+				CompletedReps:    nil,
+			},
 		}
-	case "endurance":
+	case workoutTypeEndurance:
 		// Progress from endurance to strength
-		adjustedWeight := lastWeight * 1.3
+		adjustedWeight := lastWeight * enduranceToStrengthWeightFactor
 		return []workout.Set{
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 3, MaxReps: 6},
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 3, MaxReps: 6},
-			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 3, MaxReps: 6},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          strengthMinReps,
+				MaxReps:          strengthMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          strengthMinReps,
+				MaxReps:          strengthMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         adjustedWeight,
+				AdjustedWeightKg: adjustedWeight,
+				MinReps:          strengthMinReps,
+				MaxReps:          strengthMaxReps,
+				CompletedReps:    nil,
+			},
 		}
 	default:
 		// Default to hypertrophy
 		return []workout.Set{
-			{WeightKg: lastWeight, AdjustedWeightKg: lastWeight, MinReps: 8, MaxReps: 12},
-			{WeightKg: lastWeight, AdjustedWeightKg: lastWeight, MinReps: 8, MaxReps: 12},
-			{WeightKg: lastWeight, AdjustedWeightKg: lastWeight, MinReps: 8, MaxReps: 12},
+			{
+				WeightKg:         lastWeight,
+				AdjustedWeightKg: lastWeight,
+				MinReps:          hypertrophyMinReps,
+				MaxReps:          hypertrophyMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         lastWeight,
+				AdjustedWeightKg: lastWeight,
+				MinReps:          hypertrophyMinReps,
+				MaxReps:          hypertrophyMaxReps,
+				CompletedReps:    nil,
+			},
+			{
+				WeightKg:         lastWeight,
+				AdjustedWeightKg: lastWeight,
+				MinReps:          hypertrophyMinReps,
+				MaxReps:          hypertrophyMaxReps,
+				CompletedReps:    nil,
+			},
 		}
 	}
 }
@@ -547,20 +662,21 @@ func (g *Generator) integrateUserFeedback(sets []workout.Set, feedback *int) []w
 	}
 
 	switch *feedback {
-	case 1: // Too easy
+	case feedbackTooEasy: // Too easy
 		// Increase intensity more aggressively
-		return increaseWeight(sets, 5.0) // Add 5kg
-	case 5: // Too difficult
+		return increaseWeight(sets, largerWeightIncrementKg)
+	case feedbackTooDifficult: // Too difficult
 		// Reduce volume or intensity
-		if len(sets) > 3 {
+		const maxStandardSets = 3
+		if len(sets) > maxStandardSets {
 			// Reduce volume by removing a set
 			return sets[:len(sets)-1]
 		}
 		// Reduce intensity by reducing weight
-		return reduceWeight(sets, 0.1)
+		return reduceWeight(sets, weightReductionFactor)
 	default: // 2-4 (optimal challenge)
 		// For optimal challenge, make a small increase
-		return increaseWeight(sets, 2.5) // Add 2.5kg
+		return increaseWeight(sets, standardWeightIncrementKg)
 	}
 }
 
