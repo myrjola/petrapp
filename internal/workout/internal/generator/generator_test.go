@@ -1,10 +1,10 @@
 package generator_test
 
 import (
-	"github.com/myrjola/petrapp/internal/ptr"
 	"testing"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/ptr"
 	"github.com/myrjola/petrapp/internal/workout"
 	"github.com/myrjola/petrapp/internal/workout/internal/generator"
 )
@@ -26,6 +26,10 @@ func TestGenerate(t *testing.T) {
 				Monday:    true,
 				Wednesday: true,
 				Friday:    true,
+				Tuesday:   false,
+				Thursday:  false,
+				Saturday:  false,
+				Sunday:    false,
 			},
 			history: nil,
 			pool:    createExercisePool(),
@@ -34,10 +38,13 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "User with workout history",
 			preferences: workout.Preferences{
-				Monday:   true,
-				Tuesday:  true,
-				Thursday: true,
-				Saturday: true,
+				Monday:    true,
+				Tuesday:   true,
+				Thursday:  true,
+				Saturday:  true,
+				Wednesday: false,
+				Friday:    false,
+				Sunday:    false,
 			},
 			history: createWorkoutHistory(),
 			pool:    createExercisePool(),
@@ -46,8 +53,13 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "Weekend workout",
 			preferences: workout.Preferences{
-				Saturday: true,
-				Sunday:   true,
+				Saturday:  true,
+				Sunday:    true,
+				Monday:    false,
+				Tuesday:   false,
+				Wednesday: false,
+				Thursday:  false,
+				Friday:    false,
 			},
 			history: createWorkoutHistory(),
 			pool:    createExercisePool(),
@@ -76,7 +88,15 @@ func TestGenerate(t *testing.T) {
 // TestGenerateErrorHandling verifies that generator returns appropriate errors.
 func TestGenerateErrorHandling(t *testing.T) {
 	// Create a generator with no exercises in the pool
-	emptyPreferences := workout.Preferences{}
+	emptyPreferences := workout.Preferences{
+		Monday:    false,
+		Tuesday:   false,
+		Wednesday: false,
+		Thursday:  false,
+		Friday:    false,
+		Saturday:  false,
+		Sunday:    false,
+	}
 	emptyHistory := []workout.Session{}
 	emptyPool := []workout.Exercise{}
 
@@ -94,7 +114,7 @@ func TestGenerateErrorHandling(t *testing.T) {
 	}
 }
 
-// Helper function to verify a generated workout
+// Helper function to verify a generated workout.
 func verifyGeneratedWorkout(t *testing.T, session workout.Session, date time.Time) {
 	t.Helper()
 
@@ -168,7 +188,7 @@ func verifyGeneratedWorkout(t *testing.T, session workout.Session, date time.Tim
 	}
 }
 
-// Helper function to check if an exercise set has consistent rep ranges
+// Helper function to check if an exercise set has consistent rep ranges.
 func setsHaveConsistentRepRanges(sets []workout.Set) bool {
 	if len(sets) == 0 {
 		return true
@@ -186,7 +206,7 @@ func setsHaveConsistentRepRanges(sets []workout.Set) bool {
 	return true
 }
 
-// Helper function to check if all exercises in a workout are unique
+// Helper function to check if all exercises in a workout are unique.
 func hasUniqueExercises(exerciseSets []workout.ExerciseSet) bool {
 	exerciseIDs := make(map[int]bool)
 
@@ -200,7 +220,7 @@ func hasUniqueExercises(exerciseSets []workout.ExerciseSet) bool {
 	return true
 }
 
-// Helper function to create a diverse pool of exercises
+// Helper function to create a diverse pool of exercises.
 func createExercisePool() []workout.Exercise {
 	return []workout.Exercise{
 		// Upper body exercises
@@ -337,7 +357,7 @@ func createExercisePool() []workout.Exercise {
 	}
 }
 
-// Helper function to create mock workout history
+// Helper function to create mock workout history.
 func createWorkoutHistory() []workout.Session {
 	// Example completed rep counts
 	rep8 := 8
@@ -348,13 +368,20 @@ func createWorkoutHistory() []workout.Session {
 	// Create some sample exercises
 	exercises := createExercisePool()
 
+	// Set mock dates for the workouts
+	twoWeeksAgo := time.Now().AddDate(0, 0, -14)
+	oneWeekAgo := time.Now().AddDate(0, 0, -7)
+	twoDaysAgo := time.Now().AddDate(0, 0, -2)
+
 	// Create workout history - 3 previous workouts
 	return []workout.Session{
 		{
 			// 2 weeks ago - Monday workout
-			WorkoutDate:      time.Now().AddDate(0, 0, -14),
+			WorkoutDate:      twoWeeksAgo,
 			Status:           workout.StatusDone,
 			DifficultyRating: ptr.Ref(3), // Medium difficulty
+			StartedAt:        ptr.Ref(twoWeeksAgo.Add(17 * time.Hour)),
+			CompletedAt:      ptr.Ref(twoWeeksAgo.Add(18 * time.Hour)),
 			ExerciseSets: []workout.ExerciseSet{
 				{
 					Exercise: exercises[0], // Bench Press
@@ -376,9 +403,11 @@ func createWorkoutHistory() []workout.Session {
 		},
 		{
 			// 1 week ago - Monday workout
-			WorkoutDate:      time.Now().AddDate(0, 0, -7),
+			WorkoutDate:      oneWeekAgo,
 			Status:           workout.StatusDone,
 			DifficultyRating: ptr.Ref(4), // Somewhat challenging
+			StartedAt:        ptr.Ref(oneWeekAgo.Add(17 * time.Hour)),
+			CompletedAt:      ptr.Ref(oneWeekAgo.Add(18 * time.Hour)),
 			ExerciseSets: []workout.ExerciseSet{
 				{
 					Exercise: exercises[0], // Bench Press
@@ -400,9 +429,11 @@ func createWorkoutHistory() []workout.Session {
 		},
 		{
 			// 2 days ago - Saturday workout
-			WorkoutDate:      time.Now().AddDate(0, 0, -2),
+			WorkoutDate:      twoDaysAgo,
 			Status:           workout.StatusDone,
 			DifficultyRating: ptr.Ref(2), // Somewhat easy
+			StartedAt:        ptr.Ref(twoDaysAgo.Add(10 * time.Hour)),
+			CompletedAt:      ptr.Ref(twoDaysAgo.Add(11 * time.Hour)),
 			ExerciseSets: []workout.ExerciseSet{
 				{
 					Exercise: exercises[6], // Squat
@@ -428,16 +459,15 @@ func createWorkoutHistory() []workout.Session {
 // TestProgressionOverTime verifies that the workout generator
 // correctly progresses workouts over time.
 func TestProgressionOverTime(t *testing.T) {
-	// Skip in short mode
-	if testing.Short() {
-		t.Skip("skipping progression test in short mode")
-	}
-
-	// Create initial generator with test data
+	// Create initial generator with test data.
 	preferences := workout.Preferences{
 		Monday:    true,
 		Wednesday: true,
 		Friday:    true,
+		Tuesday:   false,
+		Thursday:  false,
+		Saturday:  false,
+		Sunday:    false,
 	}
 	exercises := createExercisePool()
 	initialHistory := []workout.Session{}
@@ -452,19 +482,19 @@ func TestProgressionOverTime(t *testing.T) {
 	startDate := time.Date(2023, 1, 2, 0, 0, 0, 0, time.UTC) // Start on a Monday
 
 	// For each simulated week
-	for week := 0; week < simulationWeeks; week++ {
+	for weekIndex := range simulationWeeks {
 		// For each workout day in the week
 		for _, dayOffset := range []int{0, 2, 4} { // Monday, Wednesday, Friday
-			workoutDate := startDate.AddDate(0, 0, week*7+dayOffset)
+			workoutDate := startDate.AddDate(0, 0, weekIndex*7+dayOffset)
 
 			// Generate workout
 			session, err := gen.Generate(workoutDate)
 			if err != nil {
-				t.Fatalf("Failed to generate workout for week %d, day %d: %v", week+1, dayOffset, err)
+				t.Fatalf("Failed to generate workout for week %d, day %d: %v", weekIndex+1, dayOffset, err)
 			}
 
 			// Complete the workout (simulate user completing it)
-			completedSession := simulateWorkoutCompletion(session, week)
+			completedSession := simulateWorkoutCompletion(session, weekIndex)
 
 			// Add to history
 			history = append(history, completedSession)
@@ -483,8 +513,13 @@ func TestProgressionOverTime(t *testing.T) {
 func TestContinuityBetweenWeeks(t *testing.T) {
 	// Create test data
 	preferences := workout.Preferences{
-		Monday: true,
-		Friday: true,
+		Monday:    true,
+		Friday:    true,
+		Tuesday:   false,
+		Wednesday: false,
+		Thursday:  false,
+		Saturday:  false,
+		Sunday:    false,
 	}
 	exercises := createExercisePool()
 
@@ -493,20 +528,20 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 	numWeeks := 3
 	gen := generator.NewGenerator(preferences, history, exercises)
 
-	var mondaySessions []workout.Session
+	mondaySessions := make([]workout.Session, numWeeks)
 
 	// Generate Monday workouts for several weeks
-	for week := 0; week < numWeeks; week++ {
-		date := time.Date(2023, 1, 2+week*7, 0, 0, 0, 0, time.UTC) // Mondays
+	for weekIndex := range numWeeks {
+		date := time.Date(2023, 1, 2+weekIndex*7, 0, 0, 0, 0, time.UTC) // Mondays
 		session, err := gen.Generate(date)
 		if err != nil {
-			t.Fatalf("Failed to generate workout for week %d: %v", week+1, err)
+			t.Fatalf("Failed to generate workout for week %d: %v", weekIndex+1, err)
 		}
 
 		// Complete the workout and add to history
-		completedSession := simulateWorkoutCompletion(session, week)
+		completedSession := simulateWorkoutCompletion(session, weekIndex)
 		history = append(history, completedSession)
-		mondaySessions = append(mondaySessions, completedSession)
+		mondaySessions[weekIndex] = completedSession
 
 		// Update generator with new history
 		gen = generator.NewGenerator(preferences, history, exercises)
@@ -520,8 +555,13 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 func TestUserFeedbackIntegration(t *testing.T) {
 	// Setup test data
 	preferences := workout.Preferences{
-		Tuesday:  true,
-		Thursday: true,
+		Tuesday:   true,
+		Thursday:  true,
+		Monday:    false,
+		Wednesday: false,
+		Friday:    false,
+		Saturday:  false,
+		Sunday:    false,
 	}
 	exercises := createExercisePool()
 
@@ -551,9 +591,9 @@ func TestUserFeedbackIntegration(t *testing.T) {
 		gen = generator.NewGenerator(preferences, initialHistory, exercises)
 
 		testDate := initialDate.AddDate(0, 0, 2) // Thursday
-		session, err := gen.Generate(testDate)
-		if err != nil {
-			t.Fatalf("Failed to generate test workout: %v", err)
+		session, genErr := gen.Generate(testDate)
+		if genErr != nil {
+			t.Fatalf("Failed to generate test workout: %v", genErr)
 		}
 
 		// Complete the workout with specific feedback
@@ -570,14 +610,15 @@ func TestUserFeedbackIntegration(t *testing.T) {
 		rating := testCase.rating
 		completedSession := testCase.session
 
-		history := append(initialHistory, completedSession)
-		gen := generator.NewGenerator(preferences, history, exercises)
+		// Create a new history with initial session and current completed session
+		var updatedHistory = append(initialHistory, completedSession)
+		updatedGen := generator.NewGenerator(preferences, updatedHistory, exercises)
 
 		// Generate next workout
 		nextDate := initialDate.AddDate(0, 0, 7) // Next Tuesday
-		nextSession, err := gen.Generate(nextDate)
-		if err != nil {
-			t.Fatalf("Failed to generate workout after feedback %d: %v", rating, err)
+		nextSession, nextErr := updatedGen.Generate(nextDate)
+		if nextErr != nil {
+			t.Fatalf("Failed to generate workout after feedback %d: %v", rating, nextErr)
 		}
 
 		// Verify appropriate response to feedback
@@ -587,7 +628,7 @@ func TestUserFeedbackIntegration(t *testing.T) {
 
 // Helper functions for test cases
 
-// Simulate a user completing a workout with a specified difficulty rating
+// Simulate a user completing a workout with a specified difficulty rating.
 func simulateWorkoutCompletionWithFeedback(session workout.Session, week int, difficultyRating int) workout.Session {
 	// Start with basic completion
 	completed := simulateWorkoutCompletion(session, week)
@@ -598,7 +639,7 @@ func simulateWorkoutCompletionWithFeedback(session workout.Session, week int, di
 	return completed
 }
 
-// Simulate a user completing a workout
+// Simulate a user completing a workout.
 func simulateWorkoutCompletion(session workout.Session, week int) workout.Session {
 	// Copy the session
 	completed := session
@@ -630,8 +671,8 @@ func simulateWorkoutCompletion(session workout.Session, week int) workout.Sessio
 			completionLevel := float64(week) * 0.1 // 0%, 10%, 20%, etc. improvement per week
 
 			// Calculate completed reps between min and max
-			range_ := set.MaxReps - set.MinReps
-			improvement := int(float64(range_) * completionLevel)
+			repRange := set.MaxReps - set.MinReps
+			improvement := int(float64(repRange) * completionLevel)
 			completedReps := set.MinReps + improvement
 
 			// Ensure we don't exceed max reps
@@ -652,7 +693,7 @@ func simulateWorkoutCompletion(session workout.Session, week int) workout.Sessio
 	return completed
 }
 
-// Helper function to determine a reasonable starting weight based on exercise
+// Helper function to determine a reasonable starting weight based on exercise.
 func determineStartingWeight(exerciseName string) float64 {
 	// Map common exercises to reasonable starting weights
 	// These are just examples and should be adjusted for your app's context
@@ -683,7 +724,7 @@ func determineStartingWeight(exerciseName string) float64 {
 	}
 }
 
-// Verify that workouts progress over time (weights increase)
+// Verify that workouts progress over time (weights increase).
 func verifyWorkoutProgression(t *testing.T, history []workout.Session) {
 	t.Helper()
 
@@ -773,7 +814,7 @@ func verifyContinuityBetweenWeeks(t *testing.T, sessions []workout.Session) {
 	}
 }
 
-// Verify appropriate response to user feedback
+// Verify appropriate response to user feedback.
 func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.Session) {
 	t.Helper()
 
@@ -824,7 +865,8 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 			nextSets := len(pair.next.Sets)
 
 			if prevWeight > 0 && nextWeight >= prevWeight && nextSets >= prevSets {
-				t.Errorf("Expected weight decrease or volume reduction after 'too difficult' feedback for %s (ID: %d), but got %.1f -> %.1f, sets: %d -> %d",
+				t.Errorf("Expected weight decrease or volume reduction after 'too difficult' feedback for %s (ID: %d), "+
+					"but got %.1f -> %.1f, sets: %d -> %d",
 					pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight, prevSets, nextSets)
 			} else if prevWeight == 0 && nextSets >= prevSets {
 				// If weight is already 0, we should at least reduce volume
@@ -853,16 +895,16 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 
 // Helper functions for data manipulation
 
-// Get list of exercise IDs from a session
+// Get list of exercise IDs from a session.
 func getExerciseIDs(session workout.Session) []int {
-	var ids []int
+	ids := make([]int, 0, len(session.ExerciseSets))
 	for _, exerciseSet := range session.ExerciseSets {
 		ids = append(ids, exerciseSet.Exercise.ID)
 	}
 	return ids
 }
 
-// Count common elements between two slices
+// Count common elements between two slices.
 func countCommonElements(slice1, slice2 []int) int {
 	set := make(map[int]bool)
 	for _, val := range slice1 {
@@ -879,13 +921,13 @@ func countCommonElements(slice1, slice2 []int) int {
 	return count
 }
 
-// Exercise pair for comparison
+// Exercise pair for comparison.
 type exercisePair struct {
 	previous workout.ExerciseSet
 	next     workout.ExerciseSet
 }
 
-// FindCommonExercises finds exercises that exist in both workouts
+// FindCommonExercises finds exercises that exist in both workouts.
 func findCommonExercises(prev, next workout.Session) []exercisePair {
 	var common []exercisePair
 
@@ -906,7 +948,7 @@ func findCommonExercises(prev, next workout.Session) []exercisePair {
 	return common
 }
 
-// Get average weight across all sets for an exercise
+// Get average weight across all sets for an exercise.
 func getAverageWeight(exerciseSet workout.ExerciseSet) float64 {
 	if len(exerciseSet.Sets) == 0 {
 		return 0

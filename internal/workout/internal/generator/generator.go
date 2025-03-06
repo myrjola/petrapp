@@ -547,7 +547,10 @@ func allSetsCompletedAtMax(sets []workout.Set) bool {
 }
 
 // createSetsForNextWorkoutType creates sets for the next workout type in the cycle.
-func createSetsForNextWorkoutType(currentType string, lastWeight float64) []workout.Set {
+func createSetsForNextWorkoutType(
+	currentType string,
+	lastWeight float64,
+) []workout.Set {
 	switch currentType {
 	case workoutTypeStrength:
 		// Progress from strength to hypertrophy (with adjusted weight factor)
