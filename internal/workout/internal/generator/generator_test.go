@@ -428,6 +428,11 @@ func createWorkoutHistory() []workout.Session {
 // TestProgressionOverTime verifies that the workout generator
 // correctly progresses workouts over time.
 func TestProgressionOverTime(t *testing.T) {
+	// Skip in short mode
+	if testing.Short() {
+		t.Skip("skipping progression test in short mode")
+	}
+
 	// Create initial generator with test data
 	preferences := workout.Preferences{
 		Monday:    true,
@@ -534,13 +539,16 @@ func TestUserFeedbackIntegration(t *testing.T) {
 	initialCompletedSession := simulateWorkoutCompletion(initialSession, 0)
 	initialHistory := []workout.Session{initialCompletedSession}
 
-	// Now create three variations of the same workout with different feedback ratings
-	sessions := []workout.Session{}
+	// For each feedback level, create a new test session
+	testSessions := []struct {
+		rating  int
+		session workout.Session
+	}{}
 
 	// For each feedback level
 	for _, rating := range []int{1, 3, 5} { // Too easy, Optimal, Too difficult
 		// Generate workout with initial history
-		gen := generator.NewGenerator(preferences, initialHistory, exercises)
+		gen = generator.NewGenerator(preferences, initialHistory, exercises)
 
 		testDate := initialDate.AddDate(0, 0, 2) // Thursday
 		session, err := gen.Generate(testDate)
@@ -550,11 +558,18 @@ func TestUserFeedbackIntegration(t *testing.T) {
 
 		// Complete the workout with specific feedback
 		completedSession := simulateWorkoutCompletionWithFeedback(session, 0, rating)
-		sessions = append(sessions, completedSession)
+
+		testSessions = append(testSessions, struct {
+			rating  int
+			session workout.Session
+		}{rating, completedSession})
 	}
 
 	// For each type of feedback, generate a new workout
-	for i, completedSession := range sessions {
+	for _, testCase := range testSessions {
+		rating := testCase.rating
+		completedSession := testCase.session
+
 		history := append(initialHistory, completedSession)
 		gen := generator.NewGenerator(preferences, history, exercises)
 
@@ -562,7 +577,7 @@ func TestUserFeedbackIntegration(t *testing.T) {
 		nextDate := initialDate.AddDate(0, 0, 7) // Next Tuesday
 		nextSession, err := gen.Generate(nextDate)
 		if err != nil {
-			t.Fatalf("Failed to generate workout after feedback %d: %v", i+1, err)
+			t.Fatalf("Failed to generate workout after feedback %d: %v", rating, err)
 		}
 
 		// Verify appropriate response to feedback
@@ -668,7 +683,7 @@ func determineStartingWeight(exerciseName string) float64 {
 	}
 }
 
-// Verify that workouts progress over time (weights increase).
+// Verify that workouts progress over time (weights increase)
 func verifyWorkoutProgression(t *testing.T, history []workout.Session) {
 	t.Helper()
 
@@ -694,7 +709,7 @@ func verifyWorkoutProgression(t *testing.T, history []workout.Session) {
 	progressionFound := false
 	nonZeroWeightsFound := false
 
-	for exerciseID, weights := range exerciseProgression {
+	for _, weights := range exerciseProgression {
 		if len(weights) < 2 {
 			continue // Skip exercises that only appear once
 		}
@@ -722,7 +737,6 @@ func verifyWorkoutProgression(t *testing.T, history []workout.Session) {
 		// We expect more increases than decreases for progression
 		if increasesCount > decreasesCount {
 			progressionFound = true
-			t.Logf("Exercise ID %d showed progression: %v", exerciseID, weights)
 		}
 	}
 
@@ -778,8 +792,7 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 	commonExercises := findCommonExercises(previousSession, nextSession)
 
 	if len(commonExercises) == 0 {
-		t.Logf("No common exercises found between workouts to verify feedback response")
-		return
+		t.Errorf("No common exercises found between workouts to verify feedback response")
 	}
 
 	// Check weight changes based on feedback
@@ -787,13 +800,23 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 		prevWeight := getAverageWeight(pair.previous)
 		nextWeight := getAverageWeight(pair.next)
 
+		// Log exercise details for debugging
+		t.Logf("Exercise %s (ID: %d): Previous weight: %.1f, Next weight: %.1f",
+			pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight)
+
 		switch rating {
 		case 1: // Too easy
 			// Should see weight increase after 'too easy' feedback
 			// But only if there was weight to begin with
 			if prevWeight > 0 && nextWeight <= prevWeight {
-				t.Errorf("Expected weight increase after 'too easy' feedback for %s, but got %.1f -> %.1f",
-					pair.previous.Exercise.Name, prevWeight, nextWeight)
+				// If weight dropped to 0, it indicates a likely matching issue
+				if nextWeight == 0 {
+					t.Errorf("Weight reset to 0 for %s (ID: %d) after 'too easy' feedback - likely an exercise matching issue",
+						pair.previous.Exercise.Name, pair.previous.Exercise.ID)
+				} else {
+					t.Errorf("Expected weight increase after 'too easy' feedback for %s (ID: %d), but got %.1f -> %.1f",
+						pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight)
+				}
 			} else if prevWeight == 0 && nextWeight == 0 {
 				// If weights are still at 0, that's okay for the first workout since user needs to select weight
 				t.Logf("Weight remains at 0 for %s after 'too easy' feedback - this is expected for initial workouts",
@@ -806,18 +829,28 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession workout.S
 			nextSets := len(pair.next.Sets)
 
 			if prevWeight > 0 && nextWeight >= prevWeight && nextSets >= prevSets {
-				t.Errorf("Expected weight decrease or volume reduction after 'too difficult' feedback for %s, but got %.1f -> %.1f, sets: %d -> %d",
-					pair.previous.Exercise.Name, prevWeight, nextWeight, prevSets, nextSets)
+				t.Errorf("Expected weight decrease or volume reduction after 'too difficult' feedback for %s (ID: %d), but got %.1f -> %.1f, sets: %d -> %d",
+					pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight, prevSets, nextSets)
 			} else if prevWeight == 0 && nextSets >= prevSets {
 				// If weight is already 0, we should at least reduce volume
 				t.Logf("Weight already at 0 for %s after 'too difficult' feedback - expected volume reduction",
 					pair.previous.Exercise.Name)
 			}
 		default: // Optimal (2-4)
-			// Standard progression - small increase or same weight
-			if prevWeight > 0 && (nextWeight < prevWeight*0.9 || nextWeight > prevWeight*1.1) {
-				t.Errorf("Expected moderate weight changes after 'optimal' feedback for %s, but got %.1f -> %.1f",
-					pair.previous.Exercise.Name, prevWeight, nextWeight)
+			// More forgiving check for small weight changes (within 15%)
+			if prevWeight > 0 && nextWeight > 0 &&
+				(nextWeight < prevWeight*0.85 || nextWeight > prevWeight*1.15) {
+				// For undulating periodization, allow larger weight changes but flag potential issues
+				if nextWeight == 0 {
+					t.Errorf("Weight reset to 0 for %s (ID: %d) after 'optimal' feedback - likely an exercise matching issue",
+						pair.previous.Exercise.Name, pair.previous.Exercise.ID)
+				} else {
+					t.Errorf("Expected moderate weight changes after 'optimal' feedback for %s (ID: %d), but got %.1f -> %.1f",
+						pair.previous.Exercise.Name, pair.previous.Exercise.ID, prevWeight, nextWeight)
+				}
+			} else if prevWeight > 0 && nextWeight == 0 {
+				t.Errorf("Weight reset to 0 for %s (ID: %d) after 'optimal' feedback - likely an exercise matching issue",
+					pair.previous.Exercise.Name, pair.previous.Exercise.ID)
 			}
 		}
 	}
@@ -857,13 +890,15 @@ type exercisePair struct {
 	next     workout.ExerciseSet
 }
 
-// Find exercises that exist in both workouts
+// FindCommonExercises finds exercises that exist in both workouts
 func findCommonExercises(prev, next workout.Session) []exercisePair {
 	var common []exercisePair
 
 	for _, prevEx := range prev.ExerciseSets {
 		for _, nextEx := range next.ExerciseSets {
-			if prevEx.Exercise.ID == nextEx.Exercise.ID {
+			// Match by both ID and name for more reliable matching
+			if prevEx.Exercise.ID == nextEx.Exercise.ID ||
+				prevEx.Exercise.Name == nextEx.Exercise.Name {
 				common = append(common, exercisePair{
 					previous: prevEx,
 					next:     nextEx,

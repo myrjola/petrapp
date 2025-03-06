@@ -129,7 +129,9 @@ func (g *Generator) selectExercises(t time.Time, category workout.Category) ([]w
 	// Create exercise sets with appropriate sets and reps
 	exerciseSets := make([]workout.ExerciseSet, 0, len(selectedExercises))
 	for _, exercise := range selectedExercises {
-		sets := g.determineSetsRepsWeight(exercise, lastSameWeekdayWorkout)
+		// Now we're just passing the exercise, not lastSameWeekdayWorkout
+		// The function will find the most recent occurrence of this exercise
+		sets := g.determineSetsRepsWeight(exercise, nil)
 		exerciseSets = append(exerciseSets, workout.ExerciseSet{
 			Exercise: exercise,
 			Sets:     sets,
@@ -158,6 +160,11 @@ func (g *Generator) findLastSameWeekdayWorkout(t time.Time) *workout.Session {
 	var mostRecentDate time.Time
 
 	for i, session := range g.history {
+		// Only consider completed workouts
+		if session.Status != workout.StatusDone {
+			continue
+		}
+
 		if session.WorkoutDate.Weekday() == targetWeekday &&
 			(mostRecent == nil || session.WorkoutDate.After(mostRecentDate)) {
 			mostRecent = &g.history[i]
@@ -295,16 +302,8 @@ func (g *Generator) determineSetsRepsWeight(
 	exercise workout.Exercise,
 	lastWorkout *workout.Session,
 ) []workout.Set {
-	// Find if this exercise has history
-	var lastExerciseSet *workout.ExerciseSet
-	if lastWorkout != nil {
-		for i, es := range lastWorkout.ExerciseSets {
-			if es.Exercise.ID == exercise.ID {
-				lastExerciseSet = &lastWorkout.ExerciseSets[i]
-				break
-			}
-		}
-	}
+	// Find most recent occurrence of this exercise in workout history
+	lastExerciseSet := g.findMostRecentExerciseSet(exercise.ID)
 
 	// No history - start with 3 sets of 8 reps
 	if lastExerciseSet == nil {
@@ -333,6 +332,32 @@ func (g *Generator) determineSetsRepsWeight(
 	}
 
 	return sets
+}
+
+// findMostRecentExerciseSet finds the most recent performance of a specific exercise.
+func (g *Generator) findMostRecentExerciseSet(exerciseID int) *workout.ExerciseSet {
+	var mostRecent *workout.ExerciseSet
+	var mostRecentDate time.Time
+
+	for _, session := range g.history {
+		// Only consider completed workouts
+		if session.Status != workout.StatusDone {
+			continue
+		}
+
+		// Look for the exercise in this session
+		for i, es := range session.ExerciseSets {
+			if es.Exercise.ID == exerciseID {
+				if mostRecent == nil || session.WorkoutDate.After(mostRecentDate) {
+					mostRecent = &session.ExerciseSets[i]
+					mostRecentDate = session.WorkoutDate
+				}
+				break // Found the exercise in this session, move to next session
+			}
+		}
+	}
+
+	return mostRecent
 }
 
 // isBeginnerUser determines if a user is a beginner (1-3 months of training).
@@ -545,7 +570,12 @@ func (g *Generator) getMostRecentFeedback(exerciseID int) *int {
 	var mostRecentDate time.Time
 
 	for i, session := range g.history {
-		// Check if this session contains the exercise and has a difficulty rating
+		// Only consider sessions with feedback
+		if session.DifficultyRating == nil {
+			continue
+		}
+
+		// Check if this session contains the exercise
 		containsExercise := false
 		for _, es := range session.ExerciseSets {
 			if es.Exercise.ID == exerciseID {
@@ -554,7 +584,7 @@ func (g *Generator) getMostRecentFeedback(exerciseID int) *int {
 			}
 		}
 
-		if containsExercise && session.DifficultyRating != nil &&
+		if containsExercise &&
 			(mostRecentSession == nil || session.WorkoutDate.After(mostRecentDate)) {
 			mostRecentSession = &g.history[i]
 			mostRecentDate = session.WorkoutDate
