@@ -309,36 +309,26 @@ func (g *Generator) determineSetsRepsWeight(
 	// No history - start with 3 sets of 8 reps
 	if lastExerciseSet == nil {
 		return []workout.Set{
-			{
-				WeightKg:         0,
-				AdjustedWeightKg: 0,
-				MinReps:          8,
-				MaxReps:          8,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         0,
-				AdjustedWeightKg: 0,
-				MinReps:          8,
-				MaxReps:          8,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         0,
-				AdjustedWeightKg: 0,
-				MinReps:          8,
-				MaxReps:          8,
-				CompletedReps:    nil,
-			},
+			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: 8, MaxReps: 8},
+			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: 8, MaxReps: 8},
+			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: 8, MaxReps: 8},
 		}
+	}
+
+	// Apply user feedback if available
+	feedback := g.getMostRecentFeedback(exercise.ID)
+
+	// Check if we have a "too easy" feedback, which should override progression
+	if feedback != nil && *feedback == 1 {
+		// For "too easy", just increase weight directly
+		return increaseWeight(lastExerciseSet.Sets, 5.0)
 	}
 
 	// Has history - determine progression
 	sets := g.progressSets(*lastExerciseSet)
 
-	// Apply user feedback if available
-	feedback := g.getMostRecentFeedback(exercise.ID)
-	if feedback != nil {
+	// Apply other feedback types
+	if feedback != nil && *feedback != 1 {
 		sets = g.integrateUserFeedback(sets, feedback)
 	}
 
@@ -492,25 +482,28 @@ func allSetsCompletedAtMax(sets []workout.Set) bool {
 func createSetsForNextWorkoutType(currentType string, lastWeight float64) []workout.Set {
 	switch currentType {
 	case "strength":
-		// Progress from strength to hypertrophy
+		// Progress from strength to hypertrophy (with adjusted weight factor)
+		adjustedWeight := lastWeight * 0.85 // Reduced the drop to 15% instead of 20%
 		return []workout.Set{
-			{WeightKg: lastWeight * 0.8, AdjustedWeightKg: lastWeight * 0.8, MinReps: 8, MaxReps: 12},
-			{WeightKg: lastWeight * 0.8, AdjustedWeightKg: lastWeight * 0.8, MinReps: 8, MaxReps: 12},
-			{WeightKg: lastWeight * 0.8, AdjustedWeightKg: lastWeight * 0.8, MinReps: 8, MaxReps: 12},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 8, MaxReps: 12},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 8, MaxReps: 12},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 8, MaxReps: 12},
 		}
 	case "hypertrophy":
-		// Progress from hypertrophy to endurance
+		// Progress from hypertrophy to endurance (with adjusted weight factor)
+		adjustedWeight := lastWeight * 0.8 // Reduced the drop to 20% instead of 30%
 		return []workout.Set{
-			{WeightKg: lastWeight * 0.7, AdjustedWeightKg: lastWeight * 0.7, MinReps: 12, MaxReps: 15},
-			{WeightKg: lastWeight * 0.7, AdjustedWeightKg: lastWeight * 0.7, MinReps: 12, MaxReps: 15},
-			{WeightKg: lastWeight * 0.7, AdjustedWeightKg: lastWeight * 0.7, MinReps: 12, MaxReps: 15},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 12, MaxReps: 15},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 12, MaxReps: 15},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 12, MaxReps: 15},
 		}
 	case "endurance":
 		// Progress from endurance to strength
+		adjustedWeight := lastWeight * 1.3
 		return []workout.Set{
-			{WeightKg: lastWeight * 1.3, AdjustedWeightKg: lastWeight * 1.3, MinReps: 3, MaxReps: 6},
-			{WeightKg: lastWeight * 1.3, AdjustedWeightKg: lastWeight * 1.3, MinReps: 3, MaxReps: 6},
-			{WeightKg: lastWeight * 1.3, AdjustedWeightKg: lastWeight * 1.3, MinReps: 3, MaxReps: 6},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 3, MaxReps: 6},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 3, MaxReps: 6},
+			{WeightKg: adjustedWeight, AdjustedWeightKg: adjustedWeight, MinReps: 3, MaxReps: 6},
 		}
 	default:
 		// Default to hypertrophy
@@ -541,8 +534,8 @@ func (g *Generator) integrateUserFeedback(sets []workout.Set, feedback *int) []w
 		// Reduce intensity by reducing weight
 		return reduceWeight(sets, 0.1)
 	default: // 2-4 (optimal challenge)
-		// Follow standard progression
-		return sets
+		// For optimal challenge, make a small increase
+		return increaseWeight(sets, 2.5) // Add 2.5kg
 	}
 }
 
