@@ -46,8 +46,52 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 
 // generateWorkout creates a new workout plan based on user preferences and history.
 func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session, error) {
-	// TODO: Implement workout generation.
-	return Session{}, nil
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	// Get user preferences
+	prefs, err := s.repo.getUserPreferences(ctx, userID)
+	if err != nil {
+		return Session{}, fmt.Errorf("get user preferences: %w", err)
+	}
+
+	// Get workout history (past 3 months)
+	threeMonthsAgo := date.AddDate(0, -3, 0)
+	history, err := s.repo.getWorkoutHistory(ctx, userID, threeMonthsAgo, date)
+	if err != nil {
+		return Session{}, fmt.Errorf("get workout history: %w", err)
+	}
+
+	// Get exercise pool
+	exercisePool, err := s.repo.getExercisePool(ctx)
+	if err != nil {
+		return Session{}, fmt.Errorf("get exercise pool: %w", err)
+	}
+
+	// If exercise pool is empty, create a session with a friendly error
+	if len(exercisePool) == 0 {
+		return Session{
+			WorkoutDate:      date,
+			DifficultyRating: nil,
+			StartedAt:        nil,
+			CompletedAt:      nil,
+			ExerciseSets:     []ExerciseSet{},
+			Status:           StatusPlanned,
+		}, nil
+	}
+
+	// Initialize workout generator
+	gen, err := NewGenerator(prefs, history, exercisePool)
+	if err != nil {
+		return Session{}, fmt.Errorf("initialize workout generator: %w", err)
+	}
+
+	// Generate the workout
+	session, err := gen.Generate(date)
+	if err != nil {
+		return Session{}, fmt.Errorf("generate workout: %w", err)
+	}
+
+	return session, nil
 }
 
 // ResolveWeeklySchedule retrieves the workout schedule for a week.
