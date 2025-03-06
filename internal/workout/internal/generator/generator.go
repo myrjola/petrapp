@@ -344,9 +344,9 @@ func (g *Generator) determineSetsRepsWeight(
 	if lastExerciseSet == nil {
 		const defaultReps = 8
 		return []workout.Set{
-			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
-			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
-			{WeightKg: 0, AdjustedWeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
+			{WeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
+			{WeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
+			{WeightKg: 0, MinReps: defaultReps, MaxReps: defaultReps, CompletedReps: nil},
 		}
 	}
 
@@ -556,104 +556,32 @@ func createSetsForNextWorkoutType(
 		// Progress from strength to hypertrophy (with adjusted weight factor)
 		adjustedWeight := lastWeight * strengthToHypertrophyWeightFactor
 		return []workout.Set{
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          hypertrophyMinReps,
-				MaxReps:          hypertrophyMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          hypertrophyMinReps,
-				MaxReps:          hypertrophyMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          hypertrophyMinReps,
-				MaxReps:          hypertrophyMaxReps,
-				CompletedReps:    nil,
-			},
+			{WeightKg: adjustedWeight, MinReps: hypertrophyMinReps, MaxReps: hypertrophyMaxReps, CompletedReps: nil},
+			{WeightKg: adjustedWeight, MinReps: hypertrophyMinReps, MaxReps: hypertrophyMaxReps, CompletedReps: nil},
+			{WeightKg: adjustedWeight, MinReps: hypertrophyMinReps, MaxReps: hypertrophyMaxReps, CompletedReps: nil},
 		}
 	case workoutTypeHypertrophy:
 		// Progress from hypertrophy to endurance (with adjusted weight factor)
 		adjustedWeight := lastWeight * hypertrophyToEnduranceWeightFactor
 		return []workout.Set{
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          enduranceMinReps,
-				MaxReps:          enduranceMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          enduranceMinReps,
-				MaxReps:          enduranceMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          enduranceMinReps,
-				MaxReps:          enduranceMaxReps,
-				CompletedReps:    nil,
-			},
+			{WeightKg: adjustedWeight, MinReps: enduranceMinReps, MaxReps: enduranceMaxReps, CompletedReps: nil},
+			{WeightKg: adjustedWeight, MinReps: enduranceMinReps, MaxReps: enduranceMaxReps, CompletedReps: nil},
+			{WeightKg: adjustedWeight, MinReps: enduranceMinReps, MaxReps: enduranceMaxReps, CompletedReps: nil},
 		}
 	case workoutTypeEndurance:
 		// Progress from endurance to strength
 		adjustedWeight := lastWeight * enduranceToStrengthWeightFactor
 		return []workout.Set{
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          strengthMinReps,
-				MaxReps:          strengthMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          strengthMinReps,
-				MaxReps:          strengthMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         adjustedWeight,
-				AdjustedWeightKg: adjustedWeight,
-				MinReps:          strengthMinReps,
-				MaxReps:          strengthMaxReps,
-				CompletedReps:    nil,
-			},
+			{WeightKg: adjustedWeight, MinReps: strengthMinReps, MaxReps: strengthMaxReps, CompletedReps: nil},
+			{WeightKg: adjustedWeight, MinReps: strengthMinReps, MaxReps: strengthMaxReps, CompletedReps: nil},
+			{WeightKg: adjustedWeight, MinReps: strengthMinReps, MaxReps: strengthMaxReps, CompletedReps: nil},
 		}
 	default:
 		// Default to hypertrophy
 		return []workout.Set{
-			{
-				WeightKg:         lastWeight,
-				AdjustedWeightKg: lastWeight,
-				MinReps:          hypertrophyMinReps,
-				MaxReps:          hypertrophyMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         lastWeight,
-				AdjustedWeightKg: lastWeight,
-				MinReps:          hypertrophyMinReps,
-				MaxReps:          hypertrophyMaxReps,
-				CompletedReps:    nil,
-			},
-			{
-				WeightKg:         lastWeight,
-				AdjustedWeightKg: lastWeight,
-				MinReps:          hypertrophyMinReps,
-				MaxReps:          hypertrophyMaxReps,
-				CompletedReps:    nil,
-			},
+			{WeightKg: lastWeight, MinReps: hypertrophyMinReps, MaxReps: hypertrophyMaxReps, CompletedReps: nil},
+			{WeightKg: lastWeight, MinReps: hypertrophyMinReps, MaxReps: hypertrophyMaxReps, CompletedReps: nil},
+			{WeightKg: lastWeight, MinReps: hypertrophyMinReps, MaxReps: hypertrophyMaxReps, CompletedReps: nil},
 		}
 	}
 }
@@ -722,11 +650,10 @@ func copySetWithoutCompletion(sets []workout.Set) []workout.Set {
 	newSets := make([]workout.Set, len(sets))
 	for i, set := range sets {
 		newSets[i] = workout.Set{
-			WeightKg:         set.WeightKg,
-			AdjustedWeightKg: set.AdjustedWeightKg,
-			MinReps:          set.MinReps,
-			MaxReps:          set.MaxReps,
-			CompletedReps:    nil, // Reset completion
+			WeightKg:      set.WeightKg,
+			MinReps:       set.MinReps,
+			MaxReps:       set.MaxReps,
+			CompletedReps: nil, // Reset completion
 		}
 	}
 	return newSets
@@ -743,11 +670,10 @@ func reduceWeight(sets []workout.Set, percentage float64) []workout.Set {
 		}
 
 		newSets[i] = workout.Set{
-			WeightKg:         newWeight,
-			AdjustedWeightKg: newWeight,
-			MinReps:          set.MinReps,
-			MaxReps:          set.MaxReps,
-			CompletedReps:    nil, // Reset completion
+			WeightKg:      newWeight,
+			MinReps:       set.MinReps,
+			MaxReps:       set.MaxReps,
+			CompletedReps: nil, // Reset completion
 		}
 	}
 	return newSets
@@ -760,11 +686,10 @@ func increaseWeight(sets []workout.Set, increment float64) []workout.Set {
 		newWeight := set.WeightKg + increment
 
 		newSets[i] = workout.Set{
-			WeightKg:         newWeight,
-			AdjustedWeightKg: newWeight,
-			MinReps:          set.MinReps,
-			MaxReps:          set.MaxReps,
-			CompletedReps:    nil, // Reset completion
+			WeightKg:      newWeight,
+			MinReps:       set.MinReps,
+			MaxReps:       set.MaxReps,
+			CompletedReps: nil, // Reset completion
 		}
 	}
 	return newSets

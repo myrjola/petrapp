@@ -24,11 +24,10 @@ type Exercise struct {
 
 // Set represents a single set of an exercise with target and actual performance.
 type Set struct {
-	WeightKg         float64
-	AdjustedWeightKg float64
-	MinReps          int
-	MaxReps          int
-	CompletedReps    *int
+	WeightKg      float64
+	MinReps       int
+	MaxReps       int
+	CompletedReps *int
 }
 
 // ExerciseSet groups all sets for a specific exercise in a workout.

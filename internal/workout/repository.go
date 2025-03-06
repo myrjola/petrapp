@@ -99,7 +99,7 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
 	// Load exercise sets.
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
         SELECT e.id, e.name, e.category, 
-               es.set_number, es.weight_kg, es.adjusted_weight_kg,
+               es.set_number, es.weight_kg,
                es.min_reps, es.max_reps, es.completed_reps
         FROM exercise_sets es
         JOIN exercises e ON e.id = es.exercise_id
@@ -121,8 +121,8 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
 
 		err = rows.Scan(
 			&exercise.ID, &exercise.Name, &exercise.Category,
-			&setNum, &set.WeightKg, &set.AdjustedWeightKg,
-			&set.MinReps, &set.MaxReps, &set.CompletedReps)
+			&setNum, &set.WeightKg, &set.MinReps, &set.MaxReps,
+			&set.CompletedReps)
 		if err != nil {
 			return Session{}, fmt.Errorf("scan exercise set: %w", err)
 		}
@@ -264,11 +264,11 @@ func (r *sqliteRepository) saveExerciseSets(
 			_, err = tx.ExecContext(ctx, `
                 INSERT INTO exercise_sets (
                     workout_user_id, workout_date, exercise_id, set_number,
-                    weight_kg, adjusted_weight_kg, min_reps, max_reps
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    weight_kg, min_reps, max_reps
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (workout_user_id, workout_date, exercise_id, set_number) DO NOTHING`,
 				userID, dateStr, exerciseSet.Exercise.ID, i+1,
-				set.WeightKg, set.AdjustedWeightKg, set.MinReps, set.MaxReps)
+				set.WeightKg, set.MinReps, set.MaxReps)
 			if err != nil {
 				return fmt.Errorf("insert exercise set: %w", err)
 			}
@@ -346,13 +346,12 @@ func (r *sqliteRepository) updateSetWeight(
 
 	result, err := r.db.ReadWrite.ExecContext(ctx, `
         UPDATE exercise_sets 
-        SET weight_kg = ?,
-            adjusted_weight_kg = ?
+        SET weight_kg = ?
         WHERE workout_user_id = ? 
         AND workout_date = ? 
         AND exercise_id = ?
         AND set_number = ?`,
-		newWeight, newWeight, userID, dateStr, exerciseID, setIndex+1)
+		newWeight, userID, dateStr, exerciseID, setIndex+1)
 	if err != nil {
 		return fmt.Errorf("update exercise set: %w", err)
 	}

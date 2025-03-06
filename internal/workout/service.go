@@ -77,11 +77,10 @@ func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session,
 		var sets []Set
 		for _, ps := range pe.sets {
 			sets = append(sets, Set{
-				WeightKg:         ps.weightKg,
-				AdjustedWeightKg: ps.weightKg, // Initially same as base weight
-				MinReps:          ps.targetMinReps,
-				MaxReps:          ps.targetMaxReps,
-				CompletedReps:    nil, // Not completed yet
+				WeightKg:      ps.weightKg,
+				MinReps:       ps.targetMinReps,
+				MaxReps:       ps.targetMaxReps,
+				CompletedReps: nil, // Not completed yet
 			})
 		}
 

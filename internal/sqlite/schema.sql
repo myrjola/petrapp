@@ -98,7 +98,6 @@ CREATE TABLE exercise_sets
     exercise_id        INTEGER NOT NULL REFERENCES exercises (id),
     set_number         INTEGER NOT NULL CHECK (set_number > 0),
     weight_kg          REAL    NOT NULL CHECK (weight_kg >= 0),
-    adjusted_weight_kg REAL    NOT NULL CHECK (adjusted_weight_kg >= 0),
     min_reps           INTEGER NOT NULL CHECK (min_reps > 0),
     max_reps           INTEGER NOT NULL CHECK (max_reps >= min_reps),
     completed_reps     INTEGER,

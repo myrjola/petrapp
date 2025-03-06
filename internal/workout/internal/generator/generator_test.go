@@ -386,17 +386,17 @@ func createWorkoutHistory() []workout.Session {
 				{
 					Exercise: exercises[0], // Bench Press
 					Sets: []workout.Set{
-						{WeightKg: 80, AdjustedWeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 80, AdjustedWeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
-						{WeightKg: 80, AdjustedWeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						{WeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
+						{WeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						{WeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
 					},
 				},
 				{
 					Exercise: exercises[2], // Shoulder Press
 					Sets: []workout.Set{
-						{WeightKg: 50, AdjustedWeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
-						{WeightKg: 50, AdjustedWeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 50, AdjustedWeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						{WeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
+						{WeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
+						{WeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
 					},
 				},
 			},
@@ -412,17 +412,17 @@ func createWorkoutHistory() []workout.Session {
 				{
 					Exercise: exercises[0], // Bench Press
 					Sets: []workout.Set{
-						{WeightKg: 82.5, AdjustedWeightKg: 82.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 82.5, AdjustedWeightKg: 82.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
-						{WeightKg: 82.5, AdjustedWeightKg: 82.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep6},
+						{WeightKg: 82., MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
+						{WeightKg: 82., MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						{WeightKg: 82., MinReps: 8, MaxReps: 12, CompletedReps: &rep6},
 					},
 				},
 				{
 					Exercise: exercises[2], // Shoulder Press
 					Sets: []workout.Set{
-						{WeightKg: 52.5, AdjustedWeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 52.5, AdjustedWeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
-						{WeightKg: 52.5, AdjustedWeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						{WeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
+						{WeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						{WeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
 					},
 				},
 			},
@@ -438,17 +438,17 @@ func createWorkoutHistory() []workout.Session {
 				{
 					Exercise: exercises[6], // Squat
 					Sets: []workout.Set{
-						{WeightKg: 100, AdjustedWeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
-						{WeightKg: 100, AdjustedWeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
-						{WeightKg: 100, AdjustedWeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
+						{WeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
+						{WeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
+						{WeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
 					},
 				},
 				{
 					Exercise: exercises[7], // Deadlift
 					Sets: []workout.Set{
-						{WeightKg: 120, AdjustedWeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
-						{WeightKg: 120, AdjustedWeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
-						{WeightKg: 120, AdjustedWeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
+						{WeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
+						{WeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
+						{WeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
 					},
 				},
 			},
@@ -664,7 +664,6 @@ func simulateWorkoutCompletion(session workout.Session, week int) workout.Sessio
 				// Set a starting weight based on exercise type and primary muscle groups
 				exerciseName := completed.ExerciseSets[i].Exercise.Name
 				set.WeightKg = determineStartingWeight(exerciseName)
-				set.AdjustedWeightKg = set.WeightKg
 			}
 
 			// Determine completion level (improve over weeks)
