@@ -90,8 +90,9 @@ func (r *sqliteRepository) saveUserPreferences(ctx context.Context, userID []byt
 }
 
 // getSession retrieves a workout session for a specific date.
-func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date time.Time) (Session, error) {
-	session, err := r.queryWorkoutSession(ctx, userID, date)
+func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date time.Time) (_ Session, err error) {
+	var session Session
+	session, err = r.queryWorkoutSession(ctx, userID, date)
 	if err != nil {
 		return Session{}, fmt.Errorf("query workout session: %w", err)
 	}
@@ -109,7 +110,11 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
 	if err != nil {
 		return Session{}, fmt.Errorf("query exercise sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
 	var currentExerciseSet *ExerciseSet
 	for rows.Next() {
@@ -170,7 +175,11 @@ func (r *sqliteRepository) getSession(ctx context.Context, userID []byte, date t
 	return session, nil
 }
 
-func (r *sqliteRepository) queryWorkoutSession(ctx context.Context, userID []byte, date time.Time) (Session, error) {
+func (r *sqliteRepository) queryWorkoutSession(
+	ctx context.Context,
+	userID []byte,
+	date time.Time,
+) (Session, error) {
 	var (
 		workoutDateStr string
 		session        Session
@@ -209,30 +218,13 @@ func (r *sqliteRepository) startSession(ctx context.Context, userID []byte, date
 	dateStr := date.Format(dateFormat)
 	startedAt := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-	// Start a transaction since we need to insert multiple rows
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func(tx *sql.Tx) {
-		err = tx.Rollback()
-		if err != nil && !errors.Is(err, sql.ErrTxDone) {
-			r.logger.LogAttrs(ctx, slog.LevelError, "rollback transaction", slog.Any("error", err))
-		}
-	}(tx)
-
-	_, err = tx.ExecContext(ctx, `
+	if _, err := r.db.ReadWrite.ExecContext(ctx, `
         INSERT INTO workout_sessions (user_id, workout_date, started_at)
         VALUES (?, ?, ?)
         ON CONFLICT (user_id, workout_date) DO UPDATE SET
             started_at = COALESCE(workout_sessions.started_at, ?)`,
-		userID, dateStr, startedAt, startedAt)
-	if err != nil {
+		userID, dateStr, startedAt, startedAt); err != nil {
 		return fmt.Errorf("insert workout session: %w", err)
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return nil
@@ -244,19 +236,20 @@ func (r *sqliteRepository) saveExerciseSets(
 	userID []byte,
 	date time.Time,
 	exerciseSets []ExerciseSet,
-) error {
+) (err error) {
 	dateStr := date.Format(dateFormat)
 
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	var tx *sql.Tx
+	tx, err = r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer func(tx *sql.Tx) {
-		err = tx.Rollback()
-		if err != nil && !errors.Is(err, sql.ErrTxDone) {
-			r.logger.LogAttrs(ctx, slog.LevelError, "rollback transaction", slog.Any("error", err))
+	defer func() {
+		rbErr := tx.Rollback()
+		if rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rbErr))
 		}
-	}(tx)
+	}()
 
 	// Insert exercise sets
 	for _, exerciseSet := range exerciseSets {
@@ -437,7 +430,10 @@ func parseTimestamp(timestampStr sql.NullString) (*time.Time, error) {
 }
 
 // fetchExerciseMuscleGroups retrieves the muscle groups associated with an exercise.
-func (r *sqliteRepository) fetchExerciseMuscleGroups(ctx context.Context, exerciseID int) ([]string, []string, error) {
+func (r *sqliteRepository) fetchExerciseMuscleGroups(
+	ctx context.Context,
+	exerciseID int,
+) (_ []string, _ []string, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
         SELECT mg.name, emg.is_primary
         FROM exercise_muscle_groups emg
@@ -447,7 +443,11 @@ func (r *sqliteRepository) fetchExerciseMuscleGroups(ctx context.Context, exerci
 	if err != nil {
 		return nil, nil, fmt.Errorf("query muscle groups: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
 	var primaryMuscleGroups []string
 	var secondaryMuscleGroups []string
@@ -483,83 +483,130 @@ func (r *sqliteRepository) getWorkoutHistory(
 	userID []byte,
 	startDate, endDate time.Time,
 ) ([]Session, error) {
+	// Get basic session data
+	sessions, err := r.getBasicSessionData(ctx, userID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("get basic session data: %w", err)
+	}
+
+	// Enrich completed sessions with exercise sets
+	err = r.enrichSessionsWithExerciseSets(ctx, userID, sessions)
+	if err != nil {
+		return nil, fmt.Errorf("enrich sessions: %w", err)
+	}
+
+	return sessions, nil
+}
+
+// getBasicSessionData retrieves basic session information from the database.
+func (r *sqliteRepository) getBasicSessionData(
+	ctx context.Context,
+	userID []byte,
+	startDate, endDate time.Time,
+) ([]Session, error) {
 	startDateStr := startDate.Format(dateFormat)
 	endDateStr := endDate.Format(dateFormat)
 
-	// First get all workout sessions in the date range
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+	query := `
 		SELECT workout_date, difficulty_rating, started_at, completed_at
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date BETWEEN ? AND ?
-		ORDER BY workout_date DESC`,
-		userID, startDateStr, endDateStr)
+		ORDER BY workout_date DESC`
+
+	rows, err := r.db.ReadOnly.QueryContext(ctx, query, userID, startDateStr, endDateStr)
 	if err != nil {
 		return nil, fmt.Errorf("query workout history: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
+	return scanSessionRows(rows)
+}
+
+// scanSessionRows scans database rows into Session objects.
+func scanSessionRows(rows *sql.Rows) ([]Session, error) {
 	var sessions []Session
 
 	for rows.Next() {
-		var (
-			session        Session
-			workoutDateStr string
-			startedAtStr   sql.NullString
-			completedAtStr sql.NullString
-		)
-
-		err = rows.Scan(&workoutDateStr, &session.DifficultyRating, &startedAtStr, &completedAtStr)
+		session, err := scanSingleSessionRow(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan workout history row: %w", err)
+			return nil, err
 		}
-
-		session.WorkoutDate, err = time.Parse(dateFormat, workoutDateStr)
-		if err != nil {
-			return nil, fmt.Errorf("parse workout date: %w", err)
-		}
-
-		var startedAt, completedAt *time.Time
-		if startedAt, err = parseTimestamp(startedAtStr); err != nil {
-			return nil, fmt.Errorf("parse started_at: %w", err)
-		}
-		session.StartedAt = startedAt
-
-		if completedAt, err = parseTimestamp(completedAtStr); err != nil {
-			return nil, fmt.Errorf("parse completed_at: %w", err)
-		}
-		session.CompletedAt = completedAt
-
-		// Determine status
-		if session.CompletedAt != nil {
-			session.Status = StatusDone
-		} else {
-			session.Status = StatusPlanned
-		}
-
 		sessions = append(sessions, session)
 	}
 
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	// Now load exercise sets for all sessions
+	return sessions, nil
+}
+
+// scanSingleSessionRow scans a single row into a Session object.
+func scanSingleSessionRow(rows *sql.Rows) (Session, error) {
+	var (
+		session        Session
+		workoutDateStr string
+		startedAtStr   sql.NullString
+		completedAtStr sql.NullString
+	)
+
+	err := rows.Scan(&workoutDateStr, &session.DifficultyRating, &startedAtStr, &completedAtStr)
+	if err != nil {
+		return Session{}, fmt.Errorf("scan workout history row: %w", err)
+	}
+
+	// Parse workout date
+	session.WorkoutDate, err = time.Parse(dateFormat, workoutDateStr)
+	if err != nil {
+		return Session{}, fmt.Errorf("parse workout date: %w", err)
+	}
+
+	// Parse timestamp strings
+	session.StartedAt, err = parseTimestamp(startedAtStr)
+	if err != nil {
+		return Session{}, fmt.Errorf("parse started_at: %w", err)
+	}
+
+	session.CompletedAt, err = parseTimestamp(completedAtStr)
+	if err != nil {
+		return Session{}, fmt.Errorf("parse completed_at: %w", err)
+	}
+
+	// Determine status
+	if session.CompletedAt != nil {
+		session.Status = StatusDone
+	} else {
+		session.Status = StatusPlanned
+	}
+
+	return session, nil
+}
+
+// enrichSessionsWithExerciseSets adds exercise sets to completed sessions.
+func (r *sqliteRepository) enrichSessionsWithExerciseSets(
+	ctx context.Context,
+	userID []byte,
+	sessions []Session,
+) error {
 	for i, session := range sessions {
 		// Skip loading exercises for non-completed workouts
 		if session.Status != StatusDone {
 			continue
 		}
 
-		var exerciseSets []ExerciseSet
-		exerciseSets, err = r.getExerciseSetsForWorkout(ctx, userID, session.WorkoutDate)
+		exerciseSets, err := r.getExerciseSetsForWorkout(ctx, userID, session.WorkoutDate)
 		if err != nil {
-			return nil, fmt.Errorf("get exercise sets for workout: %w", err)
+			return fmt.Errorf("get exercise sets for workout on %s: %w",
+				session.WorkoutDate.Format(dateFormat), err)
 		}
 
 		sessions[i].ExerciseSets = exerciseSets
 	}
-
-	return sessions, nil
+	return nil
 }
 
 // getExerciseSetsForWorkout fetches all exercise sets for a specific workout.
@@ -567,7 +614,7 @@ func (r *sqliteRepository) getExerciseSetsForWorkout(
 	ctx context.Context,
 	userID []byte,
 	date time.Time,
-) ([]ExerciseSet, error) {
+) (_ []ExerciseSet, err error) {
 	dateStr := date.Format(dateFormat)
 
 	// Load exercise sets
@@ -583,7 +630,11 @@ func (r *sqliteRepository) getExerciseSetsForWorkout(
 	if err != nil {
 		return nil, fmt.Errorf("query exercise sets: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
 	var exerciseSets []ExerciseSet
 	var currentExerciseSet *ExerciseSet
@@ -639,22 +690,26 @@ func (r *sqliteRepository) getExerciseSetsForWorkout(
 	return exerciseSets, nil
 }
 
-// getExercisePool returns all available exercises with their muscle groups.
-func (r *sqliteRepository) getExercisePool(ctx context.Context) ([]Exercise, error) {
+// listExercises returns all available exercises with their muscle groups.
+func (r *sqliteRepository) listExercises(ctx context.Context) (_ []Exercise, err error) {
 	// First, get all exercises
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT id, name, category
+		SELECT id, name, category, description_markdown
 		FROM exercises
 		ORDER BY id`)
 	if err != nil {
 		return nil, fmt.Errorf("query exercises: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
 	var exercises []Exercise
 	for rows.Next() {
 		var exercise Exercise
-		if err = rows.Scan(&exercise.ID, &exercise.Name, &exercise.Category); err != nil {
+		if err = rows.Scan(&exercise.ID, &exercise.Name, &exercise.Category, &exercise.DescriptionMarkdown); err != nil {
 			return nil, fmt.Errorf("scan exercise: %w", err)
 		}
 		exercises = append(exercises, exercise)

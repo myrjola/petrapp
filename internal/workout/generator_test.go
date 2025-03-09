@@ -227,6 +227,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryUpper,
 			PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
 			SecondaryMuscleGroups: []string{"Shoulders"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    2,
@@ -234,6 +235,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryUpper,
 			PrimaryMuscleGroups:   []string{"Back", "Biceps"},
 			SecondaryMuscleGroups: []string{"Forearms"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    3,
@@ -241,6 +243,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryUpper,
 			PrimaryMuscleGroups:   []string{"Shoulders"},
 			SecondaryMuscleGroups: []string{"Triceps"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    4,
@@ -248,6 +251,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryUpper,
 			PrimaryMuscleGroups:   []string{"Biceps"},
 			SecondaryMuscleGroups: []string{"Forearms"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    5,
@@ -255,6 +259,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryUpper,
 			PrimaryMuscleGroups:   []string{"Triceps"},
 			SecondaryMuscleGroups: []string{},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    6,
@@ -262,6 +267,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryUpper,
 			PrimaryMuscleGroups:   []string{"Shoulders"},
 			SecondaryMuscleGroups: []string{},
+			DescriptionMarkdown:   "",
 		},
 
 		// Lower body exercises
@@ -271,6 +277,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryLower,
 			PrimaryMuscleGroups:   []string{"Quadriceps", "Glutes"},
 			SecondaryMuscleGroups: []string{"Hamstrings", "Core"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    8,
@@ -278,6 +285,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryLower,
 			PrimaryMuscleGroups:   []string{"Hamstrings", "Back"},
 			SecondaryMuscleGroups: []string{"Glutes", "Forearms"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    9,
@@ -285,6 +293,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryLower,
 			PrimaryMuscleGroups:   []string{"Quadriceps"},
 			SecondaryMuscleGroups: []string{"Glutes", "Hamstrings"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    10,
@@ -292,6 +301,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryLower,
 			PrimaryMuscleGroups:   []string{"Hamstrings"},
 			SecondaryMuscleGroups: []string{},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    11,
@@ -299,6 +309,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryLower,
 			PrimaryMuscleGroups:   []string{"Calves"},
 			SecondaryMuscleGroups: []string{},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    12,
@@ -306,6 +317,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryLower,
 			PrimaryMuscleGroups:   []string{"Quadriceps"},
 			SecondaryMuscleGroups: []string{},
+			DescriptionMarkdown:   "",
 		},
 
 		// Full body exercises
@@ -315,6 +327,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryFullBody,
 			PrimaryMuscleGroups:   []string{"Shoulders", "Legs", "Back"},
 			SecondaryMuscleGroups: []string{"Core", "Arms"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    14,
@@ -322,6 +335,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryFullBody,
 			PrimaryMuscleGroups:   []string{"Chest", "Legs", "Shoulders"},
 			SecondaryMuscleGroups: []string{"Core", "Arms"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    15,
@@ -329,6 +343,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryFullBody,
 			PrimaryMuscleGroups:   []string{"Hamstrings", "Glutes", "Back"},
 			SecondaryMuscleGroups: []string{"Shoulders", "Core"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    16,
@@ -336,6 +351,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryFullBody,
 			PrimaryMuscleGroups:   []string{"Shoulders", "Core", "Legs"},
 			SecondaryMuscleGroups: []string{"Arms", "Back"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    17,
@@ -343,6 +359,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryFullBody,
 			PrimaryMuscleGroups:   []string{"Legs", "Shoulders"},
 			SecondaryMuscleGroups: []string{"Core", "Arms"},
+			DescriptionMarkdown:   "",
 		},
 		{
 			ID:                    18,
@@ -350,6 +367,7 @@ func createExercisePool() []workout.Exercise {
 			Category:              workout.CategoryFullBody,
 			PrimaryMuscleGroups:   []string{"Back", "Legs", "Shoulders"},
 			SecondaryMuscleGroups: []string{"Arms", "Core"},
+			DescriptionMarkdown:   "",
 		},
 	}
 }

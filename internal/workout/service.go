@@ -62,7 +62,7 @@ func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session,
 	}
 
 	// Get exercise pool
-	exercisePool, err := s.repo.getExercisePool(ctx)
+	exercisePool, err := s.repo.listExercises(ctx)
 	if err != nil {
 		return Session{}, fmt.Errorf("get exercise pool: %w", err)
 	}
@@ -213,4 +213,9 @@ func (s *Service) UpdateCompletedReps(
 		return fmt.Errorf("update completed reps: %w", err)
 	}
 	return nil
+}
+
+// ListExercises returns all available exercises.
+func (s *Service) ListExercises(ctx context.Context) ([]Exercise, error) {
+	return s.repo.listExercises(ctx)
 }
