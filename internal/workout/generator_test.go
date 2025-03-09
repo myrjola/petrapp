@@ -116,13 +116,8 @@ func verifyGeneratedWorkout(t *testing.T, session workout.Session, date time.Tim
 	t.Helper()
 
 	// Verify date is correct
-	if !session.WorkoutDate.Equal(date) {
-		t.Errorf("Expected workout date %v, got %v", date, session.WorkoutDate)
-	}
-
-	// Verify status is planned
-	if session.Status != workout.StatusPlanned {
-		t.Errorf("Expected workout status to be %v, got %v", workout.StatusPlanned, session.Status)
+	if !session.Date.Equal(date) {
+		t.Errorf("Expected workout date %v, got %v", date, session.Date)
 	}
 
 	// Verify workout has appropriate number of exercises (5-8)
@@ -392,11 +387,10 @@ func createWorkoutHistory() []workout.Session {
 	return []workout.Session{
 		{
 			// 2 weeks ago - Monday workout
-			WorkoutDate:      twoWeeksAgo,
-			Status:           workout.StatusDone,
+			Date:             twoWeeksAgo,
 			DifficultyRating: ptr.Ref(3), // Medium difficulty
-			StartedAt:        ptr.Ref(twoWeeksAgo.Add(17 * time.Hour)),
-			CompletedAt:      ptr.Ref(twoWeeksAgo.Add(18 * time.Hour)),
+			StartedAt:        twoWeeksAgo.Add(17 * time.Hour),
+			CompletedAt:      twoWeeksAgo.Add(18 * time.Hour),
 			ExerciseSets: []workout.ExerciseSet{
 				{
 					Exercise: exercises[0], // Bench Press
@@ -418,11 +412,10 @@ func createWorkoutHistory() []workout.Session {
 		},
 		{
 			// 1 week ago - Monday workout
-			WorkoutDate:      oneWeekAgo,
-			Status:           workout.StatusDone,
+			Date:             oneWeekAgo,
 			DifficultyRating: ptr.Ref(4), // Somewhat challenging
-			StartedAt:        ptr.Ref(oneWeekAgo.Add(17 * time.Hour)),
-			CompletedAt:      ptr.Ref(oneWeekAgo.Add(18 * time.Hour)),
+			StartedAt:        oneWeekAgo.Add(17 * time.Hour),
+			CompletedAt:      oneWeekAgo.Add(18 * time.Hour),
 			ExerciseSets: []workout.ExerciseSet{
 				{
 					Exercise: exercises[0], // Bench Press
@@ -444,11 +437,10 @@ func createWorkoutHistory() []workout.Session {
 		},
 		{
 			// 2 days ago - Saturday workout
-			WorkoutDate:      twoDaysAgo,
-			Status:           workout.StatusDone,
+			Date:             twoDaysAgo,
 			DifficultyRating: ptr.Ref(2), // Somewhat easy
-			StartedAt:        ptr.Ref(twoDaysAgo.Add(10 * time.Hour)),
-			CompletedAt:      ptr.Ref(twoDaysAgo.Add(11 * time.Hour)),
+			StartedAt:        twoDaysAgo.Add(10 * time.Hour),
+			CompletedAt:      twoDaysAgo.Add(11 * time.Hour),
 			ExerciseSets: []workout.ExerciseSet{
 				{
 					Exercise: exercises[6], // Squat
@@ -683,14 +675,11 @@ func simulateWorkoutCompletion(session workout.Session, week int) workout.Sessio
 	// Copy the session
 	completed := session
 
-	// workout.Set status to done
-	completed.Status = workout.StatusDone
-
 	// workout.Set start and end times
-	startTime := session.WorkoutDate.Add(17 * time.Hour) // 5 PM
-	endTime := startTime.Add(1 * time.Hour)              // 1 hour workout
-	completed.StartedAt = &startTime
-	completed.CompletedAt = &endTime
+	startTime := session.Date.Add(17 * time.Hour) // 5 PM
+	endTime := startTime.Add(1 * time.Hour)       // 1-hour workout
+	completed.StartedAt = startTime
+	completed.CompletedAt = endTime
 
 	// Simulate completing each set
 	for i := range completed.ExerciseSets {

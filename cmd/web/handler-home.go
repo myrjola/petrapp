@@ -18,14 +18,10 @@ type dayView struct {
 	Date time.Time
 	// Name is the weekday name (e.g. "Monday")
 	Name string
-	// Status represents the workout status (e.g. "Done", "Skipped", "Rest day", "Planned")
-	Status string
 	// IsToday indicates if this is the current day
 	IsToday bool
 	// IsPast indicates if this day is in the past
 	IsPast bool
-	// HasWorkout indicates if a workout is scheduled for this day
-	HasWorkout bool
 }
 
 func toDays(sessions []workout.Session) []dayView {
@@ -33,14 +29,12 @@ func toDays(sessions []workout.Session) []dayView {
 	days := make([]dayView, len(sessions))
 
 	for i, session := range sessions {
-		date := session.WorkoutDate
+		date := session.Date
 		days[i] = dayView{
-			Date:       date,
-			Name:       date.Format("Monday"),
-			Status:     string(session.Status),
-			IsToday:    date.Format("2006-01-02") == today.Format("2006-01-02"),
-			IsPast:     date.Before(today),
-			HasWorkout: session.Status != workout.StatusRest,
+			Date:    date,
+			Name:    date.Format("Monday"),
+			IsToday: date.Format("2006-01-02") == today.Format("2006-01-02"),
+			IsPast:  date.Before(today),
 		}
 	}
 

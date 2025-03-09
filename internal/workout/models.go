@@ -37,24 +37,13 @@ type ExerciseSet struct {
 	Sets     []Set
 }
 
-// Status represents the state of a workout for a specific day.
-type Status string
-
-const (
-	StatusDone    Status = "Done"
-	StatusSkipped Status = "Skipped"
-	StatusRest    Status = "Rest day"
-	StatusPlanned Status = "Planned"
-)
-
 // Session represents a complete workout session including all exercises and their sets.
 type Session struct {
-	WorkoutDate      time.Time
+	Date             time.Time
 	DifficultyRating *int
-	StartedAt        *time.Time
-	CompletedAt      *time.Time
+	StartedAt        time.Time
+	CompletedAt      time.Time
 	ExerciseSets     []ExerciseSet
-	Status           Status
 }
 
 // Preferences stores which days of the week a user wants to work out.

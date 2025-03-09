@@ -2,10 +2,8 @@ package workout
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"time"
@@ -13,22 +11,22 @@ import (
 
 // Service handles the business logic for workout management.
 type Service struct {
-	repo   *sqliteRepository
+	repo   *Repository
 	logger *slog.Logger
 }
 
-// NewService creates a new workout service with SQLite repository.
+// NewService creates a new workout service.
 func NewService(db *sqlite.Database, logger *slog.Logger) *Service {
+	factory := NewRepositoryFactory(db, logger)
 	return &Service{
-		repo:   newSQLiteRepository(db, logger),
+		repo:   factory.NewRepository(),
 		logger: logger,
 	}
 }
 
 // GetUserPreferences retrieves the workout preferences for a user.
 func (s *Service) GetUserPreferences(ctx context.Context) (Preferences, error) {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	prefs, err := s.repo.getUserPreferences(ctx, userID)
+	prefs, err := s.repo.prefs.Get(ctx)
 	if err != nil {
 		return Preferences{}, fmt.Errorf("get user preferences: %w", err)
 	}
@@ -37,55 +35,40 @@ func (s *Service) GetUserPreferences(ctx context.Context) (Preferences, error) {
 
 // SaveUserPreferences saves the workout preferences for a user.
 func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	if err := s.repo.saveUserPreferences(ctx, userID, prefs); err != nil {
+	if err := s.repo.prefs.Set(ctx, prefs); err != nil {
 		return fmt.Errorf("save user preferences: %w", err)
 	}
 	return nil
 }
 
-// generateWorkout creates a new workout plan based on user preferences and history.
+// GenerateWorkout creates a new workout plan based on user preferences and history.
 func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session, error) {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-
-	// Get user preferences
-	prefs, err := s.repo.getUserPreferences(ctx, userID)
+	// Get user preferences.
+	prefs, err := s.repo.prefs.Get(ctx)
 	if err != nil {
 		return Session{}, fmt.Errorf("get user preferences: %w", err)
 	}
 
-	// Get workout history (past 3 months)
+	// Get workout history (past 3 months).
 	threeMonthsAgo := date.AddDate(0, -3, 0)
-	history, err := s.repo.getWorkoutHistory(ctx, userID, threeMonthsAgo, date)
+	history, err := s.repo.sessions.List(ctx, threeMonthsAgo)
 	if err != nil {
 		return Session{}, fmt.Errorf("get workout history: %w", err)
 	}
 
-	// Get exercise pool
-	exercisePool, err := s.repo.listExercises(ctx)
+	// Get exercise pool.
+	exercisePool, err := s.repo.exercises.List(ctx)
 	if err != nil {
 		return Session{}, fmt.Errorf("get exercise pool: %w", err)
 	}
 
-	// If exercise pool is empty, create a session with a friendly error
-	if len(exercisePool) == 0 {
-		return Session{
-			WorkoutDate:      date,
-			DifficultyRating: nil,
-			StartedAt:        nil,
-			CompletedAt:      nil,
-			ExerciseSets:     []ExerciseSet{},
-			Status:           StatusPlanned,
-		}, nil
-	}
-
-	// Initialize workout generator
+	// Initialize workout generator.
 	gen, err := NewGenerator(prefs, history, exercisePool)
 	if err != nil {
 		return Session{}, fmt.Errorf("initialize workout generator: %w", err)
 	}
 
-	// Generate the workout
+	// Generate the workout.
 	session, err := gen.Generate(date)
 	if err != nil {
 		return Session{}, fmt.Errorf("generate workout: %w", err)
@@ -96,23 +79,15 @@ func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session,
 
 // ResolveWeeklySchedule retrieves the workout schedule for a week.
 func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) {
-	//nolint:godox // temporary todo
-	// TODO: Implement weekly schedule retrieval
-	// This should:
-	// 1. Get all sessions for the week
-	// 2. Fill in rest days and planned workouts based on preferences
-	// 3. Return complete 7-day schedule
 	workouts := make([]Session, 7) //nolint:mnd // 7 days in a week
 
-	// Get the current date
+	// Get the current date.
 	now := time.Now()
 
-	// Calculate the current week's Monday
-	// Weekday() returns the day of the week with Sunday as 0
-	// We need to adjust this to 1-based with Monday as 1
+	// Calculate the current week's Monday.
 	offset := int(time.Monday - now.Weekday())
 	if offset > 0 {
-		offset = -6 //nolint:mnd // If today is Sunday, adjust the offset to get last Monday
+		offset = -6 //nolint:mnd // If today is Sunday, adjust the offset to get last Monday.
 	}
 	monday := now.AddDate(0, 0, offset)
 
@@ -121,7 +96,7 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 		day := monday.AddDate(0, 0, i)
 		workout, err := s.generateWorkout(ctx, day)
 		if err != nil {
-			return nil, fmt.Errorf("generate workout: %w", err)
+			return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
 		}
 		workouts[i] = workout
 	}
@@ -131,37 +106,39 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 
 // GetSession retrieves a workout session for a specific date.
 func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, error) {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-
-	session, err := s.repo.getSession(ctx, userID, date)
+	session, err := s.repo.sessions.Get(ctx, date)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// If no session exists, generate a new one
-			return s.generateWorkout(ctx, date)
-		}
-		return Session{}, fmt.Errorf("get session: %w", err)
+		return Session{}, fmt.Errorf("get session %s: %w", formatDate(date), err)
 	}
 
 	return session, nil
 }
 
-// StartSession starts a new workout session or returns an error if one already exists.
+// StartSession starts a new workout session.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-
-	if err := s.repo.startSession(ctx, userID, date); err != nil {
-		return fmt.Errorf("start session: %w", err)
-	}
-
 	// Generate workout if it doesn't exist
-	session, err := s.generateWorkout(ctx, date)
+	_, err := s.repo.sessions.Get(ctx, date)
+	if errors.Is(err, ErrNotFound) {
+		var sess Session
+		if sess, err = s.generateWorkout(ctx, date); err != nil {
+			return fmt.Errorf("generate workout %s: %w", formatDate(date), err)
+		}
+		if err = s.repo.sessions.Create(ctx, sess); err != nil {
+			return fmt.Errorf("create session %s: %w", formatDate(date), err)
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("generate workout: %w", err)
+		return fmt.Errorf("get session %s: %w", formatDate(date), err)
 	}
 
-	// Save the generated exercise sets to the database
-	if err = s.repo.saveExerciseSets(ctx, userID, date, session.ExerciseSets); err != nil {
-		return fmt.Errorf("save exercise sets: %w", err)
+	if err = s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+		if sess.StartedAt.IsZero() {
+			sess.StartedAt = time.Now()
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
 
 	return nil
@@ -169,19 +146,25 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 
 // CompleteSession marks a workout session as completed.
 func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	if err := s.repo.completeSession(ctx, userID, date); err != nil {
-		return fmt.Errorf("complete session: %w", err)
+	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+		sess.CompletedAt = time.Now()
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
+
 	return nil
 }
 
 // SaveFeedback saves the difficulty rating for a completed workout session.
 func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty int) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	if err := s.repo.saveFeedback(ctx, userID, date, difficulty); err != nil {
-		return fmt.Errorf("save feedback: %w", err)
+	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+		sess.DifficultyRating = &difficulty
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
+
 	return nil
 }
 
@@ -193,10 +176,21 @@ func (s *Service) UpdateSetWeight(
 	setIndex int,
 	newWeight float64,
 ) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	if err := s.repo.updateSetWeight(ctx, userID, date, exerciseID, setIndex, newWeight); err != nil {
-		return fmt.Errorf("set weight: %w", err)
+	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+		for _, ex := range sess.ExerciseSets {
+			if ex.Exercise.ID == exerciseID {
+				if setIndex >= len(ex.Sets) {
+					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
+				}
+				ex.Sets[setIndex].WeightKg = newWeight
+				return true, nil
+			}
+		}
+		return false, errors.New("exercise not found")
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
+
 	return nil
 }
 
@@ -208,14 +202,29 @@ func (s *Service) UpdateCompletedReps(
 	setIndex int,
 	completedReps int,
 ) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	if err := s.repo.updateCompletedReps(ctx, userID, date, exerciseID, setIndex, completedReps); err != nil {
-		return fmt.Errorf("update completed reps: %w", err)
+	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+		for _, ex := range sess.ExerciseSets {
+			if ex.Exercise.ID == exerciseID {
+				if setIndex >= len(ex.Sets) {
+					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
+				}
+				ex.Sets[setIndex].CompletedReps = &completedReps
+				return true, nil
+			}
+		}
+		return false, errors.New("exercise not found")
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
+
 	return nil
 }
 
-// ListExercises returns all available exercises.
-func (s *Service) ListExercises(ctx context.Context) ([]Exercise, error) {
-	return s.repo.listExercises(ctx)
+// List returns all available exercises.
+func (s *Service) List(ctx context.Context) ([]Exercise, error) {
+	exercises, err := s.repo.exercises.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list exercises: %w", err)
+	}
+	return exercises, nil
 }

@@ -50,18 +50,13 @@
                     <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
                         {{ csrf }}
                         <button type="submit">
-                            {{ if .HasWorkout }}
-                                Start workout
-                            {{ else }}
-                                Start extra workout
-                            {{ end }}
+                            Start workout
                         </button>
                     </form>
                 </div>
             {{ else }}
                 <div>
                     <span>{{ .Name }}</span>
-                    <span>{{ .Status }}</span>
                 </div>
             {{ end }}
         {{ end }}

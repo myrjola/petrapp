@@ -91,15 +91,15 @@ func NewGenerator(prefs Preferences, history []Session, pool []Exercise) (*Gener
 	dateHistory := make(DateExerciseMap)
 	for i, session := range history {
 		// Only consider completed workouts
-		if session.Status != StatusDone {
+		if session.CompletedAt.IsZero() {
 			continue
 		}
 
 		// Index by date
 		sessionDate := time.Date(
-			session.WorkoutDate.Year(),
-			session.WorkoutDate.Month(),
-			session.WorkoutDate.Day(),
+			session.Date.Year(),
+			session.Date.Month(),
+			session.Date.Day(),
 			0, 0, 0, 0, time.UTC,
 		)
 		dateHistory[sessionDate] = &history[i]
@@ -134,12 +134,11 @@ func (g *Generator) Generate(t time.Time) (Session, error) {
 
 	// Create the workout session
 	session := Session{
-		WorkoutDate:      t,
+		Date:             t,
 		ExerciseSets:     exerciseSets,
-		Status:           StatusPlanned,
 		DifficultyRating: nil,
-		StartedAt:        nil,
-		CompletedAt:      nil,
+		StartedAt:        time.Time{},
+		CompletedAt:      time.Time{},
 	}
 
 	return session, nil
@@ -249,10 +248,10 @@ func (g *Generator) findLastSameWeekdayWorkout(t time.Time) *Session {
 	var mostRecentDate time.Time
 
 	for _, session := range g.dateHistory {
-		if session.WorkoutDate.Weekday() == targetWeekday &&
-			(mostRecent == nil || session.WorkoutDate.After(mostRecentDate)) {
+		if session.Date.Weekday() == targetWeekday &&
+			(mostRecent == nil || session.Date.After(mostRecentDate)) {
 			mostRecent = session
-			mostRecentDate = session.WorkoutDate
+			mostRecentDate = session.Date
 		}
 	}
 
@@ -460,16 +459,16 @@ func (g *Generator) findMostRecentExerciseSet(exerciseID int) *ExerciseSet {
 
 	for _, session := range g.history {
 		// Only consider completed workouts
-		if session.Status != StatusDone {
+		if session.CompletedAt.IsZero() {
 			continue
 		}
 
 		// Look for the exercise in this session
 		for i, es := range session.ExerciseSets {
 			if es.Exercise.ID == exerciseID {
-				if mostRecent == nil || session.WorkoutDate.After(mostRecentDate) {
+				if mostRecent == nil || session.Date.After(mostRecentDate) {
 					mostRecent = &session.ExerciseSets[i]
-					mostRecentDate = session.WorkoutDate
+					mostRecentDate = session.Date
 				}
 				break // Found the exercise in this session, move to next session
 			}
@@ -489,14 +488,14 @@ func (g *Generator) isBeginnerUser() bool {
 	sortedHistory := make([]Session, len(g.history))
 	copy(sortedHistory, g.history)
 	sort.Slice(sortedHistory, func(i, j int) bool {
-		return sortedHistory[i].WorkoutDate.Before(sortedHistory[j].WorkoutDate)
+		return sortedHistory[i].Date.Before(sortedHistory[j].Date)
 	})
 
 	// Find the oldest workout
 	oldestWorkout := sortedHistory[0]
 
 	// Calculate duration since oldest workout
-	duration := time.Since(oldestWorkout.WorkoutDate)
+	duration := time.Since(oldestWorkout.Date)
 
 	// Check if it's less than the beginner period
 	return duration < BeginnerPeriodDays*24*time.Hour
@@ -750,9 +749,9 @@ func (g *Generator) getMostRecentFeedback(exerciseID int) *int {
 		}
 
 		if containsExercise &&
-			(mostRecentSession == nil || session.WorkoutDate.After(mostRecentDate)) {
+			(mostRecentSession == nil || session.Date.After(mostRecentDate)) {
 			mostRecentSession = &g.history[i]
-			mostRecentDate = session.WorkoutDate
+			mostRecentDate = session.Date
 		}
 	}
 
