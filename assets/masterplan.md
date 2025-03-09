@@ -62,6 +62,8 @@ Petrapp is a minimalist, privacy-focused mobile web application that automatical
 - Minimalist styling using minimal CSS while maintaining accessibility and usability
 - Scoped CSS for style isolation
 - Mobile-only interface
+- Progressive enhancement for JavaScript features, i.e., app will work even when JavaScript is disabled.
+  - Vanilla HTML forms and anchor links for core functionality
 
 ## Task Execution
 
