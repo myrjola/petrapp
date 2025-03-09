@@ -5,10 +5,11 @@ import (
 	"net/http"
 )
 
-func AuthenticateContext(r *http.Request, userID []byte) *http.Request {
+func AuthenticateContext(r *http.Request, userID []byte, isAdmin bool) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, isAuthenticatedContextKey, true)
 	ctx = context.WithValue(ctx, authenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, isAdminContextKey, isAdmin)
 	return r.WithContext(ctx)
 }
 
@@ -27,5 +28,11 @@ func SetCSRFToken(r *http.Request, csrfToken string) *http.Request {
 func SetCSPNonce(r *http.Request, cspNonce string) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, cspNonceContextKey, cspNonce)
+	return r.WithContext(ctx)
+}
+
+func SetAdminStatus(r *http.Request, isAdmin bool) *http.Request {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, isAdminContextKey, isAdmin)
 	return r.WithContext(ctx)
 }

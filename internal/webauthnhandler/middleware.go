@@ -2,7 +2,9 @@ package webauthnhandler
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
@@ -20,16 +22,15 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 			return
 		}
 
-		// If user exists, set context values.
-		exists, err := h.userExists(ctx, userID)
-		if err != nil {
-			h.logger.LogAttrs(r.Context(), slog.LevelError, "server error",
-				slog.String("method", r.Method), slog.String("uri", r.URL.RequestURI()), slog.Any("error", err))
+		role, err := h.getUserRole(ctx, userID)
+		switch {
+		case errors.Is(err, sql.ErrNoRows): // Do not authenticate if user does not exist.
+		case err != nil:
+			h.logger.LogAttrs(r.Context(), slog.LevelError, "unable to fetch user", slog.Any("error", err))
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
-		}
-		if exists {
-			r = contexthelpers.AuthenticateContext(r, userID)
+		default:
+			r = contexthelpers.AuthenticateContext(r, userID, role == roleAdmin)
 		}
 
 		// Add session information to logging context.

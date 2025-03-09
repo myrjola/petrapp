@@ -18,6 +18,7 @@ type Exercise struct {
 	ID                    int
 	Name                  string
 	Category              Category
+	DescriptionMarkdown   string
 	PrimaryMuscleGroups   []string
 	SecondaryMuscleGroups []string
 }

@@ -48,3 +48,11 @@ func CSPNonce(ctx context.Context) string {
 
 	return cspNonce
 }
+
+func IsAdmin(ctx context.Context) bool {
+	isAdmin, ok := ctx.Value(isAdminContextKey).(bool)
+	if !ok {
+		return false
+	}
+	return isAdmin
+}

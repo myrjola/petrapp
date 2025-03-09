@@ -153,11 +153,22 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
 	return nil
 }
 
-func (h *WebAuthnHandler) userExists(ctx context.Context, userID []byte) (bool, error) {
-	stmt := `SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`
-	var exists bool
-	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, userID).Scan(&exists); err != nil {
-		return false, fmt.Errorf("query user exists: %w", err)
+type role int
+
+const (
+	roleUser role = iota
+	roleAdmin
+)
+
+// getUserRole returns the role of the user or sql.ErrNoRows if the user does not exist.
+func (h *WebAuthnHandler) getUserRole(ctx context.Context, userID []byte) (role, error) {
+	stmt := `SELECT is_admin FROM users WHERE id = ?`
+	var is_admin bool
+	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, userID).Scan(&is_admin); err != nil {
+		return roleUser, fmt.Errorf("query user role: %w", err)
 	}
-	return exists, nil
+	if is_admin {
+		return roleAdmin, nil
+	}
+	return roleUser, nil
 }
