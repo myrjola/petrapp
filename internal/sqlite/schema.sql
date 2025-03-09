@@ -76,7 +76,8 @@ CREATE TABLE exercises
 (
     id       INTEGER PRIMARY KEY,
     name     TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
-    category TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower'))
+    category TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
+    description_markdown TEXT NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000)
 ) STRICT;
 
 CREATE TABLE workout_sessions
