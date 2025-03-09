@@ -18,7 +18,8 @@ CREATE TABLE users
     created      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created) = created),
     updated      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
-        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated)
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated),
+    is_admin     INTEGER NOT NULL CHECK (is_admin IN (0, 1))
 ) WITHOUT ROWID, STRICT;
 
 CREATE TRIGGER users_updated_timestamp
