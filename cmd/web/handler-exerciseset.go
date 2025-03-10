@@ -144,7 +144,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	// First update the weight
 	if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-		app.serverError(w, r, fmt.Errorf("UPDATE set weight: %w", err))
+		app.serverError(w, r, fmt.Errorf("update weight: %w", err))
 		return
 	}
 

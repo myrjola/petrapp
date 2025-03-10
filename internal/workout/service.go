@@ -11,15 +11,15 @@ import (
 
 // Service handles the business logic for workout management.
 type Service struct {
-	repo   *Repository
+	repo   *repository
 	logger *slog.Logger
 }
 
 // NewService creates a new workout service.
 func NewService(db *sqlite.Database, logger *slog.Logger) *Service {
-	factory := NewRepositoryFactory(db, logger)
+	factory := newRepositoryFactory(db, logger)
 	return &Service{
-		repo:   factory.NewRepository(),
+		repo:   factory.newRepository(),
 		logger: logger,
 	}
 }
@@ -42,36 +42,36 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 }
 
 // GenerateWorkout creates a new workout plan based on user preferences and history.
-func (s *Service) generateWorkout(ctx context.Context, date time.Time) (Session, error) {
+func (s *Service) generateWorkout(ctx context.Context, date time.Time) (sessionAggregate, error) {
 	// Get user preferences.
 	prefs, err := s.repo.prefs.Get(ctx)
 	if err != nil {
-		return Session{}, fmt.Errorf("get user preferences: %w", err)
+		return sessionAggregate{}, fmt.Errorf("get user preferences: %w", err)
 	}
 
 	// Get workout history (past 3 months).
 	threeMonthsAgo := date.AddDate(0, -3, 0)
 	history, err := s.repo.sessions.List(ctx, threeMonthsAgo)
 	if err != nil {
-		return Session{}, fmt.Errorf("get workout history: %w", err)
+		return sessionAggregate{}, fmt.Errorf("get workout history: %w", err)
 	}
 
 	// Get exercise pool.
 	exercisePool, err := s.repo.exercises.List(ctx)
 	if err != nil {
-		return Session{}, fmt.Errorf("get exercise pool: %w", err)
+		return sessionAggregate{}, fmt.Errorf("get exercise pool: %w", err)
 	}
 
 	// Initialize workout generator.
-	gen, err := NewGenerator(prefs, history, exercisePool)
+	gen, err := newGenerator(prefs, history, exercisePool)
 	if err != nil {
-		return Session{}, fmt.Errorf("initialize workout generator: %w", err)
+		return sessionAggregate{}, fmt.Errorf("initialize workout generator: %w", err)
 	}
 
 	// Generate the workout.
 	session, err := gen.Generate(date)
 	if err != nil {
-		return Session{}, fmt.Errorf("generate workout: %w", err)
+		return sessionAggregate{}, fmt.Errorf("generate workout: %w", err)
 	}
 
 	return session, nil
@@ -98,7 +98,11 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 		if err != nil {
 			return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
 		}
-		workouts[i] = workout
+
+		workouts[i], err = s.enrichSessionAggregate(ctx, workout)
+		if err != nil {
+			return nil, fmt.Errorf("enrich workout %s: %w", formatDate(day), err)
+		}
 	}
 
 	return workouts, nil
@@ -106,11 +110,37 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 
 // GetSession retrieves a workout session for a specific date.
 func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, error) {
-	session, err := s.repo.sessions.Get(ctx, date)
+	sessionAggr, err := s.repo.sessions.Get(ctx, date)
 	if err != nil {
 		return Session{}, fmt.Errorf("get session %s: %w", formatDate(date), err)
 	}
 
+	var session Session
+	session, err = s.enrichSessionAggregate(ctx, sessionAggr)
+	if err != nil {
+		return Session{}, fmt.Errorf("enrich session %s: %w", formatDate(date), err)
+	}
+
+	return session, nil
+}
+
+func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessionAggregate) (Session, error) {
+	session := Session{
+		Date:             sessionAggr.Date,
+		StartedAt:        sessionAggr.StartedAt,
+		CompletedAt:      sessionAggr.CompletedAt,
+		DifficultyRating: sessionAggr.DifficultyRating,
+		ExerciseSets:     make([]ExerciseSet, len(sessionAggr.ExerciseSets)),
+	}
+
+	for i, ex := range sessionAggr.ExerciseSets {
+		exercise, err := s.repo.exercises.Get(ctx, ex.ExerciseID)
+		if err != nil {
+			return Session{}, fmt.Errorf("get exercise %d: %w", ex.ExerciseID, err)
+		}
+		session.ExerciseSets[i].Exercise = exercise
+		session.ExerciseSets[i].Sets = ex.Sets
+	}
 	return session, nil
 }
 
@@ -119,7 +149,7 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	// Generate workout if it doesn't exist
 	_, err := s.repo.sessions.Get(ctx, date)
 	if errors.Is(err, ErrNotFound) {
-		var sess Session
+		var sess sessionAggregate
 		if sess, err = s.generateWorkout(ctx, date); err != nil {
 			return fmt.Errorf("generate workout %s: %w", formatDate(date), err)
 		}
@@ -131,7 +161,7 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 		return fmt.Errorf("get session %s: %w", formatDate(date), err)
 	}
 
-	if err = s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+	if err = s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		if sess.StartedAt.IsZero() {
 			sess.StartedAt = time.Now()
 			return true, nil
@@ -146,7 +176,7 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 
 // CompleteSession marks a workout session as completed.
 func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		sess.CompletedAt = time.Now()
 		return true, nil
 	}); err != nil {
@@ -158,7 +188,7 @@ func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
 
 // SaveFeedback saves the difficulty rating for a completed workout session.
 func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty int) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		sess.DifficultyRating = &difficulty
 		return true, nil
 	}); err != nil {
@@ -176,9 +206,9 @@ func (s *Service) UpdateSetWeight(
 	setIndex int,
 	newWeight float64,
 ) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for _, ex := range sess.ExerciseSets {
-			if ex.Exercise.ID == exerciseID {
+			if ex.ExerciseID == exerciseID {
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
@@ -202,9 +232,9 @@ func (s *Service) UpdateCompletedReps(
 	setIndex int,
 	completedReps int,
 ) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *Session) (bool, error) {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for _, ex := range sess.ExerciseSets {
-			if ex.Exercise.ID == exerciseID {
+			if ex.ExerciseID == exerciseID {
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}

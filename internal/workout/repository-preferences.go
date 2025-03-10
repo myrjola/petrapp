@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"log/slog"
 )
 
-// sqlitePreferencesRepository implements PreferencesRepository.
+// sqlitePreferencesRepository implements preferencesRepository.
 type sqlitePreferencesRepository struct {
 	baseRepository
 }
 
 // newSQLitePreferencesRepository creates a new SQLite preferences repository.
-func newSQLitePreferencesRepository(db *sqlite.Database, logger *slog.Logger) *sqlitePreferencesRepository {
+func newSQLitePreferencesRepository(db *sqlite.Database) *sqlitePreferencesRepository {
 	return &sqlitePreferencesRepository{
-		baseRepository: newBaseRepository(db, logger),
+		baseRepository: newBaseRepository(db),
 	}
 }
 

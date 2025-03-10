@@ -9,32 +9,47 @@ import (
 	"time"
 )
 
-// Repository defines the complete repository interface.
-type Repository struct {
-	prefs     PreferencesRepository
-	sessions  SessionRepository
-	exercises ExerciseRepository
+// repository contains the repositories for the domain-driven design aggregates.
+type repository struct {
+	prefs     preferencesRepository
+	sessions  sessionRepository
+	exercises exerciseRepository
 }
 
-// PreferencesRepository handles workout preferences.
-type PreferencesRepository interface {
+// preferencesRepository handles workout preferences.
+type preferencesRepository interface {
 	Get(ctx context.Context) (Preferences, error)
 	Set(ctx context.Context, prefs Preferences) error
 }
 
-// SessionRepository handles workout sessions.
-type SessionRepository interface {
-	List(ctx context.Context, sinceDate time.Time) ([]Session, error)
-	Get(ctx context.Context, date time.Time) (Session, error)
-	Create(ctx context.Context, sess Session) error
+// exerciseSetAggregate groups all sets for a specific exercise in a workout.
+type exerciseSetAggregate struct {
+	ExerciseID int
+	Sets       []Set
+}
+
+// sessionAggregate represents a complete workout session including all exercises and their sets.
+type sessionAggregate struct {
+	Date             time.Time
+	DifficultyRating *int
+	StartedAt        time.Time
+	CompletedAt      time.Time
+	ExerciseSets     []exerciseSetAggregate
+}
+
+// sessionRepository handles workout sessions.
+type sessionRepository interface {
+	List(ctx context.Context, sinceDate time.Time) ([]sessionAggregate, error)
+	Get(ctx context.Context, date time.Time) (sessionAggregate, error)
+	Create(ctx context.Context, sess sessionAggregate) error
 	// Update updates an existing session.
 	//
 	// The updateFn is called with the existing session and if it returns true, the modified sess is persisted.
-	Update(ctx context.Context, date time.Time, updateFn func(sess *Session) (bool, error)) error
+	Update(ctx context.Context, date time.Time, updateFn func(sess *sessionAggregate) (bool, error)) error
 }
 
-// ExerciseRepository handles exercises and sets.
-type ExerciseRepository interface {
+// exerciseRepository handles exercises and sets.
+type exerciseRepository interface {
 	Get(ctx context.Context, id int) (Exercise, error)
 	List(ctx context.Context) ([]Exercise, error)
 }
@@ -46,10 +61,9 @@ type baseRepository struct {
 }
 
 // newBaseRepository creates a new base repository.
-func newBaseRepository(db *sqlite.Database, logger *slog.Logger) baseRepository {
+func newBaseRepository(db *sqlite.Database) baseRepository {
 	return baseRepository{
-		db:     db,
-		logger: logger,
+		db: db,
 	}
 }
 
@@ -82,29 +96,29 @@ func formatTimestamp(t time.Time) string {
 	return t.UTC().Format(timestampFormat)
 }
 
-// RepositoryFactory creates and initializes repositories.
-type RepositoryFactory struct {
+// repositoryFactory creates and initializes repositories.
+type repositoryFactory struct {
 	db     *sqlite.Database
 	logger *slog.Logger
 }
 
-// NewRepositoryFactory creates a new repository factory.
-func NewRepositoryFactory(db *sqlite.Database, logger *slog.Logger) *RepositoryFactory {
-	return &RepositoryFactory{
+// newRepositoryFactory creates a new repository factory.
+func newRepositoryFactory(db *sqlite.Database, logger *slog.Logger) *repositoryFactory {
+	return &repositoryFactory{
 		db:     db,
 		logger: logger,
 	}
 }
 
-// NewRepository creates a complete repository with all needed implementations.
-func (f *RepositoryFactory) NewRepository() *Repository {
+// newRepository creates a complete repository with all needed implementations.
+func (f *repositoryFactory) newRepository() *repository {
 	// Create individual repositories
-	exerciseRepo := newSQLiteExerciseRepository(f.db, f.logger)
-	preferencesRepo := newSQLitePreferencesRepository(f.db, f.logger)
-	sessionRepo := newSQLiteSessionRepository(f.db, f.logger, exerciseRepo)
+	exerciseRepo := newSQLiteExerciseRepository(f.db)
+	preferencesRepo := newSQLitePreferencesRepository(f.db)
+	sessionRepo := newSQLiteSessionRepository(f.db)
 
 	// Return a composite repository
-	return &Repository{
+	return &repository{
 		prefs:     preferencesRepo,
 		sessions:  sessionRepo,
 		exercises: exerciseRepo,

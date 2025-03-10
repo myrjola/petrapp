@@ -7,30 +7,25 @@ import (
 	"fmt"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"log/slog"
 	"time"
 )
 
-// sqliteSessionRepository implements SessionRepository.
+// sqliteSessionRepository implements sessionRepository.
 type sqliteSessionRepository struct {
 	baseRepository
-	exerciseRepo *sqliteExerciseRepository
 }
 
 // newSQLiteSessionRepository creates a new SQLite session repository.
 func newSQLiteSessionRepository(
 	db *sqlite.Database,
-	logger *slog.Logger,
-	exerciseRepo *sqliteExerciseRepository,
 ) *sqliteSessionRepository {
 	return &sqliteSessionRepository{
-		baseRepository: newBaseRepository(db, logger),
-		exerciseRepo:   exerciseRepo,
+		baseRepository: newBaseRepository(db),
 	}
 }
 
 // List retrieves all workout sessions since a given date.
-func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time) (_ []Session, err error) {
+func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time) (_ []sessionAggregate, err error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	sinceDateStr := formatDate(sinceDate)
 
@@ -50,7 +45,7 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 		}
 	}()
 
-	var sessions []Session
+	var sessions []sessionAggregate
 	for rows.Next() {
 		var (
 			workoutDateStr   string
@@ -63,14 +58,14 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 			return nil, fmt.Errorf("scan session row: %w", err)
 		}
 
-		var session Session
+		var session sessionAggregate
 		session, err = r.parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr)
 		if err != nil {
 			return nil, err
 		}
 
 		// Load exercise sets for the session
-		var exerciseSets []ExerciseSet
+		var exerciseSets []exerciseSetAggregate
 		exerciseSets, err = r.loadExerciseSets(ctx, userID, session.Date)
 		if err != nil {
 			return nil, err
@@ -88,7 +83,7 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 }
 
 // Get retrieves a workout session for a specific date.
-func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (Session, error) {
+func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sessionAggregate, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	dateStr := formatDate(date)
 
@@ -107,20 +102,20 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (Sess
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return Session{}, ErrNotFound
+			return sessionAggregate{}, ErrNotFound
 		}
-		return Session{}, fmt.Errorf("query session: %w", err)
+		return sessionAggregate{}, fmt.Errorf("query session: %w", err)
 	}
 
 	session, err := r.parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr)
 	if err != nil {
-		return Session{}, err
+		return sessionAggregate{}, err
 	}
 
 	// Load exercise sets for the session
 	exerciseSets, err := r.loadExerciseSets(ctx, userID, session.Date)
 	if err != nil {
-		return Session{}, err
+		return sessionAggregate{}, err
 	}
 	session.ExerciseSets = exerciseSets
 
@@ -128,7 +123,7 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (Sess
 }
 
 // Create adds new workout session.
-func (r *sqliteSessionRepository) Create(ctx context.Context, sess Session) error {
+func (r *sqliteSessionRepository) Create(ctx context.Context, sess sessionAggregate) error {
 	if err := r.set(ctx, sess, false); err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -137,7 +132,7 @@ func (r *sqliteSessionRepository) Create(ctx context.Context, sess Session) erro
 }
 
 // set creates a new workout session with optional upsert.
-func (r *sqliteSessionRepository) set(ctx context.Context, sess Session, upsert bool) (err error) {
+func (r *sqliteSessionRepository) set(ctx context.Context, sess sessionAggregate, upsert bool) (err error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	dateStr := formatDate(sess.Date)
 
@@ -152,7 +147,7 @@ func (r *sqliteSessionRepository) set(ctx context.Context, sess Session, upsert 
 		}
 	}()
 
-	// We delete the session if so that it can be reinserted
+	// We delete the session so that it can be reinserted.
 	if upsert {
 		_, err = tx.ExecContext(ctx, `
 			DELETE FROM workout_sessions
@@ -189,7 +184,7 @@ func (r *sqliteSessionRepository) set(ctx context.Context, sess Session, upsert 
 func (r *sqliteSessionRepository) Update(
 	ctx context.Context,
 	date time.Time,
-	updateFn func(sess *Session) (bool, error),
+	updateFn func(sess *sessionAggregate) (bool, error),
 ) error {
 	// Get current session
 	session, err := r.Get(ctx, date)
@@ -219,13 +214,13 @@ func (r *sqliteSessionRepository) parseSessionRow(
 	difficultyRating sql.NullInt32,
 	startedAtStr sql.NullString,
 	completedAtStr sql.NullString,
-) (Session, error) {
-	var session Session
+) (sessionAggregate, error) {
+	var session sessionAggregate
 
 	// Parse date
 	date, err := time.Parse(dateFormat, workoutDateStr)
 	if err != nil {
-		return Session{}, fmt.Errorf("parse workout date: %w", err)
+		return sessionAggregate{}, fmt.Errorf("parse workout date: %w", err)
 	}
 	session.Date = date
 
@@ -237,13 +232,13 @@ func (r *sqliteSessionRepository) parseSessionRow(
 
 	var startedAt time.Time
 	if startedAt, err = parseTimestamp(startedAtStr); err != nil {
-		return Session{}, fmt.Errorf("parse started_at: %w", err)
+		return sessionAggregate{}, fmt.Errorf("parse started_at: %w", err)
 	}
 	session.StartedAt = startedAt
 
 	var completedAt time.Time
 	if completedAt, err = parseTimestamp(completedAtStr); err != nil {
-		return Session{}, fmt.Errorf("parse completed_at: %w", err)
+		return sessionAggregate{}, fmt.Errorf("parse completed_at: %w", err)
 	}
 	session.CompletedAt = completedAt
 
@@ -255,7 +250,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	ctx context.Context,
 	userID []byte,
 	date time.Time,
-) ([]ExerciseSet, error) {
+) (_ []exerciseSetAggregate, err error) {
 	dateStr := formatDate(date)
 
 	// Query for exercise sets
@@ -274,8 +269,9 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		}
 	}()
 
-	var exerciseSets []ExerciseSet
-	var currentExerciseSet ExerciseSet
+	var exerciseSets []exerciseSetAggregate
+	var currentExerciseSet exerciseSetAggregate
+	currentExerciseSet.ExerciseID = -1
 
 	for rows.Next() {
 		var (
@@ -286,22 +282,15 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		if err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
-		if exerciseID != currentExerciseSet.Exercise.ID {
+		if exerciseID != currentExerciseSet.ExerciseID {
 			// Add the previous exercise set if it exists
-			if currentExerciseSet.Exercise.ID != 0 {
+			if currentExerciseSet.ExerciseID != -1 {
 				exerciseSets = append(exerciseSets, currentExerciseSet)
 			}
 
-			// Fetch exercise details
-			var exercise Exercise
-			exercise, err = r.exerciseRepo.Get(ctx, exerciseID)
-			if err != nil {
-				return nil, fmt.Errorf("fetch exercise %d: %w", exerciseID, err)
-			}
-
-			currentExerciseSet = ExerciseSet{
-				Exercise: exercise,
-				Sets:     []Set{},
+			currentExerciseSet = exerciseSetAggregate{
+				ExerciseID: exerciseID,
+				Sets:       []Set{},
 			}
 		}
 
@@ -309,7 +298,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	}
 
 	// Add the last exercise if it exists
-	if currentExerciseSet.Exercise.ID != 0 {
+	if currentExerciseSet.ExerciseID != -1 {
 		exerciseSets = append(exerciseSets, currentExerciseSet)
 	}
 
@@ -325,7 +314,7 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 	ctx context.Context,
 	tx *sql.Tx,
 	date time.Time,
-	exerciseSets []ExerciseSet,
+	exerciseSets []exerciseSetAggregate,
 ) error {
 	dateStr := formatDate(date)
 	userID := contexthelpers.AuthenticatedUserID(ctx)
@@ -337,11 +326,11 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 					workout_user_id, workout_date, exercise_id, set_number,
 					weight_kg, min_reps, max_reps, completed_reps
 				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				userID, dateStr, exerciseSet.Exercise.ID, i+1,
+				userID, dateStr, exerciseSet.ExerciseID, i+1,
 				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps)
 
 			if err != nil {
-				return fmt.Errorf("upsert exercise set: %w", err)
+				return fmt.Errorf("insert exercise set: %w", err)
 			}
 		}
 	}

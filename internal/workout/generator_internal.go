@@ -1,4 +1,4 @@
-// Package generator provides functionality to generate personalized workout sessions.
+// Package workout provides functionality to generate personalized workout sessions.
 package workout
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"slices"
 	"sort"
 	"time"
 )
@@ -67,22 +68,22 @@ const (
 )
 
 // DateExerciseMap maps dates to completed workout sessions.
-type DateExerciseMap map[time.Time]*Session
+type DateExerciseMap map[time.Time]*sessionAggregate
 
-// Generator generates workout sessions.
-type Generator struct {
+// generator generates workout sessions.
+type generator struct {
 	// preferences provided by the user
 	preferences Preferences
 	// history of workouts from previous 6 months.
-	history []Session
+	history []sessionAggregate
 	// pool of available exercises.
 	pool []Exercise
 	// cached index for faster date lookups
 	dateHistory DateExerciseMap
 }
 
-// NewGenerator constructs a workout generator.
-func NewGenerator(prefs Preferences, history []Session, pool []Exercise) (*Generator, error) {
+// newGenerator constructs a workout generator.
+func newGenerator(prefs Preferences, history []sessionAggregate, pool []Exercise) (*generator, error) {
 	// Validate inputs
 	if len(pool) == 0 {
 		return nil, errors.New("exercise pool cannot be empty")
@@ -106,7 +107,7 @@ func NewGenerator(prefs Preferences, history []Session, pool []Exercise) (*Gener
 	}
 
 	// Create generator
-	g := &Generator{
+	g := &generator{
 		preferences: prefs,
 		history:     history,
 		pool:        pool,
@@ -117,10 +118,10 @@ func NewGenerator(prefs Preferences, history []Session, pool []Exercise) (*Gener
 }
 
 // Generate generates a new workout session for the given time.
-func (g *Generator) Generate(t time.Time) (Session, error) {
+func (g *generator) Generate(t time.Time) (sessionAggregate, error) {
 	// Validate input
 	if t.IsZero() {
-		return Session{}, errors.New("workout date cannot be zero")
+		return sessionAggregate{}, errors.New("workout date cannot be zero")
 	}
 
 	// Determine workout category
@@ -129,11 +130,11 @@ func (g *Generator) Generate(t time.Time) (Session, error) {
 	// Select exercises
 	exerciseSets, err := g.selectExercises(t, category)
 	if err != nil {
-		return Session{}, fmt.Errorf("failed to select exercises: %w", err)
+		return sessionAggregate{}, fmt.Errorf("failed to select exercises: %w", err)
 	}
 
 	// Create the workout session
-	session := Session{
+	session := sessionAggregate{
 		Date:             t,
 		ExerciseSets:     exerciseSets,
 		DifficultyRating: nil,
@@ -145,7 +146,7 @@ func (g *Generator) Generate(t time.Time) (Session, error) {
 }
 
 // determineWorkoutCategory decides what type of workout to create based on history and preferences.
-func (g *Generator) determineWorkoutCategory(t time.Time) Category {
+func (g *generator) determineWorkoutCategory(t time.Time) Category {
 	// Check if today is a planned workout day
 	if !g.isWorkoutDay(t) {
 		return CategoryFullBody // Default to full body if today is not a workout day
@@ -168,7 +169,7 @@ func (g *Generator) determineWorkoutCategory(t time.Time) Category {
 }
 
 // isWorkoutDay checks if the given day is a planned workout day according to preferences.
-func (g *Generator) isWorkoutDay(t time.Time) bool {
+func (g *generator) isWorkoutDay(t time.Time) bool {
 	switch t.Weekday() {
 	case time.Monday:
 		return g.preferences.Monday
@@ -190,7 +191,7 @@ func (g *Generator) isWorkoutDay(t time.Time) bool {
 }
 
 // wasWorkoutDay checks if there was a completed workout on the given day.
-func (g *Generator) wasWorkoutDay(t time.Time) bool {
+func (g *generator) wasWorkoutDay(t time.Time) bool {
 	normalizedDate := time.Date(
 		t.Year(), t.Month(), t.Day(),
 		0, 0, 0, 0, time.UTC,
@@ -200,7 +201,7 @@ func (g *Generator) wasWorkoutDay(t time.Time) bool {
 }
 
 // selectExercises selects appropriate exercises for the workout.
-func (g *Generator) selectExercises(t time.Time, category Category) ([]ExerciseSet, error) {
+func (g *generator) selectExercises(t time.Time, category Category) ([]exerciseSetAggregate, error) {
 	// Filter the exercise pool by category
 	filteredPool := g.filterExercisesByCategory(category)
 	if len(filteredPool) == 0 {
@@ -217,12 +218,12 @@ func (g *Generator) selectExercises(t time.Time, category Category) ([]ExerciseS
 	}
 
 	// Create exercise sets with appropriate sets and reps
-	exerciseSets := make([]ExerciseSet, 0, len(selectedExercises))
+	exerciseSets := make([]exerciseSetAggregate, 0, len(selectedExercises))
 	for _, exercise := range selectedExercises {
 		sets := g.determineSetsRepsWeight(exercise)
-		exerciseSets = append(exerciseSets, ExerciseSet{
-			Exercise: exercise,
-			Sets:     sets,
+		exerciseSets = append(exerciseSets, exerciseSetAggregate{
+			ExerciseID: exercise.ID,
+			Sets:       sets,
 		})
 	}
 
@@ -230,7 +231,7 @@ func (g *Generator) selectExercises(t time.Time, category Category) ([]ExerciseS
 }
 
 // filterExercisesByCategory returns exercises that match the given category.
-func (g *Generator) filterExercisesByCategory(category Category) []Exercise {
+func (g *generator) filterExercisesByCategory(category Category) []Exercise {
 	var filtered []Exercise
 	for _, exercise := range g.pool {
 		if exercise.Category == category {
@@ -241,10 +242,10 @@ func (g *Generator) filterExercisesByCategory(category Category) []Exercise {
 }
 
 // findLastSameWeekdayWorkout finds the most recent workout on the same weekday.
-func (g *Generator) findLastSameWeekdayWorkout(t time.Time) *Session {
+func (g *generator) findLastSameWeekdayWorkout(t time.Time) *sessionAggregate {
 	targetWeekday := t.Weekday()
 
-	var mostRecent *Session
+	var mostRecent *sessionAggregate
 	var mostRecentDate time.Time
 
 	for _, session := range g.dateHistory {
@@ -259,9 +260,9 @@ func (g *Generator) findLastSameWeekdayWorkout(t time.Time) *Session {
 }
 
 // selectExercisesWithContinuity selects exercises with ~80% continuity from previous week.
-func (g *Generator) selectExercisesWithContinuity(
+func (g *generator) selectExercisesWithContinuity(
 	pool []Exercise,
-	lastWorkout *Session,
+	lastWorkout *sessionAggregate,
 	count int,
 ) []Exercise {
 	// Handle edge cases
@@ -299,7 +300,7 @@ func (g *Generator) selectExercisesWithContinuity(
 }
 
 // calculateContinuitySets selects exercises to continue from previous workout.
-func (g *Generator) calculateContinuitySets(lastWorkout *Session, totalCount int) []Exercise {
+func (g *generator) calculateContinuitySets(lastWorkout *sessionAggregate, totalCount int) []Exercise {
 	if lastWorkout == nil {
 		return []Exercise{}
 	}
@@ -313,7 +314,14 @@ func (g *Generator) calculateContinuitySets(lastWorkout *Session, totalCount int
 	// Extract exercises from previous workout
 	previousExercises := make([]Exercise, 0, len(lastWorkout.ExerciseSets))
 	for _, es := range lastWorkout.ExerciseSets {
-		previousExercises = append(previousExercises, es.Exercise)
+		// Find the exercise in the pool
+		idx := slices.IndexFunc(g.pool, func(exercise Exercise) bool {
+			return exercise.ID == es.ExerciseID
+		})
+		if idx == -1 {
+			panic(fmt.Sprintf("exercise %d not found in pool", es.ExerciseID))
+		}
+		previousExercises = append(previousExercises, g.pool[idx])
 	}
 
 	// Check if we have enough exercises in previous workout
@@ -334,7 +342,7 @@ func (g *Generator) calculateContinuitySets(lastWorkout *Session, totalCount int
 }
 
 // addPrioritizedExercises adds exercises based on priority (compound or non-compound).
-func (g *Generator) addPrioritizedExercises(
+func (g *generator) addPrioritizedExercises(
 	sourceExercises []Exercise,
 	selected []Exercise,
 	targetCount int,
@@ -357,12 +365,12 @@ func (g *Generator) addPrioritizedExercises(
 }
 
 // calculateNewSets determines how many new exercises to add.
-func (g *Generator) calculateNewSets(totalCount int, continuitySets []Exercise) int {
+func (g *generator) calculateNewSets(totalCount int, continuitySets []Exercise) int {
 	return totalCount - len(continuitySets)
 }
 
 // selectRandomExercises selects random exercises from the pool.
-func (g *Generator) selectRandomExercises(pool []Exercise, count int) []Exercise {
+func (g *generator) selectRandomExercises(pool []Exercise, count int) []Exercise {
 	// Handle edge cases
 	if count <= 0 {
 		return []Exercise{}
@@ -412,7 +420,7 @@ func filterOutExercises(pool, toFilter []Exercise) []Exercise {
 }
 
 // determineSetsRepsWeight determines sets, reps, and weights for an exercise.
-func (g *Generator) determineSetsRepsWeight(exercise Exercise) []Set {
+func (g *generator) determineSetsRepsWeight(exercise Exercise) []Set {
 	// Find most recent occurrence of this exercise in workout history
 	lastExerciseSet := g.findMostRecentExerciseSet(exercise.ID)
 
@@ -453,8 +461,8 @@ func createDefaultSets() []Set {
 }
 
 // findMostRecentExerciseSet finds the most recent performance of a specific exercise.
-func (g *Generator) findMostRecentExerciseSet(exerciseID int) *ExerciseSet {
-	var mostRecent *ExerciseSet
+func (g *generator) findMostRecentExerciseSet(exerciseID int) *exerciseSetAggregate {
+	var mostRecent *exerciseSetAggregate
 	var mostRecentDate time.Time
 
 	for _, session := range g.history {
@@ -465,7 +473,7 @@ func (g *Generator) findMostRecentExerciseSet(exerciseID int) *ExerciseSet {
 
 		// Look for the exercise in this session
 		for i, es := range session.ExerciseSets {
-			if es.Exercise.ID == exerciseID {
+			if es.ExerciseID == exerciseID {
 				if mostRecent == nil || session.Date.After(mostRecentDate) {
 					mostRecent = &session.ExerciseSets[i]
 					mostRecentDate = session.Date
@@ -479,13 +487,13 @@ func (g *Generator) findMostRecentExerciseSet(exerciseID int) *ExerciseSet {
 }
 
 // isBeginnerUser determines if a user is a beginner (1-3 months of training).
-func (g *Generator) isBeginnerUser() bool {
+func (g *generator) isBeginnerUser() bool {
 	if len(g.history) == 0 {
 		return true // No history, assume beginner
 	}
 
 	// Sort history by date
-	sortedHistory := make([]Session, len(g.history))
+	sortedHistory := make([]sessionAggregate, len(g.history))
 	copy(sortedHistory, g.history)
 	sort.Slice(sortedHistory, func(i, j int) bool {
 		return sortedHistory[i].Date.Before(sortedHistory[j].Date)
@@ -502,7 +510,7 @@ func (g *Generator) isBeginnerUser() bool {
 }
 
 // progressSets determines the new sets based on the previous performance.
-func (g *Generator) progressSets(lastExerciseSet ExerciseSet) []Set {
+func (g *generator) progressSets(lastExerciseSet exerciseSetAggregate) []Set {
 	if g.isBeginnerUser() {
 		return g.progressSetsLinear(lastExerciseSet)
 	}
@@ -510,7 +518,7 @@ func (g *Generator) progressSets(lastExerciseSet ExerciseSet) []Set {
 }
 
 // progressSetsLinear implements linear progression for beginners.
-func (g *Generator) progressSetsLinear(lastExerciseSet ExerciseSet) []Set {
+func (g *generator) progressSetsLinear(lastExerciseSet exerciseSetAggregate) []Set {
 	// Check exercise completion status
 	completionStatus := g.evaluateSetCompletion(lastExerciseSet.Sets)
 
@@ -531,7 +539,7 @@ func (g *Generator) progressSetsLinear(lastExerciseSet ExerciseSet) []Set {
 }
 
 // evaluateSetCompletion determines the completion status of a set of exercises.
-func (g *Generator) evaluateSetCompletion(sets []Set) string {
+func (g *generator) evaluateSetCompletion(sets []Set) string {
 	allCompleted := true
 	anyFailed := false
 
@@ -557,7 +565,7 @@ func (g *Generator) evaluateSetCompletion(sets []Set) string {
 }
 
 // progressSetsUndulating implements undulating periodization for experienced users.
-func (g *Generator) progressSetsUndulating(lastExerciseSet ExerciseSet) []Set {
+func (g *generator) progressSetsUndulating(lastExerciseSet exerciseSetAggregate) []Set {
 	// Determine current workout type
 	currentType := determineWorkoutType(lastExerciseSet.Sets)
 
@@ -602,20 +610,20 @@ func getNextWorkoutType(currentType Type) Type {
 }
 
 // countConsecutiveMaxCompletions counts how many consecutive workouts had all sets completed at max reps.
-func (g *Generator) countConsecutiveMaxCompletions(lastExerciseSet ExerciseSet) int {
+func (g *generator) countConsecutiveMaxCompletions(lastExerciseSet exerciseSetAggregate) int {
 	// Initial check - if current workout isn't at max, return 0
 	if !allSetsCompletedAtMax(lastExerciseSet.Sets) {
 		return 0
 	}
 
 	count := 1 // Current workout counts as one
-	exerciseID := lastExerciseSet.Exercise.ID
+	exerciseID := lastExerciseSet.ExerciseID
 
 	// Look at previous workouts for this exercise
 	for i := len(g.history) - 1; i >= 0; i-- {
 		session := g.history[i]
 		for _, es := range session.ExerciseSets {
-			if es.Exercise.ID == exerciseID {
+			if es.ExerciseID == exerciseID {
 				if allSetsCompletedAtMax(es.Sets) {
 					count++
 					if count >= MaxConsecutiveCompletions {
@@ -699,7 +707,7 @@ func createSetsForWorkoutType(workoutType Type, baseWeight float64) []Set {
 }
 
 // integrateUserFeedback adjusts workout intensity based on user feedback.
-func (g *Generator) integrateUserFeedback(sets []Set, feedback *int) []Set {
+func (g *generator) integrateUserFeedback(sets []Set, feedback *int) []Set {
 	if feedback == nil {
 		return sets // No feedback, no adjustment
 	}
@@ -729,8 +737,8 @@ func (g *Generator) integrateUserFeedback(sets []Set, feedback *int) []Set {
 }
 
 // getMostRecentFeedback gets the most recent feedback for a session containing the specified exercise.
-func (g *Generator) getMostRecentFeedback(exerciseID int) *int {
-	var mostRecentSession *Session
+func (g *generator) getMostRecentFeedback(exerciseID int) *int {
+	var mostRecentSession *sessionAggregate
 	var mostRecentDate time.Time
 
 	for i, session := range g.history {
@@ -742,7 +750,7 @@ func (g *Generator) getMostRecentFeedback(exerciseID int) *int {
 		// Check if this session contains the exercise
 		containsExercise := false
 		for _, es := range session.ExerciseSets {
-			if es.Exercise.ID == exerciseID {
+			if es.ExerciseID == exerciseID {
 				containsExercise = true
 				break
 			}

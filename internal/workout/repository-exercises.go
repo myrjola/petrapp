@@ -5,18 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"log/slog"
 )
 
-// sqliteExerciseRepository implements ExerciseRepository.
+// sqliteExerciseRepository implements exerciseRepository.
 type sqliteExerciseRepository struct {
 	baseRepository
 }
 
 // newSQLiteExerciseRepository creates a new SQLite exercise repository.
-func newSQLiteExerciseRepository(db *sqlite.Database, logger *slog.Logger) *sqliteExerciseRepository {
+func newSQLiteExerciseRepository(db *sqlite.Database) *sqliteExerciseRepository {
 	return &sqliteExerciseRepository{
-		baseRepository: newBaseRepository(db, logger),
+		baseRepository: newBaseRepository(db),
 	}
 }
 
