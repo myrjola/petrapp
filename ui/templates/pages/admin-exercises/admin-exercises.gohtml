@@ -1,0 +1,93 @@
+{{- /* gotype: github.com/myrjola/petrapp/cmd/web.exerciseAdminTemplateData */ -}}
+{{ define "page" }}
+    <main>
+        <h1>Exercise Administration</h1>
+        Copy
+        <section>
+            <h2>Exercises</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Primary Muscles</th>
+                    <th>Secondary Muscles</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{ range .Exercises }}
+                    <tr>
+                        <td>{{ .ID }}</td>
+                        <td>{{ .Name }}</td>
+                        <td>{{ .Category }}</td>
+                        <td>
+                            {{ range $index, $element := .PrimaryMuscleGroups}}
+                                {{if $index}},{{end}}
+                                {{$element}}
+                            {{end}}
+                        </td>
+                        <td>
+                            {{ range $index, $element := .SecondaryMuscleGroups}}
+                                {{if $index}},{{end}}
+                                {{$element}}
+                            {{end}}
+                        </td>
+                        <td>
+                            <a href="/admin/exercises/{{ .ID }}">Edit</a>
+                        </td>
+                    </tr>
+                {{ end }}
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>Add New Exercise</h2>
+            <form method="post" action="/admin/exercises/create">
+                {{ csrf }}
+                <div>
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+
+                <div>
+                    <label for="category">Category:</label>
+                    <select id="category" name="category" required>
+                        <option value="full_body">Full Body</option>
+                        <option value="upper">Upper Body</option>
+                        <option value="lower">Lower Body</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="primary_muscles">Primary Muscle Groups:</label>
+                    <select id="primary_muscles" name="primary_muscles" multiple required>
+                        {{ range .MuscleGroups }}
+                            <option value="{{ . }}">{{ . }}</option>
+                        {{ end }}
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div>
+                    <label for="secondary_muscles">Secondary Muscle Groups:</label>
+                    <select id="secondary_muscles" name="secondary_muscles" multiple>
+                        {{ range .MuscleGroups }}
+                            <option value="{{ . }}">{{ . }}</option>
+                        {{ end }}
+                    </select>
+                    <small>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+
+                <div>
+                    <label for="description">Description (Markdown):</label>
+                    <textarea id="description" name="description" rows="10"></textarea>
+                </div>
+
+                <button type="submit">Add Exercise</button>
+            </form>
+        </section>
+    </main>
+{{ end }}

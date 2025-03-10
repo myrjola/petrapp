@@ -258,3 +258,40 @@ func (s *Service) List(ctx context.Context) ([]Exercise, error) {
 	}
 	return exercises, nil
 }
+
+// GetExercise retrieves a specific exercise by ID.
+func (s *Service) GetExercise(ctx context.Context, id int) (Exercise, error) {
+	exercise, err := s.repo.exercises.Get(ctx, id)
+	if err != nil {
+		return Exercise{}, fmt.Errorf("get exercise: %w", err)
+	}
+	return exercise, nil
+}
+
+// CreateExercise adds a new exercise to the system.
+func (s *Service) CreateExercise(ctx context.Context, ex Exercise) error {
+	if err := s.repo.exercises.Create(ctx, ex); err != nil {
+		return fmt.Errorf("create exercise: %w", err)
+	}
+	return nil
+}
+
+// UpdateExercise updates an existing exercise.
+func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
+	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {
+		*oldEx = ex
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("update exercise: %w", err)
+	}
+	return nil
+}
+
+// ListMuscleGroups retrieves all available muscle groups.
+func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
+	groups, err := s.repo.exercises.ListMuscleGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list muscle groups: %w", err)
+	}
+	return groups, nil
+}

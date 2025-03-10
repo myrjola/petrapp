@@ -13,8 +13,8 @@ type sqlitePreferencesRepository struct {
 	baseRepository
 }
 
-// newSQLitePreferencesRepository creates a new SQLite preferences repository.
-func newSQLitePreferencesRepository(db *sqlite.Database) *sqlitePreferencesRepository {
+// newSQLitePreferenceRepository creates a new SQLite preferences repository.
+func newSQLitePreferenceRepository(db *sqlite.Database) *sqlitePreferencesRepository {
 	return &sqlitePreferencesRepository{
 		baseRepository: newBaseRepository(db),
 	}

@@ -57,6 +57,8 @@ type exerciseRepository interface {
 	//
 	// The updateFn is called with the existing exercise and if it returns true, the modified ex is persisted.
 	Update(ctx context.Context, exerciseID int, updateFn func(ex *Exercise) (bool, error)) error
+	// ListMuscleGroups retrieves all available muscle groups.
+	ListMuscleGroups(ctx context.Context) ([]string, error)
 }
 
 // baseRepository contains common functionality for all repositories.
@@ -118,7 +120,7 @@ func newRepositoryFactory(db *sqlite.Database, logger *slog.Logger) *repositoryF
 func (f *repositoryFactory) newRepository() *repository {
 	// Create individual repositories
 	exerciseRepo := newSQLiteExerciseRepository(f.db)
-	preferencesRepo := newSQLitePreferencesRepository(f.db)
+	preferencesRepo := newSQLitePreferenceRepository(f.db)
 	sessionRepo := newSQLiteSessionRepository(f.db)
 
 	// Return a composite repository

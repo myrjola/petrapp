@@ -20,6 +20,10 @@ func (app *application) routes() http.Handler {
 		return session(app.mustAuthenticate(next))
 	}
 
+	mustAdmin := func(next http.Handler) http.Handler {
+		return mustSession(app.mustAdmin(next))
+	}
+
 	// File server
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
 	mux.Handle("/", common(cacheForeverHeaders(fileServer)))
@@ -44,6 +48,11 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /api/login/finish", session(http.HandlerFunc(app.finishLogin)))
 	mux.Handle("POST /api/logout", session(http.HandlerFunc(app.logout)))
 	mux.Handle("GET /api/healthy", session(http.HandlerFunc(app.healthy)))
+
+	mux.Handle("GET /admin/exercises", mustAdmin(http.HandlerFunc(app.adminExercisesGET)))
+	mux.Handle("GET /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseEditGET)))
+	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
+	mux.Handle("POST /admin/exercises/create", mustAdmin(http.HandlerFunc(app.adminExerciseCreatePOST)))
 
 	return mux
 }

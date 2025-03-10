@@ -272,3 +272,36 @@ func (r *sqliteExerciseRepository) insertMuscleGroups(
 	}
 	return nil
 }
+
+// ListMuscleGroups retrieves all available muscle groups.
+func (r *sqliteExerciseRepository) ListMuscleGroups(ctx context.Context) ([]string, error) {
+	var muscleGroups []string
+	var err error
+
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+		SELECT name
+		FROM muscle_groups
+		ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("query muscle groups: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
+
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scan muscle group: %w", err)
+		}
+		muscleGroups = append(muscleGroups, name)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return muscleGroups, nil
+}

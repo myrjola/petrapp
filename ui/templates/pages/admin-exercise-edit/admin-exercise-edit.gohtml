@@ -1,0 +1,51 @@
+{{- /* gotype: github.com/myrjola/petrapp/cmd/web.exerciseEditTemplateData */ -}}
+{{ define "page" }}
+    <main>
+        <h1>Edit Exercise: {{ .Exercise.Name }}</h1>
+        Copy    <form method="post" action="/admin/exercises/{{ .Exercise.ID }}">
+            {{ csrf }}
+            <div>
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" value="{{ .Exercise.Name }}" required>
+            </div>
+
+            <div>
+                <label for="category">Category:</label>
+                <select id="category" name="category" required>
+                    <option value="full_body" {{ if eq .Exercise.Category "full_body" }}selected{{ end }}>Full Body</option>
+                    <option value="upper" {{ if eq .Exercise.Category "upper" }}selected{{ end }}>Upper Body</option>
+                    <option value="lower" {{ if eq .Exercise.Category "lower" }}selected{{ end }}>Lower Body</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="primary_muscles">Primary Muscle Groups:</label>
+                <select id="primary_muscles" name="primary_muscles" multiple required>
+                    {{ range .MuscleGroups }}
+                        <option value="{{ . }}">{{ . }}</option>
+                    {{ end }}
+                </select>
+                <small>Hold Ctrl/Cmd to select multiple</small>
+            </div>
+
+            <div>
+                <label for="secondary_muscles">Secondary Muscle Groups:</label>
+                <select id="secondary_muscles" name="secondary_muscles" multiple>
+                    {{ range .MuscleGroups }}
+                        <option value="{{ . }}">{{ . }}</option>
+                    {{ end }}
+                </select>
+                <small>Hold Ctrl/Cmd to select multiple</small>
+            </div>
+
+            <div>
+                <label for="description">Description (Markdown):</label>
+                <textarea id="description" name="description" rows="10">{{ .Exercise.DescriptionMarkdown }}</textarea>
+            </div>
+
+            <button type="submit">Update Exercise</button>
+        </form>
+
+        <a href="/admin/exercises">Back to Exercise List</a>
+    </main>
+{{ end }}
