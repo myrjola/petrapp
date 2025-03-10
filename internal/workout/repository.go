@@ -52,12 +52,16 @@ type sessionRepository interface {
 type exerciseRepository interface {
 	Get(ctx context.Context, id int) (Exercise, error)
 	List(ctx context.Context) ([]Exercise, error)
+	Create(ctx context.Context, ex Exercise) error
+	// Update updates an existing exercise.
+	//
+	// The updateFn is called with the existing exercise and if it returns true, the modified ex is persisted.
+	Update(ctx context.Context, exerciseID int, updateFn func(ex *Exercise) (bool, error)) error
 }
 
 // baseRepository contains common functionality for all repositories.
 type baseRepository struct {
-	db     *sqlite.Database
-	logger *slog.Logger
+	db *sqlite.Database
 }
 
 // newBaseRepository creates a new base repository.
