@@ -364,7 +364,8 @@ func (c *Client) extractCSRFToken(doc *goquery.Document, formActionURLPath strin
 }
 
 // SubmitForm submits a form in the doc identified with action formActionUrlPath and returns the response document.
-// formFields is a map of label text to value. The function will find the input by label and set its value.
+// formFields is a map of label text to value. The function will find the form element by label and set its value.
+// For select elements with the multiple attribute, use comma-separated values (e.g., "option1,option2,option3").
 func (c *Client) SubmitForm(
 	ctx context.Context,
 	doc *goquery.Document,
@@ -386,20 +387,49 @@ func (c *Client) SubmitForm(
 		return nil, fmt.Errorf("find form: %w", err)
 	}
 
-	// Find form inputs based on their labels
+	// Find form elements based on their labels
 	for labelText, value := range formFields {
-		var input *goquery.Selection
-		if input, err = FindInputForLabel(form, labelText); err != nil {
-			return nil, fmt.Errorf("find input for label: %w", err)
+		// First try to find an input element
+		input, inputErr := FindInputForLabel(form, labelText)
+		if inputErr == nil {
+			// Found an input element
+			name, exists := input.Attr("name")
+			if !exists {
+				return nil, fmt.Errorf("input has no name attribute (label: %s, form_action: %s)",
+					labelText, formActionURLPath)
+			}
+			formData.Add(name, value)
+			continue
 		}
 
-		name, exists := input.Attr("name")
+		// If no input was found, try to find a select element
+		selectElement, selectErr := FindSelectForLabel(form, labelText)
+		if selectErr != nil {
+			// Neither input nor select found for this label
+			return nil, fmt.Errorf("form element not found for label: %s", labelText)
+		}
+
+		// Get the name of the select element
+		name, exists := selectElement.Attr("name")
 		if !exists {
-			return nil, fmt.Errorf("input has no name attribute (label: %s, form_action: %s)",
+			return nil, fmt.Errorf("select has no name attribute (label: %s, form_action: %s)",
 				labelText, formActionURLPath)
 		}
 
-		formData.Add(name, value)
+		// Check if select has multiple attribute
+		if IsMultipleSelect(selectElement) {
+			// For multiple select, handle comma-separated values
+			options := strings.Split(value, ",")
+			for _, option := range options {
+				trimmedOption := strings.TrimSpace(option)
+				if trimmedOption != "" {
+					formData.Add(name, trimmedOption)
+				}
+			}
+		} else {
+			// For single select, just add the value
+			formData.Add(name, value)
+		}
 	}
 
 	// Submit the form
