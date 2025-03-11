@@ -51,6 +51,9 @@ Petrapp is a minimalist, privacy-focused mobile web application that automatical
 ### Backend
 
 - Go with standard library focus and minimal dependencies
+  - Notable golangci-lint rules :
+    - govet shadow: declaration of "err" shadows declaration at line 392
+    - godot: check if comments end in a period.
 - SQLite database for simple, self-contained data storage
     - Since the data is local, n+1 query problem is not a concern. Keep the SQL queries simple.
 
