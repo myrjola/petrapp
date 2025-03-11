@@ -6,6 +6,7 @@ import (
 	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 )
 
@@ -16,11 +17,18 @@ type exerciseAdminTemplateData struct {
 	MuscleGroups []string
 }
 
+// MuscleGroupOption represents a muscle group with a selection state.
+type MuscleGroupOption struct {
+	Name     string
+	Selected bool
+}
+
 // exerciseEditTemplateData contains data for the exercise edit template.
 type exerciseEditTemplateData struct {
 	BaseTemplateData
-	Exercise     workout.Exercise
-	MuscleGroups []string
+	Exercise               workout.Exercise
+	PrimaryMuscleOptions   []MuscleGroupOption
+	SecondaryMuscleOptions []MuscleGroupOption
 }
 
 // adminExercisesGET handles GET requests to the exercise admin page.
@@ -72,10 +80,29 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Create primary muscle options
+	primaryMuscleOptions := make([]MuscleGroupOption, len(muscleGroups))
+	for i, group := range muscleGroups {
+		primaryMuscleOptions[i] = MuscleGroupOption{
+			Name:     group,
+			Selected: slices.Contains(exercise.PrimaryMuscleGroups, group),
+		}
+	}
+
+	// Create secondary muscle options
+	secondaryMuscleOptions := make([]MuscleGroupOption, len(muscleGroups))
+	for i, group := range muscleGroups {
+		secondaryMuscleOptions[i] = MuscleGroupOption{
+			Name:     group,
+			Selected: slices.Contains(exercise.SecondaryMuscleGroups, group),
+		}
+	}
+
 	data := exerciseEditTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Exercise:         exercise,
-		MuscleGroups:     muscleGroups,
+		BaseTemplateData:       newBaseTemplateData(r),
+		Exercise:               exercise,
+		PrimaryMuscleOptions:   primaryMuscleOptions,
+		SecondaryMuscleOptions: secondaryMuscleOptions,
 	}
 
 	app.render(w, r, http.StatusOK, "admin-exercise-edit", data)

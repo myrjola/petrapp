@@ -2,7 +2,7 @@
 {{ define "page" }}
     <main>
         <h1>Edit Exercise: {{ .Exercise.Name }}</h1>
-        Copy    <form method="post" action="/admin/exercises/{{ .Exercise.ID }}">
+        <form method="post" action="/admin/exercises/{{ .Exercise.ID }}">
             {{ csrf }}
             <div>
                 <label for="name">Name:</label>
@@ -21,8 +21,8 @@
             <div>
                 <label for="primary_muscles">Primary Muscle Groups:</label>
                 <select id="primary_muscles" name="primary_muscles" multiple required>
-                    {{ range .MuscleGroups }}
-                        <option value="{{ . }}">{{ . }}</option>
+                    {{ range .PrimaryMuscleOptions }}
+                        <option value="{{ .Name }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
                     {{ end }}
                 </select>
                 <small>Hold Ctrl/Cmd to select multiple</small>
@@ -31,8 +31,8 @@
             <div>
                 <label for="secondary_muscles">Secondary Muscle Groups:</label>
                 <select id="secondary_muscles" name="secondary_muscles" multiple>
-                    {{ range .MuscleGroups }}
-                        <option value="{{ . }}">{{ . }}</option>
+                    {{ range .SecondaryMuscleOptions }}
+                        <option value="{{ .Name }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
                     {{ end }}
                 </select>
                 <small>Hold Ctrl/Cmd to select multiple</small>
