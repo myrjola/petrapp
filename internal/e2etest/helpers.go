@@ -17,7 +17,7 @@ func FindInputForLabel(form *goquery.Selection, labelText string) (*goquery.Sele
 	var input *goquery.Selection
 	if id, exists := label.Attr("for"); exists {
 		// If label has 'for' attribute, find input by ID
-		input = form.Find(fmt.Sprintf("#%s", id))
+		input = form.Find(fmt.Sprintf("input#%s,textarea#%s", id, id))
 	} else {
 		// Otherwise, find input within label
 		input = label.Find("input")

@@ -95,13 +95,13 @@ func (app *application) mustAuthenticate(next http.Handler) http.Handler {
 	})
 }
 
-// mustAdmin redirects the user to the home page if they are not authenticated and an admin.
+// mustAdmin asserts that the user is admin.
 func (app *application) mustAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isAuthenticated := contexthelpers.IsAuthenticated(r.Context())
 		isAdmin := contexthelpers.IsAdmin(r.Context())
 		if !isAuthenticated || !isAdmin {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)

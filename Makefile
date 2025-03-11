@@ -34,7 +34,7 @@ build:
 
 test:
 	@echo "Running tests..."
-	go test --race ./...
+	go test --race --shuffle=on ./...
 
 lint:
 	@echo "Running linter..."

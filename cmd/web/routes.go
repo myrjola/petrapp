@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func (app *application) routes() http.Handler {
+func (app *application) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Define middleware chain functions
