@@ -1,6 +1,7 @@
 name: Create Review App
 permissions:
   contents: read
+  deployments: write
 on:
   pull_request:
     types: [ opened, reopened, synchronize, closed ]
