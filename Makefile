@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL := ci
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
-        cross-compile migratetest repomix repomix-clipboard setup-git-hooks
+        migratetest repomix repomix-clipboard setup-git-hooks
 
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v1.64.6
@@ -44,13 +44,6 @@ dev:
 	@echo "Running dev server with debug build..."
 	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
 	./bin/petrapp
-
-cross-compile:
-	@echo "Cross-compiling..."
-	docker build --tag petrapp-bin --file cross-compile.Dockerfile .
-	docker create --name petrapp-bin-extract petrapp-bin
-	docker cp petrapp-bin-extract:/dist/petrapp.linux_amd64 ./bin/petrapp.linux_amd64
-	docker rm petrapp-bin-extract
 
 build-docker:
 	@echo "Building Docker image..."

@@ -1,11 +1,32 @@
 # -------------------------------------------------------
-#  Build stage for preparing files
+#  Build stage for Go binary compilation
 # -------------------------------------------------------
-FROM --platform=linux/amd64 alpine:3.21.0 AS build
+FROM --platform=linux/amd64 golang:1.24.1-alpine AS go-builder
+
+# Install build dependencies if needed for any packages with C dependencies
+# For a simpler build without static linking, we may not need these
+RUN apk add --no-cache build-base
+
+WORKDIR /app
+
+# Copy Go module files first for better layer caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Build the Go binary
+RUN go build -o ./bin/petrapp ./cmd/web
+
+# -------------------------------------------------------
+#  Build stage for preparing UI files
+# -------------------------------------------------------
+FROM --platform=linux/amd64 alpine:3.21.0 AS ui-builder
 
 WORKDIR /workspace/
 
-# Hash CSS for cache busting and copy UI files to dist.
+# Hash CSS for cache busting and copy UI files to dist
 COPY /ui ./ui
 RUN filehash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
     sed -i "s/\/main.css/\/main.${filehash}.css/g" ui/templates/base.gohtml && \
@@ -38,11 +59,14 @@ RUN adduser \
   petrapp
 
 # Copy UI files
-COPY --from=build /workspace/ui /dist/ui
+COPY --from=ui-builder /workspace/ui /dist/ui
 
 # Configure Litestream for backups to object storage
 COPY /litestream.yml /etc/litestream.yml
 COPY --from=litestream /usr/local/bin/litestream /dist/litestream
+
+# Copy the compiled Go binary
+COPY --from=go-builder /app/bin/petrapp /dist/petrapp
 
 # Set environment variables
 ENV TZ=Europe/Helsinki
@@ -53,9 +77,6 @@ ENV PETRAPP_TEMPLATE_PATH="/dist/ui/templates"
 EXPOSE 4000 6060 9090
 
 WORKDIR /dist
-
-# Copy the binary
-COPY /bin/petrapp.linux_amd64 petrapp
 
 # Switch to non-root user
 USER petrapp:petrapp
