@@ -1,6 +1,7 @@
 name: Create Review App
 permissions:
   contents: read
+  deployments: write
 on:
   pull_request:
     types: [ opened, reopened, synchronize, closed ]
@@ -22,8 +23,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    # Dependabot can't create GitHub environments needed for deployment.
-    if: ${{ github.actor != 'dependabot[bot]' }}
+    if: always() # Needed to run on PR close to clean up the review app.
     needs: [ build_and_push ]
     outputs:
       hostname: ${{ steps.deploy.outputs.hostname }}

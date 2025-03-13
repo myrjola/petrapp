@@ -21,4 +21,4 @@ jobs:
           go-version-file: go.mod
 
       - name: Run Smoke Test
-        run: go run ./cmd/smoketest ${{ inputs.hostname }}
+        run: sleep 5 && go run ./cmd/smoketest ${{ inputs.hostname }}
