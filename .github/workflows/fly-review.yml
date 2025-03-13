@@ -22,7 +22,8 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    if: always() # This is needed so that we don't skip cleanup.
+    # Dependabot can't create GitHub environments needed for deployment.
+    if: ${{ github.actor != 'dependabot[bot]' }}
     needs: [ build_and_push ]
     outputs:
       hostname: ${{ steps.deploy.outputs.hostname }}
