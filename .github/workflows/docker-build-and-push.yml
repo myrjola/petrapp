@@ -1,6 +1,7 @@
 name: Docker Build and Push
 permissions:
   contents: read
+  deployments: write
 on:
   workflow_call:
     inputs:
