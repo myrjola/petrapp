@@ -13,8 +13,6 @@ func testLookupEnv(key string) (string, bool) {
 		return ":memory:", true
 	case "PETRAPP_ADDR":
 		return "localhost:0", true
-	case "PETRAPP_TEST_MODE":
-		return "I know what I'm doing", true
 	default:
 		return "", false
 	}

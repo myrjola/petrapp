@@ -2,6 +2,7 @@ package e2etest
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/myrjola/petrapp/internal/logging"
 	"io"
@@ -11,10 +12,14 @@ import (
 type Server struct {
 	url    string
 	client *Client
+	db     *sql.DB
 }
 
 // LogAddrKey is the key used to log the address the server is listening on.
 const LogAddrKey = "addr"
+
+// LogDsnKey is the data source name key used to log the SQL DSN.
+const LogDsnKey = "sqlDsn"
 
 // StartServer starts the test server, waits for it to be ready, and return the server URL for testing.
 //
@@ -31,12 +36,17 @@ func StartServer(
 
 	// We need to grab the dynamically allocated port from the log output.
 	addrCh := make(chan string, 1)
+	// We need the sqlite DSN for the client to do database manipulation in tests.
+	dsnCh := make(chan string, 1)
 	logger := slog.New(logging.NewContextHandler(slog.NewTextHandler(logSink, &slog.HandlerOptions{
 		AddSource: false,
 		Level:     slog.LevelDebug,
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			if a.Key == LogAddrKey {
 				addrCh <- a.Value.String()
+			}
+			if a.Key == LogDsnKey {
+				dsnCh <- a.Value.String()
 			}
 			return a
 		},
@@ -48,26 +58,38 @@ func StartServer(
 			cancel(err)
 		}
 	}()
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled: %w", context.Cause(ctx))
-	case addr := <-addrCh:
-		var (
-			err    error
-			client *Client
-		)
-		serverURL := fmt.Sprintf("http://%s", addr)
-		if client, err = NewClient(serverURL, "localhost", "http://localhost:0"); err != nil {
-			return nil, fmt.Errorf("new client: %w", err)
+	addr := ""
+	dsn := ""
+	for dsn == "" || addr == "" {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context cancelled: %w", context.Cause(ctx))
+		case addr = <-addrCh:
+		case dsn = <-dsnCh:
 		}
-		if err = client.WaitForReady(ctx, "/api/healthy"); err != nil {
-			return nil, fmt.Errorf("wait for ready: %w", err)
-		}
-		return &Server{
-			url:    serverURL,
-			client: client,
-		}, nil
 	}
+
+	var (
+		err    error
+		client *Client
+	)
+	serverURL := fmt.Sprintf("http://%s", addr)
+	if client, err = NewClient(serverURL, "localhost", "http://localhost:0"); err != nil {
+		return nil, fmt.Errorf("new client: %w", err)
+	}
+	if err = client.WaitForReady(ctx, "/api/healthy"); err != nil {
+		return nil, fmt.Errorf("wait for ready: %w", err)
+	}
+	var db *sql.DB
+	db, err = sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	return &Server{
+		url:    serverURL,
+		client: client,
+		db:     db,
+	}, nil
 }
 
 func (s *Server) Client() *Client {
@@ -76,4 +98,8 @@ func (s *Server) Client() *Client {
 
 func (s *Server) URL() string {
 	return s.url
+}
+
+func (s *Server) DB() *sql.DB {
+	return s.db
 }

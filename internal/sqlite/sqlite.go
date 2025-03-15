@@ -107,6 +107,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	if readWriteDB, err = sql.Open("sqlite3", readWriteConfig); err != nil {
 		return nil, fmt.Errorf("open read-write database: %w", err)
 	}
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "opened database", slog.String("sqlDsn", readWriteConfig))
 
 	readWriteDB.SetMaxOpenConns(1)
 	readWriteDB.SetMaxIdleConns(1)

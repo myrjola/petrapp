@@ -15,14 +15,14 @@ import (
 )
 
 // configureAndStartServer configures and starts the HTTP server.
-func (app *application) configureAndStartServer(ctx context.Context, addr string, routes http.Handler) error {
+func (app *application) configureAndStartServer(ctx context.Context, addr string, handler http.Handler) error {
 	var err error
 	shutdownComplete := make(chan struct{})
 	idleTimeout := time.Minute
 	defaultTimeout := 5 * time.Second //nolint:mnd // 5 seconds should be enough for slow LLM responses.
 	srv := &http.Server{
 		ErrorLog:          slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
-		Handler:           routes,
+		Handler:           handler,
 		IdleTimeout:       idleTimeout,
 		ReadTimeout:       defaultTimeout,
 		WriteTimeout:      defaultTimeout,

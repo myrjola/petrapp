@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/envstruct"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
@@ -41,8 +40,6 @@ type config struct {
 	PProfAddr string `env:"PETRAPP_PPROF_ADDR" envDefault:""`
 	// TemplatePath is the path to the directory containing the HTML templates.
 	TemplatePath string `env:"PETRAPP_TEMPLATE_PATH" envDefault:""`
-	// TestMode enables test mode to facilitate testing.
-	TestMode string `env:"PETRAPP_TEST_MODE" envDefault:""`
 }
 
 func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (string, bool)) error {
@@ -94,18 +91,6 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 
 	routes := app.routes()
-	// Quick and dirty privilege escalation for testing.
-	if cfg.TestMode == "I know what I'm doing" {
-		routes.Handle("GET /api/testing/promote-to-admin", app.sessionManager.LoadAndSave(
-			app.webAuthnHandler.AuthenticateMiddleware(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					userID := contexthelpers.AuthenticatedUserID(r.Context())
-					_ = app.sessionManager.RenewToken(r.Context())
-					_, _ = db.ReadWrite.ExecContext(r.Context(),
-						"UPDATE users SET is_admin = 1 WHERE id = ?", userID)
-					_, _ = fmt.Fprintf(w, "ok")
-				}))))
-	}
 
 	if err = app.configureAndStartServer(ctx, cfg.Addr, routes); err != nil {
 		return fmt.Errorf("start server: %w", err)
