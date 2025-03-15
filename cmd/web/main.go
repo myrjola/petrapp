@@ -120,7 +120,7 @@ func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 	sessionManager.Cookie.Persist = true
 	sessionManager.Cookie.Secure = true
 	sessionManager.Cookie.HttpOnly = true
-	sessionManager.Cookie.SameSite = http.SameSiteStrictMode
+	sessionManager.Cookie.SameSite = http.SameSiteLaxMode
 	return sessionManager
 }
 
