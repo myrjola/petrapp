@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"time"
 )
 
 // exerciseAdminTemplateData contains data for the exercise admin template.
@@ -173,8 +174,16 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 
 // adminExerciseGeneratePOST handles POST requests to generate a new exercise.
 func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http.Request) {
+	rc := http.NewResponseController(w)
+
+	err := rc.SetWriteDeadline(time.Now().Add(30 * time.Second)) //nolint:mnd // we are calling an external service.
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
 	// Parse form.
-	if err := r.ParseForm(); err != nil {
+	if err = r.ParseForm(); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

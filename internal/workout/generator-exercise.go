@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -32,27 +33,47 @@ func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (Exercis
 		return Exercise{}, errors.New("exercise name cannot be empty")
 	}
 
-	prompt := fmt.Sprintf(`Generate a detailed exercise description for "%s". 
-Include the appropriate category (full_body, upper, or lower), 
-and the primary and secondary muscle groups it targets, and
-a markdown description following this exact structure:
+	prompt := fmt.Sprintf(`Generate a detailed exercise for "%s".
+
+The response must strictly follow this JSON structure:
+{
+  "id": -1,
+  "name": "%s",
+  "category": "CATEGORY",
+  "description_markdown": "MARKDOWN_DESCRIPTION",
+  "primary_muscle_groups": ["PRIMARY_MUSCLE_GROUP1", "PRIMARY_MUSCLE_GROUP2"]
+  "secondary_muscle_groups": ["SECONDARY_MUSCLE_GROUP1", "SECONDARY_MUSCLE_GROUP2"]
+}
+
+For "category", use one of: "full_body", "upper", "lower"
+
+For "muscle_groups", use only from this list: %s
+
+The "description_markdown" must follow this exact structure:
 
 ## Instructions
-[Provide 3-5 numbered steps explaining how to perform the exercise correctly]
+1. [Step 1 with clear form guidance]
+2. [Step 2 with positioning details]
+3. [Step 3 with movement description]
+4. [Optional step 4 with breathing/tempo guidance]
+5. [Optional step 5 with repetition guidance]
 
 ## Common Mistakes
-[List 3-4 common form errors as bullet points]
+- [Mistake 1: explanation of error and correction]
+- [Mistake 2: explanation of error and correction]
+- [Mistake 3: explanation of error and correction]
+- [Optional Mistake 4: explanation of error and correction]
 
 ## Resources
-[Include 2-3 placeholder links for videos and guides]
+- [Video tutorial](https://example.com/exercise-video)
+- [Form guide](https://example.com/exercise-form)
+- [Optional additional resource](https://example.com/exercise-variations)
 
-Important guidelines:
-- Instructions should be clear, concise, and focus on proper form
-- Use simple, direct language that beginners can understand
-- Highlight safety considerations where relevant
-- For the Resources section, use placeholder URLs (https://example.com/resource-name)
+Instructions must be clear, concise, and focus on proper form using simple language for beginners.
+Include relevant safety considerations. The entire description should be 150-200 words.
 
-The description should be comprehensive yet concise, totaling around 150-200 words.`, name)
+Return only the valid JSON object with no additional text or explanation.`,
+		name, name, strings.Join(eg.muscleGroups, ", "))
 
 	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
 		Name:        openai.F("exercise"),

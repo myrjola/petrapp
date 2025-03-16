@@ -19,7 +19,7 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 	var err error
 	shutdownComplete := make(chan struct{})
 	idleTimeout := time.Minute
-	defaultTimeout := 5 * time.Second //nolint:mnd // 5 seconds should be enough for slow LLM responses.
+	defaultTimeout := 2 * time.Second //nolint:mnd // we are aiming for much faster response times.
 	srv := &http.Server{
 		ErrorLog:          slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
 		Handler:           handler,
