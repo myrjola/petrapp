@@ -11,16 +11,18 @@ import (
 
 // Service handles the business logic for workout management.
 type Service struct {
-	repo   *repository
-	logger *slog.Logger
+	repo         *repository
+	logger       *slog.Logger
+	openaiAPIKey string
 }
 
 // NewService creates a new workout service.
-func NewService(db *sqlite.Database, logger *slog.Logger) *Service {
+func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
 	factory := newRepositoryFactory(db, logger)
 	return &Service{
-		repo:   factory.newRepository(),
-		logger: logger,
+		repo:         factory.newRepository(),
+		logger:       logger,
+		openaiAPIKey: openaiAPIKey,
 	}
 }
 
@@ -268,14 +270,6 @@ func (s *Service) GetExercise(ctx context.Context, id int) (Exercise, error) {
 	return exercise, nil
 }
 
-// CreateExercise adds a new exercise to the system.
-func (s *Service) CreateExercise(ctx context.Context, ex Exercise) error {
-	if err := s.repo.exercises.Create(ctx, ex); err != nil {
-		return fmt.Errorf("create exercise: %w", err)
-	}
-	return nil
-}
-
 // UpdateExercise updates an existing exercise.
 func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
 	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {
@@ -294,4 +288,45 @@ func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("list muscle groups: %w", err)
 	}
 	return groups, nil
+}
+
+// GenerateExercise generates a new exercise based on a name.
+//
+// In case of errors, it strives to persist a minimal exercise that the user can fill in later. In this case, no error
+// is returned, but the exercise is guaranteed to have Name and ID fields set.
+func (s *Service) GenerateExercise(ctx context.Context, name string) (Exercise, error) {
+	// Start with a minimal exercise in case generation fails
+	exercise := Exercise{
+		Name:                  name,
+		Category:              CategoryFullBody,
+		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
+		PrimaryMuscleGroups:   []string{},
+		SecondaryMuscleGroups: []string{},
+	}
+
+	// Try to generate a better exercise if possible
+	if s.openaiAPIKey != "" {
+		muscleGroups, err := s.repo.exercises.ListMuscleGroups(ctx)
+		if err == nil {
+			generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups)
+			generatedExercise, err := generator.Generate(ctx, name)
+			if err == nil {
+				exercise = generatedExercise
+			} else {
+				s.logger.Warn("Failed to generate exercise details", "error", err, "name", name)
+				// Fall back to minimal exercise (already set)
+			}
+		} else {
+			s.logger.Warn("Failed to get muscle groups", "error", err)
+			// Fall back to minimal exercise (already set)
+		}
+	}
+
+	// Persist the exercise
+	var err error
+	exercise, err = s.repo.exercises.Create(ctx, exercise)
+	if err != nil {
+		return Exercise{}, fmt.Errorf("create exercise: %w", err)
+	}
+	return exercise, nil
 }

@@ -52,7 +52,7 @@ type sessionRepository interface {
 type exerciseRepository interface {
 	Get(ctx context.Context, id int) (Exercise, error)
 	List(ctx context.Context) ([]Exercise, error)
-	Create(ctx context.Context, ex Exercise) error
+	Create(ctx context.Context, ex Exercise) (Exercise, error)
 	// Update updates an existing exercise.
 	//
 	// The updateFn is called with the existing exercise and if it returns true, the modified ex is persisted.

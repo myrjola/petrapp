@@ -40,6 +40,8 @@ type config struct {
 	PProfAddr string `env:"PETRAPP_PPROF_ADDR" envDefault:""`
 	// TemplatePath is the path to the directory containing the HTML templates.
 	TemplatePath string `env:"PETRAPP_TEMPLATE_PATH" envDefault:""`
+	// OpenAIAPIKey is optional. It's used to authenticate with the OpenAI API.
+	OpenAIAPIKey string `env:"OPENAI_API_KEY" envDefault:""`
 }
 
 func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (string, bool)) error {
@@ -87,7 +89,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
-		workoutService:  workout.NewService(db, logger),
+		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
 	}
 
 	routes := app.routes()

@@ -43,49 +43,15 @@
         </section>
 
         <section>
-            <h2>Add New Exercise</h2>
-            <form method="post" action="/admin/exercises/create">
+            <h2>Generate New Exercise</h2>
+            <form method="post" action="/admin/exercises/generate">
                 {{ csrf }}
                 <div>
-                    <label for="name">Name:</label>
-                    <input type="text" id="name" name="name" required>
+                    <label for="name">Exercise Name:</label>
+                    <input type="text" id="name" name="name" required placeholder="e.g., Bench Press, Deadlift, Squat">
                 </div>
 
-                <div>
-                    <label for="category">Category:</label>
-                    <select id="category" name="category" required>
-                        <option value="full_body">Full Body</option>
-                        <option value="upper">Upper Body</option>
-                        <option value="lower">Lower Body</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="primary_muscles">Primary Muscle Groups:</label>
-                    <select id="primary_muscles" name="primary_muscles" multiple required>
-                        {{ range .MuscleGroups }}
-                            <option value="{{ . }}">{{ . }}</option>
-                        {{ end }}
-                    </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
-                </div>
-
-                <div>
-                    <label for="secondary_muscles">Secondary Muscle Groups:</label>
-                    <select id="secondary_muscles" name="secondary_muscles" multiple>
-                        {{ range .MuscleGroups }}
-                            <option value="{{ . }}">{{ . }}</option>
-                        {{ end }}
-                    </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
-                </div>
-
-                <div>
-                    <label for="description">Description (Markdown):</label>
-                    <textarea id="description" name="description" rows="10"></textarea>
-                </div>
-
-                <button type="submit">Add Exercise</button>
+                <button type="submit">Generate Exercise</button>
             </form>
         </section>
     </main>

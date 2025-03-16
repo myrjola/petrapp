@@ -171,56 +171,28 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	http.Redirect(w, r, "/admin/exercises", http.StatusSeeOther)
 }
 
-// adminExerciseCreatePOST handles POST requests to create a new exercise.
-func (app *application) adminExerciseCreatePOST(w http.ResponseWriter, r *http.Request) {
-	// Parse form
+// adminExerciseGeneratePOST handles POST requests to generate a new exercise.
+func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse form.
 	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
-		return
-	}
-
-	// Extract form data
-	name := r.PostForm.Get("name")
-	category := workout.Category(r.PostForm.Get("category"))
-	description := r.PostForm.Get("description")
-	primaryMuscles := r.PostForm["primary_muscles"]
-	secondaryMuscles := r.PostForm["secondary_muscles"]
-
-	// Validate form data
-	if name == "" {
-		app.serverError(w, r, errors.New("name is required"))
-		return
-	}
-
-	if category != workout.CategoryFullBody && category != workout.CategoryUpper && category != workout.CategoryLower {
-		app.serverError(w, r, errors.New("invalid category"))
-		return
-	}
-
-	if len(primaryMuscles) == 0 {
-		app.serverError(w, r, errors.New("primary muscle groups are required"))
-		return
-	}
-
-	// Create exercise object
-	exercise := workout.Exercise{
-		ID:                    0,
-		Name:                  name,
-		Category:              category,
-		DescriptionMarkdown:   description,
-		PrimaryMuscleGroups:   primaryMuscles,
-		SecondaryMuscleGroups: secondaryMuscles,
-	}
-
-	// Create exercise
-	if err := app.workoutService.CreateExercise(r.Context(), exercise); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "created exercise",
-		slog.String("name", name))
+	// Extract exercise name from form.
+	name := r.PostForm.Get("name")
+	if name == "" {
+		app.serverError(w, r, nil)
+		return
+	}
 
-	// Redirect to exercise list
-	http.Redirect(w, r, "/admin/exercises", http.StatusSeeOther)
+	// Generate the exercise.
+	exercise, err := app.workoutService.GenerateExercise(r.Context(), name)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Redirect to the newly created exercise.
+	http.Redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID), http.StatusSeeOther)
 }

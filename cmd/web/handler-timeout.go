@@ -27,7 +27,7 @@ const timeoutBody = `<html lang="en">
 func timeout(h http.Handler) http.Handler {
 	// We want the timeout to be a little shorter than the server's read timeout so that the
 	// timeout handler has a chance to respond before the server closes the connection.
-	defaultTimeout := time.Second
+	defaultTimeout := time.Second * 15
 	httpHandlerTimeout := defaultTimeout - 200*time.Millisecond //nolint:mnd // 200ms
 	return http.TimeoutHandler(h, httpHandlerTimeout, timeoutBody)
 }

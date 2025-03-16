@@ -52,7 +52,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("GET /admin/exercises", mustAdmin(http.HandlerFunc(app.adminExercisesGET)))
 	mux.Handle("GET /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseEditGET)))
 	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
-	mux.Handle("POST /admin/exercises/create", mustAdmin(http.HandlerFunc(app.adminExerciseCreatePOST)))
+	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
 	return mux
 }

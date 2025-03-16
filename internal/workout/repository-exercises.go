@@ -143,11 +143,12 @@ func (r *sqliteExerciseRepository) fetchMuscleGroups(
 }
 
 // Create adds a new exercise to the repository.
-func (r *sqliteExerciseRepository) Create(ctx context.Context, ex Exercise) error {
-	if err := r.set(ctx, ex, false); err != nil {
-		return fmt.Errorf("create exercise: %w", err)
+func (r *sqliteExerciseRepository) Create(ctx context.Context, ex Exercise) (Exercise, error) {
+	var err error
+	if ex, err = r.set(ctx, ex, false); err != nil {
+		return ex, fmt.Errorf("create exercise: %w", err)
 	}
-	return nil
+	return ex, nil
 }
 
 // Update modifies an existing exercise.
@@ -173,8 +174,8 @@ func (r *sqliteExerciseRepository) Update(
 		return nil
 	}
 
-	// Use the set method with upsert=true
-	if err = r.set(ctx, exercise, true); err != nil {
+	// Upsert
+	if _, err = r.set(ctx, exercise, true); err != nil {
 		return fmt.Errorf("save updated exercise: %w", err)
 	}
 
@@ -182,11 +183,11 @@ func (r *sqliteExerciseRepository) Update(
 }
 
 // set creates or updates an exercise with optional upsert.
-func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert bool) (err error) {
+func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert bool) (_ Exercise, err error) {
 	// Begin transaction
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return ex, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
@@ -201,7 +202,7 @@ func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert 
 			WHERE id = ?`,
 			ex.ID)
 		if err != nil {
-			return fmt.Errorf("delete exercise: %w", err)
+			return ex, fmt.Errorf("delete exercise: %w", err)
 		}
 	}
 
@@ -222,7 +223,7 @@ func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert 
 	}
 
 	if err != nil {
-		return fmt.Errorf("insert exercise: %w", err)
+		return ex, fmt.Errorf("insert exercise: %w", err)
 	}
 
 	// Get the inserted ID for new exercises
@@ -230,27 +231,27 @@ func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert 
 		var id int64
 		id, err = result.LastInsertId()
 		if err != nil {
-			return fmt.Errorf("get last insert ID: %w", err)
+			return ex, fmt.Errorf("get last insert ID: %w", err)
 		}
 		ex.ID = int(id)
 	}
 
 	// Insert primary muscle groups
 	if err = r.insertMuscleGroups(ctx, tx, ex.ID, ex.PrimaryMuscleGroups, true); err != nil {
-		return fmt.Errorf("insert primary muscle groups: %w", err)
+		return ex, fmt.Errorf("insert primary muscle groups: %w", err)
 	}
 
 	// Insert secondary muscle groups
 	if err = r.insertMuscleGroups(ctx, tx, ex.ID, ex.SecondaryMuscleGroups, false); err != nil {
-		return fmt.Errorf("insert secondary muscle groups: %w", err)
+		return ex, fmt.Errorf("insert secondary muscle groups: %w", err)
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
+		return ex, fmt.Errorf("commit transaction: %w", err)
 	}
 
-	return nil
+	return ex, nil
 }
 
 // insertMuscleGroups inserts muscle groups for an exercise.
