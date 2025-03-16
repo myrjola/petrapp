@@ -34,11 +34,25 @@ func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (Exercis
 
 	prompt := fmt.Sprintf(`Generate a detailed exercise description for "%s". 
 Include the appropriate category (full_body, upper, or lower), 
-a markdown description explaining how to perform the exercise correctly, 
-and the primary and secondary muscle groups it targets.
+and the primary and secondary muscle groups it targets, and
+a markdown description following this exact structure:
 
-Focus on proper form, common mistakes to avoid, and variations for different fitness levels.
-The exercise details should be accurate and appropriate for a fitness application.`, name)
+## Instructions
+[Provide 3-5 numbered steps explaining how to perform the exercise correctly]
+
+## Common Mistakes
+[List 3-4 common form errors as bullet points]
+
+## Resources
+[Include 2-3 placeholder links for videos and guides]
+
+Important guidelines:
+- Instructions should be clear, concise, and focus on proper form
+- Use simple, direct language that beginners can understand
+- Highlight safety considerations where relevant
+- For the Resources section, use placeholder URLs (https://example.com/resource-name)
+
+The description should be comprehensive yet concise, totaling around 150-200 words.`, name)
 
 	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
 		Name:        openai.F("exercise"),
