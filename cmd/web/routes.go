@@ -9,11 +9,11 @@ func (app *application) routes() *http.ServeMux {
 
 	// Define middleware chain functions
 	common := func(next http.Handler) http.Handler {
-		return app.recoverPanic(app.logRequest(secureHeaders(app.noSurf(commonContext(next)))))
+		return app.recoverPanic(app.logRequest(app.logResponse(secureHeaders(app.noSurf(commonContext(next))))))
 	}
 
 	session := func(next http.Handler) http.Handler {
-		return common(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(next)))
+		return common(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(app.timeout(next))))
 	}
 
 	mustSession := func(next http.Handler) http.Handler {

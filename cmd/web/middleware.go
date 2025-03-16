@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"time"
 )
 
 func secureHeaders(next http.Handler) http.Handler {
@@ -130,4 +131,22 @@ func (app *application) noSurf(next http.Handler) http.Handler {
 		SameSite: http.SameSiteStrictMode,
 	})
 	return csrfHandler
+}
+
+// timeout times out the request and cancels the context using http.TimeoutHandler.
+// Admins get a longer timeout so that they can call external services.
+func (app *application) timeout(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w)
+		timeout := defaultTimeout - (200 * time.Millisecond) //nolint:mnd // writing the response takes time.
+		if contexthelpers.IsAdmin(r.Context()) {
+			timeout = 29 * time.Second                                   //nolint:mnd // slow external services.
+			err := rc.SetWriteDeadline(time.Now().Add(30 * time.Second)) //nolint:mnd // slow external services.
+			if err != nil {
+				app.serverError(w, r, err)
+				return
+			}
+		}
+		http.TimeoutHandler(next, timeout, "timed out").ServeHTTP(w, r)
+	})
 }

@@ -30,9 +30,3 @@ func SetCSPNonce(r *http.Request, cspNonce string) *http.Request {
 	ctx = context.WithValue(ctx, cspNonceContextKey, cspNonce)
 	return r.WithContext(ctx)
 }
-
-func SetAdminStatus(r *http.Request, isAdmin bool) *http.Request {
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, isAdminContextKey, isAdmin)
-	return r.WithContext(ctx)
-}

@@ -61,7 +61,7 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 
 		// Check for the form to add a new exercise
-		if doc.Find("form[action='/admin/exercises/create']").Length() == 0 {
+		if doc.Find("form[action='/admin/exercises/generate']").Length() == 0 {
 			t.Error("Expected to find form to add new exercise")
 		}
 	})
@@ -73,32 +73,22 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 
 		// Find the creation form
-		form := doc.Find("form[action='/admin/exercises/create']")
+		form := doc.Find("form[action='/admin/exercises/generate']")
 		if form.Length() == 0 {
 			t.Fatalf("Exercise creation form not found")
 		}
 
 		// Submit the form with test data
 		formData := map[string]string{
-			"Name":        "Test Squat",
-			"Category":    "lower",
-			"Primary":     "Quads,Glutes",
-			"Secondary":   "Hamstrings,Calves",
-			"Description": "A test squat exercise description",
+			"Name": "Test Squat",
 		}
 
-		if doc, err = client.SubmitForm(ctx, doc, "/admin/exercises/create", formData); err != nil {
+		if doc, err = client.SubmitForm(ctx, doc, "/admin/exercises/generate", formData); err != nil {
 			t.Fatalf("Failed to submit exercise creation form: %v", err)
 		}
 
-		// Verify we're back at the exercises page
-		if doc.Find("h1").Text() != "Exercise Administration" {
-			t.Error("Expected to be redirected back to 'Exercise Administration' page")
-		}
-
-		// Check that our new exercise appears in the table
-		if doc.Find("td:contains('Test Squat')").Length() == 0 {
-			t.Error("Expected to find the newly created exercise in the table")
+		if doc.Find("h1").Text() != "Edit Exercise: Test Squat" {
+			t.Error("Expected to be redirected to exercise editing page")
 		}
 	})
 

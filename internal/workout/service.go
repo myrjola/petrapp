@@ -292,41 +292,56 @@ func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
 
 // GenerateExercise generates a new exercise based on a name.
 //
-// In case of errors, it strives to persist a minimal exercise that the user can fill in later. In this case, no error
-// is returned, but the exercise is guaranteed to have Name and ID fields set.
+// In case of errors, it persists a minimal exercise that the user can fill in later.
+// The returned exercise is guaranteed to have at least Name and ID fields set.
 func (s *Service) GenerateExercise(ctx context.Context, name string) (Exercise, error) {
-	// Start with a minimal exercise in case generation fails
-	exercise := Exercise{
+	// Generate exercise content
+	exercise := s.generateExerciseContent(ctx, name)
+
+	// Persist the exercise
+	persisted, err := s.repo.exercises.Create(ctx, exercise)
+	if err != nil {
+		return Exercise{}, fmt.Errorf("create exercise: %w", err)
+	}
+
+	return persisted, nil
+}
+
+// generateExerciseContent creates exercise content, using AI generation if available
+// or falling back to minimal content if not possible.
+func (s *Service) generateExerciseContent(ctx context.Context, name string) Exercise {
+	// Use minimal exercise if no OpenAI API key is configured
+	if s.openaiAPIKey == "" {
+		return createMinimalExercise(name)
+	}
+
+	// Try to get muscle groups for better generation
+	muscleGroups, err := s.repo.exercises.ListMuscleGroups(ctx)
+	if err != nil {
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to get muscle groups", slog.Any("error", err))
+		return createMinimalExercise(name)
+	}
+
+	// Try to generate a better exercise with AI
+	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups)
+	generated, err := generator.Generate(ctx, name)
+	if err != nil {
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to generate exercise details",
+			slog.Any("error", err), slog.String("name", name))
+		return createMinimalExercise(name)
+	}
+
+	return generated
+}
+
+// createMinimalExercise returns a basic exercise with just the essential fields populated.
+func createMinimalExercise(name string) Exercise {
+	return Exercise{
+		ID:                    -1,
 		Name:                  name,
 		Category:              CategoryFullBody,
 		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
 		PrimaryMuscleGroups:   []string{},
 		SecondaryMuscleGroups: []string{},
 	}
-
-	// Try to generate a better exercise if possible
-	if s.openaiAPIKey != "" {
-		muscleGroups, err := s.repo.exercises.ListMuscleGroups(ctx)
-		if err == nil {
-			generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups)
-			generatedExercise, err := generator.Generate(ctx, name)
-			if err == nil {
-				exercise = generatedExercise
-			} else {
-				s.logger.Warn("Failed to generate exercise details", "error", err, "name", name)
-				// Fall back to minimal exercise (already set)
-			}
-		} else {
-			s.logger.Warn("Failed to get muscle groups", "error", err)
-			// Fall back to minimal exercise (already set)
-		}
-	}
-
-	// Persist the exercise
-	var err error
-	exercise, err = s.repo.exercises.Create(ctx, exercise)
-	if err != nil {
-		return Exercise{}, fmt.Errorf("create exercise: %w", err)
-	}
-	return exercise, nil
 }

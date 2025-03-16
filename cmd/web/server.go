@@ -14,12 +14,13 @@ import (
 	"time"
 )
 
+const defaultTimeout = 2 * time.Second
+
 // configureAndStartServer configures and starts the HTTP server.
 func (app *application) configureAndStartServer(ctx context.Context, addr string, handler http.Handler) error {
 	var err error
 	shutdownComplete := make(chan struct{})
 	idleTimeout := time.Minute
-	defaultTimeout := 2 * time.Second //nolint:mnd // we are aiming for much faster response times.
 	srv := &http.Server{
 		ErrorLog:          slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
 		Handler:           handler,
