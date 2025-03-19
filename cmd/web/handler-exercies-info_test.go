@@ -152,7 +152,8 @@ func Test_application_exerciseInfo(t *testing.T) {
 	// Test error handling with invalid input
 	t.Run("Invalid exercise ID", func(t *testing.T) {
 		today := time.Now().Format("2006-01-02")
-		resp, err := client.Get(ctx, "/workouts/"+today+"/exercises/invalid/info")
+		var resp *http.Response
+		resp, err = client.Get(ctx, "/workouts/"+today+"/exercises/invalid/info")
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
@@ -162,7 +163,8 @@ func Test_application_exerciseInfo(t *testing.T) {
 	})
 
 	t.Run("Invalid date", func(t *testing.T) {
-		resp, err := client.Get(ctx, "/workouts/invalid-date/exercises/1/info")
+		var resp *http.Response
+		resp, err = client.Get(ctx, "/workouts/invalid-date/exercises/1/info")
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
