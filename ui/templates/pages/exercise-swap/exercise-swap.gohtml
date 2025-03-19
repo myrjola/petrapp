@@ -166,6 +166,22 @@
                             <input type="hidden" name="new_exercise_id" value="{{ .ID }}">
                             <button type="submit" class="swap-button">Swap to this exercise</button>
                         </form>
+                        <dialog id="dialog-exercise-{{ .ID }}">
+                            <form method="dialog">
+                                <button formmethod="dialog">Close</button>
+                            </form>
+                            <pre>
+                                {{ .DescriptionMarkdown }}
+                            </pre>
+                        </dialog>
+                        <button type="button">
+                            <script {{ nonce }}>
+                                me().addEventListener('click', () => {
+                                    document.getElementById('dialog-exercise-{{ .ID }}').showModal();
+                                });
+                            </script>
+                            Info
+                        </button>
                     </div>
                 {{ end }}
             </div>
