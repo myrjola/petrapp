@@ -170,9 +170,7 @@
                             <form method="dialog">
                                 <button formmethod="dialog">Close</button>
                             </form>
-                            <pre>
-                                {{ .DescriptionMarkdown }}
-                            </pre>
+                            {{ mdToHTML .DescriptionMarkdown }}
                         </dialog>
                         <button type="button">
                             <script {{ nonce }}>

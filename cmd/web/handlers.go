@@ -23,6 +23,9 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 		"csrf": func() string {
 			panic("not implemented")
 		},
+		"mdToHTML": func() string {
+			panic("not implemented")
+		},
 	}).ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
 		return nil, fmt.Errorf("new template: %w", err)
 	}
@@ -48,6 +51,9 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 		},
 		"csrf": func() template.HTML {
 			return template.HTML(csrf) //nolint:gosec // we trust the csrf since it's not provided by user.
+		},
+		"mdToHTML": func(markdown string) template.HTML {
+			return app.renderMarkdownToHTML(ctx, markdown)
 		},
 	})
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {

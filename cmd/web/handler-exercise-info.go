@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/workout"
 	"github.com/yuin/goldmark"
@@ -15,10 +16,9 @@ import (
 // exerciseInfoTemplateData contains data for the exercise info template.
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
-	Date            time.Time
-	Exercise        workout.Exercise
-	DescriptionHTML template.HTML
-	IsAdmin         bool
+	Date     time.Time
+	Exercise workout.Exercise
+	IsAdmin  bool
 }
 
 // exerciseInfoGET handles GET requests to view exercise information.
@@ -46,9 +46,6 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Render markdown to HTML
-	descriptionHTML := app.renderMarkdownToHTML(r, exercise.DescriptionMarkdown)
-
 	// Check if user is admin
 	isAdmin := contexthelpers.IsAdmin(r.Context())
 
@@ -56,7 +53,6 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
 		Exercise:         exercise,
-		DescriptionHTML:  descriptionHTML,
 		IsAdmin:          isAdmin,
 	}
 
@@ -64,12 +60,12 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 }
 
 // renderMarkdownToHTML converts markdown string to HTML.
-func (app *application) renderMarkdownToHTML(r *http.Request, markdown string) template.HTML {
+func (app *application) renderMarkdownToHTML(ctx context.Context, markdown string) template.HTML {
 	md := goldmark.New()
 
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(markdown), &buf); err != nil {
-		app.logger.LogAttrs(r.Context(), slog.LevelError, "failed to render markdown",
+		app.logger.LogAttrs(ctx, slog.LevelError, "failed to render markdown",
 			slog.Any("error", err))
 		return template.HTML("<p>Error rendering markdown content.</p>")
 	}
