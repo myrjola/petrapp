@@ -213,7 +213,6 @@
                                             name="weight"
                                             value="{{ $set.WeightKg }}"
                                             step="0.5"
-                                            min="0"
                                             required
                                     >
                                 </div>
@@ -225,8 +224,6 @@
                                             name="reps"
                                             placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
                                             value="{{ $set.CompletedReps }}"
-                                            min="{{ $set.MinReps }}"
-                                            max="{{ $set.MaxReps }}"
                                             required
                                             {{ if $set.CompletedReps }}disabled{{ end }}
                                             class="reps-input"
