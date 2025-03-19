@@ -81,12 +81,26 @@
                                 background: var(--sky-1);
                             }
                         }
+
+                        .swap-button {
+                            background: var(--lime-0);
+                            color: var(--lime-8);
+                            padding: var(--size-1) var(--size-3);
+                            border-radius: var(--radius-2);
+                            font-size: var(--font-size-0);
+                            font-weight: var(--font-weight-6);
+
+                            &:hover {
+                                background: var(--lime-1);
+                            }
+                        }
                     }
                 }
             </style>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}">← Back</a>
             <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info" class="info-button">Info</a>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap" class="swap-button">Swap</a>
         </header>
 
         <div class="sets">

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/myrjola/petrapp/internal/workout"
 	"net/http"
@@ -145,4 +146,103 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 
 	// Redirect back to the home page
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// workoutSwapExerciseGET handles GET requests to show available exercises for swapping.
+func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Parse exercise ID from URL path
+	exerciseIDStr := r.PathValue("exerciseID")
+	exerciseID, err := strconv.Atoi(exerciseIDStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Get current exercise
+	currentExercise, err := app.workoutService.GetExercise(r.Context(), exerciseID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Get compatible exercises
+	compatibleExercises, err := app.workoutService.FindCompatibleExercises(r.Context(), exerciseID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Prepare template data
+	data := exerciseSwapTemplateData{
+		BaseTemplateData:    newBaseTemplateData(r),
+		Date:                date,
+		CurrentExercise:     currentExercise,
+		CompatibleExercises: compatibleExercises,
+	}
+
+	app.render(w, r, http.StatusOK, "exercise-swap", data)
+}
+
+// workoutSwapExercisePOST handles POST requests to swap an exercise.
+func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Parse current exercise ID from URL path
+	exerciseIDStr := r.PathValue("exerciseID")
+	currentExerciseID, err := strconv.Atoi(exerciseIDStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Parse form
+	if err = r.ParseForm(); err != nil {
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+		return
+	}
+
+	// Get new exercise ID from form
+	newExerciseIDStr := r.PostForm.Get("new_exercise_id")
+	if newExerciseIDStr == "" {
+		app.serverError(w, r, errors.New("new exercise ID not provided"))
+		return
+	}
+
+	newExerciseID, err := strconv.Atoi(newExerciseIDStr)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("parse new exercise ID: %w", err))
+		return
+	}
+
+	// Swap exercise
+	if err = app.workoutService.SwapExercise(r.Context(), date, currentExerciseID, newExerciseID); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Redirect to exercise set page with the new exercise
+	http.Redirect(w, r,
+		fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), newExerciseID), http.StatusSeeOther)
+}
+
+// exerciseSwapTemplateData contains data for the exercise swap template.
+type exerciseSwapTemplateData struct {
+	BaseTemplateData
+	Date                time.Time
+	CurrentExercise     workout.Exercise
+	CompatibleExercises []workout.Exercise
 }

@@ -1,0 +1,178 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSwapTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+            }
+        </style>
+
+        <header>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: center;
+
+                        a {
+                            color: var(--gray-7);
+                            text-decoration: none;
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            padding: var(--size-2);
+                            border-radius: var(--radius-2);
+
+                            &:hover {
+                                background: var(--gray-1);
+                            }
+                        }
+
+                        h1 {
+                            font-size: var(--font-size-4);
+                            font-weight: var(--font-weight-6);
+                        }
+                    }
+                }
+            </style>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .CurrentExercise.ID }}">← Back</a>
+            <h1>Swap Exercise</h1>
+        </header>
+
+        <section class="current-exercise">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        background: var(--gray-1);
+                        padding: var(--size-3);
+                        border-radius: var(--radius-2);
+
+                        h2 {
+                            font-size: var(--font-size-2);
+                            margin-bottom: var(--size-2);
+                        }
+
+                        .exercise-details {
+                            display: flex;
+                            flex-direction: column;
+                            gap: var(--size-1);
+                        }
+
+                        .category {
+                            font-size: var(--font-size-0);
+                            color: var(--gray-5);
+                        }
+
+                        .muscle-groups {
+                            font-size: var(--font-size-0);
+                            color: var(--gray-6);
+                        }
+                    }
+                }
+            </style>
+            <h2>Current Exercise</h2>
+            <div class="exercise-details">
+                <div class="name">{{ .CurrentExercise.Name }}</div>
+                <div class="category">
+                    {{ if eq .CurrentExercise.Category "full_body" }}Full Body{{ end }}
+                    {{ if eq .CurrentExercise.Category "upper" }}Upper Body{{ end }}
+                    {{ if eq .CurrentExercise.Category "lower" }}Lower Body{{ end }}
+                </div>
+                <div class="muscle-groups">
+                    Primary: {{ range $i, $g := .CurrentExercise.PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
+                </div>
+            </div>
+        </section>
+
+        <section class="alternative-exercises">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        h2 {
+                            font-size: var(--font-size-2);
+                            margin-bottom: var(--size-3);
+                        }
+
+                        .alternatives-list {
+                            display: flex;
+                            flex-direction: column;
+                            gap: var(--size-3);
+                        }
+
+                        .exercise-option {
+                            background: var(--white);
+                            border: 1px solid var(--gray-3);
+                            border-radius: var(--radius-2);
+                            padding: var(--size-3);
+                        }
+
+                        .option-header {
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            margin-bottom: var(--size-2);
+                        }
+
+                        .radio-input {
+                            width: var(--size-4);
+                            height: var(--size-4);
+                        }
+
+                        .exercise-name {
+                            font-weight: var(--font-weight-6);
+                        }
+
+                        .option-details {
+                            margin-left: calc(var(--size-4) + var(--size-2));
+                            font-size: var(--font-size-0);
+                            color: var(--gray-6);
+                        }
+
+                        .category {
+                            margin-bottom: var(--size-1);
+                        }
+
+                        button {
+                            margin-top: var(--size-4);
+                            width: 100%;
+                        }
+                    }
+                }
+            </style>
+            <h2>Choose Alternative Exercise</h2>
+
+            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .CurrentExercise.ID }}/swap">
+                {{ csrf }}
+                <div class="alternatives-list">
+                    {{ range .CompatibleExercises }}
+                        <label class="exercise-option">
+                            <div class="option-header">
+                                <input type="radio" name="new_exercise_id" value="{{ .ID }}" class="radio-input" required>
+                                <span class="exercise-name">{{ .Name }}</span>
+                            </div>
+                            <div class="option-details">
+                                <div class="category">
+                                    {{ if eq .Category "full_body" }}Full Body{{ end }}
+                                    {{ if eq .Category "upper" }}Upper Body{{ end }}
+                                    {{ if eq .Category "lower" }}Lower Body{{ end }}
+                                </div>
+                                <div class="muscle-groups">
+                                    Primary: {{ range $i, $g := .PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
+                                </div>
+                            </div>
+                        </label>
+                    {{ end }}
+                </div>
+
+                <button type="submit">Swap Exercise</button>
+            </form>
+        </section>
+    </main>
+{{ end }}
