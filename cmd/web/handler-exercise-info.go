@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/workout"
 	"github.com/yuin/goldmark"
 	"html/template"
@@ -17,6 +18,7 @@ type exerciseInfoTemplateData struct {
 	Date            time.Time
 	Exercise        workout.Exercise
 	DescriptionHTML template.HTML
+	IsAdmin         bool
 }
 
 // exerciseInfoGET handles GET requests to view exercise information.
@@ -47,11 +49,15 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	// Render markdown to HTML
 	descriptionHTML := app.renderMarkdownToHTML(r, exercise.DescriptionMarkdown)
 
+	// Check if user is admin
+	isAdmin := contexthelpers.IsAdmin(r.Context())
+
 	data := exerciseInfoTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
 		Exercise:         exercise,
 		DescriptionHTML:  descriptionHTML,
+		IsAdmin:          isAdmin,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-info", data)

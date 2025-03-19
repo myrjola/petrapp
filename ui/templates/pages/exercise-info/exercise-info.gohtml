@@ -39,11 +39,28 @@
                             font-size: var(--font-size-4);
                             font-weight: var(--font-weight-6);
                         }
+
+                        .admin-edit {
+                            margin-left: auto;
+                            background: var(--yellow-2);
+                            color: var(--yellow-8);
+                            padding: var(--size-1) var(--size-3);
+                            border-radius: var(--radius-2);
+                            font-size: var(--font-size-0);
+                            font-weight: var(--font-weight-6);
+
+                            &:hover {
+                                background: var(--yellow-3);
+                            }
+                        }
                     }
                 }
             </style>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}">← Back</a>
             <h1>{{ .Exercise.Name }}</h1>
+            {{ if .IsAdmin }}
+                <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
+            {{ end }}
         </header>
 
         <div class="exercise-info">
