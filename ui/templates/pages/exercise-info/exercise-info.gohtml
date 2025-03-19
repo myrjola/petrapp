@@ -1,0 +1,155 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseInfoTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+            }
+        </style>
+
+        <header>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: center;
+
+                        a {
+                            color: var(--gray-7);
+                            text-decoration: none;
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            padding: var(--size-2);
+                            border-radius: var(--radius-2);
+
+                            &:hover {
+                                background: var(--gray-1);
+                            }
+                        }
+
+                        h1 {
+                            font-size: var(--font-size-4);
+                            font-weight: var(--font-weight-6);
+                        }
+                    }
+                }
+            </style>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}">← Back</a>
+            <h1>{{ .Exercise.Name }}</h1>
+        </header>
+
+        <div class="exercise-info">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-5);
+
+                        .section {
+                            display: flex;
+                            flex-direction: column;
+                            gap: var(--size-2);
+                        }
+
+                        .section-title {
+                            font-weight: var(--font-weight-6);
+                            color: var(--gray-8);
+                            font-size: var(--font-size-2);
+                        }
+
+                        .muscle-groups {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: var(--size-2);
+                        }
+
+                        .muscle-group {
+                            background: var(--gray-1);
+                            border-radius: var(--radius-2);
+                            padding: var(--size-1) var(--size-2);
+                            font-size: var(--font-size-1);
+                            color: var(--gray-7);
+                        }
+
+                        .primary {
+                            background: var(--sky-1);
+                            color: var(--sky-8);
+                        }
+
+                        .description {
+                            background: var(--gray-0);
+                            border-radius: var(--radius-2);
+                            padding: var(--size-3);
+                            overflow-x: auto;
+                            white-space: pre-wrap;
+                            font-family: var(--font-sans);
+                            font-size: var(--font-size-1);
+                            line-height: var(--font-lineheight-3);
+                        }
+
+                        .category-badge {
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: var(--lime-1);
+                            color: var(--lime-8);
+                            border-radius: var(--radius-2);
+                            padding: var(--size-1) var(--size-2);
+                            font-size: var(--font-size-1);
+                            font-weight: var(--font-weight-5);
+                            align-self: flex-start;
+                        }
+                    }
+                }
+            </style>
+
+            <div class="section">
+                <div class="section-title">Category</div>
+                <div class="category-badge">
+                    {{ if eq .Exercise.Category "full_body" }}
+                        Full Body
+                    {{ else if eq .Exercise.Category "upper" }}
+                        Upper Body
+                    {{ else if eq .Exercise.Category "lower" }}
+                        Lower Body
+                    {{ else }}
+                        {{ .Exercise.Category }}
+                    {{ end }}
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Primary Muscle Groups</div>
+                <div class="muscle-groups">
+                    {{ range .Exercise.PrimaryMuscleGroups }}
+                        <span class="muscle-group primary">{{ . }}</span>
+                    {{ end }}
+                </div>
+            </div>
+
+            {{ if .Exercise.SecondaryMuscleGroups }}
+                <div class="section">
+                    <div class="section-title">Secondary Muscle Groups</div>
+                    <div class="muscle-groups">
+                        {{ range .Exercise.SecondaryMuscleGroups }}
+                            <span class="muscle-group">{{ . }}</span>
+                        {{ end }}
+                    </div>
+                </div>
+            {{ end }}
+
+            <div class="section">
+                <pre class="description">{{ .Exercise.DescriptionMarkdown }}</pre>
+            </div>
+        </div>
+    </main>
+{{ end }}
