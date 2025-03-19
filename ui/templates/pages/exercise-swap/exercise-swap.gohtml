@@ -113,66 +113,62 @@
                             padding: var(--size-3);
                         }
 
-                        .option-header {
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-2);
-                            margin-bottom: var(--size-2);
-                        }
-
-                        .radio-input {
-                            width: var(--size-4);
-                            height: var(--size-4);
-                        }
-
                         .exercise-name {
                             font-weight: var(--font-weight-6);
+                            margin-bottom: var(--size-1);
                         }
 
                         .option-details {
-                            margin-left: calc(var(--size-4) + var(--size-2));
                             font-size: var(--font-size-0);
                             color: var(--gray-6);
+                            margin-bottom: var(--size-3);
                         }
 
                         .category {
                             margin-bottom: var(--size-1);
                         }
 
-                        button {
-                            margin-top: var(--size-4);
+                        .swap-button {
+                            background-color: var(--lime-2);
+                            color: var(--lime-9);
+                            border: none;
+                            border-radius: var(--radius-2);
+                            padding: var(--size-2) var(--size-3);
+                            font-weight: var(--font-weight-6);
+                            cursor: pointer;
                             width: 100%;
+
+                            &:hover {
+                                background-color: var(--lime-3);
+                            }
                         }
                     }
                 }
             </style>
             <h2>Choose Alternative Exercise</h2>
 
-            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .CurrentExercise.ID }}/swap">
-                {{ csrf }}
-                <div class="alternatives-list">
-                    {{ range .CompatibleExercises }}
-                        <label class="exercise-option">
-                            <div class="option-header">
-                                <input type="radio" name="new_exercise_id" value="{{ .ID }}" class="radio-input" required>
-                                <span class="exercise-name">{{ .Name }}</span>
+            <div class="alternatives-list">
+                {{ range .CompatibleExercises }}
+                    <div class="exercise-option">
+                        <div class="exercise-name">{{ .Name }}</div>
+                        <div class="option-details">
+                            <div class="category">
+                                {{ if eq .Category "full_body" }}Full Body{{ end }}
+                                {{ if eq .Category "upper" }}Upper Body{{ end }}
+                                {{ if eq .Category "lower" }}Lower Body{{ end }}
                             </div>
-                            <div class="option-details">
-                                <div class="category">
-                                    {{ if eq .Category "full_body" }}Full Body{{ end }}
-                                    {{ if eq .Category "upper" }}Upper Body{{ end }}
-                                    {{ if eq .Category "lower" }}Lower Body{{ end }}
-                                </div>
-                                <div class="muscle-groups">
-                                    Primary: {{ range $i, $g := .PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
-                                </div>
+                            <div class="muscle-groups">
+                                Primary: {{ range $i, $g := .PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
                             </div>
-                        </label>
-                    {{ end }}
-                </div>
-
-                <button type="submit">Swap Exercise</button>
-            </form>
+                        </div>
+                        <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.CurrentExercise.ID }}/swap">
+                            {{ csrf }}
+                            <input type="hidden" name="new_exercise_id" value="{{ .ID }}">
+                            <button type="submit" class="swap-button">Swap to this exercise</button>
+                        </form>
+                    </div>
+                {{ end }}
+            </div>
         </section>
     </main>
 {{ end }}
