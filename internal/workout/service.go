@@ -345,3 +345,156 @@ func createMinimalExercise(name string) Exercise {
 		SecondaryMuscleGroups: []string{},
 	}
 }
+
+// SwapExercise replaces an exercise in a workout with another exercise.
+// It retrieves weights from the previous time the new exercise was used.
+func (s *Service) SwapExercise(
+	ctx context.Context,
+	date time.Time,
+	currentExerciseID int,
+	newExerciseID int,
+) error {
+	// 1. Validate both exercises exist
+	if err := s.validateExercises(ctx, currentExerciseID, newExerciseID); err != nil {
+		return err
+	}
+
+	// 2. Find historical data for the new exercise
+	historicalSets, err := s.findHistoricalSets(ctx, date, newExerciseID)
+	if err != nil {
+		return fmt.Errorf("find historical sets: %w", err)
+	}
+
+	// 3. Update the session with the new exercise
+	if err = s.replaceExerciseInSession(ctx, date, currentExerciseID, newExerciseID, historicalSets); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateExercises checks if both exercises exist in the repository.
+func (s *Service) validateExercises(ctx context.Context, currentID, newID int) error {
+	_, err := s.repo.exercises.Get(ctx, currentID)
+	if err != nil {
+		return fmt.Errorf("get current exercise: %w", err)
+	}
+
+	_, err = s.repo.exercises.Get(ctx, newID)
+	if err != nil {
+		return fmt.Errorf("get new exercise: %w", err)
+	}
+
+	return nil
+}
+
+// findHistoricalSets retrieves set data from the most recent usage of an exercise.
+func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]Set, error) {
+	// Get workout history (past 3 months)
+	threeMonthsAgo := date.AddDate(0, -3, 0)
+	history, err := s.repo.sessions.List(ctx, threeMonthsAgo)
+	if err != nil {
+		return nil, fmt.Errorf("get workout history: %w", err)
+	}
+
+	// Look for the most recent usage of the exercise
+	for i := len(history) - 1; i >= 0; i-- {
+		session := history[i]
+		// Skip the current date's session
+		if session.Date.Equal(date) {
+			continue
+		}
+
+		for _, exerciseSet := range session.ExerciseSets {
+			if exerciseSet.ExerciseID == exerciseID {
+				// Copy sets and reset completion status
+				return s.copySetsWithoutCompletion(exerciseSet.Sets), nil
+			}
+		}
+	}
+
+	// No historical data found
+	return nil, nil
+}
+
+// copySetsWithoutCompletion creates a copy of sets with completed reps reset to nil.
+func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
+	result := make([]Set, len(sets))
+	for i, set := range sets {
+		result[i] = Set{
+			WeightKg:      set.WeightKg,
+			MinReps:       set.MinReps,
+			MaxReps:       set.MaxReps,
+			CompletedReps: nil, // Reset completion status
+		}
+	}
+	return result
+}
+
+// createEmptySets creates new sets with zero weight based on the structure of template sets.
+func (s *Service) createEmptySets(templateSets []Set) []Set {
+	result := make([]Set, len(templateSets))
+	for i, set := range templateSets {
+		result[i] = Set{
+			WeightKg:      0, // Empty weight
+			MinReps:       set.MinReps,
+			MaxReps:       set.MaxReps,
+			CompletedReps: nil,
+		}
+	}
+	return result
+}
+
+// replaceExerciseInSession updates a session by replacing one exercise with another.
+func (s *Service) replaceExerciseInSession(
+	ctx context.Context,
+	date time.Time,
+	currentExerciseID int,
+	newExerciseID int,
+	historicalSets []Set,
+) error {
+	err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
+		// Find the exercise set to replace
+		for i, exerciseSet := range sess.ExerciseSets {
+			if exerciseSet.ExerciseID == currentExerciseID {
+				// Replace the exercise ID
+				sess.ExerciseSets[i].ExerciseID = newExerciseID
+
+				// Replace sets with historical ones or empty sets
+				if historicalSets != nil {
+					sess.ExerciseSets[i].Sets = historicalSets
+				} else {
+					sess.ExerciseSets[i].Sets = s.createEmptySets(exerciseSet.Sets)
+				}
+
+				return true, nil
+			}
+		}
+
+		return false, fmt.Errorf("exercise %d not found in workout for date %s",
+			currentExerciseID, formatDate(date))
+	})
+	if err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+	}
+	return nil
+}
+
+// FindCompatibleExercises returns all exercises except the specified one.
+func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) ([]Exercise, error) {
+	// Get all exercises
+	allExercises, err := s.repo.exercises.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list all exercises: %w", err)
+	}
+
+	// Filter out the current exercise
+	var otherExercises []Exercise
+	for _, exercise := range allExercises {
+		if exercise.ID != exerciseID {
+			otherExercises = append(otherExercises, exercise)
+		}
+	}
+
+	return otherExercises, nil
+}
