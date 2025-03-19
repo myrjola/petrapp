@@ -1,6 +1,5 @@
-INSERT
-OR REPLACE INTO muscle_groups (name)
-VALUES 
+INSERT INTO muscle_groups (name)
+VALUES
 -- Upper Body
 ('Chest'),
 ('Shoulders'),
@@ -20,10 +19,11 @@ VALUES
 ('Glutes'),
 ('Calves'),
 ('Hip Flexors'),
-('Adductors');
+('Adductors') ON CONFLICT(name) DO
+UPDATE SET
+    name = excluded.name;
 
-INSERT
-OR REPLACE INTO exercises (id, name, category, description_markdown)
+INSERT INTO exercises (id, name, category, description_markdown)
 values  (1, 'Deadlift', 'full_body', '## Instructions
 1. Stand with your feet about hip-width apart, placed under the barbell.
 2. Bend at the hips and knees to grip the bar with your hands slightly wider than shoulder-width apart. Keep your chest up and back straight.
@@ -296,10 +296,13 @@ values  (1, 'Deadlift', 'full_body', '## Instructions
 ## Resources
 - [Video tutorial](https://www.youtube.com/watch?v=ENXyYltB7CM)
 - [Form guide](https://www.healthline.com/health/back-extension-exercise#with-weight)
-');
+')
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+                       category = excluded.category,
+                       description_markdown = excluded.description_markdown;
 
-INSERT
-OR REPLACE INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
+INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
 VALUES
 (1, 'Forearms', 0),
 (1, 'Glutes', 1),
@@ -361,4 +364,6 @@ VALUES
 (17, 'Quads', 0),
 (18, 'Glutes', 0),
 (18, 'Hamstrings', 0),
-(18, 'Lower Back', 1);
+(18, 'Lower Back', 1)
+ON CONFLICT(exercise_id, muscle_group_name) DO UPDATE SET
+    is_primary = excluded.is_primary;
