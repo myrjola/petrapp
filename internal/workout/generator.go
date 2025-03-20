@@ -230,11 +230,11 @@ func (g *generator) selectExercises(t time.Time, category Category) ([]exerciseS
 	return exerciseSets, nil
 }
 
-// filterExercisesByCategory returns exercises that match the given category.
+// filterExercisesByCategory returns exercises that match the given category. If category is full body, it matches all.
 func (g *generator) filterExercisesByCategory(category Category) []Exercise {
 	var filtered []Exercise
 	for _, exercise := range g.pool {
-		if exercise.Category == category {
+		if category == CategoryFullBody || exercise.Category == category {
 			filtered = append(filtered, exercise)
 		}
 	}
