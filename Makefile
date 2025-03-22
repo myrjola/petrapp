@@ -51,7 +51,7 @@ build-docker:
 
 fly-sqlite3:
 	@echo "Connecting to sqlite3 database on deployed Fly machine"
-	fly ssh console --pty --user petrapp -C "/usr/bin/sqlite3 /data/petrapp.sqlite3"
+	fly ssh console --pty --user petrapp -C "/usr/bin/sqlite3 -cmd \"PRAGMA foreign_keys = ON;\" /data/petrapp.sqlite3"
 
 clean:
 	@echo "Cleaning up..."
