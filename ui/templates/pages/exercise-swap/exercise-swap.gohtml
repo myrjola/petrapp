@@ -161,12 +161,63 @@
                                 Primary: {{ range $i, $g := .PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
                             </div>
                         </div>
-                        <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.CurrentExercise.ID }}/swap">
+                        <form method="post"
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.CurrentExercise.ID }}/swap">
                             {{ csrf }}
                             <input type="hidden" name="new_exercise_id" value="{{ .ID }}">
                             <button type="submit" class="swap-button">Swap to this exercise</button>
                         </form>
-                        <dialog id="dialog-exercise-{{ .ID }}">
+                        <dialog id="dialog-exercise-{{ .ID }}" class="full-width-dialog">
+                            <style {{ nonce }}>
+                                @scope {
+                                    :scope {
+                                        padding: var(--size-3);
+                                        border: none;
+                                        position: fixed;
+                                        top: 0;
+                                        bottom: 0;
+                                        left: 0;
+                                        right: 0;
+                                        transform: translateY(100%);
+                                        animation: slide-up 0.3s ease-in-out forwards;
+                                        transition-behavior: allow-discrete;
+                                    }
+
+                                    @keyframes slide-up {
+                                        from {
+                                            transform: translateY(100%);
+                                        }
+                                        to {
+                                            transform: translateY(0);
+                                        }
+                                    }
+
+                                    :scope::backdrop {
+                                        background-color: rgba(0, 0, 0, 0.5);
+                                        animation: fade-in 0.3s ease-out forwards;
+                                    }
+
+                                    @keyframes fade-in {
+                                        from {
+                                            opacity: 0;
+                                        }
+                                        to {
+                                            opacity: 1;
+                                        }
+                                    }
+
+                                    form {
+                                        display: flex;
+                                        justify-content: flex-end;
+                                        margin-bottom: var(--size-3);
+                                    }
+
+                                    button {
+                                        padding: var(--size-2);
+                                        border-radius: var(--radius-1);
+                                    }
+                                }
+                            </style>
                             <form method="dialog">
                                 <button formmethod="dialog">Close</button>
                             </form>
@@ -174,9 +225,9 @@
                         </dialog>
                         <button type="button">
                             <script {{ nonce }}>
-                                me().addEventListener('click', () => {
-                                    document.getElementById('dialog-exercise-{{ .ID }}').showModal();
-                                });
+                              me().addEventListener('click', () => {
+                                document.getElementById('dialog-exercise-{{ .ID }}').showModal();
+                              });
                             </script>
                             Info
                         </button>
