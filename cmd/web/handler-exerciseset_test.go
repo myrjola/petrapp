@@ -122,18 +122,10 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Form has no action attribute")
 	}
 
-	// Get the current weight value
-	weight := "20,50" // Default weight if we can't find it
-	weightInput := form.Find("input[name='weight']")
-	var val string
-	if val, exists = weightInput.Attr("value"); exists {
-		weight = val
-	}
-
 	// Submit the form with weight and reps
 	formData = map[string]string{
-		"weight": weight,
-		"reps":   "10", // Using 10 reps as a valid number
+		"weight": "20,5", // Test comma for decimal point
+		"reps":   "10",   // Using 10 reps as a valid number
 	}
 
 	if doc, err = client.SubmitForm(ctx, doc, action, formData); err != nil {
@@ -199,9 +191,10 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Get the current weight value
+	var weight string
 	weight, exists = form.Find("input[name='weight']").Attr("value")
 	if !exists {
-		weight = "20" // Default weight if we can't find it
+		t.Fatalf("Edit form has no weight input")
 	}
 
 	// Convert weight to float and increase it

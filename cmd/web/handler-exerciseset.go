@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -123,6 +124,8 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		app.serverError(w, r, errors.New("weight not provided"))
 		return
 	}
+	// Replace comma with dot for decimal numbers.
+	weightStr = strings.Replace(weightStr, ",", ".", 1)
 
 	weight, err := strconv.ParseFloat(weightStr, 64)
 	if err != nil {
