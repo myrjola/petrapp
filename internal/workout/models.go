@@ -36,53 +36,54 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 		return nil, fmt.Errorf("marshal muscle groups: %w", err)
 	}
 
-	return []byte(fmt.Sprintf(`{
-		  "type": "object",
-		  "required": [
+	schema := map[string]interface{}{
+		"type": "object",
+		"required": []string{
 			"id",
 			"name",
 			"category",
 			"description_markdown",
 			"primary_muscle_groups",
-			"secondary_muscle_groups"
-		  ],
-		  "properties": {
-			"id": {
-			  "type": "integer",
-			  "description": "Unique identifier for the exercise, leave as -1 for new exercises"
+			"secondary_muscle_groups",
+		},
+		"properties": map[string]interface{}{
+			"id": map[string]interface{}{
+				"type":        "integer",
+				"description": "Unique identifier for the exercise, leave as -1 for new exercises",
 			},
-			"name": {
-			  "type": "string",
-			  "description": "Name of the exercise"
+			"name": map[string]interface{}{
+				"type":        "string",
+				"description": "Name of the exercise",
 			},
-			"category": {
-			  "type": "string",
-			  "description": "Category of the exercise",
-			  "enum": ["full_body", "upper", "lower"]
+			"category": map[string]interface{}{
+				"type":        "string",
+				"description": "Category of the exercise",
+				"enum":        []string{"full_body", "upper", "lower"},
 			},
-			"description_markdown": {
-			  "type": "string",
-			  "description": "Markdown description of the exercise"
+			"description_markdown": map[string]interface{}{
+				"type":        "string",
+				"description": "Markdown description of the exercise",
 			},
-			"primary_muscle_groups": {
-			  "type": "array",
-			  "description": "Primary muscle groups targeted by the exercise",
-			  "items": {
-				"type": "string",
-				"enum": %s
-			  }
+			"primary_muscle_groups": map[string]interface{}{
+				"type":        "array",
+				"description": "Primary muscle groups targeted by the exercise",
+				"items": map[string]interface{}{
+					"type": "string",
+					"enum": ejs.muscleGroups,
+				},
 			},
-			"secondary_muscle_groups": {
-			  "type": "array",
-			  "description": "Secondary muscle groups targeted by the exercise",
-			  "items": {
-				"type": "string",
-				"enum": %s
-			  }
-			}
-		  },
-		  "additionalProperties": false
-		}`, muscleGroupsJSON, muscleGroupsJSON)), nil
+			"secondary_muscle_groups": map[string]interface{}{
+				"type":        "array",
+				"description": "Secondary muscle groups targeted by the exercise",
+				"items": map[string]interface{}{
+					"type": "string",
+					"enum": ejs.muscleGroups,
+				},
+			},
+		},
+		"additionalProperties": false,
+	}
+	return json.Marshal(schema)
 }
 
 // Set represents a single set of an exercise with target and actual performance.
