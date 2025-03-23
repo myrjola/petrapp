@@ -12,33 +12,24 @@
                 }
             }
         </style>
-        
+
         <script {{ nonce }}>
-            document.addEventListener("DOMContentLoaded", function() {
-                {{ if $.IsEditing }}
-                    const form = document.getElementById(`form-{{ $.EditingIndex }}`);
-                    if (form) {
-                        const repsInput = form.querySelector('.reps-input');
-                        const doneButton = form.querySelector('.done');
-                        
-                        if (repsInput) {
-                            // Enable the reps input
-                            repsInput.disabled = false;
-                            
-                            // Focus and select the text
-                            setTimeout(() => {
-                                repsInput.focus();
-                                repsInput.select();
-                            }, 100);
-                        }
-                        
-                        if (doneButton) {
-                            // Show the done button
-                            doneButton.style.display = 'block';
-                        }
-                    }
-                {{ end }}
-            });
+          document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById(`form-{{ $.EditingIndex }}`);
+            if (form) {
+              const repsInput = form.querySelector('.reps-input');
+              if (repsInput) {
+                // Enable the reps input
+                repsInput.disabled = false;
+
+                // Focus and select the text
+                setTimeout(() => {
+                  repsInput.focus();
+                  repsInput.select();
+                }, 100);
+              }
+            }
+          });
         </script>
 
         <header>
@@ -99,8 +90,10 @@
             </style>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}">← Back</a>
             <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info" class="info-button">Info</a>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap" class="swap-button">Swap</a>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
+               class="info-button">Info</a>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
+               class="swap-button">Swap</a>
         </header>
 
         <div class="sets">
@@ -118,10 +111,6 @@
                             padding: var(--size-3);
                             background: var(--gray-1);
                             border-radius: var(--radius-2);
-
-                            &.completed {
-                                color: var(--gray-5);
-                            }
 
                             .info {
                                 display: flex;
@@ -171,7 +160,7 @@
                                     padding: var(--size-2) var(--size-4);
                                     margin-left: auto;
                                 }
-                                
+
                                 .edit-button {
                                     margin-left: var(--size-2);
                                     padding: var(--size-1) var(--size-2);
@@ -202,7 +191,9 @@
                     </div>
 
                     {{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }}
-                        <form method="post" action="{{ if $set.CompletedReps }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ else }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ end }}" id="form-{{ $index }}">
+                        <form method="post"
+                              action="{{ if $set.CompletedReps }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ else }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ end }}"
+                              id="form-{{ $index }}">
                             {{ csrf }}
                             <div class="inputs">
                                 <div class="field">
@@ -223,14 +214,18 @@
                                             type="number"
                                             name="reps"
                                             placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
-                                            value="{{ $set.CompletedReps }}"
+                                            {{ if $set.CompletedReps }}
+                                                value="{{ $set.CompletedReps }}"
+                                            {{ end }}
                                             required
                                             {{ if $set.CompletedReps }}disabled{{ end }}
                                             class="reps-input"
                                     >
                                 </div>
                             </div>
-                            <button type="submit" class="done" {{ if $set.CompletedReps }}style="display: none;"{{ end }}>Done!</button>
+                            <button type="submit" class="done"
+                                    {{ if $set.CompletedReps }} {{ end }}>Done!
+                            </button>
                         </form>
                     {{ end }}
                 </div>
