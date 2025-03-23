@@ -610,7 +610,7 @@ func TestUserFeedbackIntegration(t *testing.T) {
 			t.Fatalf("Failed to create generator for feedback %d: %v", rating, err)
 		}
 
-		testDate := initialDate.AddDate(0, 0, 2) // Thursday
+		testDate := initialDate.AddDate(0, 0, 7) // Tuesday again to have shared exercises.
 		session, genErr := gen.Generate(testDate)
 		if genErr != nil {
 			t.Fatalf("Failed to generate test workout: %v", genErr)
