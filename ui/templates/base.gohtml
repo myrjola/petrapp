@@ -78,6 +78,22 @@
           submitButton.disabled = true
         }
       })
+
+      // Reset form states when page is loaded from browser cache (back button).
+      window.addEventListener('pageshow', function(event) {
+        // pageshow event fires when page is loaded, including from cache.
+        // event.persisted is true when the page is loaded from the back/forward cache.
+        if (event.persisted) {
+          // This was a back/forward navigation from cache.
+          document.querySelectorAll('form.submitting').forEach(form => {
+            form.classList.remove('submitting');
+            const submitButton = form.querySelector("button[type=submit]");
+            if (submitButton) {
+              submitButton.disabled = false;
+            }
+          });
+        }
+      });
     </script>
     {{ template "page" . }}
     </body>
