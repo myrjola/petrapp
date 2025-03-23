@@ -8,7 +8,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
         <meta name="robots" content="noindex,nofollow"/>
         <title>Petrapp</title>
-        <meta name="description" content="Personal trainer in your pocket." />
+        <meta name="description" content="Personal trainer in your pocket."/>
         <link rel="stylesheet" {{ nonce }} href="/main.css"/>
         <link rel="icon" href="/logo.svg"/>
         <link rel="mask-icon" href="/logo.svg" color="#000"/>
@@ -66,6 +66,16 @@
         // Follow https://github.com/whatwg/html/issues/10831 for updates on the standardization.
         if (e.hasUAVisualTransition) {
           window.sessionStorage.setItem("hasUAVisualTransition", "true")
+        }
+      })
+
+      // Form submission detector
+      document.addEventListener('submit', function (e) {
+        const form = e.target;
+        form.classList.add('submitting')
+        const submitButton = form.querySelector("button[type=submit]")
+        if (submitButton) {
+          submitButton.disabled = true
         }
       })
     </script>

@@ -196,6 +196,7 @@
 
 @layer components {
     button {
+        position: relative;
         display: inline-flex;
         border-radius: var(--radius-2);
         background-color: var(--sky-10);
@@ -204,7 +205,8 @@
         font-size: var(--font-size-1);
         font-weight: var(--font-weight-7);
         letter-spacing: var(--font-letterspacing-3);
-        padding: var(--size-2) var(--size-3);
+        --vertical-padding: 2.5em;
+        padding: var(--size-2) var(--vertical-padding);
         border: none;
         white-space: nowrap;
 
@@ -215,6 +217,27 @@
 
         &:focus-visible {
             outline: var(--white) solid 2px;
+        }
+
+        /* Add a spinner to a button when submitting */
+        form.submitting &[type=submit] {
+            cursor: wait;
+
+            &::before {
+                content: "";
+                position: absolute;
+                left: 0.8em;
+                top: 50%;
+                transform: translateY(-50%);
+                --spinner-size: calc(var(--vertical-padding) / 2);
+                width: var(--spinner-size);
+                height: var(--spinner-size);
+                border-radius: 50%;
+                border: 3px solid transparent;
+                border-top-color: var(--sky-5);
+                border-right-color: var(--sky-5);
+                animation: button-spinner 0.8s linear infinite;
+            }
         }
     }
 }
@@ -289,5 +312,11 @@
     }
     to {
         transform: translateX(0);
+    }
+}
+
+@keyframes button-spinner {
+    to {
+        transform: translateY(-50%) rotate(360deg);
     }
 }
