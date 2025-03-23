@@ -30,12 +30,6 @@ type exerciseJSONSchema struct {
 }
 
 func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
-	// encode the muscle groups into the JSON schema
-	muscleGroupsJSON, err := json.Marshal(ejs.muscleGroups)
-	if err != nil {
-		return nil, fmt.Errorf("marshal muscle groups: %w", err)
-	}
-
 	schema := map[string]interface{}{
 		"type": "object",
 		"required": []string{
@@ -83,7 +77,11 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 		},
 		"additionalProperties": false,
 	}
-	return json.Marshal(schema)
+	result, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("marshal exercise schema: %w", err)
+	}
+	return result, nil
 }
 
 // Set represents a single set of an exercise with target and actual performance.
