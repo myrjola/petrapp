@@ -200,7 +200,8 @@
                                     <label for="weight-{{ $index }}">Weight</label>
                                     <input
                                             id="weight-{{ $index }}"
-                                            type="number"
+                                            inputmode="decimal"
+                                            pattern="[0-9,\.]*"
                                             name="weight"
                                             value="{{ $set.WeightKg }}"
                                             step="0.5"
@@ -211,7 +212,8 @@
                                     <label for="reps-{{ $index }}">Reps</label>
                                     <input
                                             id="reps-{{ $index }}"
-                                            type="number"
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
                                             name="reps"
                                             placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
                                             {{ if $set.CompletedReps }}
