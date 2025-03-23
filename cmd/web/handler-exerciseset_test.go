@@ -151,7 +151,8 @@ func Test_application_exerciseSet(t *testing.T) {
 	// Extract the first exercise ID
 	doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
 		if i == 0 { // Just take the first exercise
-			href, exists := s.Attr("href")
+			var href string
+			href, exists = s.Attr("href")
 			if exists {
 				exerciseID = href[len("/workouts/"+today+"/exercises/"):]
 			}
