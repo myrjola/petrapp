@@ -29,7 +29,9 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func(db *sqlite.Database) {
+		_ = db.Close()
+	}(db)
 
 	// Create a test user ID
 	userID := []byte("test-user-id")
@@ -185,7 +187,9 @@ func Test_AddExercise(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func(db *sqlite.Database) {
+		_ = db.Close()
+	}(db)
 
 	// Create a test user ID
 	userID := []byte("test-user-id")
