@@ -287,7 +287,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 	})
 
-	// Test adding an exercise to a non-existent workout (should create it)
+	// Test adding an exercise to a non-existent workout (should return an error)
 	t.Run("Add exercise to non-existent workout", func(t *testing.T) {
 		// Set a future date for a workout that doesn't exist yet
 		futureDate := today.AddDate(0, 0, 7) // 1 week in the future
@@ -299,31 +299,22 @@ func Test_AddExercise(t *testing.T) {
 			t.Fatalf("Failed to check if workout exists: %v", err)
 		}
 		if exists {
-			t.Fatalf("Workout already exists for future date, can't test creation")
+			t.Fatalf("Workout already exists for future date, can't test error case")
 		}
 
-		// Add exercise to the non-existent workout
+		// Add exercise to the non-existent workout - should fail
 		err = svc.AddExercise(ctx, futureDate, exercise1ID)
-		if err != nil {
-			t.Fatalf("Failed to add exercise to non-existent workout: %v", err)
+		if err == nil {
+			t.Error("Expected error when adding exercise to non-existent workout, but got nil")
 		}
 
-		// Verify workout was created
+		// Verify workout was NOT created
 		exists, err = workoutExistsForDate(db, futureDateStr)
 		if err != nil {
 			t.Fatalf("Failed to check if workout was created: %v", err)
 		}
-		if !exists {
-			t.Error("Workout was not created for future date")
-		}
-
-		// Verify the exercise was added
-		exists, err = exerciseExistsInWorkout(db, futureDateStr, exercise1ID)
-		if err != nil {
-			t.Fatalf("Failed to check if exercise exists in new workout: %v", err)
-		}
-		if !exists {
-			t.Error("Exercise was not added to the new workout")
+		if exists {
+			t.Error("Workout was created for future date when it should not have been")
 		}
 	})
 }

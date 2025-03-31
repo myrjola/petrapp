@@ -520,22 +520,10 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
-	// 3. Check if the workout session exists and create it if not
+	// 3. Check if the workout session exists
 	_, err = s.repo.sessions.Get(ctx, date)
 	if errors.Is(err, ErrNotFound) {
-		// Create a minimal session for this date
-		newSession := sessionAggregate{
-			Date:             date,
-			DifficultyRating: nil,
-			StartedAt:        time.Time{},
-			CompletedAt:      time.Time{},
-			ExerciseSets:     []exerciseSetAggregate{},
-		}
-
-		// Create the session
-		if err = s.repo.sessions.Create(ctx, newSession); err != nil {
-			return fmt.Errorf("create session for date %s: %w", formatDate(date), err)
-		}
+		return fmt.Errorf("workout session for date %s does not exist", formatDate(date))
 	} else if err != nil {
 		return fmt.Errorf("check session existence: %w", err)
 	}
