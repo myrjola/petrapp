@@ -161,20 +161,21 @@ func verifyGeneratedWorkout(t *testing.T, session sessionAggregate, date time.Ti
 		}
 
 		// Verify set consistency (all sets for an exercise should have the same rep range)
-		if !setsHaveConsistentRepRanges(exerciseSet.Sets) {
+		if !setsHaveConsistentRepRanges(t, exerciseSet.Sets) {
 			t.Errorf("Exercise %d has inconsistent rep ranges across sets",
 				exerciseSet.ExerciseID)
 		}
 	}
 
 	// Verify exercise uniqueness
-	if !hasUniqueExercises(session.ExerciseSets) {
+	if !hasUniqueExercises(t, session.ExerciseSets) {
 		t.Error("Workout contains duplicate exercises")
 	}
 }
 
 // Helper function to check if an exercise set has consistent rep ranges.
-func setsHaveConsistentRepRanges(sets []Set) bool {
+func setsHaveConsistentRepRanges(t *testing.T, sets []Set) bool {
+	t.Helper()
 	if len(sets) == 0 {
 		return true
 	}
@@ -192,7 +193,8 @@ func setsHaveConsistentRepRanges(sets []Set) bool {
 }
 
 // Helper function to check if all exercises in a workout are unique.
-func hasUniqueExercises(exerciseSets []exerciseSetAggregate) bool {
+func hasUniqueExercises(t *testing.T, exerciseSets []exerciseSetAggregate) bool {
+	t.Helper()
 	exerciseIDs := make(map[int]bool)
 
 	for _, es := range exerciseSets {
@@ -783,11 +785,11 @@ func verifyContinuityBetweenWeeks(t *testing.T, sessions []sessionAggregate) {
 
 	// For each pair of consecutive workouts
 	for i := 1; i < len(sessions); i++ {
-		currentExercises := getExerciseIDs(sessions[i])
-		previousExercises := getExerciseIDs(sessions[i-1])
+		currentExercises := getExerciseIDs(t, sessions[i])
+		previousExercises := getExerciseIDs(t, sessions[i-1])
 
 		// Calculate continuity percentage
-		commonExercises := countCommonElements(currentExercises, previousExercises)
+		commonExercises := countCommonElements(t, currentExercises, previousExercises)
 		continuityPercentage := float64(commonExercises) / float64(len(previousExercises)) * 100
 
 		// We expect around 80% continuity
@@ -809,7 +811,7 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession sessionAg
 	rating := *previousSession.DifficultyRating
 
 	// Find exercises that exist in both workouts for comparison
-	commonExercises := findCommonExercises(previousSession, nextSession)
+	commonExercises := findCommonExercises(t, previousSession, nextSession)
 
 	if len(commonExercises) == 0 {
 		t.Errorf("No common exercises found between workouts to verify feedback response")
@@ -817,8 +819,8 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession sessionAg
 
 	// Check weight changes based on feedback
 	for _, pair := range commonExercises {
-		prevWeight := getAverageWeight(pair.previous)
-		nextWeight := getAverageWeight(pair.next)
+		prevWeight := getAverageWeight(t, pair.previous)
+		nextWeight := getAverageWeight(t, pair.next)
 
 		switch rating {
 		case 1: // Too easy
@@ -872,7 +874,8 @@ func verifyFeedbackResponse(t *testing.T, previousSession, nextSession sessionAg
 // Helper functions for data manipulation
 
 // Get list of exercise IDs from a session.
-func getExerciseIDs(session sessionAggregate) []int {
+func getExerciseIDs(t *testing.T, session sessionAggregate) []int {
+	t.Helper()
 	ids := make([]int, 0, len(session.ExerciseSets))
 	for _, exerciseSet := range session.ExerciseSets {
 		ids = append(ids, exerciseSet.ExerciseID)
@@ -881,7 +884,8 @@ func getExerciseIDs(session sessionAggregate) []int {
 }
 
 // Count common elements between two slices.
-func countCommonElements(slice1, slice2 []int) int {
+func countCommonElements(t *testing.T, slice1, slice2 []int) int {
+	t.Helper()
 	set := make(map[int]bool)
 	for _, val := range slice1 {
 		set[val] = true
@@ -904,7 +908,8 @@ type exercisePair struct {
 }
 
 // FindCommonExercises finds exercises that exist in both workouts.
-func findCommonExercises(prev, next sessionAggregate) []exercisePair {
+func findCommonExercises(t *testing.T, prev, next sessionAggregate) []exercisePair {
+	t.Helper()
 	var common []exercisePair
 
 	for _, prevEx := range prev.ExerciseSets {
@@ -924,7 +929,8 @@ func findCommonExercises(prev, next sessionAggregate) []exercisePair {
 }
 
 // Get average weight across all sets for an exercise.
-func getAverageWeight(exerciseSet exerciseSetAggregate) float64 {
+func getAverageWeight(t *testing.T, exerciseSet exerciseSetAggregate) float64 {
+	t.Helper()
 	if len(exerciseSet.Sets) == 0 {
 		return 0
 	}

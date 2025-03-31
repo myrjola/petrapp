@@ -47,7 +47,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 
 	// Insert necessary muscle groups
 	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
-		if err = tryInsertMuscleGroup(ctx, db, group); err != nil {
+		if err = tryInsertMuscleGroup(t, ctx, db, group); err != nil {
 			t.Fatalf("Failed to insert muscle group: %v", err)
 		}
 	}
@@ -105,7 +105,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	}
 
 	// 3. Verify exercise set exists
-	countBefore, err := countExerciseSets(db, exerciseID)
+	countBefore, err := countExerciseSets(t, db, exerciseID)
 	if err != nil {
 		t.Fatalf("Failed to count exercise sets before update: %v", err)
 	}
@@ -132,7 +132,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	}
 
 	// 5. Verify exercise sets still exist after update
-	countAfter, err := countExerciseSets(db, exerciseID)
+	countAfter, err := countExerciseSets(t, db, exerciseID)
 	if err != nil {
 		t.Fatalf("Failed to count exercise sets after update: %v", err)
 	}
@@ -147,7 +147,8 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 }
 
 // Helper function to count exercise sets for a given exercise.
-func countExerciseSets(db *sqlite.Database, exerciseID int) (int, error) {
+func countExerciseSets(t *testing.T, db *sqlite.Database, exerciseID int) (int, error) {
+	t.Helper()
 	var count int
 	err := db.ReadOnly.QueryRow(
 		"SELECT COUNT(*) FROM exercise_sets WHERE exercise_id = ?",
@@ -157,7 +158,8 @@ func countExerciseSets(db *sqlite.Database, exerciseID int) (int, error) {
 }
 
 // Try to insert a muscle group, ignoring if it already exists.
-func tryInsertMuscleGroup(ctx context.Context, db *sqlite.Database, name string) error {
+func tryInsertMuscleGroup(t *testing.T, ctx context.Context, db *sqlite.Database, name string) error {
+	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx, "INSERT INTO muscle_groups (name) VALUES (?)", name)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
 		// Muscle group already exists, which is fine
@@ -201,18 +203,18 @@ func Test_AddExercise(t *testing.T) {
 
 	// Insert necessary muscle groups
 	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
-		if err = tryInsertMuscleGroup(ctx, db, group); err != nil {
+		if err = tryInsertMuscleGroup(t, ctx, db, group); err != nil {
 			t.Fatalf("Failed to insert muscle group: %v", err)
 		}
 	}
 
 	// Create test exercises
-	exercise1ID, err := createTestExercise(ctx, db, "Test Exercise 1", "lower")
+	exercise1ID, err := createTestExercise(t, ctx, db, "Test Exercise 1", "lower")
 	if err != nil {
 		t.Fatalf("Failed to create test exercise 1: %v", err)
 	}
 
-	exercise2ID, err := createTestExercise(ctx, db, "Test Exercise 2", "upper")
+	exercise2ID, err := createTestExercise(t, ctx, db, "Test Exercise 2", "upper")
 	if err != nil {
 		t.Fatalf("Failed to create test exercise 2: %v", err)
 	}
@@ -246,7 +248,7 @@ func Test_AddExercise(t *testing.T) {
 	// Test adding a new exercise
 	t.Run("Add exercise to existing workout", func(t *testing.T) {
 		// Count exercise sets before adding
-		countBefore, err := countExerciseSetsForWorkout(svc, ctx, today)
+		countBefore, err := countExerciseSetsForWorkout(t, svc, ctx, today)
 		if err != nil {
 			t.Fatalf("Failed to count exercise sets before update: %v", err)
 		}
@@ -258,7 +260,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Count exercise sets after adding
-		countAfter, err := countExerciseSetsForWorkout(svc, ctx, today)
+		countAfter, err := countExerciseSetsForWorkout(t, svc, ctx, today)
 		if err != nil {
 			t.Fatalf("Failed to count exercise sets after update: %v", err)
 		}
@@ -270,7 +272,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Verify the added exercise exists in the workout
-		exists, err := exerciseExistsInWorkout(svc, ctx, today, exercise2ID)
+		exists, err := exerciseExistsInWorkout(t, svc, ctx, today, exercise2ID)
 		if err != nil {
 			t.Fatalf("Failed to check if exercise exists in workout: %v", err)
 		}
@@ -294,7 +296,7 @@ func Test_AddExercise(t *testing.T) {
 		futureDate := today.AddDate(0, 0, 7) // 1 week in the future
 
 		// Verify the workout doesn't exist yet
-		exists, err := workoutExistsForDate(svc, ctx, futureDate)
+		exists, err := workoutExistsForDate(t, svc, ctx, futureDate)
 		if err != nil {
 			t.Fatalf("Failed to check if workout exists: %v", err)
 		}
@@ -309,7 +311,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Verify workout was NOT created
-		exists, err = workoutExistsForDate(svc, ctx, futureDate)
+		exists, err = workoutExistsForDate(t, svc, ctx, futureDate)
 		if err != nil {
 			t.Fatalf("Failed to check if workout was created: %v", err)
 		}
@@ -320,7 +322,8 @@ func Test_AddExercise(t *testing.T) {
 }
 
 // Helper function to create a test exercise.
-func createTestExercise(ctx context.Context, db *sqlite.Database, name, category string) (int, error) {
+func createTestExercise(t *testing.T, ctx context.Context, db *sqlite.Database, name, category string) (int, error) {
+	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx,
 		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
 		name, category, "Test description")
@@ -347,7 +350,8 @@ func createTestExercise(ctx context.Context, db *sqlite.Database, name, category
 }
 
 // Helper function to count exercise sets for a specific workout date.
-func countExerciseSetsForWorkout(svc *workout.Service, ctx context.Context, date time.Time) (int, error) {
+func countExerciseSetsForWorkout(t *testing.T, svc *workout.Service, ctx context.Context, date time.Time) (int, error) {
+	t.Helper()
 	session, err := svc.GetSession(ctx, date)
 	if err != nil {
 		return 0, err
@@ -363,7 +367,8 @@ func countExerciseSetsForWorkout(svc *workout.Service, ctx context.Context, date
 }
 
 // Helper function to check if an exercise exists in a workout.
-func exerciseExistsInWorkout(svc *workout.Service, ctx context.Context, date time.Time, exerciseID int) (bool, error) {
+func exerciseExistsInWorkout(t *testing.T, svc *workout.Service, ctx context.Context, date time.Time, exerciseID int) (bool, error) {
+	t.Helper()
 	session, err := svc.GetSession(ctx, date)
 	if err != nil {
 		return false, err
@@ -380,7 +385,8 @@ func exerciseExistsInWorkout(svc *workout.Service, ctx context.Context, date tim
 }
 
 // Helper function to check if a workout exists for a date.
-func workoutExistsForDate(svc *workout.Service, ctx context.Context, date time.Time) (bool, error) {
+func workoutExistsForDate(t *testing.T, svc *workout.Service, ctx context.Context, date time.Time) (bool, error) {
+	t.Helper()
 	_, err := svc.GetSession(ctx, date)
 	if err != nil {
 		if errors.Is(err, workout.ErrNotFound) {
