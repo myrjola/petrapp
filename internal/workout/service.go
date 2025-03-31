@@ -499,7 +499,7 @@ func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) (
 	return otherExercises, nil
 }
 
-// Default rep ranges
+// Default rep ranges.
 const (
 	defaultMinReps = 8
 	defaultMaxReps = 12
