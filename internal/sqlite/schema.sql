@@ -97,7 +97,7 @@ CREATE TABLE exercise_sets
 (
     workout_user_id    BLOB    NOT NULL,
     workout_date       TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
-    exercise_id        INTEGER NOT NULL REFERENCES exercises (id) ON DELETE CASCADE,
+    exercise_id        INTEGER NOT NULL,
     set_number         INTEGER NOT NULL CHECK (set_number > 0),
     weight_kg          REAL    NOT NULL CHECK (weight_kg >= 0),
     min_reps           INTEGER NOT NULL CHECK (min_reps > 0),
@@ -105,7 +105,8 @@ CREATE TABLE exercise_sets
     completed_reps     INTEGER,
 
     PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
-    FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE
+    FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
 ) WITHOUT ROWID, STRICT;
 
 CREATE TABLE muscle_groups
