@@ -2,6 +2,7 @@ package workout_test
 
 import (
 	"context"
+	"errors"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/workout"
@@ -245,7 +246,7 @@ func Test_AddExercise(t *testing.T) {
 	// Test adding a new exercise
 	t.Run("Add exercise to existing workout", func(t *testing.T) {
 		// Count exercise sets before adding
-		countBefore, err := countExerciseSetsForWorkout(db, dateStr)
+		countBefore, err := countExerciseSetsForWorkout(svc, ctx, today)
 		if err != nil {
 			t.Fatalf("Failed to count exercise sets before update: %v", err)
 		}
@@ -257,7 +258,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Count exercise sets after adding
-		countAfter, err := countExerciseSetsForWorkout(db, dateStr)
+		countAfter, err := countExerciseSetsForWorkout(svc, ctx, today)
 		if err != nil {
 			t.Fatalf("Failed to count exercise sets after update: %v", err)
 		}
@@ -269,7 +270,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Verify the added exercise exists in the workout
-		exists, err := exerciseExistsInWorkout(db, dateStr, exercise2ID)
+		exists, err := exerciseExistsInWorkout(svc, ctx, today, exercise2ID)
 		if err != nil {
 			t.Fatalf("Failed to check if exercise exists in workout: %v", err)
 		}
@@ -291,10 +292,9 @@ func Test_AddExercise(t *testing.T) {
 	t.Run("Add exercise to non-existent workout", func(t *testing.T) {
 		// Set a future date for a workout that doesn't exist yet
 		futureDate := today.AddDate(0, 0, 7) // 1 week in the future
-		futureDateStr := futureDate.Format("2006-01-02")
 
 		// Verify the workout doesn't exist yet
-		exists, err := workoutExistsForDate(db, futureDateStr)
+		exists, err := workoutExistsForDate(svc, ctx, futureDate)
 		if err != nil {
 			t.Fatalf("Failed to check if workout exists: %v", err)
 		}
@@ -309,7 +309,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Verify workout was NOT created
-		exists, err = workoutExistsForDate(db, futureDateStr)
+		exists, err = workoutExistsForDate(svc, ctx, futureDate)
 		if err != nil {
 			t.Fatalf("Failed to check if workout was created: %v", err)
 		}
@@ -347,31 +347,46 @@ func createTestExercise(ctx context.Context, db *sqlite.Database, name, category
 }
 
 // Helper function to count exercise sets for a specific workout date.
-func countExerciseSetsForWorkout(db *sqlite.Database, dateStr string) (int, error) {
-	var count int
-	err := db.ReadOnly.QueryRow(
-		"SELECT COUNT(*) FROM exercise_sets WHERE workout_date = ?",
-		dateStr,
-	).Scan(&count)
-	return count, err
+func countExerciseSetsForWorkout(svc *workout.Service, ctx context.Context, date time.Time) (int, error) {
+	session, err := svc.GetSession(ctx, date)
+	if err != nil {
+		return 0, err
+	}
+
+	// Count total sets across all exercises
+	totalSets := 0
+	for _, exerciseSet := range session.ExerciseSets {
+		totalSets += len(exerciseSet.Sets)
+	}
+
+	return totalSets, nil
 }
 
 // Helper function to check if an exercise exists in a workout.
-func exerciseExistsInWorkout(db *sqlite.Database, dateStr string, exerciseID int) (bool, error) {
-	var count int
-	err := db.ReadOnly.QueryRow(
-		"SELECT COUNT(*) FROM exercise_sets WHERE workout_date = ? AND exercise_id = ?",
-		dateStr, exerciseID,
-	).Scan(&count)
-	return count > 0, err
+func exerciseExistsInWorkout(svc *workout.Service, ctx context.Context, date time.Time, exerciseID int) (bool, error) {
+	session, err := svc.GetSession(ctx, date)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if any exercise set has the specified exercise ID
+	for _, exerciseSet := range session.ExerciseSets {
+		if exerciseSet.Exercise.ID == exerciseID {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // Helper function to check if a workout exists for a date.
-func workoutExistsForDate(db *sqlite.Database, dateStr string) (bool, error) {
-	var count int
-	err := db.ReadOnly.QueryRow(
-		"SELECT COUNT(*) FROM workout_sessions WHERE workout_date = ?",
-		dateStr,
-	).Scan(&count)
-	return count > 0, err
+func workoutExistsForDate(svc *workout.Service, ctx context.Context, date time.Time) (bool, error) {
+	_, err := svc.GetSession(ctx, date)
+	if err != nil {
+		if errors.Is(err, workout.ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
