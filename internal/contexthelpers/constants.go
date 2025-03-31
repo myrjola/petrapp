@@ -2,9 +2,9 @@ package contexthelpers
 
 type contextKey string
 
-const isAuthenticatedContextKey = contextKey("isAuthenticated")
-const authenticatedUserIDContextKey = contextKey("authenticatedUserID")
-const currentPathContextKey = contextKey("currentPath")
-const csrfTokenContextKey = contextKey("csrfToken")
-const cspNonceContextKey = contextKey("cspNonce")
-const isAdminContextKey = contextKey("isAdmin")
+const IsAuthenticatedContextKey = contextKey("isAuthenticated")
+const AuthenticatedUserIDContextKey = contextKey("authenticatedUserID")
+const CurrentPathContextKey = contextKey("currentPath")
+const CsrfTokenContextKey = contextKey("csrfToken")
+const CspNonceContextKey = contextKey("cspNonce")
+const IsAdminContextKey = contextKey("isAdmin")

@@ -5,7 +5,7 @@ import (
 )
 
 func IsAuthenticated(ctx context.Context) bool {
-	isAuthenticated, ok := ctx.Value(isAuthenticatedContextKey).(bool)
+	isAuthenticated, ok := ctx.Value(IsAuthenticatedContextKey).(bool)
 	if !ok {
 		return false
 	}
@@ -14,7 +14,7 @@ func IsAuthenticated(ctx context.Context) bool {
 }
 
 func AuthenticatedUserID(ctx context.Context) []byte {
-	userID, ok := ctx.Value(authenticatedUserIDContextKey).([]byte)
+	userID, ok := ctx.Value(AuthenticatedUserIDContextKey).([]byte)
 	if !ok {
 		return nil
 	}
@@ -23,7 +23,7 @@ func AuthenticatedUserID(ctx context.Context) []byte {
 }
 
 func CurrentPath(ctx context.Context) string {
-	currentPath, ok := ctx.Value(currentPathContextKey).(string)
+	currentPath, ok := ctx.Value(CurrentPathContextKey).(string)
 	if !ok {
 		return ""
 	}
@@ -32,7 +32,7 @@ func CurrentPath(ctx context.Context) string {
 }
 
 func CSRFToken(ctx context.Context) string {
-	csrfToken, ok := ctx.Value(csrfTokenContextKey).(string)
+	csrfToken, ok := ctx.Value(CsrfTokenContextKey).(string)
 	if !ok {
 		return ""
 	}
@@ -41,7 +41,7 @@ func CSRFToken(ctx context.Context) string {
 }
 
 func CSPNonce(ctx context.Context) string {
-	cspNonce, ok := ctx.Value(cspNonceContextKey).(string)
+	cspNonce, ok := ctx.Value(CspNonceContextKey).(string)
 	if !ok {
 		return ""
 	}
@@ -50,7 +50,7 @@ func CSPNonce(ctx context.Context) string {
 }
 
 func IsAdmin(ctx context.Context) bool {
-	isAdmin, ok := ctx.Value(isAdminContextKey).(bool)
+	isAdmin, ok := ctx.Value(IsAdminContextKey).(bool)
 	if !ok {
 		return false
 	}

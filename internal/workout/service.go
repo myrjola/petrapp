@@ -498,3 +498,100 @@ func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) (
 
 	return otherExercises, nil
 }
+
+// Default rep ranges
+const (
+	defaultMinReps = 8
+	defaultMaxReps = 12
+)
+
+// AddExercise adds a new exercise to an existing workout session.
+// It will retrieve historical weight data if available.
+func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID int) error {
+	// 1. Validate the exercise exists
+	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	if err != nil {
+		return fmt.Errorf("get exercise: %w", err)
+	}
+
+	// 2. Find historical data for the exercise
+	historicalSets, err := s.findHistoricalSets(ctx, date, exerciseID)
+	if err != nil {
+		return fmt.Errorf("find historical sets: %w", err)
+	}
+
+	// 3. Check if the workout session exists and create it if not
+	_, err = s.repo.sessions.Get(ctx, date)
+	if errors.Is(err, ErrNotFound) {
+		// Create a minimal session for this date
+		newSession := sessionAggregate{
+			Date:             date,
+			DifficultyRating: nil,
+			StartedAt:        time.Time{},
+			CompletedAt:      time.Time{},
+			ExerciseSets:     []exerciseSetAggregate{},
+		}
+
+		// Create the session
+		if err = s.repo.sessions.Create(ctx, newSession); err != nil {
+			return fmt.Errorf("create session for date %s: %w", formatDate(date), err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("check session existence: %w", err)
+	}
+
+	// 4. Update the session to add the new exercise
+	err = s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
+		// Check if the exercise already exists in the session
+		for _, existingExercise := range sess.ExerciseSets {
+			if existingExercise.ExerciseID == exerciseID {
+				return false, fmt.Errorf("exercise %s already exists in workout for date %s",
+					exercise.Name, formatDate(date))
+			}
+		}
+
+		// Create sets for the exercise
+		var newSets []Set
+		if historicalSets != nil {
+			// Use historical sets if available
+			newSets = historicalSets
+		} else {
+			// Create default sets if no historical data exists
+			newSets = []Set{
+				{
+					WeightKg:      0,
+					MinReps:       defaultMinReps,
+					MaxReps:       defaultMaxReps,
+					CompletedReps: nil,
+				},
+				{
+					WeightKg:      0,
+					MinReps:       defaultMinReps,
+					MaxReps:       defaultMaxReps,
+					CompletedReps: nil,
+				},
+				{
+					WeightKg:      0,
+					MinReps:       defaultMinReps,
+					MaxReps:       defaultMaxReps,
+					CompletedReps: nil,
+				},
+			}
+		}
+
+		// Add the new exercise to the session
+		newExerciseSet := exerciseSetAggregate{
+			ExerciseID: exerciseID,
+			Sets:       newSets,
+		}
+
+		sess.ExerciseSets = append(sess.ExerciseSets, newExerciseSet)
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("update session with new exercise: %w", err)
+	}
+
+	return nil
+}
