@@ -14,7 +14,7 @@ import (
 
 // exerciseGenerator generates exercises using OpenAI API.
 type exerciseGenerator struct {
-	client       *openai.Client
+	client       openai.Client
 	muscleGroups []string
 }
 
@@ -76,25 +76,27 @@ Return only the valid JSON object with no additional text or explanation.`,
 		name, name, strings.Join(eg.muscleGroups, ", "))
 
 	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
-		Name:        openai.F("exercise"),
-		Description: openai.F("Detailed information about a fitness exercise"),
-		Schema:      openai.F(interface{}(exerciseJSONSchema{muscleGroups: eg.muscleGroups})),
+		Name:        "exercise",
+		Description: openai.Opt("Detailed information about a fitness exercise"),
+		Schema:      openai.Opt(interface{}(exerciseJSONSchema{muscleGroups: eg.muscleGroups})),
 		Strict:      openai.Bool(true),
 	}
 
 	// Query the OpenAI API
 	chat, err := eg.client.Chat.Completions.New(ctx,
 		openai.ChatCompletionNewParams{ //nolint:exhaustruct // only need to set a few fields.
-			Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
+			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage(prompt),
-			}),
-			ResponseFormat: openai.F[openai.ChatCompletionNewParamsResponseFormatUnion](
-				openai.ResponseFormatJSONSchemaParam{
-					Type:       openai.F(openai.ResponseFormatJSONSchemaTypeJSONSchema),
-					JSONSchema: openai.F(schemaParam),
+			},
+			ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
+				OfText: nil,
+				OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
+					Type:       "json_schema",
+					JSONSchema: schemaParam,
 				},
-			),
-			Model: openai.F(openai.ChatModelGPT4o2024_08_06),
+				OfJSONObject: nil,
+			},
+			Model: openai.ChatModelGPT4o2024_08_06,
 		})
 
 	if err != nil {
