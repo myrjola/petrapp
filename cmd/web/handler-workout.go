@@ -246,3 +246,76 @@ type exerciseSwapTemplateData struct {
 	CurrentExercise     workout.Exercise
 	CompatibleExercises []workout.Exercise
 }
+
+// exerciseAddTemplateData contains data for the exercise add template.
+type exerciseAddTemplateData struct {
+	BaseTemplateData
+	Date      time.Time
+	Exercises []workout.Exercise
+}
+
+// workoutAddExerciseGET handles GET requests to show available exercises for adding.
+func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Get all exercises
+	exercises, err := app.workoutService.List(r.Context())
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Prepare template data
+	data := exerciseAddTemplateData{
+		BaseTemplateData: newBaseTemplateData(r),
+		Date:             date,
+		Exercises:        exercises,
+	}
+
+	app.render(w, r, http.StatusOK, "exercise-add", data)
+}
+
+// workoutAddExercisePOST handles POST requests to add an exercise to a workout.
+func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Parse form
+	if err = r.ParseForm(); err != nil {
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+		return
+	}
+
+	// Get exercise ID from form
+	exerciseIDStr := r.PostForm.Get("exercise_id")
+	if exerciseIDStr == "" {
+		app.serverError(w, r, errors.New("exercise ID not provided"))
+		return
+	}
+
+	exerciseID, err := strconv.Atoi(exerciseIDStr)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("parse exercise ID: %w", err))
+		return
+	}
+
+	// Add exercise to workout
+	if err = app.workoutService.AddExercise(r.Context(), date, exerciseID); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Redirect to workout page
+	http.Redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")), http.StatusSeeOther)
+}

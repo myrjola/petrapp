@@ -1,0 +1,193 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseAddTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+            }
+        </style>
+
+        <header>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: center;
+
+                        a {
+                            color: var(--gray-7);
+                            text-decoration: none;
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            padding: var(--size-2);
+                            border-radius: var(--radius-2);
+
+                            &:hover {
+                                background: var(--gray-1);
+                            }
+                        }
+
+                        h1 {
+                            font-size: var(--font-size-4);
+                            font-weight: var(--font-weight-6);
+                        }
+                    }
+                }
+            </style>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}">← Back</a>
+            <h1>Add Exercise</h1>
+        </header>
+
+        <section class="available-exercises">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        h2 {
+                            font-size: var(--font-size-2);
+                            margin-bottom: var(--size-3);
+                        }
+
+                        .exercises-list {
+                            display: flex;
+                            flex-direction: column;
+                            gap: var(--size-3);
+                        }
+
+                        .exercise-option {
+                            background: var(--white);
+                            border: 1px solid var(--gray-3);
+                            border-radius: var(--radius-2);
+                            padding: var(--size-3);
+                        }
+
+                        .exercise-name {
+                            font-weight: var(--font-weight-6);
+                            margin-bottom: var(--size-1);
+                        }
+
+                        .option-details {
+                            font-size: var(--font-size-0);
+                            color: var(--gray-6);
+                            margin-bottom: var(--size-3);
+                        }
+
+                        .category {
+                            margin-bottom: var(--size-1);
+                        }
+
+                        .add-button {
+                            background-color: var(--lime-2);
+                            color: var(--lime-9);
+                            border: none;
+                            border-radius: var(--radius-2);
+                            padding: var(--size-2) var(--size-3);
+                            font-weight: var(--font-weight-6);
+                            cursor: pointer;
+                            width: 100%;
+
+                            &:hover {
+                                background-color: var(--lime-3);
+                            }
+                        }
+                    }
+                }
+            </style>
+            <h2>Choose Exercise to Add</h2>
+
+            <div class="exercises-list">
+                {{ range .Exercises }}
+                    <div class="exercise-option">
+                        <div class="exercise-name">{{ .Name }}</div>
+                        <div class="option-details">
+                            <div class="category">
+                                {{ if eq .Category "full_body" }}Full Body{{ end }}
+                                {{ if eq .Category "upper" }}Upper Body{{ end }}
+                                {{ if eq .Category "lower" }}Lower Body{{ end }}
+                            </div>
+                            <div class="muscle-groups">
+                                Primary: {{ range $i, $g := .PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
+                            </div>
+                        </div>
+                        <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/add-exercise">
+                            {{ csrf }}
+                            <input type="hidden" name="exercise_id" value="{{ .ID }}">
+                            <button type="submit" class="add-button">Add this exercise</button>
+                        </form>
+                        <dialog id="dialog-exercise-{{ .ID }}" class="full-width-dialog">
+                            <style {{ nonce }}>
+                                @scope {
+                                    :scope {
+                                        padding: var(--size-3);
+                                        border: none;
+                                        position: fixed;
+                                        top: 0;
+                                        bottom: 0;
+                                        left: 0;
+                                        right: 0;
+                                        transform: translateY(100%);
+                                        animation: slide-up 0.3s ease-in-out forwards;
+                                        transition-behavior: allow-discrete;
+                                    }
+
+                                    @keyframes slide-up {
+                                        from {
+                                            transform: translateY(100%);
+                                        }
+                                        to {
+                                            transform: translateY(0);
+                                        }
+                                    }
+
+                                    :scope::backdrop {
+                                        background-color: rgba(0, 0, 0, 0.5);
+                                        animation: fade-in 0.3s ease-out forwards;
+                                    }
+
+                                    @keyframes fade-in {
+                                        from {
+                                            opacity: 0;
+                                        }
+                                        to {
+                                            opacity: 1;
+                                        }
+                                    }
+
+                                    form {
+                                        display: flex;
+                                        justify-content: flex-end;
+                                        margin-bottom: var(--size-3);
+                                    }
+
+                                    button {
+                                        padding: var(--size-2);
+                                        border-radius: var(--radius-1);
+                                    }
+                                }
+                            </style>
+                            <form method="dialog">
+                                <button formmethod="dialog">Close</button>
+                            </form>
+                            {{ mdToHTML .DescriptionMarkdown }}
+                        </dialog>
+                        <button type="button">
+                            <script {{ nonce }}>
+                              me().addEventListener('click', () => {
+                                document.getElementById('dialog-exercise-{{ .ID }}').showModal();
+                              });
+                            </script>
+                            Info
+                        </button>
+                    </div>
+                {{ end }}
+            </div>
+        </section>
+    </main>
+{{ end }}

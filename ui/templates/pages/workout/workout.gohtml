@@ -45,6 +45,28 @@
                                 background: var(--gray-2);
                             }
                         }
+
+                        .add-exercise {
+                            display: flex;
+                            justify-content: center;
+                            margin-top: var(--size-2);
+                        }
+
+                        .add-exercise-button {
+                            background-color: var(--lime-2);
+                            color: var(--lime-9);
+                            border: none;
+                            border-radius: var(--radius-2);
+                            padding: var(--size-2) var(--size-3);
+                            font-weight: var(--font-weight-6);
+                            cursor: pointer;
+                            text-decoration: none;
+                            display: inline-block;
+
+                            &:hover {
+                                background-color: var(--lime-3);
+                            }
+                        }
                     }
                 }
             </style>
@@ -55,6 +77,12 @@
                     {{ .Exercise.Name }}
                 </a>
             {{ end }}
+
+            <div class="add-exercise">
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/add-exercise" class="add-exercise-button">
+                    Add Exercise
+                </a>
+            </div>
         </div>
 
         <div class="complete-workout">
