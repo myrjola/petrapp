@@ -1,7 +1,7 @@
 # -------------------------------------------------------
 #  Build stage for Go binary compilation
 # -------------------------------------------------------
-FROM --platform=linux/amd64 golang:1.24.1-alpine AS go-builder
+FROM --platform=linux/amd64 golang:1.24.2-alpine AS go-builder
 
 # Install build dependencies if needed for any packages with C dependencies
 # For a simpler build without static linking, we may not need these
