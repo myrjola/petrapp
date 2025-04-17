@@ -143,11 +143,12 @@ func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 
 	var (
 		registrationStartURLPath = "/api/registration/start"
-		csrfToken                string
+		hiddenFields             map[string]string
 	)
-	if csrfToken, err = c.extractCSRFToken(doc, registrationStartURLPath); err != nil {
-		return nil, fmt.Errorf("extract CSRF token: %w", err)
+	if hiddenFields, err = c.extractHiddenFormFields(doc, registrationStartURLPath); err != nil {
+		return nil, fmt.Errorf("extract hidden form fields: %w", err)
 	}
+	csrfToken := hiddenFields["csrf_token"]
 	var attOpts *virtualwebauthn.AttestationOptions
 	if attOpts, err = c.startRegistration(ctx, registrationStartURLPath, csrfToken); err != nil {
 		return nil, fmt.Errorf("start registration: %w", err)
@@ -252,11 +253,12 @@ func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
 
 	var (
 		loginStartURLPath = "/api/login/start"
-		csrfToken         string
+		hiddenFields      map[string]string
 	)
-	if csrfToken, err = c.extractCSRFToken(doc, loginStartURLPath); err != nil {
-		return nil, fmt.Errorf("extract CSRF token: %w", err)
+	if hiddenFields, err = c.extractHiddenFormFields(doc, loginStartURLPath); err != nil {
+		return nil, fmt.Errorf("extract hidden form fields: %w", err)
 	}
+	csrfToken := hiddenFields["csrf_token"]
 
 	var asOpts *virtualwebauthn.AssertionOptions
 	if asOpts, err = c.startLogin(ctx, loginStartURLPath, csrfToken); err != nil {
@@ -353,14 +355,28 @@ func (c *Client) Logout(ctx context.Context) (*goquery.Document, error) {
 	return doc, nil
 }
 
-func (c *Client) extractCSRFToken(doc *goquery.Document, formActionURLPath string) (string, error) {
+func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPath string) (map[string]string, error) {
 	formSelector := fmt.Sprintf("form[action='%s']", formActionURLPath)
 	form := doc.Find(formSelector)
-	csrfToken, ok := form.Find("input[name=csrf_token]").Attr("value")
-	if !ok {
-		return "", errors.New("csrf_token not found in form")
+
+	// Initialize the map to store hidden field values
+	hiddenFields := make(map[string]string)
+
+	// Find all hidden input fields
+	form.Find("input[type=hidden]").Each(func(i int, s *goquery.Selection) {
+		name, nameExists := s.Attr("name")
+		value, valueExists := s.Attr("value")
+		if nameExists && valueExists {
+			hiddenFields[name] = value
+		}
+	})
+
+	// Check if CSRF token is present
+	if _, ok := hiddenFields["csrf_token"]; !ok {
+		return nil, errors.New("csrf_token not found in form")
 	}
-	return csrfToken, nil
+
+	return hiddenFields, nil
 }
 
 // SubmitForm submits a form in the doc identified with action formActionUrlPath and returns the response document.
@@ -382,16 +398,16 @@ func (c *Client) SubmitForm(
 	return c.submitFormRequest(ctx, formActionURLPath, formData)
 }
 
-// prepareFormData builds the form data needed for submission including CSRF token and form fields.
+// prepareFormData builds the form data needed for submission including hidden form fields.
 func (c *Client) prepareFormData(
 	doc *goquery.Document,
 	formActionURLPath string,
 	formFields map[string]string,
 ) (neturl.Values, error) {
-	// Extract CSRF token from the form
-	csrfToken, err := c.extractCSRFToken(doc, formActionURLPath)
+	// Extract hidden form fields
+	hiddenFields, err := c.extractHiddenFormFields(doc, formActionURLPath)
 	if err != nil {
-		return nil, fmt.Errorf("extract CSRF token: %w", err)
+		return nil, fmt.Errorf("extract hidden form fields: %w", err)
 	}
 
 	// Find the form
@@ -400,9 +416,11 @@ func (c *Client) prepareFormData(
 		return nil, fmt.Errorf("find form: %w", err)
 	}
 
-	// Initialize form data with CSRF token
+	// Initialize form data with hidden fields
 	formData := neturl.Values{}
-	formData.Add("csrf_token", csrfToken)
+	for name, value := range hiddenFields {
+		formData.Add(name, value)
+	}
 
 	// Process form fields
 	if processErr := c.processFormFields(form, formFields, formData); processErr != nil {

@@ -62,31 +62,7 @@ func Test_application_addWorkout(t *testing.T) {
 		t.Error("Expected to find 'Add Exercise' heading")
 	}
 
-	// Find the first exercise option
-	var exerciseID string
-	doc.Find(".exercise-option").Each(func(i int, s *goquery.Selection) {
-		if i == 0 {
-			// Find the form and get the exercise_id input value
-			form := s.Find("form")
-			form.Find("input[name='exercise_id']").Each(func(_ int, input *goquery.Selection) {
-				val, exists := input.Attr("value")
-				if exists {
-					exerciseID = val
-				}
-			})
-		}
-	})
-
-	if exerciseID == "" {
-		t.Fatalf("No exercise found on add exercise page")
-	}
-
-	// Submit the form to add the exercise
-	formData = map[string]string{
-		"exercise_id": exerciseID,
-	}
-
-	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/add-exercise", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/add-exercise", nil); err != nil {
 		t.Fatalf("Failed to submit add exercise form: %v", err)
 	}
 
