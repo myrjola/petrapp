@@ -35,6 +35,11 @@
                             font-weight: var(--font-weight-6);
                         }
 
+                        .exercise.completed {
+                            background-color: var(--lime-2);
+                            color: var(--lime-9);
+                        }
+
                         a.exercise {
                             text-decoration: none;
                             background: var(--gray-1);
@@ -72,8 +77,14 @@
             </style>
 
             {{ range .Session.ExerciseSets }}
+                {{ $allSetsCompleted := true }}
+                {{ range .Sets }}
+                    {{ if eq .CompletedReps nil }}
+                        {{ $allSetsCompleted = false }}
+                    {{ end }}
+                {{ end }}
                 <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
-                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}">
+                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ end }}">
                     {{ .Exercise.Name }}
                 </a>
             {{ end }}
