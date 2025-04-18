@@ -88,7 +88,19 @@
                     }
                 }
             </style>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}">← Back</a>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}">
+                <script {{ nonce }}>
+                  me().addEventListener("click", function (event) {
+                    if (history.length > 1) {
+                      event.preventDefault();
+                      history.back();
+                    }
+                  });
+                </script>
+                <span>
+                    ← Back
+                </span>
+            </a>
             <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
                class="info-button">Info</a>
