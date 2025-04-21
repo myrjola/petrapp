@@ -363,7 +363,7 @@ func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPat
 	hiddenFields := make(map[string]string)
 
 	// Find all hidden input fields
-	form.Find("input[type=hidden]").Each(func(i int, s *goquery.Selection) {
+	form.Find("input[type=hidden]").Each(func(_ int, s *goquery.Selection) {
 		name, nameExists := s.Attr("name")
 		value, valueExists := s.Attr("value")
 		if nameExists && valueExists {
