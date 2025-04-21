@@ -13,7 +13,8 @@ func (app *application) routes() *http.ServeMux {
 	}
 
 	session := func(next http.Handler) http.Handler {
-		return common(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(app.timeout(next))))
+		return noCacheHeaders(common(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(
+			app.timeout(next)))))
 	}
 
 	mustSession := func(next http.Handler) http.Handler {

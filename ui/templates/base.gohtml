@@ -60,12 +60,38 @@
       })
 
       navigation.addEventListener('navigate', (e) => {
-        // The user agent already provided us with a visual transition, e.g., swipe gesture,
-        // there is no need to do one ourselves.
+        // The user agent already provided us with a visual transition, e.g., swipe gesture.
+        // In this case, there is no need to do one ourselves.
         //
         // Follow https://github.com/whatwg/html/issues/10831 for updates on the standardization.
         if (e.hasUAVisualTransition) {
           window.sessionStorage.setItem("hasUAVisualTransition", "true")
+        }
+
+        // Very experimental navigation API testing to see if we can make browser history work like a stack navigator.
+        // Check how backend is setting Content-Location header to understand better how they plumb together.
+        if (e.formData) {
+          e.intercept({
+            async handler() {
+              const result = await fetch(e.destination.url, {
+                method: "POST",
+                body: e.formData,
+              })
+              const baseUrl = window.location.origin;
+              const location = result.headers.get("Content-Location")
+              const locationUrl = new URL(location, baseUrl)
+
+              for (entry of window.navigation.entries()) {
+                const entryUrl = new URL(entry.url)
+                if (entryUrl.pathname === locationUrl.pathname) {
+                  await window.navigation.traverseTo(entry.key).committed
+                  window.navigation.reload()
+                  return
+                }
+              }
+              window.navigation.navigate(location, { history: "replace" })
+            }
+          })
         }
       })
 
@@ -79,9 +105,9 @@
         }
       })
 
-      // Reset form states when page is loaded from browser cache (back button).
+      // Reset form states when the page is loaded from the browser cache (back button).
       window.addEventListener('pageshow', function(event) {
-        // pageshow event fires when page is loaded, including from cache.
+        // pageshow event fires when the page is loaded, including from cache.
         // event.persisted is true when the page is loaded from the back/forward cache.
         if (event.persisted) {
           // This was a back/forward navigation from cache.

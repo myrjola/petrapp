@@ -166,5 +166,5 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	// Redirect to the clean URL (without the edit query parameter)
 	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	redirect(w, r, redirectURL)
 }

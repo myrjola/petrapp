@@ -74,7 +74,7 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Redirect to the completion form
-	http.Redirect(w, r, fmt.Sprintf("/workouts/%s/complete", dateStr), http.StatusSeeOther)
+	redirect(w, r, fmt.Sprintf("/workouts/%s/complete", dateStr))
 }
 
 func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +93,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Redirect to the workout page
-	http.Redirect(w, r, fmt.Sprintf("/workouts/%s", dateStr), http.StatusSeeOther)
+	redirect(w, r, fmt.Sprintf("/workouts/%s", dateStr))
 }
 
 func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +105,7 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch workout session for the date
+	// Fetch a workout session for the date
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
@@ -145,7 +145,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Redirect back to the home page
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	redirect(w, r, "/")
 }
 
 // workoutSwapExerciseGET handles GET requests to show available exercises for swapping.
@@ -234,9 +234,8 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Redirect to exercise set page with the new exercise
-	http.Redirect(w, r,
-		fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), newExerciseID), http.StatusSeeOther)
+	// Redirect to the exercise set page with the new exercise
+	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), newExerciseID))
 }
 
 // exerciseSwapTemplateData contains data for the exercise swap template.
@@ -310,12 +309,12 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Add exercise to workout
+	// Add exercise to the workout
 	if err = app.workoutService.AddExercise(r.Context(), date, exerciseID); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Redirect to workout page
-	http.Redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")), http.StatusSeeOther)
+	// Redirect to the workout page
+	redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
 }

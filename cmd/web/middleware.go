@@ -47,6 +47,14 @@ func cacheForeverHeaders(next http.Handler) http.Handler {
 	})
 }
 
+func noCacheHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (app *application) logRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
@@ -90,7 +98,7 @@ func (app *application) mustAuthenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isAuthenticated := contexthelpers.IsAuthenticated(r.Context())
 		if !isAuthenticated {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			redirect(w, r, "/")
 		}
 		next.ServeHTTP(w, r)
 	})
