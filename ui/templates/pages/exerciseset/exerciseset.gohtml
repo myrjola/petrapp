@@ -204,8 +204,9 @@
 
                     {{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }}
                         <form method="post"
-                              action="{{ if $set.CompletedReps }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ else }}/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update{{ end }}"
-                              id="form-{{ $index }}">
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
+                              id="form-{{ $index }}"
+                        >
                             {{ csrf }}
                             <div class="inputs">
                                 <div class="field">
