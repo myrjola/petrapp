@@ -29,7 +29,40 @@
                 }, 100);
               }
             }
+
+            // Initialize timer
+            initializeTimer();
           });
+
+          function initializeTimer() {
+            const timerDisplay = document.getElementById('workout-timer');
+            const startTime = Date.now();
+
+            function updateTimer() {
+              const elapsed = Date.now() - startTime;
+              const seconds = Math.floor(elapsed / 1000);
+              const minutes = Math.floor(seconds / 60);
+              const hours = Math.floor(minutes / 60);
+
+              const displaySeconds = seconds % 60;
+              const displayMinutes = minutes % 60;
+
+              let timeString = '';
+              if (hours > 0) {
+                timeString = `${hours}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
+              } else {
+                timeString = `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`;
+              }
+
+              timerDisplay.textContent = timeString;
+            }
+
+            // Update timer immediately
+            updateTimer();
+
+            // Update timer every second
+            setInterval(updateTimer, 1000);
+          }
         </script>
 
         <header>
@@ -59,8 +92,19 @@
                             font-weight: var(--font-weight-6);
                         }
 
-                        .info-button {
+                        .timer {
                             margin-left: auto;
+                            background: var(--gray-0);
+                            color: var(--gray-8);
+                            padding: var(--size-1) var(--size-3);
+                            border-radius: var(--radius-2);
+                            font-size: var(--font-size-1);
+                            font-weight: var(--font-weight-6);
+                            font-family: var(--font-mono);
+                            border: 1px solid var(--gray-3);
+                        }
+
+                        .info-button {
                             background: var(--sky-0);
                             color: var(--sky-8);
                             padding: var(--size-1) var(--size-3);
@@ -102,6 +146,7 @@
                 </span>
             </a>
             <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
+            <div class="timer" id="workout-timer">0:00</div>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
                class="info-button">Info</a>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
