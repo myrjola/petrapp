@@ -263,18 +263,39 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Get all exercises
-	exercises, err := app.workoutService.List(r.Context())
+	// Get the current workout session to see which exercises are already included
+	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
+	}
+
+	// Create a map of exercise IDs that are already in the workout
+	existingExerciseIDs := make(map[int]bool)
+	for _, exerciseSet := range session.ExerciseSets {
+		existingExerciseIDs[exerciseSet.Exercise.ID] = true
+	}
+
+	// Get all exercises
+	allExercises, err := app.workoutService.List(r.Context())
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Filter out exercises that are already in the workout
+	var availableExercises []workout.Exercise
+	for _, exercise := range allExercises {
+		if !existingExerciseIDs[exercise.ID] {
+			availableExercises = append(availableExercises, exercise)
+		}
 	}
 
 	// Prepare template data
 	data := exerciseAddTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
-		Exercises:        exercises,
+		Exercises:        availableExercises, // Use filtered exercises instead of all exercises
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-add", data)
