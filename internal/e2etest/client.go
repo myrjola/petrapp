@@ -14,6 +14,24 @@ import (
 	"time"
 )
 
+// secFetchSiteTransport wraps an http.RoundTripper and adds the Sec-Fetch-Site header to all requests
+type secFetchSiteTransport struct {
+	base      http.RoundTripper
+	siteValue string
+}
+
+// RoundTrip implements the http.RoundTripper interface.
+func (t *secFetchSiteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone the request to avoid modifying the original
+	reqClone := req.Clone(req.Context())
+
+	// Add the Sec-Fetch-Site header
+	reqClone.Header.Set("Sec-Fetch-Site", t.siteValue)
+
+	// Use the base transport to make the actual request
+	return t.base.RoundTrip(reqClone)
+}
+
 type Client struct {
 	client        *http.Client
 	url           string
@@ -24,13 +42,33 @@ type Client struct {
 // NewClient creates a Webauthn-aware HTTP client.
 //
 // rpID and rpOrigin should correspond to the Webauthn setup on the server.
+// The client will automatically add "Sec-Fetch-Site: same-origin" header to all requests.
+// Use NewClientWithSecFetchSite if you need a different Sec-Fetch-Site value.
 func NewClient(url, rpID, rpOrigin string) (*Client, error) {
+	return NewClientWithSecFetchSite(url, rpID, rpOrigin, "same-origin")
+}
+
+// NewClientWithSecFetchSite creates a Webauthn-aware HTTP client with a custom Sec-Fetch-Site header value.
+//
+// rpID and rpOrigin should correspond to the Webauthn setup on the server.
+// secFetchSite is the value for the Sec-Fetch-Site header (e.g., "same-origin", "cross-site", "same-site", "none").
+func NewClientWithSecFetchSite(url, rpID, rpOrigin, secFetchSite string) (*Client, error) {
 	jar, err := newUnsafeCookieJar()
 	if err != nil {
 		return nil, fmt.Errorf("create unsafe cookie jar: %w", err)
 	}
+
+	// Create the custom transport that adds Sec-Fetch-Site header
+	transport := &secFetchSiteTransport{
+		base:      http.DefaultTransport,
+		siteValue: secFetchSite,
+	}
+
 	return &Client{
-		client:        &http.Client{Jar: jar},
+		client: &http.Client{
+			Jar:       jar,
+			Transport: transport,
+		},
 		url:           url,
 		rp:            virtualwebauthn.RelyingParty{Name: "Petrapp", ID: rpID, Origin: rpOrigin},
 		authenticator: virtualwebauthn.NewAuthenticator(),
