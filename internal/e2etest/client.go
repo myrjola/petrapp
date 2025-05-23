@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// secFetchSiteTransport wraps an http.RoundTripper and adds the Sec-Fetch-Site header to all requests
+// secFetchSiteTransport wraps an http.RoundTripper and adds the Sec-Fetch-Site header to all requests.
 type secFetchSiteTransport struct {
 	base      http.RoundTripper
 	siteValue string
@@ -29,7 +29,11 @@ func (t *secFetchSiteTransport) RoundTrip(req *http.Request) (*http.Response, er
 	reqClone.Header.Set("Sec-Fetch-Site", t.siteValue)
 
 	// Use the base transport to make the actual request
-	return t.base.RoundTrip(reqClone)
+	resp, err := t.base.RoundTrip(reqClone)
+	if err != nil {
+		return nil, fmt.Errorf("base transport round trip: %w", err)
+	}
+	return resp, nil
 }
 
 type Client struct {
