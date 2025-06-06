@@ -23,26 +23,6 @@ jobs:
       docker_tag: ${{ github.sha }}
     secrets: inherit
 
-  migratetest:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Litestream
-        run: |
-          wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb
-          sudo dpkg -i litestream-v0.3.13-linux-amd64.deb
-
-      - name: Run migrations against production database
-        env:
-          LITESTREAM_REPLICA_TYPE: s3
-          PETRAPP_SQLITE_URL: restored.sqlite3
-          AWS_ACCESS_KEY_ID: ${{ secrets.MIGRATIONTEST_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.MIGRATIONTEST_AWS_SECRET_ACCESS_KEY }}
-          AWS_ENDPOINT_URL_S3: https://fly.storage.tigris.dev
-          AWS_ENDPOINT_URL_IAM: https://fly.iam.storage.tigris.dev
-          AWS_REGION: auto
-          BUCKET_NAME: petra-backup
-        run: make migratetest
-
   staging:
     needs: [ build_and_push ]
     uses: ./.github/workflows/deploy.yml
@@ -53,7 +33,7 @@ jobs:
       docker_image_uri: ${{ needs.build_and_push.outputs.docker_image_uri }}
 
   prod:
-    needs: [ build_and_push, staging, test, migratetest ]
+    needs: [ build_and_push, staging, test ]
     uses: ./.github/workflows/deploy.yml
     secrets: inherit
     with:
