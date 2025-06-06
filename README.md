@@ -1,4 +1,4 @@
-# Petrapp
+# Petra
 
 Personal trainer app
 
@@ -117,10 +117,9 @@ fly storage create --app petrapp-staging --name petrapp-staging-backup
 Now we are ready to deploy the app.
 
 ```sh
-make cross-compile # required for the docker build.
 fly deploy --app petrapp-staging
 ```
 
 ## Attribution
 
-Petrapp logo made by Martin Yrjölä using [Inkscape](https://inkscape.org/).
+Petra logo made by Martin Yrjölä using [Inkscape](https://inkscape.org/).
