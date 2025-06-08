@@ -173,11 +173,32 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Get compatible exercises
-	compatibleExercises, err := app.workoutService.FindCompatibleExercises(r.Context(), exerciseID)
+	// Get the current workout session to see which exercises are already included
+	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
+	}
+
+	// Create a map of exercise IDs that are already in the workout
+	existingExerciseIDs := make(map[int]bool)
+	for _, exerciseSet := range session.ExerciseSets {
+		existingExerciseIDs[exerciseSet.Exercise.ID] = true
+	}
+
+	// Get all exercises
+	allExercises, err := app.workoutService.List(r.Context())
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// Filter out exercises that are already in the workout (except the current one being swapped)
+	var compatibleExercises []workout.Exercise
+	for _, exercise := range allExercises {
+		if exercise.ID != exerciseID && !existingExerciseIDs[exercise.ID] {
+			compatibleExercises = append(compatibleExercises, exercise)
+		}
 	}
 
 	// Prepare template data
