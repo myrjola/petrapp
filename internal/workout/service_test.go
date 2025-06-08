@@ -6,8 +6,8 @@ import (
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/workout"
+	"io"
 	"log/slog"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +18,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
 		Level:       slog.LevelDebug,
 		AddSource:   false,
 		ReplaceAttr: nil,
@@ -176,7 +176,7 @@ func Test_AddExercise(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
 		Level:       slog.LevelDebug,
 		AddSource:   false,
 		ReplaceAttr: nil,
