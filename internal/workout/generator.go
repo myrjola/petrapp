@@ -84,65 +84,82 @@ type generator struct {
 
 // newGenerator constructs a workout generator.
 func newGenerator(prefs Preferences, history []sessionAggregate, pool []Exercise) (*generator, error) {
-	// Validate inputs
-	if len(pool) == 0 {
-		return nil, errors.New("exercise pool cannot be empty")
+	if err := validateGeneratorInputs(pool); err != nil {
+		return nil, err
 	}
 
-	dateHistory := make(DateExerciseMap)
-	for i, session := range history {
-		// Only consider completed workouts
-		if session.CompletedAt.IsZero() {
-			continue
-		}
+	dateHistory := buildDateHistoryIndex(history)
 
-		// Index by date
-		sessionDate := time.Date(
-			session.Date.Year(),
-			session.Date.Month(),
-			session.Date.Day(),
-			0, 0, 0, 0, time.UTC,
-		)
-		dateHistory[sessionDate] = &history[i]
-	}
-
-	// Create generator
-	g := &generator{
+	return &generator{
 		preferences: prefs,
 		history:     history,
 		pool:        pool,
 		dateHistory: dateHistory,
-	}
+	}, nil
+}
 
-	return g, nil
+// validateGeneratorInputs validates the inputs for generator creation.
+func validateGeneratorInputs(pool []Exercise) error {
+	if len(pool) == 0 {
+		return errors.New("exercise pool cannot be empty")
+	}
+	return nil
+}
+
+// buildDateHistoryIndex creates a date-indexed map of completed sessions.
+func buildDateHistoryIndex(history []sessionAggregate) DateExerciseMap {
+	dateHistory := make(DateExerciseMap)
+	for i, session := range history {
+		if session.CompletedAt.IsZero() {
+			continue
+		}
+
+		sessionDate := normalizeDate(session.Date)
+		dateHistory[sessionDate] = &history[i]
+	}
+	return dateHistory
+}
+
+// normalizeDate normalizes a date to midnight UTC.
+func normalizeDate(t time.Time) time.Time {
+	return time.Date(
+		t.Year(), t.Month(), t.Day(),
+		0, 0, 0, 0, time.UTC,
+	)
 }
 
 // Generate generates a new workout session for the given time.
 func (g *generator) Generate(t time.Time) (sessionAggregate, error) {
-	// Validate input
-	if t.IsZero() {
-		return sessionAggregate{}, errors.New("workout date cannot be zero")
+	if err := validateWorkoutDate(t); err != nil {
+		return sessionAggregate{}, err
 	}
 
-	// Determine workout category
 	category := g.determineWorkoutCategory(t)
-
-	// Select exercises
 	exerciseSets, err := g.selectExercises(t, category)
 	if err != nil {
 		return sessionAggregate{}, fmt.Errorf("failed to select exercises: %w", err)
 	}
 
-	// Create the workout session
-	session := sessionAggregate{
-		Date:             t,
+	return g.createWorkoutSession(t, exerciseSets), nil
+}
+
+// validateWorkoutDate validates the workout date.
+func validateWorkoutDate(t time.Time) error {
+	if t.IsZero() {
+		return errors.New("workout date cannot be zero")
+	}
+	return nil
+}
+
+// createWorkoutSession creates a new workout session.
+func (g *generator) createWorkoutSession(date time.Time, exerciseSets []exerciseSetAggregate) sessionAggregate {
+	return sessionAggregate{
+		Date:             date,
 		ExerciseSets:     exerciseSets,
 		DifficultyRating: nil,
 		StartedAt:        time.Time{},
 		CompletedAt:      time.Time{},
 	}
-
-	return session, nil
 }
 
 // determineWorkoutCategory decides what type of workout to create based on history and preferences.
@@ -192,42 +209,49 @@ func (g *generator) isWorkoutDay(t time.Time) bool {
 
 // wasWorkoutDay checks if there was a completed workout on the given day.
 func (g *generator) wasWorkoutDay(t time.Time) bool {
-	normalizedDate := time.Date(
-		t.Year(), t.Month(), t.Day(),
-		0, 0, 0, 0, time.UTC,
-	)
+	normalizedDate := normalizeDate(t)
 	_, exists := g.dateHistory[normalizedDate]
 	return exists
 }
 
 // selectExercises selects appropriate exercises for the workout.
 func (g *generator) selectExercises(t time.Time, category Category) ([]exerciseSetAggregate, error) {
-	// Filter the exercise pool by category
 	filteredPool := g.filterExercisesByCategory(category)
 	if len(filteredPool) == 0 {
 		return nil, fmt.Errorf("no exercises found for category: %s", category)
 	}
 
-	// Find the last workout on the same weekday for exercise continuity
-	lastSameWeekdayWorkout := g.findLastSameWeekdayWorkout(t)
-
-	// Select exercises with continuity in mind
-	selectedExercises := g.selectExercisesWithContinuity(filteredPool, lastSameWeekdayWorkout, DefaultExercisesPerWorkout)
-	if len(selectedExercises) == 0 {
-		return nil, fmt.Errorf("failed to select exercises for category: %s", category)
+	selectedExercises, err := g.selectExercisesForWorkout(t, filteredPool)
+	if err != nil {
+		return nil, fmt.Errorf("failed to select exercises for category %s: %w", category, err)
 	}
 
-	// Create exercise sets with appropriate sets and reps
-	exerciseSets := make([]exerciseSetAggregate, 0, len(selectedExercises))
-	for _, exercise := range selectedExercises {
+	return g.createExerciseSets(selectedExercises), nil
+}
+
+// selectExercisesForWorkout selects exercises with continuity consideration.
+func (g *generator) selectExercisesForWorkout(t time.Time, pool []Exercise) ([]Exercise, error) {
+	lastSameWeekdayWorkout := g.findLastSameWeekdayWorkout(t)
+	selectedExercises := g.selectExercisesWithContinuity(pool, lastSameWeekdayWorkout, DefaultExercisesPerWorkout)
+
+	if len(selectedExercises) == 0 {
+		return nil, errors.New("no exercises could be selected")
+	}
+
+	return selectedExercises, nil
+}
+
+// createExerciseSets creates exercise sets with appropriate parameters.
+func (g *generator) createExerciseSets(exercises []Exercise) []exerciseSetAggregate {
+	exerciseSets := make([]exerciseSetAggregate, 0, len(exercises))
+	for _, exercise := range exercises {
 		sets := g.determineSetsRepsWeight(exercise)
 		exerciseSets = append(exerciseSets, exerciseSetAggregate{
 			ExerciseID: exercise.ID,
 			Sets:       sets,
 		})
 	}
-
-	return exerciseSets, nil
+	return exerciseSets
 }
 
 // filterExercisesByCategory returns exercises that match the given category. If category is full body, it matches all.
@@ -265,38 +289,44 @@ func (g *generator) selectExercisesWithContinuity(
 	lastWorkout *sessionAggregate,
 	count int,
 ) []Exercise {
-	// Handle edge cases
 	if count <= 0 {
 		return []Exercise{}
 	}
 
-	// If no previous workout, just select random exercises
 	if lastWorkout == nil {
 		return g.selectRandomExercises(pool, count)
 	}
 
-	// Calculate the number of exercises to keep
-	continuitySets := g.calculateContinuitySets(lastWorkout, count)
-	newSets := g.calculateNewSets(count, continuitySets)
+	return g.combineExercisesWithContinuity(pool, lastWorkout, count)
+}
 
-	// The result will consist of continued exercises and new exercises
+// combineExercisesWithContinuity combines continued and new exercises.
+func (g *generator) combineExercisesWithContinuity(
+	pool []Exercise,
+	lastWorkout *sessionAggregate,
+	count int,
+) []Exercise {
+	continuitySets := g.calculateContinuitySets(lastWorkout, count)
+	newSets := count - len(continuitySets)
+
 	selected := make([]Exercise, 0, count)
 	selected = append(selected, continuitySets...)
 
-	// Add random new exercises if needed
 	if newSets > 0 {
-		remainingPool := filterOutExercises(pool, selected)
-		if len(remainingPool) == 0 {
-			// If somehow we don't have any remaining exercises, use original pool
-			remainingPool = pool
-		}
-
-		// Get random exercises from remaining pool
-		randomExercises := g.selectRandomExercises(remainingPool, newSets)
-		selected = append(selected, randomExercises...)
+		newExercises := g.selectNewExercises(pool, selected, newSets)
+		selected = append(selected, newExercises...)
 	}
 
 	return selected
+}
+
+// selectNewExercises selects new exercises not already in the selection.
+func (g *generator) selectNewExercises(pool, selected []Exercise, count int) []Exercise {
+	remainingPool := filterOutExercises(pool, selected)
+	if len(remainingPool) == 0 {
+		remainingPool = pool
+	}
+	return g.selectRandomExercises(remainingPool, count)
 }
 
 // calculateContinuitySets selects exercises to continue from previous workout.
@@ -305,39 +335,49 @@ func (g *generator) calculateContinuitySets(lastWorkout *sessionAggregate, total
 		return []Exercise{}
 	}
 
-	// Calculate how many exercises to keep from previous workout
+	continuityCount := g.calculateContinuityCount(totalCount)
+	previousExercises, err := g.extractPreviousExercises(lastWorkout)
+	if err != nil {
+		// Log error and return empty slice instead of panicking
+		return []Exercise{}
+	}
+
+	return g.selectContinuityExercises(previousExercises, continuityCount)
+}
+
+// calculateContinuityCount calculates how many exercises to continue.
+func (g *generator) calculateContinuityCount(totalCount int) int {
 	continuityCount := int(math.Ceil(float64(totalCount) * ContinuityPercentage))
 	if continuityCount > totalCount {
 		continuityCount = totalCount
 	}
+	return continuityCount
+}
 
-	// Extract exercises from previous workout
+// extractPreviousExercises extracts exercises from the previous workout.
+func (g *generator) extractPreviousExercises(lastWorkout *sessionAggregate) ([]Exercise, error) {
 	previousExercises := make([]Exercise, 0, len(lastWorkout.ExerciseSets))
 	for _, es := range lastWorkout.ExerciseSets {
-		// Find the exercise in the pool
 		idx := slices.IndexFunc(g.pool, func(exercise Exercise) bool {
 			return exercise.ID == es.ExerciseID
 		})
 		if idx == -1 {
-			panic(fmt.Sprintf("exercise %d not found in pool", es.ExerciseID))
+			return nil, fmt.Errorf("exercise %d not found in pool", es.ExerciseID)
 		}
 		previousExercises = append(previousExercises, g.pool[idx])
 	}
+	return previousExercises, nil
+}
 
-	// Check if we have enough exercises in previous workout
+// selectContinuityExercises selects exercises for continuity with prioritization.
+func (g *generator) selectContinuityExercises(previousExercises []Exercise, continuityCount int) []Exercise {
 	if len(previousExercises) < continuityCount {
 		continuityCount = len(previousExercises)
 	}
 
-	// Selected exercises for continuity
 	selected := make([]Exercise, 0, continuityCount)
-
-	// First, prioritize compound movements
 	selected = g.addPrioritizedExercises(previousExercises, selected, continuityCount, true)
-
-	// Then add non-compound movements if needed
 	selected = g.addPrioritizedExercises(previousExercises, selected, continuityCount, false)
-
 	return selected
 }
 
@@ -362,11 +402,6 @@ func (g *generator) addPrioritizedExercises(
 	}
 
 	return selected
-}
-
-// calculateNewSets determines how many new exercises to add.
-func (g *generator) calculateNewSets(totalCount int, continuitySets []Exercise) int {
-	return totalCount - len(continuitySets)
 }
 
 // selectRandomExercises selects random exercises from the pool.
@@ -421,29 +456,22 @@ func filterOutExercises(pool, toFilter []Exercise) []Exercise {
 
 // determineSetsRepsWeight determines sets, reps, and weights for an exercise.
 func (g *generator) determineSetsRepsWeight(exercise Exercise) []Set {
-	// Find most recent occurrence of this exercise in workout history
 	lastExerciseSet := g.findMostRecentExerciseSet(exercise.ID)
-
-	// No history - start with default sets and reps
 	if lastExerciseSet == nil {
 		return createDefaultSets()
 	}
 
-	// Apply user feedback if available
 	feedback := g.getMostRecentFeedback(exercise.ID)
+	return g.createProgressiveSets(*lastExerciseSet, feedback)
+}
 
-	// Check if we have feedback to override progression
-	if feedback != nil {
-		// For "too easy", increase weight directly
-		if *feedback == int(FeedbackTooEasy) {
-			return increaseWeight(lastExerciseSet.Sets, LargerWeightIncrementKg)
-		}
+// createProgressiveSets creates sets with progression based on history and feedback.
+func (g *generator) createProgressiveSets(lastExerciseSet exerciseSetAggregate, feedback *int) []Set {
+	if feedback != nil && *feedback == int(FeedbackTooEasy) {
+		return increaseWeight(lastExerciseSet.Sets, LargerWeightIncrementKg)
 	}
 
-	// Has history - determine progression
-	sets := g.progressSets(*lastExerciseSet)
-
-	// Apply other feedback types if available
+	sets := g.progressSets(lastExerciseSet)
 	if feedback != nil && *feedback != int(FeedbackTooEasy) {
 		sets = g.integrateUserFeedback(sets, feedback)
 	}
@@ -451,7 +479,7 @@ func (g *generator) determineSetsRepsWeight(exercise Exercise) []Set {
 	return sets
 }
 
-// createDefaultSets creates a default set of exercises for beginners.
+// createDefaultSets creates a default set of exercises for beginners with 8 reps and no weight.
 func createDefaultSets() []Set {
 	return []Set{
 		{WeightKg: 0, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
@@ -566,33 +594,34 @@ func (g *generator) evaluateSetCompletion(sets []Set) string {
 
 // progressSetsUndulating implements undulating periodization for experienced users.
 func (g *generator) progressSetsUndulating(lastExerciseSet exerciseSetAggregate) []Set {
-	// Determine current workout type
 	currentType := determineWorkoutType(lastExerciseSet.Sets)
-
-	// Check if all sets were completed at maximum reps
 	allCompletedAtMax := allSetsCompletedAtMax(lastExerciseSet.Sets)
 
-	// If not completed at max, maintain current program
 	if !allCompletedAtMax {
 		return copySetWithoutCompletion(lastExerciseSet.Sets)
 	}
 
-	// Now handle the case where all sets were completed at max
-	// Count consecutive workouts with all sets at max reps
+	return g.handleMaxCompletionProgression(lastExerciseSet, currentType)
+}
+
+// handleMaxCompletionProgression handles progression when all sets completed at max.
+func (g *generator) handleMaxCompletionProgression(lastExerciseSet exerciseSetAggregate, currentType Type) []Set {
 	consecutiveMaxCompletions := g.countConsecutiveMaxCompletions(lastExerciseSet)
 
-	// Progress to next workout type if completed at max for consecutive workouts
 	if consecutiveMaxCompletions >= MaxConsecutiveCompletions {
-		// Get weight from the first set (they should all be the same weight)
-		weight := 0.0
-		if len(lastExerciseSet.Sets) > 0 {
-			weight = lastExerciseSet.Sets[0].WeightKg
-		}
+		weight := g.extractWeightFromSets(lastExerciseSet.Sets)
 		return createSetsForWorkoutType(getNextWorkoutType(currentType), weight)
 	}
 
-	// Just increase weight within current workout type
 	return increaseWeight(lastExerciseSet.Sets, StandardWeightIncrementKg)
+}
+
+// extractWeightFromSets extracts weight from the first set.
+func (g *generator) extractWeightFromSets(sets []Set) float64 {
+	if len(sets) > 0 {
+		return sets[0].WeightKg
+	}
+	return 0.0
 }
 
 // getNextWorkoutType determines the next workout type in the cycle.
@@ -674,66 +703,83 @@ func allSetsCompletedAtMax(sets []Set) bool {
 
 // createSetsForWorkoutType creates sets for a specific workout type with adjusted weight.
 func createSetsForWorkoutType(workoutType Type, baseWeight float64) []Set {
-	// Apply weight adjustment based on workout type transition
-	var adjustedWeight float64
-	var minReps, maxReps int
+	params := getWorkoutTypeParameters(workoutType, baseWeight)
+	return createStandardSets(params.weight, params.minReps, params.maxReps)
+}
 
+// workoutTypeParams holds parameters for a workout type.
+type workoutTypeParams struct {
+	weight  float64
+	minReps int
+	maxReps int
+}
+
+// getWorkoutTypeParameters returns parameters for a specific workout type.
+func getWorkoutTypeParameters(workoutType Type, baseWeight float64) workoutTypeParams {
 	switch workoutType {
 	case WorkoutTypeStrength:
-		adjustedWeight = baseWeight * EnduranceToStrengthWeightFactor
-		minReps = StrengthMinReps
-		maxReps = StrengthMaxReps
+		return workoutTypeParams{
+			weight:  baseWeight * EnduranceToStrengthWeightFactor,
+			minReps: StrengthMinReps,
+			maxReps: StrengthMaxReps,
+		}
 	case WorkoutTypeHypertrophy:
-		adjustedWeight = baseWeight * StrengthToHypertrophyWeightFactor
-		minReps = HypertrophyMinReps
-		maxReps = HypertrophyMaxReps
+		return workoutTypeParams{
+			weight:  baseWeight * StrengthToHypertrophyWeightFactor,
+			minReps: HypertrophyMinReps,
+			maxReps: HypertrophyMaxReps,
+		}
 	case WorkoutTypeEndurance:
-		adjustedWeight = baseWeight * HypertrophyToEnduranceWeightFactor
-		minReps = EnduranceMinReps
-		maxReps = EnduranceMaxReps
+		return workoutTypeParams{
+			weight:  baseWeight * HypertrophyToEnduranceWeightFactor,
+			minReps: EnduranceMinReps,
+			maxReps: EnduranceMaxReps,
+		}
 	default:
-		// Default to hypertrophy
-		adjustedWeight = baseWeight
-		minReps = HypertrophyMinReps
-		maxReps = HypertrophyMaxReps
+		return workoutTypeParams{
+			weight:  baseWeight,
+			minReps: HypertrophyMinReps,
+			maxReps: HypertrophyMaxReps,
+		}
 	}
+}
 
-	// Create the sets with the calculated parameters
-	return []Set{
-		{WeightKg: adjustedWeight, MinReps: minReps, MaxReps: maxReps, CompletedReps: nil},
-		{WeightKg: adjustedWeight, MinReps: minReps, MaxReps: maxReps, CompletedReps: nil},
-		{WeightKg: adjustedWeight, MinReps: minReps, MaxReps: maxReps, CompletedReps: nil},
+// createStandardSets creates a standard set of 3 sets with given parameters.
+func createStandardSets(weight float64, minReps, maxReps int) []Set {
+	set := Set{
+		WeightKg:      weight,
+		MinReps:       minReps,
+		MaxReps:       maxReps,
+		CompletedReps: nil,
 	}
+	return []Set{set, set, set}
 }
 
 // integrateUserFeedback adjusts workout intensity based on user feedback.
 func (g *generator) integrateUserFeedback(sets []Set, feedback *int) []Set {
 	if feedback == nil {
-		return sets // No feedback, no adjustment
+		return sets
 	}
 
-	switch FeedbackLevel(*feedback) {
-	case FeedbackTooEasy: // Too easy
-		// Increase intensity more aggressively
+	feedbackLevel := FeedbackLevel(*feedback)
+	switch feedbackLevel {
+	case FeedbackTooEasy:
 		return increaseWeight(sets, LargerWeightIncrementKg)
-	case FeedbackTooDifficult: // Too difficult
-		// Reduce volume or intensity
-		if len(sets) > MaxStandardSets {
-			// Reduce volume by removing a set
-			return sets[:len(sets)-1]
-		}
-		// Reduce intensity by reducing weight
-		return reduceWeight(sets, WeightReductionFactor)
-	case FeedbackOptimalLow:
+	case FeedbackTooDifficult:
+		return g.reduceDifficulty(sets)
+	case FeedbackOptimalLow, FeedbackOptimalMid, FeedbackOptimalHigh:
 		return increaseWeight(sets, StandardWeightIncrementKg)
-	case FeedbackOptimalMid:
-		return increaseWeight(sets, StandardWeightIncrementKg)
-	case FeedbackOptimalHigh:
-		return increaseWeight(sets, StandardWeightIncrementKg)
-	default: // 2-4 (optimal challenge)
-		// For optimal challenge, make a small increase
+	default:
 		return increaseWeight(sets, StandardWeightIncrementKg)
 	}
+}
+
+// reduceDifficulty reduces workout difficulty by volume or intensity.
+func (g *generator) reduceDifficulty(sets []Set) []Set {
+	if len(sets) > MaxStandardSets {
+		return sets[:len(sets)-1] // Reduce volume
+	}
+	return reduceWeight(sets, WeightReductionFactor) // Reduce intensity
 }
 
 // getMostRecentFeedback gets the most recent feedback for a session containing the specified exercise.
@@ -772,50 +818,47 @@ func (g *generator) getMostRecentFeedback(exerciseID int) *int {
 
 // copySetWithoutCompletion creates a copy of sets without completed reps.
 func copySetWithoutCompletion(sets []Set) []Set {
-	newSets := make([]Set, len(sets))
-	for i, set := range sets {
-		newSets[i] = Set{
+	return transformSets(sets, func(set Set) Set {
+		return Set{
 			WeightKg:      set.WeightKg,
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
-			CompletedReps: nil, // Reset completion
+			CompletedReps: nil,
 		}
-	}
-	return newSets
+	})
 }
 
 // reduceWeight reduces the weight by a percentage.
 func reduceWeight(sets []Set, percentage float64) []Set {
-	newSets := make([]Set, len(sets))
-	for i, set := range sets {
+	return transformSets(sets, func(set Set) Set {
 		reduction := set.WeightKg * percentage
-		newWeight := set.WeightKg - reduction
-		if newWeight < 0 {
-			newWeight = 0
-		}
-
-		newSets[i] = Set{
+		newWeight := math.Max(0, set.WeightKg-reduction)
+		return Set{
 			WeightKg:      newWeight,
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
-			CompletedReps: nil, // Reset completion
+			CompletedReps: nil,
 		}
-	}
-	return newSets
+	})
 }
 
 // increaseWeight increases the weight by a fixed amount.
 func increaseWeight(sets []Set, increment float64) []Set {
-	newSets := make([]Set, len(sets))
-	for i, set := range sets {
-		newWeight := set.WeightKg + increment
-
-		newSets[i] = Set{
-			WeightKg:      newWeight,
+	return transformSets(sets, func(set Set) Set {
+		return Set{
+			WeightKg:      set.WeightKg + increment,
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
-			CompletedReps: nil, // Reset completion
+			CompletedReps: nil,
 		}
+	})
+}
+
+// transformSets applies a transformation function to all sets.
+func transformSets(sets []Set, transform func(Set) Set) []Set {
+	newSets := make([]Set, len(sets))
+	for i, set := range sets {
+		newSets[i] = transform(set)
 	}
 	return newSets
 }
