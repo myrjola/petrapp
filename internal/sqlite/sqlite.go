@@ -6,12 +6,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/mattn/go-sqlite3"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	_ "embed"
-	_ "github.com/mattn/go-sqlite3" // Enable sqlite3 driver
 )
 
 //go:embed schema.sql
@@ -26,7 +27,7 @@ type Database struct {
 	logger    *slog.Logger
 }
 
-// NewDatabase connects to database, migrates the schema, and applies fixtures.
+// NewDatabase connects to a database, migrates the schema, and applies fixtures.
 //
 // It establishes two database connections, one for read/write operations and one for read-only operations.
 // This is a best practice mentioned in https://github.com/mattn/go-sqlite3/issues/1179#issuecomment-1638083995
@@ -56,6 +57,9 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 	return db, nil
 }
 
+//nolint:gochecknoglobals // once is used to ensure that the SQLite driver is registered only once.
+var once sync.Once
+
 func connect(url string, logger *slog.Logger) (*Database, error) {
 	var (
 		err         error
@@ -73,38 +77,51 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 		url = fmt.Sprintf("file:%s", rand.Text())
 		inMemoryConfig = "mode=memory&cache=shared"
 	}
-	//nolint:godox // temporary todo
-	// TODO: Many of these don't work. Would need a connection hook instead.
-	//       See https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Connection_Hook
-	//       and https://github.com/mattn/go-sqlite3/issues/1248#issuecomment-2227586113
-	//       also consider adding a logging or duration hook.
 	commonConfig := strings.Join([]string{
+		// Uses current time.Location for timestamps.
+		"_loc=auto",
+		// Makes it possible to temporarily violate foreign key constraints during transactions.
+		"_defer_foreign_keys=1",
 		// Write-ahead logging enables higher performance and concurrent readers.
 		"_journal_mode=wal",
-		// Avoids SQLITE_BUSY errors when database is under load.
+		// Avoids SQLITE_BUSY errors when the database is under load.
 		"_busy_timeout=5000",
 		// Increases performance at the cost of durability https://www.sqlite.org/pragma.html#pragma_synchronous.
 		"_synchronous=normal",
 		// Enables foreign key constraints.
 		"_foreign_keys=on",
-		// Performance enhancement by storing temporary tables indices in memory instead of files.
-		"_temp_store=memory",
-		// Performance enhancement for reducing syscalls by having the pages in memory-mapped I/O.
-		"_mmap_size=30000000000",
-		// Recommended performance enhancement for long-lived connections.
-		// See https://www.sqlite.org/pragma.html#pragma_optimize.
-		"_optimize=0x10002",
-		// Litestream handles checkpoints.
-		// See https://litestream.io/tips/#disable-autocheckpoints-for-high-write-load-servers
-		"_wal_autocheckpoint = 0",
 	}, "&")
 
-	// The options prefixed with underscore '_' are SQLite pragmas documented at https://www.sqlite.org/pragma.html.
 	// The options without leading underscore are SQLite URI parameters documented at https://www.sqlite.org/uri.html.
+	// The options prefixed with underscore '_' are documented at
+	// https://pkg.go.dev/github.com/mattn/go-sqlite3#SQLiteDriver.Open.
 	readConfig := fmt.Sprintf("file:%s?mode=ro&_txlock=deferred&_query_only=true&%s&%s", url, commonConfig, inMemoryConfig)
 	readWriteConfig := fmt.Sprintf("file:%s?mode=rwc&_txlock=immediate&%s&%s", url, commonConfig, inMemoryConfig)
 
-	if readWriteDB, err = sql.Open("sqlite3", readWriteConfig); err != nil {
+	// Register a new SQlite driver that executes performance-enhancing pragmas on connection.
+	optimizedDriver := "sqlite3optimized"
+
+	once.Do(func() {
+		sql.Register(optimizedDriver,
+			&sqlite3.SQLiteDriver{
+				Extensions: nil,
+				ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+					if _, err = conn.Exec(
+						// Performance enhancement by storing temporary tables indices in memory instead of files.
+						"PRAGMA temp_store = memory;"+
+							// Performance enhancement for reducing syscalls by having the pages in memory-mapped I/O.
+							"PRAGMA mmap_size = 30000000000;"+
+							// Litestream handles checkpoints.
+							// See https://litestream.io/tips/#disable-autocheckpoints-for-high-write-load-servers
+							"PRAGMA wal_autocheckpoint = 0;", nil); err != nil {
+						return fmt.Errorf("exec optimization pragmas: %w", err)
+					}
+					return nil
+				},
+			})
+	})
+
+	if readWriteDB, err = sql.Open(optimizedDriver, readWriteConfig); err != nil {
 		return nil, fmt.Errorf("open read-write database: %w", err)
 	}
 	logger.LogAttrs(context.Background(), slog.LevelInfo, "opened database", slog.String("sqlDsn", readWriteConfig))
@@ -114,7 +131,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readWriteDB.SetConnMaxLifetime(time.Hour)
 	readWriteDB.SetConnMaxIdleTime(time.Hour)
 
-	if readDB, err = sql.Open("sqlite3", readConfig); err != nil {
+	if readDB, err = sql.Open(optimizedDriver, readConfig); err != nil {
 		return nil, fmt.Errorf("open read database: %w", err)
 	}
 
