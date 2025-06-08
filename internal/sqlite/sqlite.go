@@ -60,6 +60,29 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 //nolint:gochecknoglobals // once is used to ensure that the SQLite driver is registered only once.
 var once sync.Once
 
+const optimizedDriver = "sqlite3optimized"
+
+// registerOptimizedDriver that executes performance-enhancing pragmas on connection.
+func registerOptimizedDriver() {
+	sql.Register(optimizedDriver,
+		&sqlite3.SQLiteDriver{
+			Extensions: nil,
+			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+				if _, err := conn.Exec(
+					// Performance enhancement by storing temporary tables indices in memory instead of files.
+					"PRAGMA temp_store = memory;"+
+						// Performance enhancement for reducing syscalls by having the pages in memory-mapped I/O.
+						"PRAGMA mmap_size = 30000000000;"+
+						// Litestream handles checkpoints.
+						// See https://litestream.io/tips/#disable-autocheckpoints-for-high-write-load-servers
+						"PRAGMA wal_autocheckpoint = 0;", nil); err != nil {
+					return fmt.Errorf("exec optimization pragmas: %w", err)
+				}
+				return nil
+			},
+		})
+}
+
 func connect(url string, logger *slog.Logger) (*Database, error) {
 	var (
 		err         error
@@ -98,28 +121,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readConfig := fmt.Sprintf("file:%s?mode=ro&_txlock=deferred&_query_only=true&%s&%s", url, commonConfig, inMemoryConfig)
 	readWriteConfig := fmt.Sprintf("file:%s?mode=rwc&_txlock=immediate&%s&%s", url, commonConfig, inMemoryConfig)
 
-	// Register a new SQlite driver that executes performance-enhancing pragmas on connection.
-	optimizedDriver := "sqlite3optimized"
-
-	once.Do(func() {
-		sql.Register(optimizedDriver,
-			&sqlite3.SQLiteDriver{
-				Extensions: nil,
-				ConnectHook: func(conn *sqlite3.SQLiteConn) error {
-					if _, err = conn.Exec(
-						// Performance enhancement by storing temporary tables indices in memory instead of files.
-						"PRAGMA temp_store = memory;"+
-							// Performance enhancement for reducing syscalls by having the pages in memory-mapped I/O.
-							"PRAGMA mmap_size = 30000000000;"+
-							// Litestream handles checkpoints.
-							// See https://litestream.io/tips/#disable-autocheckpoints-for-high-write-load-servers
-							"PRAGMA wal_autocheckpoint = 0;", nil); err != nil {
-						return fmt.Errorf("exec optimization pragmas: %w", err)
-					}
-					return nil
-				},
-			})
-	})
+	once.Do(registerOptimizedDriver)
 
 	if readWriteDB, err = sql.Open(optimizedDriver, readWriteConfig); err != nil {
 		return nil, fmt.Errorf("open read-write database: %w", err)
