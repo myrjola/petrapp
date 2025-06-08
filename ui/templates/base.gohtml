@@ -89,7 +89,7 @@
                   return
                 }
               }
-              window.navigation.navigate(location, { history: "replace" })
+              window.navigation.navigate(location, {history: "replace"})
             }
           })
         }
@@ -106,7 +106,7 @@
       })
 
       // Reset form states when the page is loaded from the browser cache (back button).
-      window.addEventListener('pageshow', function(event) {
+      window.addEventListener('pageshow', function (event) {
         // pageshow event fires when the page is loaded, including from cache.
         // event.persisted is true when the page is loaded from the back/forward cache.
         if (event.persisted) {
@@ -122,36 +122,31 @@
       });
 
       function findMatchingHistoryEntry(targetUrl) {
-        try {
-          const entries = navigation.entries();
-          const currentIndex = navigation.currentEntry.index;
-          const targetURL = new URL(targetUrl);
+        const entries = navigation.entries();
+        const currentIndex = navigation.currentEntry.index;
+        const targetURL = new URL(targetUrl);
 
-          // Search backwards through history
-          for (let i = currentIndex - 1; i >= 0; i--) {
-            const entry = entries[i];
-            const entryURL = new URL(entry.url);
+        // Search backwards through history
+        for (let i = currentIndex - 1; i >= 0; i--) {
+          const entry = entries[i];
+          const entryURL = new URL(entry.url);
 
-            if (urlsMatch(entryURL, targetURL)) {
-              return entry;
-            }
+          if (urlsMatch(entryURL, targetURL)) {
+            return entry;
           }
-        } catch (error) {
-          console.warn('Error searching history:', error);
         }
 
         return null;
       }
 
       function urlsMatch(url1, url2) {
-        // Customize matching logic as needed
         return url1.href === url2.href ||
           (url1.pathname === url2.pathname && url1.origin === url2.origin);
       }
 
       // Create a smart back button using the Navigation API.
       document.addEventListener("DOMContentLoaded", function () {
-        // Find all anchors marked for back button enhancement
+        // Find all anchors marked for back button enhancement.
         const backLinks = document.querySelectorAll('a[data-back-button]');
 
         backLinks.forEach(link => {
@@ -160,20 +155,12 @@
           // Only enhance if Navigation API is supported
           if (typeof navigation !== 'undefined') {
             link.addEventListener('click', async (e) => {
-              debugger;
               const matchingEntry = findMatchingHistoryEntry(destinationUrl);
 
               if (matchingEntry) {
-                e.preventDefault(); // Only prevent when we have enhancement
-
-                try {
-                  await navigation.traverseTo(matchingEntry.key);
-                } catch (error) {
-                  // Manual fallback needed since we prevented default
-                  window.location.href = destinationUrl;
-                }
+                e.preventDefault();
+                await navigation.traverseTo(matchingEntry.key);
               }
-              // No preventDefault = browser handles navigation normally
             });
           }
         })
