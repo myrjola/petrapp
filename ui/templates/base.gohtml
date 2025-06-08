@@ -81,15 +81,15 @@
               const location = result.headers.get("Content-Location")
               const locationUrl = new URL(location, baseUrl)
 
-              for (entry of window.navigation.entries()) {
+              for (entry of navigation.entries()) {
                 const entryUrl = new URL(entry.url)
                 if (entryUrl.pathname === locationUrl.pathname) {
-                  await window.navigation.traverseTo(entry.key).committed
-                  window.navigation.reload()
+                  await navigation.traverseTo(entry.key).committed
+                  navigation.reload()
                   return
                 }
               }
-              window.navigation.navigate(location, {history: "replace"})
+              navigation.navigate(location, {history: "replace"})
             }
           })
         }
