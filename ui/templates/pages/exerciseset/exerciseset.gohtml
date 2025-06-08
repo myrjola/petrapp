@@ -132,18 +132,8 @@
                     }
                 }
             </style>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}">
-                <script {{ nonce }}>
-                  me().addEventListener("click", function (event) {
-                    if (history.length > 1) {
-                      event.preventDefault();
-                      history.back();
-                    }
-                  });
-                </script>
-                <span>
-                    ← Back
-                </span>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button>
+                ← Back
             </a>
             <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
             <div class="timer" id="workout-timer">0:00</div>
