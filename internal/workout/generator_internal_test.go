@@ -7,7 +7,7 @@ import (
 	"github.com/myrjola/petrapp/internal/ptr"
 )
 
-// Helper function for creating test sets with weights
+// Helper function for creating test sets with weights.
 func createTestSet(weight float64, minReps, maxReps int, completedReps *int) Set {
 	return Set{
 		WeightKg:      &weight,

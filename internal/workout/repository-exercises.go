@@ -69,7 +69,9 @@ func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err 
 	var exercises []Exercise
 	for rows.Next() {
 		var exercise Exercise
-		if err = rows.Scan(&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType, &exercise.DescriptionMarkdown); err != nil {
+		if err = rows.Scan(
+			&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType, &exercise.DescriptionMarkdown,
+		); err != nil {
 			return nil, fmt.Errorf("scan exercise: %w", err)
 		}
 		exercises = append(exercises, exercise)

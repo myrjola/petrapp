@@ -90,24 +90,81 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "exerciseset", data)
 }
 
-func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Request) {
-	// Parse URL parameters
+// parseExerciseSetURLParams extracts and validates URL parameters for exercise set operations.
+func (app *application) parseExerciseSetURLParams(r *http.Request) (time.Time, int, int, string, error) {
 	dateStr := r.PathValue("date")
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		http.NotFound(w, r)
-		return
+		return time.Time{}, 0, 0, "", fmt.Errorf("parse date: %w", err)
 	}
 
 	exerciseIDStr := r.PathValue("exerciseID")
 	exerciseID, err := strconv.Atoi(exerciseIDStr)
 	if err != nil {
-		http.NotFound(w, r)
-		return
+		return time.Time{}, 0, 0, "", fmt.Errorf("parse exercise ID: %w", err)
 	}
 
 	setIndexStr := r.PathValue("setIndex")
 	setIndex, err := strconv.Atoi(setIndexStr)
+	if err != nil {
+		return time.Time{}, 0, 0, "", fmt.Errorf("parse set index: %w", err)
+	}
+
+	return date, exerciseID, setIndex, dateStr, nil
+}
+
+// findExerciseInSession finds an exercise by ID in the given session.
+func (app *application) findExerciseInSession(session *workout.Session, exerciseID int) (workout.Exercise, bool) {
+	for _, es := range session.ExerciseSets {
+		if es.Exercise.ID == exerciseID {
+			return es.Exercise, true
+		}
+	}
+	return workout.Exercise{
+		ID:                    0,
+		Name:                  "",
+		Category:              "",
+		ExerciseType:          "",
+		DescriptionMarkdown:   "",
+		PrimaryMuscleGroups:   nil,
+		SecondaryMuscleGroups: nil,
+	}, false
+}
+
+// parseWeightAndReps extracts weight and reps from form data based on exercise type.
+func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exercise) (float64, int, error) {
+	var weight float64
+	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
+		weightStr := r.PostForm.Get("weight")
+		if weightStr == "" {
+			return 0, 0, errors.New("weight not provided for weighted exercise")
+		}
+		// Replace comma with dot for decimal numbers.
+		weightStr = strings.Replace(weightStr, ",", ".", 1)
+
+		var err error
+		weight, err = strconv.ParseFloat(weightStr, 64)
+		if err != nil {
+			return 0, 0, fmt.Errorf("parse weight: %w", err)
+		}
+	}
+
+	repsStr := r.PostForm.Get("reps")
+	if repsStr == "" {
+		return 0, 0, errors.New("reps not provided")
+	}
+
+	reps, err := strconv.Atoi(repsStr)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse reps: %w", err)
+	}
+
+	return weight, reps, nil
+}
+
+func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse URL parameters
+	date, exerciseID, setIndex, dateStr, err := app.parseExerciseSetURLParams(r)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -126,46 +183,16 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var exercise workout.Exercise
-	for _, es := range session.ExerciseSets {
-		if es.Exercise.ID == exerciseID {
-			exercise = es.Exercise
-			break
-		}
-	}
-	if exercise.ID == 0 {
+	exercise, found := app.findExerciseInSession(&session, exerciseID)
+	if !found {
 		http.NotFound(w, r)
 		return
 	}
 
-	// Handle weight based on exercise type
-	var weight float64
-	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
-		weightStr := r.PostForm.Get("weight")
-		if weightStr == "" {
-			app.serverError(w, r, errors.New("weight not provided for weighted exercise"))
-			return
-		}
-		// Replace comma with dot for decimal numbers.
-		weightStr = strings.Replace(weightStr, ",", ".", 1)
-
-		weight, err = strconv.ParseFloat(weightStr, 64)
-		if err != nil {
-			app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
-			return
-		}
-	}
-	// For bodyweight exercises, weight remains 0 (will be ignored in service layer)
-
-	repsStr := r.PostForm.Get("reps")
-	if repsStr == "" {
-		app.serverError(w, r, errors.New("reps not provided"))
-		return
-	}
-
-	reps, err := strconv.Atoi(repsStr)
+	// Parse weight and reps from form
+	weight, reps, err := app.parseWeightAndReps(r, exercise)
 	if err != nil {
-		app.serverError(w, r, fmt.Errorf("parse reps: %w", err))
+		app.serverError(w, r, err)
 		return
 	}
 

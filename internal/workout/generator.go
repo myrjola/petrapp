@@ -33,6 +33,20 @@ const (
 	FeedbackTooDifficult FeedbackLevel = 5
 )
 
+// Bodyweight exercise progression constants.
+const (
+	// Rep adjustments.
+	BodyweightRepIncrease = 2
+	BodyweightRepDecrease = 2
+	BodyweightMaxReps     = 15
+	BodyweightBaseReps    = 8
+	BodyweightMinReps     = 5
+
+	// Set limits.
+	BodyweightMaxSets = 5
+	BodyweightMinSets = 2
+)
+
 // Progression model constants.
 const (
 	// Exercise selection constants.
@@ -466,10 +480,12 @@ func (g *generator) determineSetsRepsWeight(exercise Exercise) []Set {
 }
 
 // createProgressiveSets creates sets with progression based on history and feedback.
-func (g *generator) createProgressiveSets(lastExerciseSet exerciseSetAggregate, feedback *int, exerciseType ExerciseType) []Set {
+func (g *generator) createProgressiveSets(
+	lastExerciseSet exerciseSetAggregate, feedback *int, exerciseType ExerciseType,
+) []Set {
 	if feedback != nil && *feedback == int(FeedbackTooEasy) {
 		if exerciseType == ExerciseTypeBodyweight {
-			return increaseReps(lastExerciseSet.Sets, 2)
+			return increaseReps(lastExerciseSet.Sets, BodyweightRepIncrease)
 		}
 		return increaseWeight(lastExerciseSet.Sets, LargerWeightIncrementKg)
 	}
@@ -620,7 +636,9 @@ func (g *generator) progressSetsUndulating(lastExerciseSet exerciseSetAggregate,
 }
 
 // handleMaxCompletionProgression handles progression when all sets completed at max.
-func (g *generator) handleMaxCompletionProgression(lastExerciseSet exerciseSetAggregate, currentType Type, exerciseType ExerciseType) []Set {
+func (g *generator) handleMaxCompletionProgression(
+	lastExerciseSet exerciseSetAggregate, currentType Type, exerciseType ExerciseType,
+) []Set {
 	consecutiveMaxCompletions := g.countConsecutiveMaxCompletions(lastExerciseSet)
 
 	if consecutiveMaxCompletions >= MaxConsecutiveCompletions {
@@ -940,14 +958,14 @@ func increaseReps(sets []Set, increment int) []Set {
 func (g *generator) increaseBodyweightDifficulty(sets []Set) []Set {
 	// First try increasing reps up to 15
 	if len(sets) > 0 && sets[0].MaxReps < 15 {
-		return increaseReps(sets, 2)
+		return increaseReps(sets, BodyweightRepIncrease)
 	}
 	// If already at high reps, add a set (up to 5 sets max)
-	if len(sets) < 5 {
+	if len(sets) < BodyweightMaxSets {
 		newSet := Set{
-			WeightKg:      nil, // Bodyweight, no weight
-			MinReps:       8,   // Reset to base reps for new set
-			MaxReps:       8,
+			WeightKg:      nil,                // Bodyweight, no weight
+			MinReps:       BodyweightBaseReps, // Reset to base reps for new set
+			MaxReps:       BodyweightBaseReps,
 			CompletedReps: nil,
 		}
 		return append(sets, newSet)
@@ -963,14 +981,14 @@ func (g *generator) reduceBodyweightDifficulty(sets []Set) []Set {
 		return transformSets(sets, func(set Set) Set {
 			return Set{
 				WeightKg:      set.WeightKg,
-				MinReps:       set.MinReps - 2,
-				MaxReps:       set.MaxReps - 2,
+				MinReps:       set.MinReps - BodyweightRepDecrease,
+				MaxReps:       set.MaxReps - BodyweightRepDecrease,
 				CompletedReps: nil,
 			}
 		})
 	}
 	// If at minimum reps, reduce sets (minimum 2 sets)
-	if len(sets) > 2 {
+	if len(sets) > BodyweightMinSets {
 		return sets[:len(sets)-1]
 	}
 	// If already at minimum, keep same difficulty
