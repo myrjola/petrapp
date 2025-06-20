@@ -19,6 +19,14 @@
             </div>
 
             <div>
+                <label for="exercise_type">Exercise Type:</label>
+                <select id="exercise_type" name="exercise_type" required>
+                    <option value="weighted" {{ if eq .Exercise.ExerciseType "weighted" }}selected{{ end }}>Weighted</option>
+                    <option value="bodyweight" {{ if eq .Exercise.ExerciseType "bodyweight" }}selected{{ end }}>Bodyweight</option>
+                </select>
+            </div>
+
+            <div>
                 <label for="primary_muscles">Primary Muscle Groups:</label>
                 <select id="primary_muscles" name="primary_muscles" multiple required>
                     {{ range .PrimaryMuscleOptions }}

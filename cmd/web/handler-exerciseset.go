@@ -119,19 +119,43 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	weightStr := r.PostForm.Get("weight")
-	if weightStr == "" {
-		app.serverError(w, r, errors.New("weight not provided"))
-		return
-	}
-	// Replace comma with dot for decimal numbers.
-	weightStr = strings.Replace(weightStr, ",", ".", 1)
-
-	weight, err := strconv.ParseFloat(weightStr, 64)
+	// Get the exercise to check if it's bodyweight or weighted
+	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
-		app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
+		app.serverError(w, r, err)
 		return
 	}
+
+	var exercise workout.Exercise
+	for _, es := range session.ExerciseSets {
+		if es.Exercise.ID == exerciseID {
+			exercise = es.Exercise
+			break
+		}
+	}
+	if exercise.ID == 0 {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Handle weight based on exercise type
+	var weight float64
+	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
+		weightStr := r.PostForm.Get("weight")
+		if weightStr == "" {
+			app.serverError(w, r, errors.New("weight not provided for weighted exercise"))
+			return
+		}
+		// Replace comma with dot for decimal numbers.
+		weightStr = strings.Replace(weightStr, ",", ".", 1)
+
+		weight, err = strconv.ParseFloat(weightStr, 64)
+		if err != nil {
+			app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
+			return
+		}
+	}
+	// For bodyweight exercises, weight remains 0 (will be ignored in service layer)
 
 	repsStr := r.PostForm.Get("reps")
 	if repsStr == "" {
@@ -145,13 +169,15 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// First update the weight
-	if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-		app.serverError(w, r, fmt.Errorf("update weight: %w", err))
-		return
+	// Update weight only for weighted exercises
+	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
+		if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
+			app.serverError(w, r, fmt.Errorf("update weight: %w", err))
+			return
+		}
 	}
 
-	// Then update the completed reps
+	// Update the completed reps
 	if err = app.workoutService.UpdateCompletedReps(r.Context(), date, exerciseID, setIndex, reps); err != nil {
 		app.serverError(w, r, fmt.Errorf("update completed reps: %w", err))
 		return

@@ -127,6 +127,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	// Extract form data
 	name := r.PostForm.Get("name")
 	category := workout.Category(r.PostForm.Get("category"))
+	exerciseType := workout.ExerciseType(r.PostForm.Get("exercise_type"))
 	description := r.PostForm.Get("description")
 	primaryMuscles := r.PostForm["primary_muscles"]
 	secondaryMuscles := r.PostForm["secondary_muscles"]
@@ -142,6 +143,11 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if exerciseType != workout.ExerciseTypeWeighted && exerciseType != workout.ExerciseTypeBodyweight {
+		app.serverError(w, r, errors.New("invalid exercise type"))
+		return
+	}
+
 	if len(primaryMuscles) == 0 {
 		app.serverError(w, r, errors.New("primary muscle groups are required"))
 		return
@@ -152,6 +158,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		ID:                    id,
 		Name:                  name,
 		Category:              category,
+		ExerciseType:          exerciseType,
 		DescriptionMarkdown:   description,
 		PrimaryMuscleGroups:   primaryMuscles,
 		SecondaryMuscleGroups: secondaryMuscles,

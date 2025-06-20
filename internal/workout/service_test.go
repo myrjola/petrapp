@@ -123,6 +123,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		ID:                    exerciseID,
 		Name:                  "Updated Test Exercise",
 		Category:              workout.CategoryLower,
+		ExerciseType:          workout.ExerciseTypeWeighted,
 		DescriptionMarkdown:   "Updated test description",
 		PrimaryMuscleGroups:   []string{"Quads", "Glutes"},
 		SecondaryMuscleGroups: []string{"Hamstrings", "Core"},

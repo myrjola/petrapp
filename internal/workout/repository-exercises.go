@@ -25,12 +25,13 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 	var exercise Exercise
 
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT id, name, category, description_markdown
+		SELECT id, name, category, exercise_type, description_markdown
 		FROM exercises
 		WHERE id = ?`, id).Scan(
 		&exercise.ID,
 		&exercise.Name,
 		&exercise.Category,
+		&exercise.ExerciseType,
 		&exercise.DescriptionMarkdown,
 	)
 	if err != nil {
@@ -53,7 +54,7 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err error) {
 	// First, get all exercises
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT id, name, category, description_markdown
+		SELECT id, name, category, exercise_type, description_markdown
 		FROM exercises
 		ORDER BY id`)
 	if err != nil {
@@ -68,7 +69,7 @@ func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err 
 	var exercises []Exercise
 	for rows.Next() {
 		var exercise Exercise
-		if err = rows.Scan(&exercise.ID, &exercise.Name, &exercise.Category, &exercise.DescriptionMarkdown); err != nil {
+		if err = rows.Scan(&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType, &exercise.DescriptionMarkdown); err != nil {
 			return nil, fmt.Errorf("scan exercise: %w", err)
 		}
 		exercises = append(exercises, exercise)
@@ -211,15 +212,15 @@ func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert 
 	if upsert {
 		// When upserting, use the existing ID
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (id, name, category, description_markdown)
-			VALUES (?, ?, ?, ?)`,
-			ex.ID, ex.Name, ex.Category, ex.DescriptionMarkdown)
+			INSERT INTO exercises (id, name, category, exercise_type, description_markdown)
+			VALUES (?, ?, ?, ?, ?)`,
+			ex.ID, ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown)
 	} else {
 		// When creating new, let SQLite assign the ID
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (name, category, description_markdown)
-			VALUES (?, ?, ?)`,
-			ex.Name, ex.Category, ex.DescriptionMarkdown)
+			INSERT INTO exercises (name, category, exercise_type, description_markdown)
+			VALUES (?, ?, ?, ?)`,
+			ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown)
 	}
 
 	if err != nil {

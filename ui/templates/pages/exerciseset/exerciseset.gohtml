@@ -228,7 +228,9 @@
             {{ range $index, $set := .ExerciseSet.Sets }}
                 <div class="set{{ if $set.CompletedReps }} completed{{ end }}">
                     <div class="info">
-                        <span class="weight">{{ $set.WeightKg }} kg</span>
+                        {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                            <span class="weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
+                        {{ end }}
                         {{ if $set.CompletedReps }}
                             <span class="reps">{{ $set.CompletedReps }} reps</span>
                             <a href="?edit={{ $index }}" class="edit-button">Edit</a>
@@ -244,18 +246,20 @@
                         >
                             {{ csrf }}
                             <div class="inputs">
-                                <div class="field">
-                                    <label for="weight-{{ $index }}">Weight</label>
-                                    <input
-                                            id="weight-{{ $index }}"
-                                            inputmode="decimal"
-                                            pattern="[0-9,\.]*"
-                                            name="weight"
-                                            value="{{ $set.WeightKg }}"
-                                            step="0.5"
-                                            required
-                                    >
-                                </div>
+                                {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                                    <div class="field">
+                                        <label for="weight-{{ $index }}">Weight</label>
+                                        <input
+                                                id="weight-{{ $index }}"
+                                                inputmode="decimal"
+                                                pattern="[0-9,\.]*"
+                                                name="weight"
+                                                value="{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }}"
+                                                step="0.5"
+                                                required
+                                        >
+                                    </div>
+                                {{ end }}
                                 <div class="field">
                                     <label for="reps-{{ $index }}">Reps</label>
                                     <input
@@ -305,7 +309,9 @@
             {{ range .ExerciseSet.Sets }}
                 {{ if not .CompletedReps }}
                     <div class="set">
-                        <span class="weight">{{ .WeightKg }} kg</span>
+                        {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                            <span class="weight">{{ if .WeightKg }}{{ .WeightKg }}{{ else }}0{{ end }} kg</span>
+                        {{ end }}
                         <span class="reps">{{ .MinReps }}-{{ .MaxReps }} reps</span>
                     </div>
                 {{ end }}

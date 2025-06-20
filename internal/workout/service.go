@@ -340,6 +340,7 @@ func createMinimalExercise(name string) Exercise {
 		ID:                    -1,
 		Name:                  name,
 		Category:              CategoryFullBody,
+		ExerciseType:          ExerciseTypeWeighted,
 		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
 		PrimaryMuscleGroups:   []string{},
 		SecondaryMuscleGroups: []string{},

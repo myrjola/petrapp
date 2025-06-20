@@ -122,11 +122,12 @@ func Test_application_adminExercises(t *testing.T) {
 
 		// Update the exercise
 		formData := map[string]string{
-			"Name":        "Updated Test Squat",
-			"Category":    "lower",
-			"Primary":     "Quads,Glutes",
-			"Secondary":   "Hamstrings,Calves,Abs,Lower Back",
-			"Description": "An updated test squat exercise description",
+			"Name":           "Updated Test Squat",
+			"Category":       "lower",
+			"Exercise Type:": "weighted",
+			"Primary":        "Quads,Glutes",
+			"Secondary":      "Hamstrings,Calves,Abs,Lower Back",
+			"Description":    "An updated test squat exercise description",
 		}
 
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
