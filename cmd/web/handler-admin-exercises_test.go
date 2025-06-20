@@ -134,7 +134,7 @@ func Test_application_adminExercises(t *testing.T) {
 			t.Fatalf("Failed to submit exercise update form: %v", err)
 		}
 
-		// Verify we're back at the exercises page
+		// Verify we're back at the exercise list page
 		if doc.Find("h1").Text() != "Exercise Administration" {
 			t.Error("Expected to be redirected back to 'Exercise Administration' page")
 		}
