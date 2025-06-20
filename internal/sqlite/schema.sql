@@ -78,6 +78,7 @@ CREATE TABLE exercises
     id       INTEGER PRIMARY KEY,
     name     TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
     category TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
+    exercise_type TEXT NOT NULL DEFAULT 'weighted' CHECK (exercise_type IN ('weighted', 'bodyweight')),
     description_markdown TEXT NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000)
 ) STRICT;
 
@@ -99,7 +100,7 @@ CREATE TABLE exercise_sets
     workout_date       TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
     exercise_id        INTEGER NOT NULL,
     set_number         INTEGER NOT NULL CHECK (set_number > 0),
-    weight_kg          REAL    NOT NULL CHECK (weight_kg >= 0),
+    weight_kg          REAL    CHECK (weight_kg IS NULL OR weight_kg >= 0),
     min_reps           INTEGER NOT NULL CHECK (min_reps > 0),
     max_reps           INTEGER NOT NULL CHECK (max_reps >= min_reps),
     completed_reps     INTEGER,
