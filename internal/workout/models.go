@@ -15,14 +15,23 @@ const (
 	CategoryLower    Category = "lower"
 )
 
+// ExerciseType represents whether an exercise uses weights or bodyweight.
+type ExerciseType string
+
+const (
+	ExerciseTypeWeighted   ExerciseType = "weighted"
+	ExerciseTypeBodyweight ExerciseType = "bodyweight"
+)
+
 // Exercise represents a single exercise type, e.g. Squat, Bench Press, etc.
 type Exercise struct {
-	ID                    int      `json:"id"`
-	Name                  string   `json:"name"`
-	Category              Category `json:"category"`
-	DescriptionMarkdown   string   `json:"description_markdown"`
-	PrimaryMuscleGroups   []string `json:"primary_muscle_groups"`
-	SecondaryMuscleGroups []string `json:"secondary_muscle_groups"`
+	ID                    int          `json:"id"`
+	Name                  string       `json:"name"`
+	Category              Category     `json:"category"`
+	ExerciseType          ExerciseType `json:"exercise_type"`
+	DescriptionMarkdown   string       `json:"description_markdown"`
+	PrimaryMuscleGroups   []string     `json:"primary_muscle_groups"`
+	SecondaryMuscleGroups []string     `json:"secondary_muscle_groups"`
 }
 
 type exerciseJSONSchema struct {
@@ -36,6 +45,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 			"id",
 			"name",
 			"category",
+			"exercise_type",
 			"description_markdown",
 			"primary_muscle_groups",
 			"secondary_muscle_groups",
@@ -53,6 +63,11 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 				"type":        "string",
 				"description": "Category of the exercise",
 				"enum":        []string{"full_body", "upper", "lower"},
+			},
+			"exercise_type": map[string]interface{}{
+				"type":        "string",
+				"description": "Type of exercise (weighted or bodyweight)",
+				"enum":        []string{"weighted", "bodyweight"},
 			},
 			"description_markdown": map[string]interface{}{
 				"type":        "string",
@@ -86,7 +101,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 
 // Set represents a single set of an exercise with target and actual performance.
 type Set struct {
-	WeightKg      float64
+	WeightKg      *float64 // Nullable for bodyweight exercises
 	MinReps       int
 	MaxReps       int
 	CompletedReps *int

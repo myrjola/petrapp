@@ -7,6 +7,16 @@ import (
 	"github.com/myrjola/petrapp/internal/ptr"
 )
 
+// Helper function for creating test sets with weights
+func createTestSet(weight float64, minReps, maxReps int, completedReps *int) Set {
+	return Set{
+		WeightKg:      &weight,
+		MinReps:       minReps,
+		MaxReps:       maxReps,
+		CompletedReps: completedReps,
+	}
+}
+
 // TestGenerate verifies that the workout generator generates
 // valid workouts according to our specifications.
 func TestGenerate(t *testing.T) {
@@ -135,10 +145,10 @@ func verifyGeneratedWorkout(t *testing.T, session sessionAggregate, date time.Ti
 
 		// Verify set parameters
 		for j, set := range exerciseSet.Sets {
-			// Verify all weights are reasonable
-			if set.WeightKg < 0 {
+			// Verify all weights are reasonable (skip for bodyweight exercises where weight is nil)
+			if set.WeightKg != nil && *set.WeightKg < 0 {
 				t.Errorf("Exercise %d, set #%d has negative weight: %f",
-					exerciseSet.ExerciseID, j+1, set.WeightKg)
+					exerciseSet.ExerciseID, j+1, *set.WeightKg)
 			}
 
 			// Verify rep ranges (3-16)
@@ -390,17 +400,17 @@ func createWorkoutHistory() []sessionAggregate {
 				{
 					ExerciseID: exercises[0].ID, // Bench Press
 					Sets: []Set{
-						{WeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
-						{WeightKg: 80, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						createTestSet(80, 8, 12, &rep10),
+						createTestSet(80, 8, 12, &rep8),
+						createTestSet(80, 8, 12, &rep8),
 					},
 				},
 				{
 					ExerciseID: exercises[2].ID, // Shoulder Press
 					Sets: []Set{
-						{WeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
-						{WeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 50, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						createTestSet(50, 8, 12, &rep12),
+						createTestSet(50, 8, 12, &rep10),
+						createTestSet(50, 8, 12, &rep8),
 					},
 				},
 			},
@@ -415,17 +425,17 @@ func createWorkoutHistory() []sessionAggregate {
 				{
 					ExerciseID: exercises[0].ID, // Bench Press
 					Sets: []Set{
-						{WeightKg: 82., MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 82., MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
-						{WeightKg: 82., MinReps: 8, MaxReps: 12, CompletedReps: &rep6},
+						createTestSet(82., 8, 12, &rep10),
+						createTestSet(82., 8, 12, &rep8),
+						createTestSet(82., 8, 12, &rep6),
 					},
 				},
 				{
 					ExerciseID: exercises[2].ID, // Shoulder Press
 					Sets: []Set{
-						{WeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
-						{WeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
-						{WeightKg: 52.5, MinReps: 8, MaxReps: 12, CompletedReps: &rep8},
+						createTestSet(52.5, 8, 12, &rep10),
+						createTestSet(52.5, 8, 12, &rep8),
+						createTestSet(52.5, 8, 12, &rep8),
 					},
 				},
 			},
@@ -440,17 +450,17 @@ func createWorkoutHistory() []sessionAggregate {
 				{
 					ExerciseID: exercises[6].ID, // Squat
 					Sets: []Set{
-						{WeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
-						{WeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep12},
-						{WeightKg: 100, MinReps: 8, MaxReps: 12, CompletedReps: &rep10},
+						createTestSet(100, 8, 12, &rep12),
+						createTestSet(100, 8, 12, &rep12),
+						createTestSet(100, 8, 12, &rep10),
 					},
 				},
 				{
 					ExerciseID: exercises[7].ID, // Deadlift
 					Sets: []Set{
-						{WeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
-						{WeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
-						{WeightKg: 120, MinReps: 3, MaxReps: 6, CompletedReps: &rep6},
+						createTestSet(120, 3, 6, &rep6),
+						createTestSet(120, 3, 6, &rep6),
+						createTestSet(120, 3, 6, &rep6),
 					},
 				},
 			},
@@ -682,8 +692,8 @@ func simulateWorkoutCompletion(session sessionAggregate, week int) sessionAggreg
 			set := &completed.ExerciseSets[i].Sets[j]
 
 			// If weight is 0, assign a reasonable starting weight based on exercise
-			if set.WeightKg == 0 {
-				set.WeightKg = 30
+			if set.WeightKg != nil && *set.WeightKg == 0 {
+				*set.WeightKg = 30
 			}
 
 			// Determine completion level (improve over weeks)
@@ -726,9 +736,13 @@ func verifyWorkoutProgression(t *testing.T, history []sessionAggregate) {
 
 			// Use the weight of the first set as representative
 			if len(exerciseSet.Sets) > 0 {
+				var weight float64
+				if exerciseSet.Sets[0].WeightKg != nil {
+					weight = *exerciseSet.Sets[0].WeightKg
+				}
 				exerciseProgression[exerciseID] = append(
 					exerciseProgression[exerciseID],
-					exerciseSet.Sets[0].WeightKg,
+					weight,
 				)
 			}
 		}
@@ -937,7 +951,9 @@ func getAverageWeight(t *testing.T, exerciseSet exerciseSetAggregate) float64 {
 
 	var total float64
 	for _, set := range exerciseSet.Sets {
-		total += set.WeightKg
+		if set.WeightKg != nil {
+			total += *set.WeightKg
+		}
 	}
 
 	return total / float64(len(exerciseSet.Sets))

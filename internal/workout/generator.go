@@ -458,33 +458,42 @@ func filterOutExercises(pool, toFilter []Exercise) []Exercise {
 func (g *generator) determineSetsRepsWeight(exercise Exercise) []Set {
 	lastExerciseSet := g.findMostRecentExerciseSet(exercise.ID)
 	if lastExerciseSet == nil {
-		return createDefaultSets()
+		return createDefaultSets(exercise.ExerciseType)
 	}
 
 	feedback := g.getMostRecentFeedback(exercise.ID)
-	return g.createProgressiveSets(*lastExerciseSet, feedback)
+	return g.createProgressiveSets(*lastExerciseSet, feedback, exercise.ExerciseType)
 }
 
 // createProgressiveSets creates sets with progression based on history and feedback.
-func (g *generator) createProgressiveSets(lastExerciseSet exerciseSetAggregate, feedback *int) []Set {
+func (g *generator) createProgressiveSets(lastExerciseSet exerciseSetAggregate, feedback *int, exerciseType ExerciseType) []Set {
 	if feedback != nil && *feedback == int(FeedbackTooEasy) {
+		if exerciseType == ExerciseTypeBodyweight {
+			return increaseReps(lastExerciseSet.Sets, 2)
+		}
 		return increaseWeight(lastExerciseSet.Sets, LargerWeightIncrementKg)
 	}
 
-	sets := g.progressSets(lastExerciseSet)
+	sets := g.progressSets(lastExerciseSet, exerciseType)
 	if feedback != nil && *feedback != int(FeedbackTooEasy) {
-		sets = g.integrateUserFeedback(sets, feedback)
+		sets = g.integrateUserFeedback(sets, feedback, exerciseType)
 	}
 
 	return sets
 }
 
-// createDefaultSets creates a default set of exercises for beginners with 8 reps and no weight.
-func createDefaultSets() []Set {
+// createDefaultSets creates a default set of exercises for beginners with 8 reps.
+func createDefaultSets(exerciseType ExerciseType) []Set {
+	var weight *float64
+	if exerciseType == ExerciseTypeWeighted {
+		weight = &[]float64{0}[0] // Starting weight of 0 for weighted exercises
+	}
+	// For bodyweight exercises, weight remains nil
+
 	return []Set{
-		{WeightKg: 0, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
-		{WeightKg: 0, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
-		{WeightKg: 0, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
+		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
+		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
+		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
 	}
 }
 
@@ -538,15 +547,15 @@ func (g *generator) isBeginnerUser() bool {
 }
 
 // progressSets determines the new sets based on the previous performance.
-func (g *generator) progressSets(lastExerciseSet exerciseSetAggregate) []Set {
+func (g *generator) progressSets(lastExerciseSet exerciseSetAggregate, exerciseType ExerciseType) []Set {
 	if g.isBeginnerUser() {
-		return g.progressSetsLinear(lastExerciseSet)
+		return g.progressSetsLinear(lastExerciseSet, exerciseType)
 	}
-	return g.progressSetsUndulating(lastExerciseSet)
+	return g.progressSetsUndulating(lastExerciseSet, exerciseType)
 }
 
 // progressSetsLinear implements linear progression for beginners.
-func (g *generator) progressSetsLinear(lastExerciseSet exerciseSetAggregate) []Set {
+func (g *generator) progressSetsLinear(lastExerciseSet exerciseSetAggregate, exerciseType ExerciseType) []Set {
 	// Check exercise completion status
 	completionStatus := g.evaluateSetCompletion(lastExerciseSet.Sets)
 
@@ -555,13 +564,19 @@ func (g *generator) progressSetsLinear(lastExerciseSet exerciseSetAggregate) []S
 		// If not completed yet, keep the same sets
 		return copySetWithoutCompletion(lastExerciseSet.Sets)
 	case "failed":
-		// If any set failed, reduce weight
+		// If any set failed, reduce difficulty
+		if exerciseType == ExerciseTypeBodyweight {
+			return g.reduceBodyweightDifficulty(lastExerciseSet.Sets)
+		}
 		return reduceWeight(lastExerciseSet.Sets, WeightReductionFactor)
 	case "completed_max":
-		// If all sets completed at max, increase weight
+		// If all sets completed at max, increase difficulty
+		if exerciseType == ExerciseTypeBodyweight {
+			return g.increaseBodyweightDifficulty(lastExerciseSet.Sets)
+		}
 		return increaseWeight(lastExerciseSet.Sets, StandardWeightIncrementKg)
 	default:
-		// Partial completion, keep weight the same
+		// Partial completion, keep difficulty the same
 		return copySetWithoutCompletion(lastExerciseSet.Sets)
 	}
 }
@@ -593,7 +608,7 @@ func (g *generator) evaluateSetCompletion(sets []Set) string {
 }
 
 // progressSetsUndulating implements undulating periodization for experienced users.
-func (g *generator) progressSetsUndulating(lastExerciseSet exerciseSetAggregate) []Set {
+func (g *generator) progressSetsUndulating(lastExerciseSet exerciseSetAggregate, exerciseType ExerciseType) []Set {
 	currentType := determineWorkoutType(lastExerciseSet.Sets)
 	allCompletedAtMax := allSetsCompletedAtMax(lastExerciseSet.Sets)
 
@@ -601,25 +616,32 @@ func (g *generator) progressSetsUndulating(lastExerciseSet exerciseSetAggregate)
 		return copySetWithoutCompletion(lastExerciseSet.Sets)
 	}
 
-	return g.handleMaxCompletionProgression(lastExerciseSet, currentType)
+	return g.handleMaxCompletionProgression(lastExerciseSet, currentType, exerciseType)
 }
 
 // handleMaxCompletionProgression handles progression when all sets completed at max.
-func (g *generator) handleMaxCompletionProgression(lastExerciseSet exerciseSetAggregate, currentType Type) []Set {
+func (g *generator) handleMaxCompletionProgression(lastExerciseSet exerciseSetAggregate, currentType Type, exerciseType ExerciseType) []Set {
 	consecutiveMaxCompletions := g.countConsecutiveMaxCompletions(lastExerciseSet)
 
 	if consecutiveMaxCompletions >= MaxConsecutiveCompletions {
+		if exerciseType == ExerciseTypeBodyweight {
+			// For bodyweight, switch workout types with rep adjustments
+			return createSetsForBodyweightWorkoutType(getNextWorkoutType(currentType))
+		}
 		weight := g.extractWeightFromSets(lastExerciseSet.Sets)
 		return createSetsForWorkoutType(getNextWorkoutType(currentType), weight)
 	}
 
+	if exerciseType == ExerciseTypeBodyweight {
+		return g.increaseBodyweightDifficulty(lastExerciseSet.Sets)
+	}
 	return increaseWeight(lastExerciseSet.Sets, StandardWeightIncrementKg)
 }
 
 // extractWeightFromSets extracts weight from the first set.
 func (g *generator) extractWeightFromSets(sets []Set) float64 {
-	if len(sets) > 0 {
-		return sets[0].WeightKg
+	if len(sets) > 0 && sets[0].WeightKg != nil {
+		return *sets[0].WeightKg
 	}
 	return 0.0
 }
@@ -707,6 +729,22 @@ func createSetsForWorkoutType(workoutType Type, baseWeight float64) []Set {
 	return createStandardSets(params.weight, params.minReps, params.maxReps)
 }
 
+// createSetsForBodyweightWorkoutType creates sets for bodyweight exercises with workout type variations.
+func createSetsForBodyweightWorkoutType(workoutType Type) []Set {
+	var minReps, maxReps int
+	switch workoutType {
+	case WorkoutTypeStrength:
+		minReps, maxReps = 3, 6
+	case WorkoutTypeHypertrophy:
+		minReps, maxReps = 8, 12
+	case WorkoutTypeEndurance:
+		minReps, maxReps = 12, 15
+	default:
+		minReps, maxReps = 8, 12
+	}
+	return createStandardBodyweightSets(minReps, maxReps)
+}
+
 // workoutTypeParams holds parameters for a workout type.
 type workoutTypeParams struct {
 	weight  float64
@@ -746,8 +784,20 @@ func getWorkoutTypeParameters(workoutType Type, baseWeight float64) workoutTypeP
 
 // createStandardSets creates a standard set of 3 sets with given parameters.
 func createStandardSets(weight float64, minReps, maxReps int) []Set {
+	weightPtr := &weight
 	set := Set{
-		WeightKg:      weight,
+		WeightKg:      weightPtr,
+		MinReps:       minReps,
+		MaxReps:       maxReps,
+		CompletedReps: nil,
+	}
+	return []Set{set, set, set}
+}
+
+// createStandardBodyweightSets creates a standard set of 3 bodyweight sets.
+func createStandardBodyweightSets(minReps, maxReps int) []Set {
+	set := Set{
+		WeightKg:      nil, // No weight for bodyweight exercises
 		MinReps:       minReps,
 		MaxReps:       maxReps,
 		CompletedReps: nil,
@@ -756,7 +806,7 @@ func createStandardSets(weight float64, minReps, maxReps int) []Set {
 }
 
 // integrateUserFeedback adjusts workout intensity based on user feedback.
-func (g *generator) integrateUserFeedback(sets []Set, feedback *int) []Set {
+func (g *generator) integrateUserFeedback(sets []Set, feedback *int, exerciseType ExerciseType) []Set {
 	if feedback == nil {
 		return sets
 	}
@@ -764,18 +814,30 @@ func (g *generator) integrateUserFeedback(sets []Set, feedback *int) []Set {
 	feedbackLevel := FeedbackLevel(*feedback)
 	switch feedbackLevel {
 	case FeedbackTooEasy:
+		if exerciseType == ExerciseTypeBodyweight {
+			return g.increaseBodyweightDifficulty(sets)
+		}
 		return increaseWeight(sets, LargerWeightIncrementKg)
 	case FeedbackTooDifficult:
-		return g.reduceDifficulty(sets)
+		return g.reduceDifficulty(sets, exerciseType)
 	case FeedbackOptimalLow, FeedbackOptimalMid, FeedbackOptimalHigh:
+		if exerciseType == ExerciseTypeBodyweight {
+			return g.increaseBodyweightDifficulty(sets)
+		}
 		return increaseWeight(sets, StandardWeightIncrementKg)
 	default:
+		if exerciseType == ExerciseTypeBodyweight {
+			return g.increaseBodyweightDifficulty(sets)
+		}
 		return increaseWeight(sets, StandardWeightIncrementKg)
 	}
 }
 
 // reduceDifficulty reduces workout difficulty by volume or intensity.
-func (g *generator) reduceDifficulty(sets []Set) []Set {
+func (g *generator) reduceDifficulty(sets []Set, exerciseType ExerciseType) []Set {
+	if exerciseType == ExerciseTypeBodyweight {
+		return g.reduceBodyweightDifficulty(sets)
+	}
 	if len(sets) > MaxStandardSets {
 		return sets[:len(sets)-1] // Reduce volume
 	}
@@ -831,8 +893,12 @@ func copySetWithoutCompletion(sets []Set) []Set {
 // reduceWeight reduces the weight by a percentage.
 func reduceWeight(sets []Set, percentage float64) []Set {
 	return transformSets(sets, func(set Set) Set {
-		reduction := set.WeightKg * percentage
-		newWeight := math.Max(0, set.WeightKg-reduction)
+		var newWeight *float64
+		if set.WeightKg != nil {
+			reduction := *set.WeightKg * percentage
+			weightValue := math.Max(0, *set.WeightKg-reduction)
+			newWeight = &weightValue
+		}
 		return Set{
 			WeightKg:      newWeight,
 			MinReps:       set.MinReps,
@@ -845,13 +911,70 @@ func reduceWeight(sets []Set, percentage float64) []Set {
 // increaseWeight increases the weight by a fixed amount.
 func increaseWeight(sets []Set, increment float64) []Set {
 	return transformSets(sets, func(set Set) Set {
+		var newWeight *float64
+		if set.WeightKg != nil {
+			newWeight = &[]float64{*set.WeightKg + increment}[0]
+		}
 		return Set{
-			WeightKg:      set.WeightKg + increment,
+			WeightKg:      newWeight,
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
 		}
 	})
+}
+
+// increaseReps increases the rep range for bodyweight exercises.
+func increaseReps(sets []Set, increment int) []Set {
+	return transformSets(sets, func(set Set) Set {
+		return Set{
+			WeightKg:      set.WeightKg, // Keep weight nil for bodyweight
+			MinReps:       set.MinReps + increment,
+			MaxReps:       set.MaxReps + increment,
+			CompletedReps: nil,
+		}
+	})
+}
+
+// increaseBodyweightDifficulty increases difficulty for bodyweight exercises.
+func (g *generator) increaseBodyweightDifficulty(sets []Set) []Set {
+	// First try increasing reps up to 15
+	if len(sets) > 0 && sets[0].MaxReps < 15 {
+		return increaseReps(sets, 2)
+	}
+	// If already at high reps, add a set (up to 5 sets max)
+	if len(sets) < 5 {
+		newSet := Set{
+			WeightKg:      nil, // Bodyweight, no weight
+			MinReps:       8,   // Reset to base reps for new set
+			MaxReps:       8,
+			CompletedReps: nil,
+		}
+		return append(sets, newSet)
+	}
+	// If already at max sets and reps, keep same difficulty
+	return copySetWithoutCompletion(sets)
+}
+
+// reduceBodyweightDifficulty reduces difficulty for bodyweight exercises.
+func (g *generator) reduceBodyweightDifficulty(sets []Set) []Set {
+	// First try reducing reps (minimum 5)
+	if len(sets) > 0 && sets[0].MinReps > 5 {
+		return transformSets(sets, func(set Set) Set {
+			return Set{
+				WeightKg:      set.WeightKg,
+				MinReps:       set.MinReps - 2,
+				MaxReps:       set.MaxReps - 2,
+				CompletedReps: nil,
+			}
+		})
+	}
+	// If at minimum reps, reduce sets (minimum 2 sets)
+	if len(sets) > 2 {
+		return sets[:len(sets)-1]
+	}
+	// If already at minimum, keep same difficulty
+	return copySetWithoutCompletion(sets)
 }
 
 // transformSets applies a transformation function to all sets.

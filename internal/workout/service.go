@@ -214,7 +214,7 @@ func (s *Service) UpdateSetWeight(
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
-				ex.Sets[setIndex].WeightKg = newWeight
+				ex.Sets[setIndex].WeightKg = &newWeight
 				return true, nil
 			}
 		}
@@ -435,8 +435,12 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 func (s *Service) createEmptySets(templateSets []Set) []Set {
 	result := make([]Set, len(templateSets))
 	for i, set := range templateSets {
+		var weight *float64
+		if set.WeightKg != nil {
+			weight = &[]float64{0}[0] // Empty weight for weighted exercises
+		}
 		result[i] = Set{
-			WeightKg:      0, // Empty weight
+			WeightKg:      weight,
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
@@ -547,19 +551,19 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			// Create default sets if no historical data exists
 			newSets = []Set{
 				{
-					WeightKg:      0,
+					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
 				},
 				{
-					WeightKg:      0,
+					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
 				},
 				{
-					WeightKg:      0,
+					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
