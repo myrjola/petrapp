@@ -2,6 +2,257 @@
 
 {{ define "page" }}
     <main class="page-container" role="main" aria-label="Exercise Set Workout">
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                    max-width: 600px;
+                    margin-left: auto;
+                    margin-right: auto;
+                    padding: var(--size-4);
+
+                    @media (max-width: 768px) {
+                        margin: var(--size-2);
+                        padding: var(--size-2);
+                    }
+                }
+
+                .exercise-header {
+                    display: flex;
+                    gap: var(--size-3);
+                    align-items: center;
+                    margin-bottom: var(--size-6);
+
+                    .back-link {
+                        color: var(--color-text-secondary);
+                        text-decoration: none;
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-2);
+                        padding: var(--size-2);
+                        border-radius: var(--radius-2);
+                        transition: background-color 0.2s ease;
+
+                        &:hover {
+                            background: var(--color-surface);
+                        }
+                    }
+
+                    .exercise-title {
+                        font-size: var(--font-size-4);
+                        font-weight: var(--font-weight-6);
+                        color: var(--color-text-primary);
+                    }
+
+                    .timer {
+                        margin-left: auto;
+                        background: var(--color-surface);
+                        color: var(--color-text-primary);
+                        padding: var(--size-2) var(--size-3);
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-1);
+                        font-weight: var(--font-weight-6);
+                        font-family: var(--font-mono);
+                        border: 1px solid var(--color-border);
+                        min-width: 4rem;
+                        text-align: center;
+                    }
+
+                    .action-button {
+                        padding: var(--size-2) var(--size-3);
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-0);
+                        font-weight: var(--font-weight-6);
+                        text-decoration: none;
+                        transition: background-color 0.2s ease;
+
+                        &.info-button {
+                            background: var(--color-info-bg);
+                            color: var(--color-info);
+
+                            &:hover {
+                                background: var(--sky-1);
+                            }
+                        }
+
+                        &.swap-button {
+                            background: var(--color-success-bg);
+                            color: var(--color-success);
+
+                            &:hover {
+                                background: var(--lime-1);
+                            }
+                        }
+                    }
+                }
+
+                .sets-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                    margin-bottom: var(--size-6);
+                }
+
+                .exercise-set {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                    padding: var(--size-4);
+                    background: var(--color-surface);
+                    border: 1px solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    transition: all 0.2s ease;
+                    position: relative;
+
+                    &.completed {
+                        background: var(--color-surface-completed);
+                        border-color: var(--color-success);
+
+                        &::before {
+                            content: "✓";
+                            position: absolute;
+                            top: var(--size-2);
+                            right: var(--size-2);
+                            color: var(--color-success);
+                            font-weight: var(--font-weight-7);
+                        }
+                    }
+
+                    &.active {
+                        background: var(--color-surface-active);
+                        border-color: var(--color-info);
+                        box-shadow: 0 0 0 2px var(--sky-1);
+                    }
+
+                    .set-info {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                        margin-bottom: var(--size-2);
+
+                        .weight {
+                            font-weight: var(--font-weight-6);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-2);
+                        }
+
+                        .reps {
+                            color: var(--color-text-secondary);
+                            font-size: var(--font-size-1);
+                        }
+
+                        .edit-button {
+                            margin-left: auto;
+                            padding: var(--size-1) var(--size-2);
+                            background: var(--color-surface-elevated);
+                            border: 1px solid var(--color-border);
+                            border-radius: var(--radius-2);
+                            font-size: var(--font-size-0);
+                            cursor: pointer;
+                            text-decoration: none;
+                            color: var(--color-text-secondary);
+                            transition: all 0.2s ease;
+
+                            &:hover {
+                                background: var(--gray-1);
+                                border-color: var(--gray-4);
+                            }
+                        }
+                    }
+
+                    .set-form {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: end;
+
+                        .form-inputs {
+                            display: flex;
+                            gap: var(--size-3);
+                            flex: 1;
+                        }
+
+                        .input-field {
+                            display: flex;
+                            flex-direction: column;
+                            gap: var(--size-1);
+
+                            label {
+                                font-size: var(--font-size-0);
+                                color: var(--color-text-secondary);
+                                font-weight: var(--font-weight-5);
+                            }
+
+                            input {
+                                width: 5rem;
+                                padding: var(--size-2) var(--size-3);
+                                border: 2px solid var(--color-border);
+                                border-radius: var(--radius-2);
+                                text-align: center;
+                                font-size: var(--font-size-1);
+                                font-weight: var(--font-weight-5);
+                                transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+                                &:focus {
+                                    outline: none;
+                                    border-color: var(--color-border-focus);
+                                    box-shadow: 0 0 0 3px var(--sky-1);
+                                }
+
+                                &:invalid {
+                                    border-color: var(--red-5);
+                                }
+                            }
+                        }
+
+                        .submit-button {
+                            padding: var(--size-3) var(--size-5);
+                            background: var(--color-success);
+                            color: var(--white);
+                            border: none;
+                            border-radius: var(--radius-2);
+                            font-weight: var(--font-weight-6);
+                            cursor: pointer;
+                            transition: background-color 0.2s ease, transform 0.1s ease;
+
+                            &:hover {
+                                background: var(--lime-7);
+                                transform: translateY(-1px);
+                            }
+
+                            &:active {
+                                transform: translateY(0);
+                            }
+                        }
+                    }
+                }
+
+                .remaining-sets {
+                    .section-title {
+                        font-size: var(--font-size-2);
+                        color: var(--color-text-secondary);
+                        margin-bottom: var(--size-3);
+                        font-weight: var(--font-weight-5);
+                    }
+
+                    .remaining-set {
+                        color: var(--color-text-muted);
+                        display: flex;
+                        gap: var(--size-3);
+                        padding: var(--size-2) var(--size-3);
+                        background: var(--gray-0);
+                        border-radius: var(--radius-2);
+                        margin-bottom: var(--size-2);
+                        
+                        .weight {
+                            font-weight: var(--font-weight-5);
+                        }
+                    }
+                }
+            }
+        </style>
 
         <script {{ nonce }}>
           document.addEventListener("DOMContentLoaded", function () {
