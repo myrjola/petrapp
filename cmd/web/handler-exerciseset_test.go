@@ -73,7 +73,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Check for set information
-	if doc.Find(".set").Length() == 0 {
+	if doc.Find(".exercise-set").Length() == 0 {
 		t.Error("Expected to find sets on the page")
 	}
 
@@ -138,7 +138,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Check that the set is now marked as completed
-	if doc.Find(".set.completed").Length() == 0 {
+	if doc.Find(".exercise-set.completed").Length() == 0 {
 		t.Error("Expected to find a completed set")
 	}
 
@@ -169,7 +169,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Find the "Edit" link in the first completed set
-	editLink := doc.Find(".set.completed .edit-button").First()
+	editLink := doc.Find(".exercise-set.completed .edit-button").First()
 	if editLink.Length() == 0 {
 		t.Fatalf("No edit button found for completed set")
 	}
@@ -219,13 +219,13 @@ func Test_application_exerciseSet(t *testing.T) {
 
 	// Verify the updated values are shown
 	// Extract the first completed set's weight
-	setWeight := doc.Find(".set.completed .weight").First().Text()
+	setWeight := doc.Find(".exercise-set.completed .weight").First().Text()
 	if setWeight == "" {
 		t.Error("Expected to find weight in completed set")
 	}
 
 	// Extract the reps value
-	setReps := doc.Find(".set.completed .reps").First().Text()
+	setReps := doc.Find(".exercise-set.completed .reps").First().Text()
 	if setReps == "" {
 		t.Error("Expected to find reps in completed set")
 	}

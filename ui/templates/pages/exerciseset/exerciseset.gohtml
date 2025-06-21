@@ -1,17 +1,7 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
-        <style {{ nonce }}>
-            @scope {
-                :scope {
-                    margin: var(--size-4);
-                    display: flex;
-                    flex-direction: column;
-                    gap: var(--size-6);
-                }
-            }
-        </style>
+    <main class="page-container" role="main" aria-label="Exercise Set Workout">
 
         <script {{ nonce }}>
           document.addEventListener("DOMContentLoaded", function () {
@@ -65,177 +55,33 @@
           }
         </script>
 
-        <header>
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        display: flex;
-                        gap: var(--size-3);
-                        align-items: center;
-
-                        a {
-                            color: var(--gray-7);
-                            text-decoration: none;
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-2);
-                            padding: var(--size-2);
-                            border-radius: var(--radius-2);
-
-                            &:hover {
-                                background: var(--gray-1);
-                            }
-                        }
-
-                        h1 {
-                            font-size: var(--font-size-4);
-                            font-weight: var(--font-weight-6);
-                        }
-
-                        .timer {
-                            margin-left: auto;
-                            background: var(--gray-0);
-                            color: var(--gray-8);
-                            padding: var(--size-1) var(--size-3);
-                            border-radius: var(--radius-2);
-                            font-size: var(--font-size-1);
-                            font-weight: var(--font-weight-6);
-                            font-family: var(--font-mono);
-                            border: 1px solid var(--gray-3);
-                        }
-
-                        .info-button {
-                            background: var(--sky-0);
-                            color: var(--sky-8);
-                            padding: var(--size-1) var(--size-3);
-                            border-radius: var(--radius-2);
-                            font-size: var(--font-size-0);
-                            font-weight: var(--font-weight-6);
-
-                            &:hover {
-                                background: var(--sky-1);
-                            }
-                        }
-
-                        .swap-button {
-                            background: var(--lime-0);
-                            color: var(--lime-8);
-                            padding: var(--size-1) var(--size-3);
-                            border-radius: var(--radius-2);
-                            font-size: var(--font-size-0);
-                            font-weight: var(--font-weight-6);
-
-                            &:hover {
-                                background: var(--lime-1);
-                            }
-                        }
-                    }
-                }
-            </style>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button>
+        <header class="exercise-header">
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link" aria-label="Back to workout">
                 ← Back
             </a>
-            <h1>{{ .ExerciseSet.Exercise.Name }}</h1>
-            <div class="timer" id="workout-timer">0:00</div>
+            <h1 class="exercise-title">{{ .ExerciseSet.Exercise.Name }}</h1>
+            <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
-               class="info-button">Info</a>
+               class="action-button info-button" aria-label="View exercise information">Info</a>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
-               class="swap-button">Swap</a>
+               class="action-button swap-button" aria-label="Swap exercise">Swap</a>
         </header>
 
-        <div class="sets">
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        display: flex;
-                        flex-direction: column;
-                        gap: var(--size-4);
-
-                        .set {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--size-3);
-                            padding: var(--size-3);
-                            background: var(--gray-1);
-                            border-radius: var(--radius-2);
-
-                            .info {
-                                display: flex;
-                                align-items: center;
-                                gap: var(--size-3);
-                            }
-
-                            .weight {
-                                font-weight: var(--font-weight-6);
-                            }
-
-                            .reps {
-                                color: var(--gray-7);
-                            }
-
-                            form {
-                                display: flex;
-                                gap: var(--size-3);
-                                align-items: center;
-
-                                .inputs {
-                                    display: flex;
-                                    gap: var(--size-3);
-                                    flex: 1;
-                                }
-
-                                .field {
-                                    display: flex;
-                                    flex-direction: column;
-                                    gap: var(--size-1);
-
-                                    label {
-                                        font-size: var(--font-size-0);
-                                        color: var(--gray-6);
-                                    }
-
-                                    input {
-                                        width: 5rem;
-                                        padding: var(--size-2);
-                                        border: var(--border-size-1) solid var(--gray-3);
-                                        border-radius: var(--radius-2);
-                                        text-align: right;
-                                    }
-                                }
-
-                                button {
-                                    padding: var(--size-2) var(--size-4);
-                                    margin-left: auto;
-                                }
-
-                                .edit-button {
-                                    margin-left: var(--size-2);
-                                    padding: var(--size-1) var(--size-2);
-                                    background: var(--gray-2);
-                                    border: 1px solid var(--gray-3);
-                                    border-radius: var(--radius-1);
-                                    font-size: var(--font-size-0);
-                                    cursor: pointer;
-                                    text-decoration: none;
-                                    color: var(--gray-7);
-                                }
-                            }
-                        }
-                    }
-                }
-            </style>
+        <div class="sets-container" aria-label="Exercise sets">
 
             {{ range $index, $set := .ExerciseSet.Sets }}
-                <div class="set{{ if $set.CompletedReps }} completed{{ end }}">
-                    <div class="info">
+                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }} active{{ end }}" 
+                     role="group" 
+                     aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
+                    <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                            <span class="weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
+                            <span class="weight" aria-label="Weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
                         {{ end }}
                         {{ if $set.CompletedReps }}
-                            <span class="reps">{{ $set.CompletedReps }} reps</span>
-                            <a href="?edit={{ $index }}" class="edit-button">Edit</a>
+                            <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
+                            <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
                         {{ else }}
-                            <span class="reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
+                            <span class="reps" aria-label="Target reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
                         {{ end }}
                     </div>
 
@@ -243,12 +89,13 @@
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
-                        >
+                              class="set-form"
+                              aria-label="Complete set {{ $index }}">
                             {{ csrf }}
-                            <div class="inputs">
+                            <div class="form-inputs">
                                 {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                                    <div class="field">
-                                        <label for="weight-{{ $index }}">Weight</label>
+                                    <div class="input-field">
+                                        <label for="weight-{{ $index }}">Weight (kg)</label>
                                         <input
                                                 id="weight-{{ $index }}"
                                                 inputmode="decimal"
@@ -257,10 +104,12 @@
                                                 value="{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }}"
                                                 step="0.5"
                                                 required
+                                                aria-describedby="weight-help-{{ $index }}"
                                         >
+                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
                                     </div>
                                 {{ end }}
-                                <div class="field">
+                                <div class="input-field">
                                     <label for="reps-{{ $index }}">Reps</label>
                                     <input
                                             id="reps-{{ $index }}"
@@ -274,11 +123,13 @@
                                             required
                                             {{ if $set.CompletedReps }}disabled{{ end }}
                                             class="reps-input"
+                                            aria-describedby="reps-help-{{ $index }}"
                                     >
+                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter number of repetitions completed</div>
                                 </div>
                             </div>
-                            <button type="submit" class="done"
-                                    {{ if $set.CompletedReps }} {{ end }}>Done!
+                            <button type="submit" class="submit-button"
+                                    aria-label="Complete set {{ $index }}">Done!
                             </button>
                         </form>
                     {{ end }}
@@ -286,33 +137,15 @@
             {{ end }}
         </div>
 
-        <div class="remaining">
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        h2 {
-                            font-size: var(--font-size-2);
-                            color: var(--gray-6);
-                            margin-bottom: var(--size-3);
-                        }
-
-                        .set {
-                            color: var(--gray-5);
-                            display: flex;
-                            gap: var(--size-3);
-                            padding: var(--size-2);
-                        }
-                    }
-                }
-            </style>
-            <h2>Remaining sets</h2>
+        <div class="remaining-sets" aria-label="Remaining sets">
+            <h2 class="section-title">Remaining sets</h2>
             {{ range .ExerciseSet.Sets }}
                 {{ if not .CompletedReps }}
-                    <div class="set">
+                    <div class="remaining-set" role="group" aria-label="Upcoming set">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                            <span class="weight">{{ if .WeightKg }}{{ .WeightKg }}{{ else }}0{{ end }} kg</span>
+                            <span class="weight" aria-label="Weight">{{ if .WeightKg }}{{ .WeightKg }}{{ else }}0{{ end }} kg</span>
                         {{ end }}
-                        <span class="reps">{{ .MinReps }}-{{ .MaxReps }} reps</span>
+                        <span class="reps" aria-label="Target reps">{{ .MinReps }}-{{ .MaxReps }} reps</span>
                     </div>
                 {{ end }}
             {{ end }}
