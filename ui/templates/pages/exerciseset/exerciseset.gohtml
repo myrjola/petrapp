@@ -252,28 +252,6 @@
                     }
                 }
 
-                .remaining-sets {
-                    .section-title {
-                        font-size: var(--font-size-2);
-                        color: var(--color-text-secondary);
-                        margin-bottom: var(--size-3);
-                        font-weight: var(--font-weight-5);
-                    }
-
-                    .remaining-set {
-                        color: var(--color-text-muted);
-                        display: flex;
-                        gap: var(--size-3);
-                        padding: var(--size-2) var(--size-3);
-                        background: var(--gray-0);
-                        border-radius: var(--radius-2);
-                        margin-bottom: var(--size-2);
-                        
-                        .weight {
-                            font-weight: var(--font-weight-5);
-                        }
-                    }
-                }
             }
         </style>
 
@@ -419,18 +397,5 @@
             {{ end }}
         </div>
 
-        <div class="remaining-sets" aria-label="Remaining sets">
-            <h2 class="section-title">Remaining sets</h2>
-            {{ range .ExerciseSet.Sets }}
-                {{ if not .CompletedReps }}
-                    <div class="remaining-set" role="group" aria-label="Upcoming set">
-                        {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                            <span class="weight" aria-label="Weight">{{ if .WeightKg }}{{ .WeightKg }}{{ else }}0{{ end }} kg</span>
-                        {{ end }}
-                        <span class="reps" aria-label="Target reps">{{ .MinReps }}-{{ .MaxReps }} reps</span>
-                    </div>
-                {{ end }}
-            {{ end }}
-        </div>
     </main>
 {{ end }}
