@@ -22,9 +22,33 @@
 
                 .exercise-header {
                     display: flex;
+                    flex-direction: column;
                     gap: var(--size-3);
-                    align-items: center;
                     margin-bottom: var(--size-6);
+
+                    .header-row {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                    }
+
+                    .title-row {
+                        justify-content: center;
+                    }
+
+                    .actions-row {
+                        justify-content: flex-start;
+                        align-items: center;
+
+                        .timer {
+                            margin-right: auto;
+                        }
+
+                        > div:last-child {
+                            display: flex;
+                            gap: var(--size-2);
+                        }
+                    }
 
                     .back-link {
                         color: var(--color-text-secondary);
@@ -48,7 +72,6 @@
                     }
 
                     .timer {
-                        margin-left: auto;
                         background: var(--color-surface);
                         color: var(--color-text-primary);
                         padding: var(--size-2) var(--size-3);
@@ -307,15 +330,23 @@
         </script>
 
         <header class="exercise-header">
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link" aria-label="Back to workout">
-                ← Back
-            </a>
-            <h1 class="exercise-title">{{ .ExerciseSet.Exercise.Name }}</h1>
-            <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
-               class="action-button info-button" aria-label="View exercise information">Info</a>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
-               class="action-button swap-button" aria-label="Swap exercise">Swap</a>
+            <div class="header-row">
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link" aria-label="Back to workout">
+                    ← Back
+                </a>
+            </div>
+            <div class="header-row title-row">
+                <h1 class="exercise-title">{{ .ExerciseSet.Exercise.Name }}</h1>
+            </div>
+            <div class="header-row actions-row">
+                <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
+                <div>
+                    <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
+                       class="action-button info-button" aria-label="View exercise information">Info</a>
+                    <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
+                       class="action-button swap-button" aria-label="Swap exercise">Swap</a>
+                </div>
+            </div>
         </header>
 
         <div class="sets-container" aria-label="Exercise sets">
