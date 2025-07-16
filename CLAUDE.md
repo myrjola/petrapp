@@ -77,7 +77,4 @@ NEVER proactively create documentation files (*.md) or README files. Only create
 
 ## Debugging Test Failures
 
-- When tests fail with generic errors (like "unexpected status code: 500"), temporarily replace io.Discard with os.Stdout in test setup to see detailed error output
-- After identifying the issue, revert back to io.Discard to keep test output clean
 - For template-related errors, check for missing functions, syntax errors, or data structure mismatches
-- Use verbose test output (go test -v) to get more detailed failure information
