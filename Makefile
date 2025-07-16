@@ -6,6 +6,11 @@
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v1.64.6
 
+# Suppress linker warnings on macOS
+ifeq ($(shell uname -s),Darwin)
+	export CGO_LDFLAGS := -w
+endif
+
 init: gomod custom-gcl setup-git-hooks
 	@echo "Dependencies installed"
 
