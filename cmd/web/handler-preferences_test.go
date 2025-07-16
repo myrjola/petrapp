@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"io"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"net/http"
 	"testing"
 )
@@ -15,7 +15,7 @@ func Test_application_preferences(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t.Context(), io.Discard, testLookupEnv, run)
+	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

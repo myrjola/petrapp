@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"io"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"testing"
 	"time"
 )
@@ -15,7 +15,7 @@ func Test_application_addWorkout(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(ctx, io.Discard, testLookupEnv, run)
+	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

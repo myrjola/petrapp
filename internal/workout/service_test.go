@@ -5,26 +5,16 @@ import (
 	"errors"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/myrjola/petrapp/internal/workout"
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
 )
 
 func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
-	// Setup context
 	ctx := t.Context()
-
-	// Setup logger
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level:       slog.LevelDebug,
-		AddSource:   false,
-		ReplaceAttr: nil,
-	}))
-
-	// Setup test database
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
@@ -173,17 +163,8 @@ func tryInsertMuscleGroup(ctx context.Context, t *testing.T, db *sqlite.Database
 
 // Test_AddExercise tests adding a new exercise to a workout.
 func Test_AddExercise(t *testing.T) {
-	// Setup context
 	ctx := t.Context()
-
-	// Setup logger
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
-		Level:       slog.LevelDebug,
-		AddSource:   false,
-		ReplaceAttr: nil,
-	}))
-
-	// Setup test database
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)

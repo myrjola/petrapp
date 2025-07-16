@@ -6,7 +6,7 @@ import (
 	"log/slog"
 )
 
-// NewLogger creates a new logger with the given log sink such as io.Discard.
+// NewLogger creates a new logger with the given log sink such as testhelpers.Writer.
 func NewLogger(logSink io.Writer) *slog.Logger {
 	handler := logging.NewContextHandler(slog.NewTextHandler(logSink, &slog.HandlerOptions{
 		AddSource:   false,
