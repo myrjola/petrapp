@@ -159,5 +159,119 @@
                 {{ mdToHTML .Exercise.DescriptionMarkdown }}
             </div>
         </div>
+
+        <div class="progress-chart">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        margin-top: var(--size-6);
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+                    }
+
+                    .section-title {
+                        font-weight: var(--font-weight-6);
+                        color: var(--gray-8);
+                        font-size: var(--font-size-2);
+                    }
+
+                    .chart-container {
+                        width: 100%;
+                        height: 300px;
+                        border: 1px solid var(--gray-3);
+                        border-radius: var(--radius-3);
+                        background: var(--gray-0);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: var(--gray-6);
+                        font-size: var(--font-size-1);
+                    }
+
+                    .chart-loading {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-2);
+                    }
+                }
+            </style>
+
+            <div class="section-title">Progress Chart</div>
+            <div class="chart-container" id="progress-chart">
+                <div class="chart-loading">
+                    <span>Loading chart...</span>
+                </div>
+            </div>
+        </div>
+
+        <script {{ nonce }}>
+            const chartContainer = document.getElementById('progress-chart');
+            const dataUrl = "/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}/progress-chart";
+            
+            // Load ECharts and chart data
+            async function loadExerciseChart() {
+                try {
+                    const [echarts, response] = await Promise.all([
+                        import("echarts"),
+                        fetch(dataUrl)
+                    ]);
+                    
+                    const dataset = await response.json();
+                    
+                    // Create ECharts option from dataset
+                    const option = {
+                        title: {
+                            text: dataset.exercise_name + ' Progress'
+                        },
+                        tooltip: {
+                            trigger: 'axis',
+                            formatter: function(params) {
+                                const point = params[0];
+                                const dataPoint = dataset.data_points[point.dataIndex];
+                                return dataPoint.date + '<br>' + 
+                                       dataPoint.max_weight + ' kg<br>' + 
+                                       'Sets:<br>' + dataPoint.sets;
+                            }
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: dataset.data_points.map(d => d.date)
+                        },
+                        yAxis: {
+                            type: 'value',
+                            name: 'Weight (kg)'
+                        },
+                        series: [{
+                            name: 'Max Weight (kg)',
+                            type: 'line',
+                            data: dataset.data_points.map(d => d.max_weight),
+                            symbolSize: 6,
+                            lineStyle: {
+                                color: '#0ea5e9'
+                            },
+                            itemStyle: {
+                                color: '#0ea5e9'
+                            }
+                        }]
+                    };
+                    
+                    // Initialize chart
+                    const chart = echarts.init(chartContainer);
+                    chart.setOption(option);
+                    
+                    // Handle window resize
+                    window.addEventListener('resize', () => {
+                        chart.resize();
+                    });
+                    
+                } catch (error) {
+                    console.error('Error loading chart:', error);
+                    chartContainer.innerHTML = '<div class="chart-loading">Failed to load chart</div>';
+                }
+            }
+            
+            loadExerciseChart();
+        </script>
     </main>
 {{ end }}

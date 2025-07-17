@@ -270,6 +270,56 @@ func (s *Service) GetExercise(ctx context.Context, id int) (Exercise, error) {
 	return exercise, nil
 }
 
+// GetSessionsWithExerciseSince retrieves all sessions since a given date that contain the specified exercise.
+func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID int, since time.Time) (
+	[]Session, error) {
+	sessions, err := s.repo.sessions.List(ctx, since)
+	if err != nil {
+		return nil, fmt.Errorf("get sessions: %w", err)
+	}
+
+	// Filter sessions that contain the specified exercise
+	var result []Session
+	for _, session := range sessions {
+		// Check if this session contains the exercise
+		hasExercise := false
+		for _, es := range session.ExerciseSets {
+			if es.ExerciseID == exerciseID {
+				hasExercise = true
+				break
+			}
+		}
+
+		if hasExercise {
+			// Convert sessionAggregate to Session by enriching with exercise data
+			enrichedSession := Session{
+				Date:             session.Date,
+				DifficultyRating: session.DifficultyRating,
+				StartedAt:        session.StartedAt,
+				CompletedAt:      session.CompletedAt,
+				ExerciseSets:     make([]ExerciseSet, len(session.ExerciseSets)),
+			}
+
+			// Enrich exercise sets with exercise data
+			for i, es := range session.ExerciseSets {
+				ex, getErr := s.repo.exercises.Get(ctx, es.ExerciseID)
+				if getErr != nil {
+					return nil, fmt.Errorf("get exercise %d: %w", es.ExerciseID, getErr)
+				}
+
+				enrichedSession.ExerciseSets[i] = ExerciseSet{
+					Exercise: ex,
+					Sets:     es.Sets,
+				}
+			}
+
+			result = append(result, enrichedSession)
+		}
+	}
+
+	return result, nil
+}
+
 // UpdateExercise updates an existing exercise.
 func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
 	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {
