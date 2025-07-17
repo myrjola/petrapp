@@ -17,12 +17,13 @@ func secureHeaders(next http.Handler) http.Handler {
 		// Generate a random nonce for use in CSP and set it in the context so that it can be added to the script tags.
 		cspNonce := rand.Text()
 		csp := fmt.Sprintf(`default-src 'none';
-script-src 'nonce-%s' 'strict-dynamic' https: http:;
+script-src 'nonce-%s' 'strict-dynamic' 'unsafe-inline' https: http:;
 connect-src 'self';
 img-src 'self';
-style-src 'nonce-%s' 'self';
+style-src 'nonce-%s' 'self' 'unsafe-inline';
 frame-ancestors 'self';
 form-action 'self';
+font-src 'none';
 object-src 'none';
 manifest-src 'self';
 base-uri 'none';`, cspNonce, cspNonce)
@@ -32,6 +33,8 @@ base-uri 'none';`, cspNonce, cspNonce)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")
 		w.Header().Set("X-XSS-Protection", "0")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 
 		r = contexthelpers.SetCSPNonce(r, cspNonce)
 
