@@ -67,6 +67,24 @@ When making changes to files, first understand the file's code conventions. Mimi
 - Only add styles to main.css if they are truly global (design tokens, utilities, base components)
 - Page-specific styles should be scoped within their respective template files
 
+### Design System and Color Usage
+- **ALWAYS verify CSS custom properties exist in main.css before using them**
+- **NEVER use undefined color tokens** - examine main.css props layer to see available colors:
+  - Gray colors: `--gray-0` through `--gray-10`
+  - Success colors: `--lime-0` through `--lime-10`
+  - Warning colors: `--yellow-0` through `--yellow-12`
+  - Error colors: `--red-0` through `--red-12`
+  - Info/Accent colors: `--sky-0` through `--sky-10`
+  - Semantic colors: `--color-success`, `--color-success-bg`, etc.
+- Map semantic intentions to available color tokens (e.g., `--success-9` → `--lime-6`)
+- Use proper contrast ratios by pairing light backgrounds with dark text colors from the same scale
+
+### CSP Compliance
+- **NEVER use inline styles** - they violate Content Security Policy
+- Use CSS classes or data attributes with corresponding CSS selectors instead
+- For dynamic values (like progress percentages), use data attributes with pre-defined CSS selectors
+- All styling must be in the scoped CSS section with {{ nonce }} attribute
+
 ## Template Functions and Data Preparation
 
 - Check cmd/web/handlers.go for available custom template functions (like nonce, csrf, mdToHTML)

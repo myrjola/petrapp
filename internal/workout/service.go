@@ -96,12 +96,22 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 	// Generate dates from Monday to Sunday
 	for i := range 7 {
 		day := monday.AddDate(0, 0, i)
-		workout, err := s.generateWorkout(ctx, day)
-		if err != nil {
-			return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
+
+		// Try to get existing session first
+		sessionAggr, err := s.repo.sessions.Get(ctx, day)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return nil, fmt.Errorf("get session %s: %w", formatDate(day), err)
 		}
 
-		workouts[i], err = s.enrichSessionAggregate(ctx, workout)
+		// If no existing session, generate a new one
+		if errors.Is(err, ErrNotFound) {
+			sessionAggr, err = s.generateWorkout(ctx, day)
+			if err != nil {
+				return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
+			}
+		}
+
+		workouts[i], err = s.enrichSessionAggregate(ctx, sessionAggr)
 		if err != nil {
 			return nil, fmt.Errorf("enrich workout %s: %w", formatDate(day), err)
 		}

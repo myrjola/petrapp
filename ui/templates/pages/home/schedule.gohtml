@@ -13,52 +13,441 @@
                     header {
                         margin-left: auto;
                     }
+
+                    .menu-button a {
+                        display: inline-flex;
+                        align-items: center;
+                        padding: var(--size-2) var(--size-3);
+                        background: var(--white);
+                        color: var(--gray-9);
+                        text-decoration: none;
+                        border-radius: var(--radius-2);
+                        border: 1px solid var(--gray-3);
+                        font-weight: var(--font-weight-5);
+                        font-size: var(--font-size-1);
+                        transition: all 0.2s ease;
+                        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                    }
+
+                    .menu-button a:hover {
+                        background: var(--gray-0);
+                        border-color: var(--gray-4);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                        transform: translateY(-1px);
+                    }
+
+                    .menu-button a:active {
+                        transform: translateY(0);
+                        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                    }
+
+                    .weekly-schedule {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+                    }
+
+                    .day-card {
+                        border: 1px solid var(--gray-3);
+                        border-radius: var(--radius-3);
+                        padding: var(--size-4);
+                        background: var(--gray-0);
+                        transition: all 0.2s ease;
+                    }
+
+                    .day-card.today {
+                        border-color: var(--sky-6);
+                        background: var(--sky-0);
+                        box-shadow: 0 2px 8px var(--sky-2);
+                    }
+
+                    .day-card.completed {
+                        border-color: var(--lime-6);
+                        background: var(--lime-0);
+                    }
+
+                    .day-card.in-progress {
+                        border-color: var(--yellow-6);
+                        background: var(--yellow-0);
+                    }
+
+                    .day-card.past-incomplete {
+                        border-color: var(--red-6);
+                        background: var(--red-1);
+                    }
+
+                    .day-card.unscheduled {
+                        border-color: var(--gray-4);
+                        background: var(--gray-1);
+                        border-style: dashed;
+                        border-width: 1px;
+                        opacity: 0.7;
+                    }
+
+                    .day-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+
+                    .day-title {
+                        font-weight: var(--font-weight-6);
+                        font-size: var(--font-size-4);
+                    }
+
+                    .day-date {
+                        color: var(--gray-6);
+                        font-size: var(--font-size-0);
+                    }
+
+                    .status-indicator {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: var(--size-1);
+                        padding: var(--size-1) var(--size-2);
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-1);
+                        font-weight: var(--font-weight-5);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                    }
+
+                    .status-completed {
+                        background: var(--lime-2);
+                        color: var(--lime-9);
+                    }
+
+                    .status-in-progress {
+                        background: var(--yellow-2);
+                        color: var(--yellow-9);
+                    }
+
+                    .status-not-started,
+                    .status-upcoming {
+                        background: var(--gray-3);
+                        color: var(--gray-9);
+                    }
+
+                    .status-incomplete {
+                        background: var(--red-2);
+                        color: var(--red-9);
+                    }
+
+                    .status-unscheduled {
+                        background: var(--gray-2);
+                        color: var(--gray-9);
+                        border: 1px dashed var(--gray-5);
+                    }
+
+                    .progress-info {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                        margin-bottom: var(--size-3);
+                    }
+
+                    .progress-bar {
+                        flex: 1;
+                        height: 8px;
+                        background: var(--gray-3);
+                        border-radius: var(--radius-round);
+                        overflow: hidden;
+                    }
+
+                    .progress-fill {
+                        height: 100%;
+                        transition: width 0.3s ease;
+                        width: 0%;
+                    }
+
+                    .progress-fill[data-progress="0"] { width: 0%; }
+                    .progress-fill[data-progress="1"] { width: 1%; }
+                    .progress-fill[data-progress="2"] { width: 2%; }
+                    .progress-fill[data-progress="3"] { width: 3%; }
+                    .progress-fill[data-progress="4"] { width: 4%; }
+                    .progress-fill[data-progress="5"] { width: 5%; }
+                    .progress-fill[data-progress="6"] { width: 6%; }
+                    .progress-fill[data-progress="7"] { width: 7%; }
+                    .progress-fill[data-progress="8"] { width: 8%; }
+                    .progress-fill[data-progress="9"] { width: 9%; }
+                    .progress-fill[data-progress="10"] { width: 10%; }
+                    .progress-fill[data-progress="11"] { width: 11%; }
+                    .progress-fill[data-progress="12"] { width: 12%; }
+                    .progress-fill[data-progress="13"] { width: 13%; }
+                    .progress-fill[data-progress="14"] { width: 14%; }
+                    .progress-fill[data-progress="15"] { width: 15%; }
+                    .progress-fill[data-progress="16"] { width: 16%; }
+                    .progress-fill[data-progress="17"] { width: 17%; }
+                    .progress-fill[data-progress="18"] { width: 18%; }
+                    .progress-fill[data-progress="19"] { width: 19%; }
+                    .progress-fill[data-progress="20"] { width: 20%; }
+                    .progress-fill[data-progress="21"] { width: 21%; }
+                    .progress-fill[data-progress="22"] { width: 22%; }
+                    .progress-fill[data-progress="23"] { width: 23%; }
+                    .progress-fill[data-progress="24"] { width: 24%; }
+                    .progress-fill[data-progress="25"] { width: 25%; }
+                    .progress-fill[data-progress="26"] { width: 26%; }
+                    .progress-fill[data-progress="27"] { width: 27%; }
+                    .progress-fill[data-progress="28"] { width: 28%; }
+                    .progress-fill[data-progress="29"] { width: 29%; }
+                    .progress-fill[data-progress="30"] { width: 30%; }
+                    .progress-fill[data-progress="31"] { width: 31%; }
+                    .progress-fill[data-progress="32"] { width: 32%; }
+                    .progress-fill[data-progress="33"] { width: 33%; }
+                    .progress-fill[data-progress="34"] { width: 34%; }
+                    .progress-fill[data-progress="35"] { width: 35%; }
+                    .progress-fill[data-progress="36"] { width: 36%; }
+                    .progress-fill[data-progress="37"] { width: 37%; }
+                    .progress-fill[data-progress="38"] { width: 38%; }
+                    .progress-fill[data-progress="39"] { width: 39%; }
+                    .progress-fill[data-progress="40"] { width: 40%; }
+                    .progress-fill[data-progress="41"] { width: 41%; }
+                    .progress-fill[data-progress="42"] { width: 42%; }
+                    .progress-fill[data-progress="43"] { width: 43%; }
+                    .progress-fill[data-progress="44"] { width: 44%; }
+                    .progress-fill[data-progress="45"] { width: 45%; }
+                    .progress-fill[data-progress="46"] { width: 46%; }
+                    .progress-fill[data-progress="47"] { width: 47%; }
+                    .progress-fill[data-progress="48"] { width: 48%; }
+                    .progress-fill[data-progress="49"] { width: 49%; }
+                    .progress-fill[data-progress="50"] { width: 50%; }
+                    .progress-fill[data-progress="51"] { width: 51%; }
+                    .progress-fill[data-progress="52"] { width: 52%; }
+                    .progress-fill[data-progress="53"] { width: 53%; }
+                    .progress-fill[data-progress="54"] { width: 54%; }
+                    .progress-fill[data-progress="55"] { width: 55%; }
+                    .progress-fill[data-progress="56"] { width: 56%; }
+                    .progress-fill[data-progress="57"] { width: 57%; }
+                    .progress-fill[data-progress="58"] { width: 58%; }
+                    .progress-fill[data-progress="59"] { width: 59%; }
+                    .progress-fill[data-progress="60"] { width: 60%; }
+                    .progress-fill[data-progress="61"] { width: 61%; }
+                    .progress-fill[data-progress="62"] { width: 62%; }
+                    .progress-fill[data-progress="63"] { width: 63%; }
+                    .progress-fill[data-progress="64"] { width: 64%; }
+                    .progress-fill[data-progress="65"] { width: 65%; }
+                    .progress-fill[data-progress="66"] { width: 66%; }
+                    .progress-fill[data-progress="67"] { width: 67%; }
+                    .progress-fill[data-progress="68"] { width: 68%; }
+                    .progress-fill[data-progress="69"] { width: 69%; }
+                    .progress-fill[data-progress="70"] { width: 70%; }
+                    .progress-fill[data-progress="71"] { width: 71%; }
+                    .progress-fill[data-progress="72"] { width: 72%; }
+                    .progress-fill[data-progress="73"] { width: 73%; }
+                    .progress-fill[data-progress="74"] { width: 74%; }
+                    .progress-fill[data-progress="75"] { width: 75%; }
+                    .progress-fill[data-progress="76"] { width: 76%; }
+                    .progress-fill[data-progress="77"] { width: 77%; }
+                    .progress-fill[data-progress="78"] { width: 78%; }
+                    .progress-fill[data-progress="79"] { width: 79%; }
+                    .progress-fill[data-progress="80"] { width: 80%; }
+                    .progress-fill[data-progress="81"] { width: 81%; }
+                    .progress-fill[data-progress="82"] { width: 82%; }
+                    .progress-fill[data-progress="83"] { width: 83%; }
+                    .progress-fill[data-progress="84"] { width: 84%; }
+                    .progress-fill[data-progress="85"] { width: 85%; }
+                    .progress-fill[data-progress="86"] { width: 86%; }
+                    .progress-fill[data-progress="87"] { width: 87%; }
+                    .progress-fill[data-progress="88"] { width: 88%; }
+                    .progress-fill[data-progress="89"] { width: 89%; }
+                    .progress-fill[data-progress="90"] { width: 90%; }
+                    .progress-fill[data-progress="91"] { width: 91%; }
+                    .progress-fill[data-progress="92"] { width: 92%; }
+                    .progress-fill[data-progress="93"] { width: 93%; }
+                    .progress-fill[data-progress="94"] { width: 94%; }
+                    .progress-fill[data-progress="95"] { width: 95%; }
+                    .progress-fill[data-progress="96"] { width: 96%; }
+                    .progress-fill[data-progress="97"] { width: 97%; }
+                    .progress-fill[data-progress="98"] { width: 98%; }
+                    .progress-fill[data-progress="99"] { width: 99%; }
+                    .progress-fill[data-progress="100"] { width: 100%; }
+
+                    .progress-completed {
+                        background: var(--lime-6);
+                    }
+
+                    .progress-partial {
+                        background: var(--yellow-6);
+                    }
+
+                    .progress-text {
+                        font-size: var(--font-size-0);
+                        color: var(--gray-6);
+                        min-width: fit-content;
+                    }
+
+                    .workout-actions {
+                        display: flex;
+                        gap: var(--size-2);
+                    }
+
+                    .btn-primary {
+                        background: var(--sky-6);
+                        color: var(--white);
+                        border: none;
+                        padding: var(--size-2) var(--size-4);
+                        border-radius: var(--radius-2);
+                        font-weight: var(--font-weight-5);
+                        cursor: pointer;
+                        transition: background 0.2s ease;
+                    }
+
+                    .btn-primary:hover {
+                        background: var(--sky-7);
+                    }
+
+                    .btn-secondary {
+                        background: var(--gray-2);
+                        color: var(--gray-9);
+                        border: 1px solid var(--gray-4);
+                        padding: var(--size-2) var(--size-4);
+                        border-radius: var(--radius-2);
+                        font-weight: var(--font-weight-5);
+                        cursor: pointer;
+                        text-decoration: none;
+                        display: inline-flex;
+                        align-items: center;
+                        transition: all 0.2s ease;
+                    }
+
+                    .btn-secondary:hover {
+                        background: var(--gray-3);
+                        border-color: var(--gray-5);
+                    }
+
+                    .difficulty-rating {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-1);
+                        margin-top: var(--size-2);
+                        font-size: var(--font-size-0);
+                        color: var(--gray-6);
+                    }
+
+                    .rating-stars {
+                        display: flex;
+                        gap: 2px;
+                    }
+
+                    .star {
+                        width: 12px;
+                        height: 12px;
+                        color: var(--yellow-6);
+                    }
+
+                    .btn-link {
+                        text-decoration: none;
+                    }
                 }
             }
         </style>
 
         <header class="menu-button">
-            <a href="/preferences">Menu</a>
+            <a href="/preferences">
+                Menu
+            </a>
         </header>
 
-        {{ range .Days }}
-            {{ if .IsToday }}
-                <div>
-                    <style {{nonce}}>
-                        @scope {
-                            :scope {
-                                display: flex;
-                                flex-direction: column;
-                                gap: var(--size-2);
+        <div class="weekly-schedule">
+            {{ range .Days }}
+                {{ $statusClass := "" }}
+                {{ $statusLabel := "" }}
+                {{ $statusBadgeClass := "" }}
+                
+                {{ if eq .WorkoutStatus "completed" }}
+                    {{ $statusClass = "completed" }}
+                    {{ $statusLabel = "Completed" }}
+                    {{ $statusBadgeClass = "status-completed" }}
+                {{ else if eq .WorkoutStatus "in_progress" }}
+                    {{ $statusClass = "in-progress" }}
+                    {{ $statusLabel = "In Progress" }}
+                    {{ $statusBadgeClass = "status-in-progress" }}
+                {{ else if eq .WorkoutStatus "unscheduled" }}
+                    {{ $statusClass = "unscheduled" }}
+                    {{ $statusLabel = "Not Scheduled" }}
+                    {{ $statusBadgeClass = "status-unscheduled" }}
+                {{ else if and .IsPast (eq .WorkoutStatus "not_started") }}
+                    {{ $statusClass = "past-incomplete" }}
+                    {{ $statusLabel = "Missed" }}
+                    {{ $statusBadgeClass = "status-incomplete" }}
+                {{ else }}
+                    {{ $statusClass = "" }}
+                    {{ $statusLabel = "Upcoming" }}
+                    {{ $statusBadgeClass = "status-upcoming" }}
+                {{ end }}
 
-                                div {
-                                    display: flex;
-                                    justify-content: space-between;
-                                    gap: var(--size-3);
-                                }
-                            }
-                        }
-                    </style>
-                    <div>
-                        <span>
-                            Today {{ .Name }}
-                        </span>
-                        <span>
-                        {{ .Date.Format "2006-01-02" }}
-                        </span>
+                {{ if .IsToday }}
+                    {{ $statusClass = printf "%s today" $statusClass }}
+                {{ end }}
+
+                <div class="day-card {{ $statusClass }}">
+                    <div class="day-header">
+                        <div>
+                            <div class="day-title">
+                                {{ if .IsToday }}Today - {{ end }}{{ .Name }}
+                            </div>
+                            <div class="day-date">{{ .Date.Format "Jan 2, 2006" }}</div>
+                        </div>
+                        <div class="status-indicator {{ $statusBadgeClass }}">
+                            {{ $statusLabel }}
+                        </div>
                     </div>
-                    <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                        {{ csrf }}
-                        <button type="submit">
-                            Start workout
-                        </button>
-                    </form>
-                </div>
-            {{ else }}
-                <div>
-                    <span>{{ .Name }}</span>
+
+                    {{ if and (gt .TotalSets 0) (ne .WorkoutStatus "unscheduled") }}
+                        <div class="progress-info">
+                            <div class="progress-bar">
+                                <div class="progress-fill {{ if eq .WorkoutStatus "completed" }}progress-completed{{ else }}progress-partial{{ end }}" 
+                                     data-progress="{{ .ProgressPercent }}"></div>
+                            </div>
+                            <div class="progress-text">
+                                {{ .CompletedSets }}/{{ .TotalSets }} sets
+                            </div>
+                        </div>
+                    {{ end }}
+
+                    <div class="workout-actions">
+                        {{ if eq .WorkoutStatus "unscheduled" }}
+                            {{ if .IsToday }}
+                                <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                                    {{ csrf }}
+                                    <button type="submit" class="btn-secondary">
+                                        Start Extra Workout
+                                    </button>
+                                </form>
+                            {{ end }}
+                        {{ else if .IsToday }}
+                            {{ if eq .WorkoutStatus "not_started" }}
+                                <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                                    {{ csrf }}
+                                    <button type="submit" class="btn-primary">
+                                        Start Workout
+                                    </button>
+                                </form>
+                            {{ else if eq .WorkoutStatus "in_progress" }}
+                                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn-primary btn-link">
+                                    Continue Workout
+                                </a>
+                            {{ else }}
+                                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn-secondary">
+                                    Review Workout
+                                </a>
+                            {{ end }}
+                        {{ else if eq .WorkoutStatus "in_progress" }}
+                            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn-primary btn-link">
+                                Complete Workout
+                            </a>
+                        {{ else if and .IsPast (eq .WorkoutStatus "not_started") }}
+                            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn-secondary">
+                                Start Late
+                            </a>
+                        {{ else if eq .WorkoutStatus "completed" }}
+                            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn-secondary">
+                                View Details
+                            </a>
+                        {{ end }}
+                    </div>
                 </div>
             {{ end }}
-        {{ end }}
+        </div>
     </main>
 {{ end }}
