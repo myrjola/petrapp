@@ -2,16 +2,40 @@
 
 ## Build & Run Commands
 ```
-make build        # Build binary and tools
+make build        # Build binary and tools - use after significant code changes
 make dev          # Run development server
-make lint         # Run golangci-lint checks
-make test         # Run all tests with race detection
-make ci           # Run init, build, lint, test, sec
+make lint         # Run golangci-lint checks - use before committing changes  
+make test         # Run all tests with race detection - use after functionality changes
+make ci           # Run init, build, lint, test, sec - use for comprehensive verification
 ```
+
+**When to use specific commands:**
+- Use `make build` after adding new files or significant code changes
+- Use `make test` after implementing new features or modifying existing functionality
+- Use `make lint` before committing to catch style and complexity issues
+- Use `make ci` for complex changes requiring full validation (database changes, major refactoring)
+- Always run `make ci` when making significant architectural changes
 
 ## Testing
 - Run single test: `go test -v ./path/to/package -run TestName`
 - Table-driven tests with clear assertions
+
+### Maintaining Test Compatibility
+When making UI changes:
+- Consider impact on existing tests that rely on DOM structure
+- Use specific selectors instead of generic ones (e.g., `.Find("form").FilterFunction()` instead of `.Find("form").First()`)
+- Run tests after UI changes to catch compatibility issues early  
+- When tests break due to DOM changes, update selectors to be more specific and resilient
+- Look for unique identifiers like button text, form actions, or data attributes for reliable test selectors
+
+## Database Schema Changes
+When modifying database schema:
+- Add new columns/tables to `internal/sqlite/schema.sql` following existing patterns
+- Update corresponding Go models in both domain (`internal/workout/models.go`) and repository aggregates (`internal/workout/repository.go`)
+- Update repository SQL queries (SELECT, INSERT, UPDATE) to include new fields
+- Update service layer conversion functions between domain and repository types
+- Test schema changes work with existing data and new migrations
+- Follow SQLite constraints and validation patterns used in existing schema
 
 ## Code Style
 - Standard Go formatting with 100-line function limit
@@ -47,10 +71,13 @@ When making changes to files, first understand the file's code conventions. Mimi
 
 - Check cmd/web/handlers.go for available custom template functions (like nonce, csrf, mdToHTML)
 - Built-in Go template functions (add, sub, mul, div) may not always be available - verify before use
-- STRONGLY PREFER preparing data in Go code rather than adding complexity to templates
-- When templates need computed values (like human-readable indices), transform the data in the handler before passing to template
+- **STRONGLY PREFER preparing data in Go code rather than adding complexity to templates**
+- **When templates need computed values (like human-readable indices), transform the data in the handler before passing to template**
+- **When template rendering fails, prioritize fixing data preparation over modifying templates**
+- **If missing template functions cause errors, transform data in Go handlers instead of registering new functions**
 - Use the Task tool to search for existing template function usage patterns
-- If a template function is missing, modify the backend data structure instead of adding new template functions
+- **For display formatting (like converting 0-based to 1-based indexing), modify the data structure before template rendering**
+- **Prefer simple, logic-free templates over complex template expressions**
 
 ## Design System Architecture
 
@@ -78,3 +105,9 @@ NEVER proactively create documentation files (*.md) or README files. Only create
 ## Debugging Test Failures
 
 - For template-related errors, check for missing functions, syntax errors, or data structure mismatches
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
