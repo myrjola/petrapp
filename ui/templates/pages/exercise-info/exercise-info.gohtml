@@ -236,7 +236,8 @@
                         },
                         xAxis: {
                             type: 'category',
-                            data: dataset.data_points.map(d => d.date)
+                            data: dataset.data_points.map(d => d.date),
+                            inverse: true
                         },
                         yAxis: {
                             type: 'value',
