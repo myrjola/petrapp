@@ -133,6 +133,12 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	readWriteDB.SetConnMaxLifetime(time.Hour)
 	readWriteDB.SetConnMaxIdleTime(time.Hour)
 
+	// Since sql.DB is lazy, we need to ping it to ensure the connection is established and the database is configured.
+	err = readWriteDB.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("ping read-write database: %w", err)
+	}
+
 	if readDB, err = sql.Open(optimizedDriver, readConfig); err != nil {
 		return nil, fmt.Errorf("open read database: %w", err)
 	}
