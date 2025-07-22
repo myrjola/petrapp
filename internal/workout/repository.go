@@ -24,8 +24,9 @@ type preferencesRepository interface {
 
 // exerciseSetAggregate groups all sets for a specific exercise in a workout.
 type exerciseSetAggregate struct {
-	ExerciseID int
-	Sets       []Set
+	ExerciseID        int
+	Sets              []Set
+	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
 }
 
 // sessionAggregate represents a complete workout session including all exercises and their sets.

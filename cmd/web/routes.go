@@ -40,6 +40,8 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}", mustSession(http.HandlerFunc(app.exerciseSetGET)))
 	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/sets/{setIndex}/update",
 		mustSession(http.HandlerFunc(app.exerciseSetUpdatePOST)))
+	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/warmup/complete",
+		mustSession(http.HandlerFunc(app.exerciseSetWarmupCompletePOST)))
 	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/info", mustSession(http.HandlerFunc(app.exerciseInfoGET)))
 	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/progress-chart",
 		mustSession(http.HandlerFunc(app.exerciseProgressChart)))

@@ -261,8 +261,9 @@ func (g *generator) createExerciseSets(exercises []Exercise) []exerciseSetAggreg
 	for _, exercise := range exercises {
 		sets := g.determineSetsRepsWeight(exercise)
 		exerciseSets = append(exerciseSets, exerciseSetAggregate{
-			ExerciseID: exercise.ID,
-			Sets:       sets,
+			ExerciseID:        exercise.ID,
+			Sets:              sets,
+			WarmupCompletedAt: nil,
 		})
 	}
 	return exerciseSets

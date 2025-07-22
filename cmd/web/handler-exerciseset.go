@@ -235,3 +235,35 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
 	redirect(w, r, redirectURL)
 }
+
+func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	dateStr := r.PathValue("date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Parse exercise ID from URL path
+	exerciseIDStr := r.PathValue("exerciseID")
+	exerciseID, err := strconv.Atoi(exerciseIDStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Mark warmup as complete
+	if err = app.workoutService.MarkWarmupComplete(r.Context(), date, exerciseID); err != nil {
+		app.serverError(w, r, fmt.Errorf("mark warmup complete: %w", err))
+		return
+	}
+
+	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "warmup completed",
+		slog.String("date", dateStr),
+		slog.Int("exercise_id", exerciseID))
+
+	// Redirect back to the exercise set page
+	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
+	redirect(w, r, redirectURL)
+}

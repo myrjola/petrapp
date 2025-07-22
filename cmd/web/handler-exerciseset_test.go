@@ -113,8 +113,14 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to get exercise set page: %v", err)
 	}
 
-	// Find the first form (which should be for the first incomplete set)
-	form := doc.Find("form").First()
+	// Find the set completion form (which contains a button with type="submit" and text "Done!")
+	form := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[type=submit]:contains('Done!')").Length() > 0
+	}).First()
+
+	if form.Length() == 0 {
+		t.Fatalf("Set completion form not found")
+	}
 
 	// Get the form action
 	action, exists := form.Attr("action")
@@ -184,8 +190,15 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to load edit page: %v", err)
 	}
 
-	// Find the edit form
-	form = doc.Find("form").First()
+	// Find the edit form (which contains a button with type="submit" and text "Done!")
+	form = doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[type=submit]:contains('Done!')").Length() > 0
+	}).First()
+
+	if form.Length() == 0 {
+		t.Fatalf("Edit form not found")
+	}
+
 	action, exists = form.Attr("action")
 	if !exists {
 		t.Fatalf("Edit form has no action attribute")

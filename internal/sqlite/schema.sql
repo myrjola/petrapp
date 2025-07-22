@@ -94,6 +94,18 @@ CREATE TABLE workout_sessions
     PRIMARY KEY (user_id, workout_date)
 ) WITHOUT ROWID, STRICT;
 
+CREATE TABLE workout_exercise
+(
+    workout_user_id     BLOB    NOT NULL,
+    workout_date        TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
+    exercise_id         INTEGER NOT NULL,
+    warmup_completed_at TEXT    CHECK (warmup_completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', warmup_completed_at) = warmup_completed_at),
+
+    PRIMARY KEY (workout_user_id, workout_date, exercise_id),
+    FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
+) WITHOUT ROWID, STRICT;
+
 CREATE TABLE exercise_sets
 (
     workout_user_id    BLOB    NOT NULL,

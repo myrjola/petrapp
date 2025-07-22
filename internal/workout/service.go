@@ -142,6 +142,7 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 		}
 		session.ExerciseSets[i].Exercise = exercise
 		session.ExerciseSets[i].Sets = ex.Sets
+		session.ExerciseSets[i].WarmupCompletedAt = ex.WarmupCompletedAt
 	}
 	return session, nil
 }
@@ -254,6 +255,28 @@ func (s *Service) UpdateCompletedReps(
 	return nil
 }
 
+// MarkWarmupComplete marks the warmup as complete for a specific exercise.
+func (s *Service) MarkWarmupComplete(
+	ctx context.Context,
+	date time.Time,
+	exerciseID int,
+) error {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
+		for i := range sess.ExerciseSets {
+			if sess.ExerciseSets[i].ExerciseID == exerciseID {
+				now := time.Now().UTC()
+				sess.ExerciseSets[i].WarmupCompletedAt = &now
+				return true, nil
+			}
+		}
+		return false, errors.New("exercise not found")
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+	}
+
+	return nil
+}
+
 // List returns all available exercises.
 func (s *Service) List(ctx context.Context) ([]Exercise, error) {
 	exercises, err := s.repo.exercises.List(ctx)
@@ -310,8 +333,9 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 				}
 
 				enrichedSession.ExerciseSets[i] = ExerciseSet{
-					Exercise: ex,
-					Sets:     es.Sets,
+					Exercise:          ex,
+					Sets:              es.Sets,
+					WarmupCompletedAt: es.WarmupCompletedAt,
 				}
 			}
 
@@ -631,8 +655,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 
 		// Add the new exercise to the session
 		newExerciseSet := exerciseSetAggregate{
-			ExerciseID: exerciseID,
-			Sets:       newSets,
+			ExerciseID:        exerciseID,
+			Sets:              newSets,
+			WarmupCompletedAt: nil,
 		}
 
 		sess.ExerciseSets = append(sess.ExerciseSets, newExerciseSet)

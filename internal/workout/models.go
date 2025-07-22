@@ -110,8 +110,9 @@ type Set struct {
 
 // ExerciseSet groups all sets for a specific exercise in a workout.
 type ExerciseSet struct {
-	Exercise Exercise
-	Sets     []Set
+	Exercise          Exercise
+	Sets              []Set
+	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
 }
 
 // Session represents a complete workout session including all exercises and their sets.

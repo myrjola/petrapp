@@ -253,10 +253,14 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 ) (_ []exerciseSetAggregate, err error) {
 	dateStr := formatDate(date)
 
-	// Query for exercise sets
+	// Query for exercise sets with warmup completion timestamp
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps, es.completed_at
+		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps, 
+		       es.completed_at, we.warmup_completed_at
 		FROM exercise_sets es
+		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id 
+		                              AND we.workout_date = es.workout_date 
+		                              AND we.exercise_id = es.exercise_id
 		WHERE es.workout_user_id = ? AND es.workout_date = ?
 		ORDER BY es.exercise_id, es.set_number`,
 		userID, dateStr)
@@ -275,34 +279,38 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 
 	for rows.Next() {
 		var (
-			exerciseID     int
-			set            Set
-			completedAtStr sql.NullString
+			exerciseID           int
+			set                  Set
+			completedAtStr       sql.NullString
+			warmupCompletedAtStr sql.NullString
 		)
-		err = rows.Scan(&exerciseID, &set.WeightKg, &set.MinReps, &set.MaxReps, &set.CompletedReps, &completedAtStr)
+		err = rows.Scan(&exerciseID, &set.WeightKg, &set.MinReps, &set.MaxReps,
+			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr)
 		if err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
 
 		// Parse the completed_at timestamp
-		if completedAtStr.Valid {
-			completedAt, parseErr := parseTimestamp(completedAtStr)
-			if parseErr != nil {
-				return nil, fmt.Errorf("parse completed_at timestamp: %w", parseErr)
-			}
-			if !completedAt.IsZero() {
-				set.CompletedAt = &completedAt
-			}
+		if err = r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
+			return nil, err
 		}
+
 		if exerciseID != currentExerciseSet.ExerciseID {
 			// Add the previous exercise set if it exists
 			if currentExerciseSet.ExerciseID != -1 {
 				exerciseSets = append(exerciseSets, currentExerciseSet)
 			}
 
+			// Create new exercise set with parsed warmup timestamp
+			warmupCompletedAt, parseErr := r.parseWarmupCompletedAtTimestamp(warmupCompletedAtStr)
+			if parseErr != nil {
+				return nil, parseErr
+			}
+
 			currentExerciseSet = exerciseSetAggregate{
-				ExerciseID: exerciseID,
-				Sets:       []Set{},
+				ExerciseID:        exerciseID,
+				Sets:              []Set{},
+				WarmupCompletedAt: warmupCompletedAt,
 			}
 		}
 
@@ -319,6 +327,40 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	}
 
 	return exerciseSets, nil
+}
+
+// parseCompletedAtTimestamp parses the completed_at timestamp and sets it on the set if valid.
+func (r *sqliteSessionRepository) parseCompletedAtTimestamp(completedAtStr sql.NullString, set *Set) error {
+	if completedAtStr.Valid {
+		completedAt, parseErr := parseTimestamp(completedAtStr)
+		if parseErr != nil {
+			return fmt.Errorf("parse completed_at timestamp: %w", parseErr)
+		}
+		if !completedAt.IsZero() {
+			set.CompletedAt = &completedAt
+		}
+	}
+	return nil
+}
+
+// parseWarmupCompletedAtTimestamp parses the warmup_completed_at timestamp.
+func (r *sqliteSessionRepository) parseWarmupCompletedAtTimestamp(
+	warmupCompletedAtStr sql.NullString,
+) (*time.Time, error) {
+	if !warmupCompletedAtStr.Valid {
+		return nil, nil //nolint:nilnil // Valid case for optional timestamp
+	}
+
+	warmupTime, parseErr := parseTimestamp(warmupCompletedAtStr)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parse warmup_completed_at timestamp: %w", parseErr)
+	}
+
+	if warmupTime.IsZero() {
+		return nil, nil //nolint:nilnil // Valid case for zero timestamp
+	}
+
+	return &warmupTime, nil
 }
 
 // saveExerciseSets inserts or updates exercise sets for a session.
@@ -349,6 +391,21 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 
 			if err != nil {
 				return fmt.Errorf("insert exercise set: %w", err)
+			}
+		}
+
+		// Insert or update workout_exercise record for warmup completion tracking
+		if exerciseSet.WarmupCompletedAt != nil {
+			warmupCompletedAtStr := formatTimestamp(*exerciseSet.WarmupCompletedAt)
+
+			_, err := tx.ExecContext(ctx, `
+				INSERT OR REPLACE INTO workout_exercise (
+					workout_user_id, workout_date, exercise_id, warmup_completed_at
+				) VALUES (?, ?, ?, ?)`,
+				userID, dateStr, exerciseSet.ExerciseID, warmupCompletedAtStr)
+
+			if err != nil {
+				return fmt.Errorf("insert workout exercise: %w", err)
 			}
 		}
 	}

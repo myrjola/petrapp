@@ -423,6 +423,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(80, 8, 12, &rep8),
 						createTestSet(80, 8, 12, &rep8),
 					},
+					WarmupCompletedAt: nil,
 				},
 				{
 					ExerciseID: exercises[2].ID, // Shoulder Press
@@ -431,6 +432,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(50, 8, 12, &rep10),
 						createTestSet(50, 8, 12, &rep8),
 					},
+					WarmupCompletedAt: nil,
 				},
 			},
 		},
@@ -448,6 +450,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(82., 8, 12, &rep8),
 						createTestSet(82., 8, 12, &rep6),
 					},
+					WarmupCompletedAt: nil,
 				},
 				{
 					ExerciseID: exercises[2].ID, // Shoulder Press
@@ -456,6 +459,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(52.5, 8, 12, &rep8),
 						createTestSet(52.5, 8, 12, &rep8),
 					},
+					WarmupCompletedAt: nil,
 				},
 			},
 		},
@@ -473,6 +477,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(100, 8, 12, &rep12),
 						createTestSet(100, 8, 12, &rep10),
 					},
+					WarmupCompletedAt: nil,
 				},
 				{
 					ExerciseID: exercises[7].ID, // Deadlift
@@ -481,6 +486,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(120, 3, 6, &rep6),
 						createTestSet(120, 3, 6, &rep6),
 					},
+					WarmupCompletedAt: nil,
 				},
 			},
 		},
