@@ -240,7 +240,9 @@ func (s *Service) UpdateCompletedReps(
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
+				now := time.Now().UTC()
 				ex.Sets[setIndex].CompletedReps = &completedReps
+				ex.Sets[setIndex].CompletedAt = &now
 				return true, nil
 			}
 		}
@@ -477,6 +479,7 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil, // Reset completion status
+			CompletedAt:   nil,
 		}
 	}
 	return result
@@ -495,6 +498,7 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 	}
 	return result
@@ -606,18 +610,21 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
+					CompletedAt:   nil,
 				},
 				{
 					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
+					CompletedAt:   nil,
 				},
 				{
 					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
+					CompletedAt:   nil,
 				},
 			}
 		}

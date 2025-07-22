@@ -255,7 +255,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 
 	// Query for exercise sets
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps
+		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps, es.completed_at
 		FROM exercise_sets es
 		WHERE es.workout_user_id = ? AND es.workout_date = ?
 		ORDER BY es.exercise_id, es.set_number`,
@@ -275,12 +275,24 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 
 	for rows.Next() {
 		var (
-			exerciseID int
-			set        Set
+			exerciseID     int
+			set            Set
+			completedAtStr sql.NullString
 		)
-		err = rows.Scan(&exerciseID, &set.WeightKg, &set.MinReps, &set.MaxReps, &set.CompletedReps)
+		err = rows.Scan(&exerciseID, &set.WeightKg, &set.MinReps, &set.MaxReps, &set.CompletedReps, &completedAtStr)
 		if err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
+		}
+
+		// Parse the completed_at timestamp
+		if completedAtStr.Valid {
+			completedAt, parseErr := parseTimestamp(completedAtStr)
+			if parseErr != nil {
+				return nil, fmt.Errorf("parse completed_at timestamp: %w", parseErr)
+			}
+			if !completedAt.IsZero() {
+				set.CompletedAt = &completedAt
+			}
 		}
 		if exerciseID != currentExerciseSet.ExerciseID {
 			// Add the previous exercise set if it exists
@@ -321,13 +333,19 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 
 	for _, exerciseSet := range exerciseSets {
 		for i, set := range exerciseSet.Sets {
+			// Format CompletedAt timestamp if it's not nil
+			var completedAtStr interface{}
+			if set.CompletedAt != nil {
+				completedAtStr = formatTimestamp(*set.CompletedAt)
+			}
+
 			_, err := tx.ExecContext(ctx, `
 				INSERT INTO exercise_sets (
 					workout_user_id, workout_date, exercise_id, set_number,
-					weight_kg, min_reps, max_reps, completed_reps
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+					weight_kg, min_reps, max_reps, completed_reps, completed_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				userID, dateStr, exerciseSet.ExerciseID, i+1,
-				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps)
+				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps, completedAtStr)
 
 			if err != nil {
 				return fmt.Errorf("insert exercise set: %w", err)

@@ -278,7 +278,11 @@
 
           function initializeTimer() {
             const timerDisplay = document.getElementById('workout-timer');
+            {{ if .LastCompletedAt }}
+            const startTime = new Date('{{ .LastCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
+            {{ else }}
             const startTime = Date.now();
+            {{ end }}
 
             function updateTimer() {
               const elapsed = Date.now() - startTime;

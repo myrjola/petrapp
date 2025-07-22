@@ -16,8 +16,9 @@ type exerciseSetTemplateData struct {
 	Date                 time.Time
 	ExerciseSet          workout.ExerciseSet
 	FirstIncompleteIndex int
-	EditingIndex         int  // Index of the set being edited
-	IsEditing            bool // Whether we're in edit mode
+	EditingIndex         int        // Index of the set being edited
+	IsEditing            bool       // Whether we're in edit mode
+	LastCompletedAt      *time.Time // Timestamp of most recently completed set
 }
 
 func getFirstIncompleteIndex(sets []workout.Set) int {
@@ -27,6 +28,18 @@ func getFirstIncompleteIndex(sets []workout.Set) int {
 		}
 	}
 	return len(sets)
+}
+
+func getLastCompletedAt(sets []workout.Set) *time.Time {
+	var latest *time.Time
+	for _, set := range sets {
+		if set.CompletedAt != nil {
+			if latest == nil || set.CompletedAt.After(*latest) {
+				latest = set.CompletedAt
+			}
+		}
+	}
+	return latest
 }
 
 func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +98,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		FirstIncompleteIndex: getFirstIncompleteIndex(exerciseSet.Sets),
 		EditingIndex:         editingIndex,
 		IsEditing:            isEditing,
+		LastCompletedAt:      getLastCompletedAt(exerciseSet.Sets),
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)

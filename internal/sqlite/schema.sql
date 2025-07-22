@@ -104,6 +104,7 @@ CREATE TABLE exercise_sets
     min_reps           INTEGER NOT NULL CHECK (min_reps > 0),
     max_reps           INTEGER NOT NULL CHECK (max_reps >= min_reps),
     completed_reps     INTEGER,
+    completed_at       TEXT    CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
 
     PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,

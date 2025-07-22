@@ -105,6 +105,7 @@ type Set struct {
 	MinReps       int
 	MaxReps       int
 	CompletedReps *int
+	CompletedAt   *time.Time // Nullable timestamp when set was completed
 }
 
 // ExerciseSet groups all sets for a specific exercise in a workout.

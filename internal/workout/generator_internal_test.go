@@ -14,6 +14,7 @@ func createTestSet(weight float64, minReps, maxReps int, completedReps *int) Set
 		MinReps:       minReps,
 		MaxReps:       maxReps,
 		CompletedReps: completedReps,
+		CompletedAt:   nil,
 	}
 }
 
