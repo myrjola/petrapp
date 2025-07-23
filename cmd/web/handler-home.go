@@ -9,6 +9,17 @@ import (
 const (
 	maxDifficultyStars = 5
 	percentMultiplier  = 100
+
+	// Workout statuses.
+	statusUnscheduled = "unscheduled"
+	statusNotStarted  = "not_started"
+	statusInProgress  = "in_progress"
+	statusCompleted   = "completed"
+
+	// Display statuses.
+	statusToday          = "today"
+	statusUpcoming       = "upcoming"
+	statusPastIncomplete = "past-incomplete"
 )
 
 // isWorkoutScheduled determines if a workout is scheduled for the given date based on user preferences.
@@ -39,7 +50,7 @@ type homeTemplateData struct {
 	Days []dayView
 }
 
-// DayView represents a single day's view data.
+// dayView represents a single day's view data.
 type dayView struct {
 	// Date is the date of this day
 	Date time.Time
@@ -51,18 +62,141 @@ type dayView struct {
 	IsPast bool
 	// IsScheduled indicates if a workout is scheduled for this day
 	IsScheduled bool
-	// WorkoutStatus indicates the completion status of the workout
-	WorkoutStatus string
+	// Status is the final computed status for display and CSS data attributes
+	Status string
+	// StatusLabel is the human-readable status label
+	StatusLabel string
 	// CompletedSets is the number of completed sets
 	CompletedSets int
 	// TotalSets is the total number of sets in the workout
 	TotalSets int
 	// ProgressPercent is the completion percentage (0-100)
 	ProgressPercent int
+	// ShouldShowProgress indicates if progress info should be displayed
+	ShouldShowProgress bool
 	// DifficultyRating is the user's difficulty rating (1-5) if provided
 	DifficultyRating *int
 	// DifficultyStars represents filled and empty stars for display
 	DifficultyStars []bool
+	// Action contains the workout action data for this day
+	Action *workoutAction
+}
+
+// workoutAction represents an action that can be taken on a workout day.
+type workoutAction struct {
+	// StartWorkout indicates if we need to start a workout instead of navigating to it
+	StartWorkout bool
+	// Label is the button/link text
+	Label string
+}
+
+// determineWorkoutStatus determines the workout status based on session data and schedule.
+func determineWorkoutStatus(session workout.Session, isScheduled bool) string {
+	switch {
+	case !isScheduled && session.StartedAt.IsZero():
+		return statusUnscheduled
+	case session.StartedAt.IsZero():
+		return statusNotStarted
+	case session.CompletedAt.IsZero():
+		return statusInProgress
+	default:
+		return statusCompleted
+	}
+}
+
+// calculateProgress counts completed and total sets and returns the progress data.
+func calculateProgress(session workout.Session) (int, int, int) {
+	var completedSets, totalSets, progressPercent int
+
+	for _, exerciseSet := range session.ExerciseSets {
+		for _, set := range exerciseSet.Sets {
+			totalSets++
+			if set.CompletedAt != nil {
+				completedSets++
+			}
+		}
+	}
+
+	if totalSets > 0 {
+		progressPercent = (completedSets * percentMultiplier) / totalSets
+	}
+
+	return completedSets, totalSets, progressPercent
+}
+
+// prepareDifficultyStars creates the difficulty stars array for display.
+func prepareDifficultyStars(rating *int) []bool {
+	if rating == nil {
+		return nil
+	}
+
+	stars := make([]bool, maxDifficultyStars)
+	for j := range maxDifficultyStars {
+		stars[j] = j < *rating
+	}
+	return stars
+}
+
+// calculateDisplayStatus determines the final status and label for display.
+func calculateDisplayStatus(workoutStatus string, isToday, isPast bool) (string, string) {
+	switch {
+	case workoutStatus == statusCompleted:
+		return statusCompleted, "Completed"
+	case workoutStatus == statusInProgress:
+		return statusInProgress, "In Progress"
+	case workoutStatus == statusUnscheduled:
+		return statusUnscheduled, "Not Scheduled"
+	case workoutStatus == statusNotStarted && isToday:
+		return statusToday, "Today"
+	case workoutStatus == statusNotStarted && isPast:
+		return statusPastIncomplete, "Missed"
+	case workoutStatus == statusNotStarted:
+		return statusUpcoming, "Upcoming"
+	default:
+		return statusUpcoming, "Upcoming"
+	}
+}
+
+// calculateWorkoutAction determines the action for the workout based on status and timing.
+func calculateWorkoutAction(status string, isToday bool) *workoutAction {
+	switch status {
+	case statusUnscheduled:
+		return nil
+	case statusToday:
+		return &workoutAction{
+			StartWorkout: true,
+			Label:        "Start Workout",
+		}
+	case statusInProgress:
+		if isToday {
+			return &workoutAction{
+				StartWorkout: false,
+				Label:        "Continue Workout",
+			}
+		}
+		return &workoutAction{
+			StartWorkout: false,
+			Label:        "Complete Workout",
+		}
+	case statusCompleted:
+		if isToday {
+			return &workoutAction{
+				StartWorkout: false,
+				Label:        "Review Workout",
+			}
+		}
+		return &workoutAction{
+			StartWorkout: false,
+			Label:        "View Details",
+		}
+	case statusPastIncomplete:
+		return &workoutAction{
+			StartWorkout: false,
+			Label:        "Start Late",
+		}
+	default:
+		return nil
+	}
 }
 
 func toDays(sessions []workout.Session, preferences workout.Preferences) []dayView {
@@ -71,62 +205,31 @@ func toDays(sessions []workout.Session, preferences workout.Preferences) []dayVi
 
 	for i, session := range sessions {
 		date := session.Date
-
-		// Determine if this day is scheduled based on preferences
 		isScheduled := isWorkoutScheduled(date, preferences)
+		isToday := date.Format("2006-01-02") == today.Format("2006-01-02")
+		isPast := date.Before(today)
 
-		// Determine workout status based on timestamps and schedule
-		var workoutStatus string
-		switch {
-		case !isScheduled && session.StartedAt.IsZero():
-			workoutStatus = "unscheduled"
-		case session.StartedAt.IsZero():
-			workoutStatus = "not_started"
-		case session.CompletedAt.IsZero():
-			workoutStatus = "in_progress"
-		default:
-			workoutStatus = "completed"
-		}
-
-		// Count completed and total sets
-		completedSets := 0
-		totalSets := 0
-		for _, exerciseSet := range session.ExerciseSets {
-			for _, set := range exerciseSet.Sets {
-				totalSets++
-				if set.CompletedAt != nil {
-					completedSets++
-				}
-			}
-		}
-
-		// Calculate progress percentage
-		progressPercent := 0
-		if totalSets > 0 {
-			progressPercent = (completedSets * percentMultiplier) / totalSets
-		}
-
-		// Prepare difficulty stars
-		var difficultyStars []bool
-		if session.DifficultyRating != nil {
-			difficultyStars = make([]bool, maxDifficultyStars)
-			for j := range maxDifficultyStars {
-				difficultyStars[j] = j < *session.DifficultyRating
-			}
-		}
+		workoutStatus := determineWorkoutStatus(session, isScheduled)
+		completedSets, totalSets, progressPercent := calculateProgress(session)
+		difficultyStars := prepareDifficultyStars(session.DifficultyRating)
+		status, statusLabel := calculateDisplayStatus(workoutStatus, isToday, isPast)
+		action := calculateWorkoutAction(status, isToday)
 
 		days[i] = dayView{
-			Date:             date,
-			Name:             date.Format("Monday"),
-			IsToday:          date.Format("2006-01-02") == today.Format("2006-01-02"),
-			IsPast:           date.Before(today),
-			IsScheduled:      isScheduled,
-			WorkoutStatus:    workoutStatus,
-			CompletedSets:    completedSets,
-			TotalSets:        totalSets,
-			ProgressPercent:  progressPercent,
-			DifficultyRating: session.DifficultyRating,
-			DifficultyStars:  difficultyStars,
+			Date:               date,
+			Name:               date.Format("Monday"),
+			IsToday:            isToday,
+			IsPast:             isPast,
+			IsScheduled:        isScheduled,
+			Status:             status,
+			StatusLabel:        statusLabel,
+			CompletedSets:      completedSets,
+			TotalSets:          totalSets,
+			ProgressPercent:    progressPercent,
+			ShouldShowProgress: totalSets > 0 && status != statusUnscheduled,
+			DifficultyRating:   session.DifficultyRating,
+			DifficultyStars:    difficultyStars,
+			Action:             action,
 		}
 	}
 

@@ -210,7 +210,7 @@
 }
 
 @layer components {
-    button {
+    button, .btn {
         position: relative;
         display: inline-flex;
         border-radius: var(--radius-2);
@@ -224,6 +224,7 @@
         padding: var(--size-2) var(--vertical-padding);
         border: none;
         white-space: nowrap;
+        text-decoration: none;
 
         &:hover {
             cursor: pointer;

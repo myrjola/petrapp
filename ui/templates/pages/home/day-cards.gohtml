@@ -1,0 +1,152 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
+
+{{ define "day-cards" }}
+    <style {{ nonce }}>
+        @scope {
+            .day-card {
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-2);
+                border: 1px solid var(--gray-3);
+                border-radius: var(--radius-3);
+                padding: var(--size-4);
+                background: var(--gray-0);
+                transition: all 0.2s ease;
+
+                &[data-status="today"] {
+                    border-color: var(--sky-6);
+                    background: var(--sky-0);
+                    box-shadow: 0 2px 8px var(--sky-2);
+                }
+
+                &[data-status="completed"] {
+                    border-color: var(--lime-6);
+                    background: var(--lime-0);
+                }
+
+                &[data-status="in_progress"] {
+                    border-color: var(--yellow-6);
+                    background: var(--yellow-0);
+                }
+
+                &[data-status="past-incomplete"] {
+                    border-color: var(--red-6);
+                    background: var(--red-1);
+                }
+
+                &[data-status="unscheduled"] {
+                    border-color: var(--gray-4);
+                    background: var(--gray-1);
+                    border-style: dashed;
+                    border-width: 1px;
+                    opacity: 0.7;
+                }
+
+                &[data-status="upcoming"] {
+                    border-color: var(--gray-3);
+                    background: var(--gray-0);
+                }
+            }
+
+            .day-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .day-title {
+                font-weight: var(--font-weight-6);
+                font-size: var(--font-size-4);
+            }
+
+            .day-date {
+                color: var(--gray-6);
+                font-size: var(--font-size-0);
+            }
+
+            .status-indicator {
+                display: inline-flex;
+                align-items: center;
+                gap: var(--size-1);
+                padding: var(--size-1) var(--size-2);
+                border-radius: var(--radius-2);
+                font-size: var(--font-size-1);
+                font-weight: var(--font-weight-5);
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+
+                &[data-status="completed"] {
+                    background: var(--lime-2);
+                    color: var(--lime-9);
+                }
+
+                &[data-status="in_progress"] {
+                    background: var(--yellow-2);
+                    color: var(--yellow-11);
+                }
+
+                &[data-status="upcoming"] {
+                    background: var(--gray-3);
+                    color: var(--gray-9);
+                }
+
+                &[data-status="past-incomplete"] {
+                    background: var(--red-2);
+                    color: var(--red-9);
+                }
+
+                &[data-status="unscheduled"] {
+                    background: var(--gray-2);
+                    color: var(--gray-9);
+                    border: 1px dashed var(--gray-5);
+                }
+
+                &[data-status="today"] {
+                    background: var(--sky-2);
+                    color: var(--sky-9);
+                    font-weight: var(--font-weight-6);
+                }
+            }
+
+            .workout-actions {
+                display: flex;
+                gap: var(--size-2);
+            }
+        }
+    </style>
+
+    {{ range .Days }}
+        <div class="day-card" data-status="{{ .Status }}">
+            <div class="day-header">
+                <div>
+                    <div class="day-title">
+                        {{ .Name }}
+                    </div>
+                    <div class="day-date">{{ .Date.Format "Jan 2, 2006" }}</div>
+                </div>
+                <div class="status-indicator" data-status="{{ .Status }}">
+                    {{ .StatusLabel }}
+                </div>
+            </div>
+
+            {{ template "progress-bar" . }}
+
+            <div class="workout-actions">
+                {{ if .Action }}
+                    {{ if .Action.StartWorkout }}
+                        <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                            {{ csrf }}
+                            <button type="submit" class="{{ if eq .Status "unscheduled" }}btn-secondary{{ else }}btn-primary{{ end }}">
+                                {{ .Action.Label }}
+                            </button>
+                        </form>
+                    {{ else }}
+                        <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn">
+                            {{ .Action.Label }}
+                        </a>
+                    {{ end }}
+                {{ end }}
+            </div>
+        </div>
+    {{ end }}
+{{ end }}

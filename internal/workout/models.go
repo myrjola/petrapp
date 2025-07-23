@@ -66,7 +66,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 			},
 			"exercise_type": map[string]interface{}{
 				"type":        "string",
-				"description": "Type of exercise (weighted or bodyweight)",
+				"description": "StartWorkout of exercise (weighted or bodyweight)",
 				"enum":        []string{"weighted", "bodyweight"},
 			},
 			"description_markdown": map[string]interface{}{
