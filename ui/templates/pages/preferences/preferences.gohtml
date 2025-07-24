@@ -5,74 +5,150 @@
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    margin: var(--size-4);
+                    max-width: 32rem;
+                    margin: 0 auto;
+                    padding: var(--size-6) var(--size-4);
+                }
+
+                h1 {
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-6);
+                    margin-bottom: var(--size-3);
+                    color: var(--color-text-primary);
+                    text-align: center;
+                }
+
+                .subtitle {
+                    color: var(--color-text-secondary);
+                    text-align: center;
+                    margin-bottom: var(--size-7);
+                    font-size: var(--font-size-2);
+                }
+
+                .schedule-form {
+                    background: var(--color-surface-elevated);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    padding: var(--size-6);
+                    margin-bottom: var(--size-6);
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                }
+
+                .weekdays-grid {
+                    display: grid;
+                    gap: var(--size-2);
+                    margin-bottom: var(--size-6);
+                }
+
+                .weekday-item {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-3);
+                    padding: var(--size-4);
+                    border-radius: var(--radius-2);
+                    border: var(--border-size-1) solid transparent;
+                    transition: all 0.2s ease;
+                    cursor: pointer;
+
+                    &:hover {
+                        background-color: var(--color-surface);
+                        border-color: var(--color-border);
+                    }
+
+                    &:has(input:checked) {
+                        background-color: var(--color-surface-completed);
+                        border-color: var(--color-success);
+                    }
+
+                    input[type="checkbox"] {
+                        width: var(--size-5);
+                        height: var(--size-5);
+                        margin: 0;
+                        accent-color: var(--color-success);
+                        cursor: pointer;
+                    }
+
+                    .weekday-name {
+                        font-weight: var(--font-weight-5);
+                        color: var(--color-text-primary);
+                        font-size: var(--font-size-2);
+                    }
+                }
+
+                .save-button {
+                    width: 100%;
+                    padding: var(--size-4) var(--size-6);
+                    background: var(--sky-6);
+                    color: var(--white);
+                    border: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-2);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--sky-7);
+                    }
+
+                    &:active {
+                        background: var(--sky-8);
+                    }
+                }
+
+                .footer-section {
+                    margin-top: var(--size-8);
+                    padding-top: var(--size-6);
+                    border-top: var(--border-size-1) solid var(--color-border);
+                    display: flex;
+                    justify-content: center;
+                }
+
+                .logout-button {
+                    padding: var(--size-3) var(--size-5);
+                    background: transparent;
+                    color: var(--color-text-secondary);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+
+                    &:hover {
+                        background: var(--gray-1);
+                        color: var(--color-text-primary);
+                        border-color: var(--gray-4);
+                    }
                 }
             }
         </style>
 
         <h1>Weekly Schedule</h1>
-        <p>On which days are you planning to go to gym?</p>
+        <p class="subtitle">Select the days you're planning to go to the gym</p>
 
-        <form method="post" action="/preferences">
+        <form method="post" action="/preferences" class="schedule-form">
             {{ csrf }}
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        label {
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-3);
-                            padding-block: var(--size-3);
-
-                            &:hover {
-                                background-color: var(--gray-0);
-                            }
-
-                            input[type="checkbox"] {
-                                width: var(--size-5);
-                                height: var(--size-5);
-                                margin: 0;
-                            }
-                        }
-
-                        button[type="submit"] {
-                            margin-top: var(--size-4);
-                            width: 100%;
-                        }
-                    }
-                }
-            </style>
-            {{ range .Weekdays }}
-                <label>
-                    <input
-                            type="checkbox"
-                            name="{{ .ID }}"
-                            value="true"
-                            {{ if .Checked }}checked{{ end }}
-                    >
-                    <span>
-                        {{ .Name }}
-                    </span>
-                </label>
-                </div>
-            {{ end }}
-            <button type="submit">Save</button>
+            <div class="weekdays-grid">
+                {{ range .Weekdays }}
+                    <label class="weekday-item">
+                        <input
+                                type="checkbox"
+                                name="{{ .ID }}"
+                                value="true"
+                                {{ if .Checked }}checked{{ end }}
+                        >
+                        <span class="weekday-name">{{ .Name }}</span>
+                    </label>
+                {{ end }}
+            </div>
+            <button type="submit" class="save-button">Save Schedule</button>
         </form>
-        <footer>
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        margin-top: var(--size-4);
-                        display: flex;
-                        justify-content: center;
-                        gap: var(--size-4);
-                    }
-                }
-            </style>
+
+        <footer class="footer-section">
             <form action="/api/logout" method="post">
                 {{ csrf }}
-                <button type="submit">
-                    <span>Log out</span>
+                <button type="submit" class="logout-button">
+                    Log out
                 </button>
             </form>
         </footer>
