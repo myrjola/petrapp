@@ -161,6 +161,12 @@ func calculateDisplayStatus(workoutStatus string, isToday, isPast bool) (string,
 func calculateWorkoutAction(status string, isToday bool) *workoutAction {
 	switch status {
 	case statusUnscheduled:
+		if isToday {
+			return &workoutAction{
+				StartWorkout: true,
+				Label:        "Start Extra Workout",
+			}
+		}
 		return nil
 	case statusToday:
 		return &workoutAction{

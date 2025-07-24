@@ -401,6 +401,11 @@ func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPat
 	formSelector := fmt.Sprintf("form[action='%s']", formActionURLPath)
 	form := doc.Find(formSelector)
 
+	// Assert that the form exists
+	if form.Length() == 0 {
+		return nil, fmt.Errorf("form with action '%s' not found in document", formActionURLPath)
+	}
+
 	// Initialize the map to store hidden field values
 	hiddenFields := make(map[string]string)
 
