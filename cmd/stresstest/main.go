@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,7 +19,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// AuthenticatedUser holds a client with valid session
+const (
+	testTimeout                = 10 * time.Second
+	userRegistrationTimeout    = 30 * time.Second
+	scenarioTimeout            = 30 * time.Second
+	maxConcurrentRegistrations = 10
+	maxConcurrentOperations    = 20
+	baseWeight                 = 15.0
+	weightRange                = 20
+	baseReps                   = 8
+	repsRange                  = 8
+	successRateThreshold       = 95.0
+	expectedArgsCount          = 2
+	percentageMultiplier       = 100
+)
+
+// AuthenticatedUser holds a client with valid session.
 type AuthenticatedUser struct {
 	Client *e2etest.Client
 	UserID string // or whatever identifier you need
@@ -25,7 +42,7 @@ type AuthenticatedUser struct {
 
 func TestAuth(client *e2etest.Client) error {
 	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, testTimeout)
 	defer cancel()
 	var err error
 
@@ -41,8 +58,13 @@ func TestAuth(client *e2etest.Client) error {
 	return nil
 }
 
-// RegisterAndAuthenticateUser creates a new user and logs them in
-func RegisterAndAuthenticateUser(ctx context.Context, url, hostname string, userIndex int, logger *slog.Logger) (*AuthenticatedUser, error) {
+// RegisterAndAuthenticateUser creates a new user and logs them in.
+func RegisterAndAuthenticateUser(
+	ctx context.Context,
+	url, hostname string,
+	userIndex int,
+	logger *slog.Logger,
+) (*AuthenticatedUser, error) {
 	// Create a new client for this user (each needs their own session)
 	client, err := e2etest.NewClient(url, hostname, url)
 	if err != nil {
@@ -63,8 +85,13 @@ func RegisterAndAuthenticateUser(ctx context.Context, url, hostname string, user
 	}, nil
 }
 
-// SetupUsers registers and authenticates the specified number of users
-func SetupUsers(ctx context.Context, url, hostname string, numUsers int, logger *slog.Logger) ([]*AuthenticatedUser, error) {
+// SetupUsers registers and authenticates the specified number of users.
+func SetupUsers(
+	ctx context.Context,
+	url, hostname string,
+	numUsers int,
+	logger *slog.Logger,
+) ([]*AuthenticatedUser, error) {
 	logger.LogAttrs(ctx, slog.LevelInfo, "Starting user registration", slog.Int("num_users", numUsers))
 
 	var (
@@ -72,12 +99,13 @@ func SetupUsers(ctx context.Context, url, hostname string, numUsers int, logger 
 		usersMu sync.Mutex
 		wg      sync.WaitGroup
 		errCh   = make(chan error, numUsers)
+		errors  = make([]error, 0, numUsers) // Pre-allocate with capacity
 	)
 
 	// Limit concurrency to avoid overwhelming the server
-	semaphore := make(chan struct{}, 10) // Max 10 concurrent registrations
+	semaphore := make(chan struct{}, maxConcurrentRegistrations) // Max concurrent registrations
 
-	for i := 0; i < numUsers; i++ {
+	for i := range numUsers {
 		wg.Add(1)
 		go func(userIndex int) {
 			defer wg.Done()
@@ -87,7 +115,7 @@ func SetupUsers(ctx context.Context, url, hostname string, numUsers int, logger 
 			defer func() { <-semaphore }()
 
 			// Create context with timeout for this user
-			userCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			userCtx, cancel := context.WithTimeout(ctx, userRegistrationTimeout)
 			defer cancel()
 
 			user, err := RegisterAndAuthenticateUser(userCtx, url, hostname, userIndex, logger)
@@ -107,7 +135,6 @@ func SetupUsers(ctx context.Context, url, hostname string, numUsers int, logger 
 	close(errCh)
 
 	// Check for errors
-	var errors []error
 	for err := range errCh {
 		errors = append(errors, err)
 	}
@@ -118,7 +145,7 @@ func SetupUsers(ctx context.Context, url, hostname string, numUsers int, logger 
 			slog.Int("successful_count", len(users)))
 
 		// Return first error for now, but you might want to handle this differently
-		return users, fmt.Errorf("registration failures: %v", errors[0])
+		return users, fmt.Errorf("registration failures: %w", errors[0])
 	}
 
 	logger.LogAttrs(ctx, slog.LevelInfo, "All users registered successfully",
@@ -127,7 +154,7 @@ func SetupUsers(ctx context.Context, url, hostname string, numUsers int, logger 
 	return users, nil
 }
 
-// WorkoutScenario represents a complete workout flow for stress testing
+// WorkoutScenario represents a complete workout flow for stress testing.
 func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.Logger) error {
 	client := user.Client
 	today := time.Now().Format("2006-01-02")
@@ -162,7 +189,7 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	})
 
 	if exerciseID == "" {
-		return fmt.Errorf("no exercise found on workout page")
+		return errors.New("no exercise found on workout page")
 	}
 
 	// Complete a set (CSRF form)
@@ -176,21 +203,21 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	}).First()
 
 	if form.Length() == 0 {
-		return fmt.Errorf("set completion form not found")
+		return errors.New("set completion form not found")
 	}
 
 	action, exists := form.Attr("action")
 	if !exists {
-		return fmt.Errorf("form has no action attribute")
+		return errors.New("form has no action attribute")
 	}
 
 	// Submit set with random-ish data to simulate real usage
 	setData := map[string]string{
-		"weight": fmt.Sprintf("%.1f", 15.0+float64(time.Now().UnixNano()%20)), // 15-35kg range
-		"reps":   fmt.Sprintf("%d", 8+time.Now().UnixNano()%8),                // 8-15 reps range
+		"weight": fmt.Sprintf("%.1f", baseWeight+float64(time.Now().UnixNano()%weightRange)), // 15-35kg range
+		"reps":   strconv.FormatInt(baseReps+time.Now().UnixNano()%repsRange, 10),            // 8-15 reps range
 	}
 
-	if doc, err = client.SubmitForm(ctx, doc, action, setData); err != nil {
+	if _, err = client.SubmitForm(ctx, doc, action, setData); err != nil {
 		return fmt.Errorf("failed to complete set: %w", err)
 	}
 
@@ -201,7 +228,7 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	return nil
 }
 
-// RunLoadTest performs the actual load testing with authenticated users
+// RunLoadTest performs the actual load testing with authenticated users.
 func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.Logger) error {
 	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test", slog.Int("num_users", len(users)))
 
@@ -213,18 +240,18 @@ func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.L
 
 	// Create errgroup with context and limit concurrency
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(20) // Max 20 concurrent operations
+	g.SetLimit(maxConcurrentOperations) // Max concurrent operations
 
 	// Launch all scenarios
 	for _, user := range users {
-		for i := 0; i < iterations; i++ {
+		for i := range iterations {
 			// Capture loop variables
 			u := user
 			iteration := i + 1
 
 			g.Go(func() error {
 				// Create context with timeout for this scenario
-				scenarioCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				scenarioCtx, cancel := context.WithTimeout(ctx, scenarioTimeout)
 				defer cancel()
 
 				if err := WorkoutScenario(scenarioCtx, u, logger); err != nil {
@@ -249,7 +276,7 @@ func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.L
 	}
 
 	// Report results
-	successRate := float64(successCount) / float64(totalScenarios) * 100
+	successRate := float64(successCount) / float64(totalScenarios) * percentageMultiplier
 
 	logger.LogAttrs(ctx, slog.LevelInfo, "Load test completed",
 		slog.Int("total_scenarios", totalScenarios),
@@ -258,7 +285,7 @@ func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.L
 		slog.Float64("success_rate", successRate))
 
 	// Consider test failed if success rate is too low
-	if successRate < 95.0 {
+	if successRate < successRateThreshold {
 		return fmt.Errorf("load test failed: success rate %.1f%% below threshold", successRate)
 	}
 
@@ -269,7 +296,7 @@ func main() {
 	logger := testhelpers.NewLogger(os.Stdout)
 	ctx := context.Background()
 
-	if len(os.Args) != 2 {
+	if len(os.Args) != expectedArgsCount {
 		logger.LogAttrs(ctx, slog.LevelError, "usage: loadtest <hostname>")
 		os.Exit(1)
 	}
