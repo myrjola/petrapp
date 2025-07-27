@@ -40,7 +40,7 @@ func main() {
 
 	var (
 		hostname = os.Args[1]
-		url      = "https://" + hostname
+		url      = hostname
 		client   *e2etest.Client
 		err      error
 		start    = time.Now()
