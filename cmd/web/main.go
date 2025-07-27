@@ -113,12 +113,22 @@ func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 
 func main() {
 	ctx := context.Background()
-	loggerHandler := logging.NewContextHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handlerOptions := &slog.HandlerOptions{
 		AddSource:   false,
 		Level:       slog.LevelDebug,
 		ReplaceAttr: nil,
-	}))
-	logger := slog.New(loggerHandler)
+	}
+	var loggerHandler slog.Handler
+	loggerHandler = slog.NewTextHandler(os.Stdout, handlerOptions)
+	if os.Getenv("FLY_MACHINE_ID") != "" {
+		loggerHandler = slog.NewJSONHandler(os.Stdout, handlerOptions)
+	}
+	loggerHandler = logging.NewContextHandler(loggerHandler)
+	appName := os.Getenv("FLY_APP_NAME")
+	if appName == "" {
+		appName = "petra-local"
+	}
+	logger := slog.New(loggerHandler).With(slog.String("service_name", appName))
 	if err := run(ctx, logger, os.LookupEnv); err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", slog.Any("error", err))
 		os.Exit(1)
