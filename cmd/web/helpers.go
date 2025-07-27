@@ -16,6 +16,7 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 	if r.Header.Get("Sec-Fetch-Dest") == "empty" {
 		w.Header().Set("Content-Location", path)
 		w.WriteHeader(http.StatusOK)
+		return
 	}
 
 	http.Redirect(w, r, path, http.StatusSeeOther)
