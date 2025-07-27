@@ -1,7 +1,7 @@
 
 .DEFAULT_GOAL := ci
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
-        migratetest repomix repomix-clipboard setup-git-hooks
+        migratetest repomix repomix-clipboard setup-git-hooks deploy-alloy deploy-logshipper
 
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v1.64.6
@@ -79,3 +79,9 @@ repomix-clipboard: repomix
 
 setup-git-hooks:
 	./scripts/setup-git-hooks.sh
+
+deploy-alloy:
+	cd ops/alloy && fly deploy --file-local="/etc/alloy/config.alloy=./config.alloy"
+
+deploy-logshipper:
+	cd ops/logshipper && fly deploy

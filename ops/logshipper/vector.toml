@@ -1,0 +1,49 @@
+[api]
+enabled = true
+address = "0.0.0.0:8686"
+
+[sources.fly_log_metrics]
+type = "internal_metrics"
+
+[sources.nats]
+type = "nats"
+url = "nats://[fdaa::3]:4223"
+queue = "${QUEUE-}"
+subject = "${SUBJECT-logs.>}"
+auth.strategy = "user_password"
+auth.user_password.user = "${ORG-personal}"
+auth.user_password.password = "${ACCESS_TOKEN?}"
+connection_name = "Fly logs stream"
+
+[transforms.log_json]
+type = "remap"
+inputs = ["nats"]
+source = '''
+  .level = .log.level
+
+  if starts_with(.message, "{") ?? false {
+    # parse json messages
+    structured = object(parse_json(.message) ?? "") ?? { "message": .message }
+
+    # delete message field and merge structured message
+    del(.message)
+    . |= structured
+  } else {
+    # parse non-json messages
+    structured = object(parse_nginx_log(.message, "combined") ?? "") ?? { "message": .message }
+
+    # delete message field and merge structured message
+    del(.message)
+    . |= structured
+  }
+
+[sinks.fly_log_metrics_prometheus]
+type = "prometheus_exporter" # required
+inputs = ["fly_log_metrics"] # required
+address = "0.0.0.0:9598" # required
+default_namespace = "fly-logs" # optional, no default
+
+[sinks.blackhole]
+type = "blackhole"
+inputs = ["log_json"]
+print_interval_secs = 100000

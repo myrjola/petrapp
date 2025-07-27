@@ -1,0 +1,14 @@
+app = "petra-alloy"
+primary_region = "arn"
+
+[build]
+image = "grafana/alloy:latest"
+
+[mounts]
+source = "alloy_data"
+destination = "/var/lib/alloy/data"
+
+[[vm]]
+cpu_kind = "shared"
+cpus = 1
+memory_mb = 256

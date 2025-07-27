@@ -1,0 +1,9 @@
+app = "my-parca-server"
+
+[[services]]
+internal_port = 7070
+protocol = "tcp"
+
+[mounts]
+source = "parca_data"
+destination = "/var/lib/parca"

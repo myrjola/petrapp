@@ -67,10 +67,10 @@ func (app *application) logRequest(next http.Handler) http.Handler {
 		)
 
 		ctx := r.Context()
-		requestID := rand.Text()
+		traceID := rand.Text()
 		ctx = logging.WithAttrs(
 			ctx,
-			slog.Any("request_id", requestID),
+			slog.Any("trace_id", traceID),
 			slog.String("proto", proto),
 			slog.String("method", method),
 			slog.String("uri", uri),
