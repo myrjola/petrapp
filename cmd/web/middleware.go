@@ -123,10 +123,9 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		if !trace.IsEnabled() {
 			next.ServeHTTP(sw, r)
 		} else {
-			traceCtx := r.Context()
 			path := r.URL.Path
 			taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
-			traceCtx, task := trace.NewTask(traceCtx, taskName)
+			traceCtx, task := trace.NewTask(ctx, taskName)
 
 			// Add trace attributes for better context
 			trace.Log(traceCtx, "request", fmt.Sprintf("method=%s path=%s proto=%s", method, path, proto))
@@ -147,7 +146,7 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 			level = slog.LevelError
 		}
 		app.logger.LogAttrs(r.Context(), level, "request completed",
-			slog.Any("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
+			slog.Int("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
 	})
 }
 
