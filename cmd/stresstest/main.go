@@ -221,6 +221,11 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 		return fmt.Errorf("failed to complete set: %w", err)
 	}
 
+	// Fetch progress chart which is a common operation after completing a set.
+	if _, err = client.Get(ctx, "/workouts/"+today+"/exercises/"+exerciseID+"/progress-chart"); err != nil {
+		return fmt.Errorf("failed to get progress chart: %w", err)
+	}
+
 	logger.LogAttrs(ctx, slog.LevelDebug, "Workout scenario completed",
 		slog.String("user_id", user.UserID),
 		slog.String("exercise_id", exerciseID))
@@ -230,10 +235,8 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 
 // RunLoadTest performs the actual load testing with authenticated users.
 func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.Logger) error {
-	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test", slog.Int("num_users", len(users)))
-
-	iterations := 3 // Number of workout scenarios per user
-	totalScenarios := len(users) * iterations
+	userCount := len(users)
+	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test", slog.Int("num_users", userCount))
 
 	// Counters for success/failure tracking
 	var successCount, failureCount int64
@@ -244,30 +247,25 @@ func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.L
 
 	// Launch all scenarios
 	for _, user := range users {
-		for i := range iterations {
+		g.Go(func() error {
 			// Capture loop variables
 			u := user
-			iteration := i + 1
+			// Create context with timeout for this scenario
+			scenarioCtx, cancel := context.WithTimeout(ctx, scenarioTimeout)
+			defer cancel()
 
-			g.Go(func() error {
-				// Create context with timeout for this scenario
-				scenarioCtx, cancel := context.WithTimeout(ctx, scenarioTimeout)
-				defer cancel()
+			if err := WorkoutScenario(scenarioCtx, u, logger); err != nil {
+				atomic.AddInt64(&failureCount, 1)
+				// Log individual failures but don't stop the entire test
+				logger.LogAttrs(scenarioCtx, slog.LevelWarn, "Scenario failed",
+					slog.String("user_id", u.UserID),
+					slog.Any("error", err))
+				return nil // Don't propagate error to avoid stopping other scenarios
+			}
 
-				if err := WorkoutScenario(scenarioCtx, u, logger); err != nil {
-					atomic.AddInt64(&failureCount, 1)
-					// Log individual failures but don't stop the entire test
-					logger.LogAttrs(scenarioCtx, slog.LevelWarn, "Scenario failed",
-						slog.String("user_id", u.UserID),
-						slog.Int("iteration", iteration),
-						slog.Any("error", err))
-					return nil // Don't propagate error to avoid stopping other scenarios
-				}
-
-				atomic.AddInt64(&successCount, 1)
-				return nil
-			})
-		}
+			atomic.AddInt64(&successCount, 1)
+			return nil
+		})
 	}
 
 	// Wait for all scenarios to complete
@@ -276,10 +274,9 @@ func RunLoadTest(ctx context.Context, users []*AuthenticatedUser, logger *slog.L
 	}
 
 	// Report results
-	successRate := float64(successCount) / float64(totalScenarios) * percentageMultiplier
+	successRate := float64(successCount) / float64(userCount) * percentageMultiplier
 
 	logger.LogAttrs(ctx, slog.LevelInfo, "Load test completed",
-		slog.Int("total_scenarios", totalScenarios),
 		slog.Int64("successful", successCount),
 		slog.Int64("failed", failureCount),
 		slog.Float64("success_rate", successRate))
@@ -303,7 +300,7 @@ func main() {
 
 	var (
 		hostname = os.Args[1]
-		numUsers = 10
+		numUsers = 1000
 		start    = time.Now()
 	)
 
