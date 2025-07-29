@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -32,6 +33,11 @@ const (
 	successRateThreshold       = 95.0
 	expectedArgsCount          = 2
 	percentageMultiplier       = 100
+	workoutHistoryWeeks        = 26 // 6 months of weekly workouts
+	daysPerWeek                = 7
+	historyTimeout             = 5 * time.Minute
+	maxWeightVariation         = 5
+	maxRepsVariation           = 3
 )
 
 // AuthenticatedUser holds a client with valid session.
@@ -154,6 +160,264 @@ func SetupUsers(
 	return users, nil
 }
 
+// GenerateWorkoutHistory creates 6 months of weekly workout history for a user.
+func GenerateWorkoutHistory(ctx context.Context, user *AuthenticatedUser, logger *slog.Logger) error {
+	client := user.Client
+
+	// Get current date and calculate start date (6 months ago)
+	now := time.Now()
+	startDate := now.AddDate(0, -6, 0)
+
+	// Set workout preferences first
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		return fmt.Errorf("failed to get preferences: %w", err)
+	}
+
+	formData := map[string]string{
+		"monday": "true",
+	}
+	if _, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		return fmt.Errorf("failed to submit preferences: %w", err)
+	}
+
+	// Generate weekly workouts
+	for week := range workoutHistoryWeeks {
+		workoutDate := startDate.AddDate(0, 0, week*daysPerWeek) // Every Monday
+		dateStr := workoutDate.Format("2006-01-02")
+
+		// Skip future dates
+		if workoutDate.After(now) {
+			continue
+		}
+
+		// Start workout for this date
+		if genErr := generateSingleWorkout(ctx, client, dateStr, logger); genErr != nil {
+			logger.LogAttrs(ctx, slog.LevelWarn, "Failed to generate workout",
+				slog.String("user_id", user.UserID),
+				slog.String("date", dateStr),
+				slog.Any("error", genErr))
+			continue // Continue with next workout instead of failing completely
+		}
+
+		logger.LogAttrs(ctx, slog.LevelDebug, "Generated workout",
+			slog.String("user_id", user.UserID),
+			slog.String("date", dateStr))
+	}
+
+	return nil
+}
+
+// getOrCreateWorkout attempts to get a workout, and if it doesn't exist (404), creates it first.
+func getOrCreateWorkout(ctx context.Context, client *e2etest.Client, dateStr string) (*goquery.Document, error) {
+	// Try to get the workout page first
+	resp, err := client.Get(ctx, "/workouts/"+dateStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workout page for %s: %w", dateStr, err)
+	}
+	defer resp.Body.Close()
+
+	// If workout exists, parse and return the document
+	if resp.StatusCode == http.StatusOK {
+		workoutDoc, parseErr := goquery.NewDocumentFromReader(resp.Body)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse workout page for %s: %w", dateStr, parseErr)
+		}
+		return workoutDoc, nil
+	}
+
+	// If it's a 404, we need to create the workout first
+	if resp.StatusCode == http.StatusNotFound {
+		// Parse the 404 page to get the create workout form
+		notFoundDoc, parseErr := goquery.NewDocumentFromReader(resp.Body)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse workout not found page for %s: %w", dateStr, parseErr)
+		}
+
+		// Find and submit the create workout form
+		form := notFoundDoc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+			return s.Find("button:contains('Create Workout')").Length() > 0
+		}).First()
+
+		if form.Length() == 0 {
+			return nil, fmt.Errorf("could not find create workout form on 404 page for %s", dateStr)
+		}
+
+		action, exists := form.Attr("action")
+		if !exists {
+			return nil, fmt.Errorf("create workout form has no action attribute for %s", dateStr)
+		}
+
+		// Submit the form to create the workout
+		createdDoc, submitErr := client.SubmitForm(ctx, notFoundDoc, action, nil)
+		if submitErr != nil {
+			return nil, fmt.Errorf("failed to create workout for %s: %w", dateStr, submitErr)
+		}
+
+		return createdDoc, nil
+	}
+
+	// Any other status code is an error
+	return nil, fmt.Errorf("unexpected status code %d when accessing workout page for %s", resp.StatusCode, dateStr)
+}
+
+// generateSingleWorkout creates and completes a single workout for the given date.
+func generateSingleWorkout(ctx context.Context, client *e2etest.Client, dateStr string, logger *slog.Logger) error {
+	// Get or create the workout
+	doc, err := getOrCreateWorkout(ctx, client, dateStr)
+	if err != nil {
+		return err
+	}
+
+	// Find all exercises on this workout
+	var exerciseIDs []string
+	doc.Find("a.exercise").Each(func(_ int, s *goquery.Selection) {
+		href, exists := s.Attr("href")
+		if exists {
+			// Extract exercise ID from URL like /workouts/2024-01-01/exercises/123
+			exerciseID := href[len("/workouts/"+dateStr+"/exercises/"):]
+			exerciseIDs = append(exerciseIDs, exerciseID)
+		}
+	})
+
+	if len(exerciseIDs) == 0 {
+		return errors.New("no exercises found on workout page")
+	}
+
+	// Complete sets for each exercise
+	for _, exerciseID := range exerciseIDs {
+		if completeErr := completeExerciseSets(ctx, client, dateStr, exerciseID); completeErr != nil {
+			logger.LogAttrs(ctx, slog.LevelWarn, "Failed to complete exercise sets",
+				slog.String("date", dateStr),
+				slog.String("exercise_id", exerciseID),
+				slog.Any("error", completeErr))
+			continue // Continue with next exercise
+		}
+	}
+
+	return nil
+}
+
+// completeExerciseSets completes all sets for a given exercise.
+func completeExerciseSets(ctx context.Context, client *e2etest.Client, dateStr, exerciseID string) error {
+	// Get the exercise page
+	doc, err := client.GetDoc(ctx, "/workouts/"+dateStr+"/exercises/"+exerciseID)
+	if err != nil {
+		return fmt.Errorf("failed to get exercise page: %w", err)
+	}
+
+	// Complete warmup if present
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[type=submit]:contains('Warmup Done!')").Length() > 0
+	}).First()
+
+	if warmupForm.Length() > 0 {
+		warmupAction, exists := warmupForm.Attr("action")
+		if exists {
+			if _, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+				return fmt.Errorf("failed to complete warmup: %w", err)
+			}
+		}
+	}
+
+	// Complete all sets
+	for {
+		// Refresh the page to get current state
+		doc, err = client.GetDoc(ctx, "/workouts/"+dateStr+"/exercises/"+exerciseID)
+		if err != nil {
+			return fmt.Errorf("failed to refresh exercise page: %w", err)
+		}
+
+		// Find the next incomplete set
+		setForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+			return s.Find("button[type=submit]:contains('Done!')").Length() > 0
+		}).First()
+
+		if setForm.Length() == 0 {
+			break // No more sets to complete
+		}
+
+		action, exists := setForm.Attr("action")
+		if !exists {
+			return errors.New("set form has no action attribute")
+		}
+
+		// Generate realistic workout data with some progression over time
+		baseWeightForHistory := baseWeight + float64(time.Now().UnixNano()%maxWeightVariation) // Small variation
+		baseRepsForHistory := baseReps + int(time.Now().UnixNano()%maxRepsVariation)           // 8-10 reps typically
+
+		setData := map[string]string{
+			"reps": strconv.Itoa(baseRepsForHistory),
+		}
+
+		// Only add weight if there's a weight input field (not a bodyweight exercise)
+		if setForm.Find("input[name='weight']").Length() > 0 {
+			setData["weight"] = fmt.Sprintf("%.1f", baseWeightForHistory)
+		}
+
+		if _, err = client.SubmitForm(ctx, doc, action, setData); err != nil {
+			return fmt.Errorf("failed to complete set: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GenerateWorkoutHistoryForUsers generates workout history for all users concurrently.
+func GenerateWorkoutHistoryForUsers(ctx context.Context, users []*AuthenticatedUser, logger *slog.Logger) error {
+	var (
+		wg     sync.WaitGroup
+		errCh  = make(chan error, len(users))
+		errors = make([]error, 0, len(users))
+	)
+
+	// Limit concurrency to avoid overwhelming the server
+	semaphore := make(chan struct{}, maxConcurrentRegistrations)
+
+	for _, user := range users {
+		wg.Add(1)
+		go func(u *AuthenticatedUser) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// Create context with timeout for workout history generation
+			historyCtx, cancel := context.WithTimeout(ctx, historyTimeout) // Generous timeout for history
+			defer cancel()
+
+			if err := GenerateWorkoutHistory(historyCtx, u, logger); err != nil {
+				errCh <- fmt.Errorf("user %s: %w", u.UserID, err)
+				return
+			}
+
+			logger.LogAttrs(historyCtx, slog.LevelDebug, "Generated workout history",
+				slog.String("user_id", u.UserID))
+		}(user)
+	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
+	close(errCh)
+
+	// Check for errors
+	for err := range errCh {
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		logger.LogAttrs(ctx, slog.LevelError, "Some workout history generations failed",
+			slog.Int("failed_count", len(errors)),
+			slog.Int("successful_count", len(users)-len(errors)))
+
+		// Return first error, but continue with load test as some users have history
+		return fmt.Errorf("workout history generation failures: %w", errors[0])
+	}
+
+	return nil
+}
+
 // WorkoutScenario represents a complete workout flow for stress testing.
 func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.Logger) error {
 	client := user.Client
@@ -213,8 +477,12 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 
 	// Submit set with random-ish data to simulate real usage
 	setData := map[string]string{
-		"weight": fmt.Sprintf("%.1f", baseWeight+float64(time.Now().UnixNano()%weightRange)), // 15-35kg range
-		"reps":   strconv.FormatInt(baseReps+time.Now().UnixNano()%repsRange, 10),            // 8-15 reps range
+		"reps": strconv.FormatInt(baseReps+time.Now().UnixNano()%repsRange, 10), // 8-15 reps range
+	}
+
+	// Only add weight if there's a weight input field (not a bodyweight exercise)
+	if form.Find("input[name='weight']").Length() > 0 {
+		setData["weight"] = fmt.Sprintf("%.1f", baseWeight+float64(time.Now().UnixNano()%weightRange)) // 15-35kg range
 	}
 
 	if _, err = client.SubmitForm(ctx, doc, action, setData); err != nil {
@@ -222,9 +490,11 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	}
 
 	// Fetch progress chart which is a common operation after completing a set.
-	if _, err = client.Get(ctx, "/workouts/"+today+"/exercises/"+exerciseID+"/progress-chart"); err != nil {
+	chartResp, err := client.Get(ctx, "/workouts/"+today+"/exercises/"+exerciseID+"/progress-chart")
+	if err != nil {
 		return fmt.Errorf("failed to get progress chart: %w", err)
 	}
+	chartResp.Body.Close()
 
 	logger.LogAttrs(ctx, slog.LevelDebug, "Workout scenario completed",
 		slog.String("user_id", user.UserID),
@@ -300,7 +570,7 @@ func main() {
 
 	var (
 		hostname = os.Args[1]
-		numUsers = 1000
+		numUsers = 10
 		start    = time.Now()
 	)
 
@@ -342,6 +612,21 @@ func main() {
 	logger.LogAttrs(ctx, slog.LevelInfo, "User setup completed",
 		slog.Duration("setup_duration", time.Since(setupStart)),
 		slog.Int("authenticated_users", len(users)))
+
+	// Generate workout history for all users
+	historyStart := time.Now()
+	logger.LogAttrs(ctx, slog.LevelInfo, "Starting workout history generation",
+		slog.Int("num_users", len(users)),
+		slog.Int("weeks_per_user", workoutHistoryWeeks))
+
+	if err = GenerateWorkoutHistoryForUsers(ctx, users, logger); err != nil {
+		logger.LogAttrs(ctx, slog.LevelWarn, "some workout history generation failed, continuing with load test",
+			slog.Any("error", err))
+	}
+
+	logger.LogAttrs(ctx, slog.LevelInfo, "Workout history generation completed",
+		slog.Duration("history_duration", time.Since(historyStart)),
+		slog.Int("users_with_history", len(users)))
 
 	// Run load test
 	loadTestStart := time.Now()

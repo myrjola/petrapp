@@ -21,6 +21,11 @@ type workoutCompletionTemplateData struct {
 	Difficulties []difficultyOption
 }
 
+type workoutNotFoundTemplateData struct {
+	BaseTemplateData
+	Date time.Time
+}
+
 type difficultyOption struct {
 	Value int
 	Label string
@@ -108,6 +113,15 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	// Fetch a workout session for the date
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
+		// Check if the workout doesn't exist
+		if errors.Is(err, workout.ErrNotFound) {
+			data := workoutNotFoundTemplateData{
+				BaseTemplateData: newBaseTemplateData(r),
+				Date:             date,
+			}
+			app.render(w, r, http.StatusNotFound, "workout-not-found", data)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}
