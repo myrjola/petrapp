@@ -13,6 +13,42 @@ import (
 	"time"
 )
 
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode    int
+	headerWritten bool
+}
+
+func newStatusResponseWriter(w http.ResponseWriter) *statusResponseWriter {
+	return &statusResponseWriter{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+		headerWritten:  false,
+	}
+}
+
+func (mw *statusResponseWriter) WriteHeader(statusCode int) {
+	mw.ResponseWriter.WriteHeader(statusCode)
+
+	if !mw.headerWritten {
+		mw.statusCode = statusCode
+		mw.headerWritten = true
+	}
+}
+
+func (mw *statusResponseWriter) Write(b []byte) (int, error) {
+	mw.headerWritten = true
+	written, err := mw.ResponseWriter.Write(b)
+	if err != nil {
+		return written, fmt.Errorf("write response: %w", err)
+	}
+	return written, nil
+}
+
+func (mw *statusResponseWriter) Unwrap() http.ResponseWriter {
+	return mw.ResponseWriter
+}
+
 func secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate a random nonce for use in CSP and set it in the context so that it can be added to the script tags.
@@ -78,22 +114,32 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		)
 		r = r.WithContext(ctx)
 
+		start := time.Now()
 		app.logger.LogAttrs(ctx, slog.LevelDebug, "received request")
 
+		// Wrap the response writer to capture status code
+		sw := newStatusResponseWriter(w)
+
 		if !trace.IsEnabled() {
-			next.ServeHTTP(w, r)
-			return
+			next.ServeHTTP(sw, r)
+		} else {
+			traceCtx := r.Context()
+			path := r.URL.Path
+			taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
+			traceCtx, task := trace.NewTask(traceCtx, taskName)
+			defer task.End()
+
+			r = r.WithContext(traceCtx)
+			next.ServeHTTP(sw, r)
 		}
 
-		ctx = r.Context()
-		path := r.URL.Path
-		taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
-		ctx, task := trace.NewTask(ctx, taskName)
-		defer task.End()
-
-		r = r.WithContext(ctx)
-
-		next.ServeHTTP(w, r)
+		// Log request completion
+		level := slog.LevelInfo
+		if sw.statusCode >= http.StatusInternalServerError {
+			level = slog.LevelError
+		}
+		app.logger.LogAttrs(r.Context(), level, "request completed",
+			slog.Any("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
 	})
 }
 
