@@ -36,6 +36,7 @@ build:
 	go build -o bin/petrapp github.com/myrjola/petrapp/cmd/web
 	go build -o bin/smoketest github.com/myrjola/petrapp/cmd/smoketest
 	go build -o bin/migratetest github.com/myrjola/petrapp/cmd/migratetest
+	go build -o bin/stresstest github.com/myrjola/petrapp/cmd/stresstest
 
 test:
 	@echo "Running tests..."
