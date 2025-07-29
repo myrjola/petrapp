@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"runtime/trace"
 	"time"
 )
 
@@ -58,7 +59,7 @@ func noCacheHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func (app *application) logRequest(next http.Handler) http.Handler {
+func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
 			proto  = r.Proto
@@ -78,6 +79,19 @@ func (app *application) logRequest(next http.Handler) http.Handler {
 		r = r.WithContext(ctx)
 
 		app.logger.LogAttrs(ctx, slog.LevelDebug, "received request")
+
+		if !trace.IsEnabled() {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ctx = r.Context()
+		path := r.URL.Path
+		taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
+		ctx, task := trace.NewTask(ctx, taskName)
+		defer task.End()
+
+		r = r.WithContext(ctx)
 
 		next.ServeHTTP(w, r)
 	})
