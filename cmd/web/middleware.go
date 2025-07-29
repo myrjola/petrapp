@@ -79,7 +79,7 @@ base-uri 'none';`, cspNonce, cspNonce)
 	})
 }
 
-func cacheForeverHeaders(next http.Handler) http.Handler {
+func cacheForever(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 
@@ -87,7 +87,7 @@ func cacheForeverHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func noCacheHeaders(next http.Handler) http.Handler {
+func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
@@ -127,7 +127,15 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 			path := r.URL.Path
 			taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
 			traceCtx, task := trace.NewTask(traceCtx, taskName)
-			defer task.End()
+
+			// Add trace attributes for better context
+			trace.Log(traceCtx, "request", fmt.Sprintf("method=%s path=%s proto=%s", method, path, proto))
+			trace.Log(traceCtx, "trace_id", traceID)
+
+			defer func() {
+				trace.Log(traceCtx, "response", fmt.Sprintf("status=%d duration=%v", sw.statusCode, time.Since(start)))
+				task.End()
+			}()
 
 			r = r.WithContext(traceCtx)
 			next.ServeHTTP(sw, r)
