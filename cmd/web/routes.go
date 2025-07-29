@@ -16,7 +16,8 @@ func (app *application) routes() *http.ServeMux {
 	}
 
 	session := func(next http.Handler) http.Handler {
-		return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(shared(next)))))
+		return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(
+			app.webAuthnHandler.AuthenticateMiddleware(shared(next)))))
 	}
 
 	mustSession := func(next http.Handler) http.Handler {
