@@ -12,9 +12,13 @@ func (app *application) routes() *http.ServeMux {
 		return app.recoverPanic(app.logAndTraceRequest(secureHeaders(app.noSurf(commonContext(next)))))
 	}
 
+	// Session-aware middleware chain with authentication before logging
+	sessionCommon := func(next http.Handler) http.Handler {
+		return app.recoverPanic(app.webAuthnHandler.AuthenticateMiddleware(app.logAndTraceRequest(secureHeaders(app.noSurf(commonContext(next))))))
+	}
+
 	session := func(next http.Handler) http.Handler {
-		return noCacheHeaders(common(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(
-			app.timeout(next)))))
+		return noCacheHeaders(app.sessionManager.LoadAndSave(sessionCommon(app.timeout(next))))
 	}
 
 	mustSession := func(next http.Handler) http.Handler {
