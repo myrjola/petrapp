@@ -7,18 +7,16 @@ import (
 func (app *application) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Define middleware chain functions
-	common := func(next http.Handler) http.Handler {
-		return app.recoverPanic(app.logAndTraceRequest(secureHeaders(app.noSurf(commonContext(next)))))
+	shared := func(next http.Handler) http.Handler {
+		return app.logAndTraceRequest(secureHeaders(app.noSurf(commonContext(app.timeout(next)))))
 	}
 
-	// Session-aware middleware chain with authentication before logging
-	sessionCommon := func(next http.Handler) http.Handler {
-		return app.recoverPanic(app.webAuthnHandler.AuthenticateMiddleware(app.logAndTraceRequest(secureHeaders(app.noSurf(commonContext(next))))))
+	noAuth := func(next http.Handler) http.Handler {
+		return app.recoverPanic(shared(next))
 	}
 
 	session := func(next http.Handler) http.Handler {
-		return noCacheHeaders(app.sessionManager.LoadAndSave(sessionCommon(app.timeout(next))))
+		return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(app.webAuthnHandler.AuthenticateMiddleware(next))))
 	}
 
 	mustSession := func(next http.Handler) http.Handler {
@@ -31,7 +29,7 @@ func (app *application) routes() *http.ServeMux {
 
 	// File server
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("/", common(cacheForeverHeaders(fileServer)))
+	mux.Handle("/", noAuth(cacheForever(fileServer)))
 
 	// Routes
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
