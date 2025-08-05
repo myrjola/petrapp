@@ -51,6 +51,12 @@
                             }
                         }
 
+                        {{ range .Session.ExerciseSets }}
+                        a.exercise[data-exercise-id="{{ .Exercise.ID }}"] {
+                            view-transition-name: exercise-title-{{ .Exercise.ID }};
+                        }
+                        {{ end }}
+
                         .add-exercise {
                             display: flex;
                             justify-content: center;
@@ -84,7 +90,8 @@
                     {{ end }}
                 {{ end }}
                 <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
-                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ end }}">
+                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ end }}"
+                   data-exercise-id="{{ .Exercise.ID }}">
                     {{ .Exercise.Name }}
                 </a>
             {{ end }}

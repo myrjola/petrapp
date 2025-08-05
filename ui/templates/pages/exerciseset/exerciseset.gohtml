@@ -82,6 +82,7 @@
                         font-size: var(--font-size-4);
                         font-weight: var(--font-weight-6);
                         color: var(--color-text-primary);
+                        view-transition-name: exercise-title-{{ .ExerciseSet.Exercise.ID }};
                     }
 
                     .action-button {
@@ -342,7 +343,7 @@
                 </a>
             </div>
             <div class="header-row title-row">
-                <h1 class="exercise-title">{{ .ExerciseSet.Exercise.Name }}</h1>
+                <h1 class="exercise-title" data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
             </div>
             <div class="header-row actions-row">
                 <div>
