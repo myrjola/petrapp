@@ -20,6 +20,23 @@
                     }
                 }
 
+                .timer {
+                    position: fixed;
+                    top: var(--size-2);
+                    right: var(--size-2);
+                    isolation: isolate;
+                    background: var(--color-surface);
+                    color: var(--color-text-primary);
+                    padding: var(--size-2) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                    font-weight: var(--font-weight-6);
+                    font-family: var(--font-mono);
+                    border: 1px solid var(--color-border);
+                    min-width: 4rem;
+                    text-align: center;
+                }
+
                 .exercise-header {
                     display: flex;
                     flex-direction: column;
@@ -39,10 +56,6 @@
                     .actions-row {
                         justify-content: flex-start;
                         align-items: center;
-
-                        .timer {
-                            margin-right: auto;
-                        }
 
                         > div:last-child {
                             display: flex;
@@ -69,19 +82,6 @@
                         font-size: var(--font-size-4);
                         font-weight: var(--font-weight-6);
                         color: var(--color-text-primary);
-                    }
-
-                    .timer {
-                        background: var(--color-surface);
-                        color: var(--color-text-primary);
-                        padding: var(--size-2) var(--size-3);
-                        border-radius: var(--radius-2);
-                        font-size: var(--font-size-1);
-                        font-weight: var(--font-weight-6);
-                        font-family: var(--font-mono);
-                        border: 1px solid var(--color-border);
-                        min-width: 4rem;
-                        text-align: center;
                     }
 
                     .action-button {
@@ -123,7 +123,7 @@
                                 background: var(--color-success-bg);
                                 color: var(--color-success);
                                 border: 1px solid var(--color-success);
-                                
+
                                 &:hover {
                                     background: var(--lime-1);
                                 }
@@ -292,7 +292,6 @@
               }
             }
 
-            // Initialize timer
             initializeTimer();
           });
 
@@ -346,7 +345,6 @@
                 <h1 class="exercise-title">{{ .ExerciseSet.Exercise.Name }}</h1>
             </div>
             <div class="header-row actions-row">
-                <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
                 <div>
                     {{ if .ExerciseSet.WarmupCompletedAt }}
                         <span class="action-button warmup-button completed" aria-label="Warmup completed">✓ Warmup Done</span>
@@ -367,8 +365,8 @@
         <div class="sets-container" aria-label="Exercise sets">
 
             {{ range $index, $set := .ExerciseSet.Sets }}
-                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }} active{{ end }}" 
-                     role="group" 
+                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }} active{{ end }}"
+                     role="group"
                      aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
                     <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
@@ -434,5 +432,6 @@
             {{ end }}
         </div>
 
+        <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
     </main>
 {{ end }}
