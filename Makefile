@@ -26,8 +26,7 @@ custom-gcl:
 	bin/golangci-lint custom
 
 sec:
-	go install golang.org/x/vuln/cmd/govulncheck@latest
-	govulncheck -show verbose ./...
+	go tool govulncheck ./...
 
 ci: init build lint test sec
 

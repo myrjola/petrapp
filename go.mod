@@ -13,6 +13,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/openai/openai-go v1.1.0
 	github.com/yuin/goldmark v1.7.12
+	golang.org/x/sync v0.16.0
 )
 
 require (
@@ -29,7 +30,12 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/telemetry v0.0.0-20240522233618-39ace7a40ae7 // indirect
+	golang.org/x/tools v0.30.0 // indirect
+	golang.org/x/vuln v1.1.4 // indirect
 )
+
+tool golang.org/x/vuln/cmd/govulncheck
