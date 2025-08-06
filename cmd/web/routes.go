@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 )
 
 func (app *application) routes() *http.ServeMux {
@@ -66,12 +67,23 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
 	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
-	// File server for static assets (must come first to avoid conflicts)
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("/", noAuth(cacheForever(fileServer)))
-
-	// Home route (more specific, so it will override the file server for exact match)
+	// Home route (most specific)
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
+
+	// File server with custom 404 handling
+	fileServer := http.FileServer(http.Dir("./ui/static/"))
+	mux.Handle("/", noAuth(cacheForever(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if this is a request for a static file that doesn't exist
+		staticPath := "./ui/static" + r.URL.Path
+		if _, err := os.Stat(staticPath); os.IsNotExist(err) {
+			// File doesn't exist, use our custom 404 handler with session middleware
+			session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
+			return
+		}
+
+		// File exists, serve it normally
+		fileServer.ServeHTTP(w, r)
+	}))))
 
 	return mux
 }

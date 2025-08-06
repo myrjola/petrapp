@@ -92,6 +92,39 @@ func Test_application_notFound(t *testing.T) {
 		// Check for custom 404 content
 		checkCustom404Content(t, doc, "invalid date")
 	})
+
+	t.Run("Nonexistent path returns custom 404", func(t *testing.T) {
+		// Test nonexistent path - should trigger our custom 404
+		resp, err := client.Get(ctx, "/nonexistent")
+		if err != nil {
+			t.Fatalf("Failed to get nonexistent path: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// Verify we get a 404 status code
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status code %d for nonexistent path, got %d", http.StatusNotFound, resp.StatusCode)
+		}
+
+		// Get the document to check content (need to parse 404 responses manually)
+		resp404, err := client.Get(ctx, "/nonexistent")
+		if err != nil {
+			t.Fatalf("Failed to get 404 response for nonexistent path: %v", err)
+		}
+		defer resp404.Body.Close()
+
+		if resp404.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected 404 status for nonexistent path, got %d", resp404.StatusCode)
+		}
+
+		doc, err := goquery.NewDocumentFromReader(resp404.Body)
+		if err != nil {
+			t.Fatalf("Failed to parse 404 document for nonexistent path: %v", err)
+		}
+
+		// Check for custom 404 content
+		checkCustom404Content(t, doc, "nonexistent path")
+	})
 }
 
 func Test_application_notFound_template_content(t *testing.T) {
