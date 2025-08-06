@@ -12,7 +12,6 @@ import (
 func Test_application_notFound(t *testing.T) {
 	var (
 		ctx = t.Context()
-		err error
 	)
 
 	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -29,11 +28,14 @@ func Test_application_notFound(t *testing.T) {
 		}
 
 		// Test invalid exercise info route - should trigger our custom 404
-		resp, err := client.Get(ctx, "/workouts/2024-01-01/exercises/invalid-id/info")
+		var resp *http.Response
+		resp, err = client.Get(ctx, "/workouts/2024-01-01/exercises/invalid-id/info")
 		if err != nil {
 			t.Fatalf("Failed to get invalid exercise info: %v", err)
 		}
-		resp.Body.Close()
+		if err = resp.Body.Close(); err != nil {
+			t.Fatalf("Failed to close response body: %v", err)
+		}
 
 		// Verify we get a 404 status code
 		if resp.StatusCode != http.StatusNotFound {
@@ -41,17 +43,23 @@ func Test_application_notFound(t *testing.T) {
 		}
 
 		// Get the document to check content (need to parse 404 responses manually)
-		resp404, err := client.Get(ctx, "/workouts/2024-01-01/exercises/invalid-id/info")
+		var resp404 *http.Response
+		resp404, err = client.Get(ctx, "/workouts/2024-01-01/exercises/invalid-id/info")
 		if err != nil {
 			t.Fatalf("Failed to get 404 response for invalid exercise ID: %v", err)
 		}
-		defer resp404.Body.Close()
+		defer func() {
+			if err = resp404.Body.Close(); err != nil {
+				t.Errorf("Failed to close resp404 body: %v", err)
+			}
+		}()
 
 		if resp404.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404 status for invalid exercise ID, got %d", resp404.StatusCode)
 		}
 
-		doc, err := goquery.NewDocumentFromReader(resp404.Body)
+		var doc *goquery.Document
+		doc, err = goquery.NewDocumentFromReader(resp404.Body)
 		if err != nil {
 			t.Fatalf("Failed to parse 404 document for invalid exercise ID: %v", err)
 		}
@@ -62,11 +70,14 @@ func Test_application_notFound(t *testing.T) {
 
 	t.Run("Invalid date returns custom 404", func(t *testing.T) {
 		// Test invalid date format - should trigger our custom 404
-		resp, err := client.Get(ctx, "/workouts/invalid-date/exercises/1/info")
+		var resp *http.Response
+		resp, err = client.Get(ctx, "/workouts/invalid-date/exercises/1/info")
 		if err != nil {
 			t.Fatalf("Failed to get invalid date exercise info: %v", err)
 		}
-		resp.Body.Close()
+		if err = resp.Body.Close(); err != nil {
+			t.Fatalf("Failed to close response body: %v", err)
+		}
 
 		// Verify we get a 404 status code
 		if resp.StatusCode != http.StatusNotFound {
@@ -74,17 +85,23 @@ func Test_application_notFound(t *testing.T) {
 		}
 
 		// Get the document to check content (need to parse 404 responses manually)
-		resp404, err := client.Get(ctx, "/workouts/invalid-date/exercises/1/info")
+		var resp404 *http.Response
+		resp404, err = client.Get(ctx, "/workouts/invalid-date/exercises/1/info")
 		if err != nil {
 			t.Fatalf("Failed to get 404 response for invalid date: %v", err)
 		}
-		defer resp404.Body.Close()
+		defer func() {
+			if err = resp404.Body.Close(); err != nil {
+				t.Errorf("Failed to close resp404 body: %v", err)
+			}
+		}()
 
 		if resp404.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404 status for invalid date, got %d", resp404.StatusCode)
 		}
 
-		doc, err := goquery.NewDocumentFromReader(resp404.Body)
+		var doc *goquery.Document
+		doc, err = goquery.NewDocumentFromReader(resp404.Body)
 		if err != nil {
 			t.Fatalf("Failed to parse 404 document for invalid date: %v", err)
 		}
@@ -95,11 +112,16 @@ func Test_application_notFound(t *testing.T) {
 
 	t.Run("Nonexistent path returns custom 404", func(t *testing.T) {
 		// Test nonexistent path - should trigger our custom 404
-		resp, err := client.Get(ctx, "/nonexistent")
+		var resp *http.Response
+		resp, err = client.Get(ctx, "/nonexistent")
 		if err != nil {
 			t.Fatalf("Failed to get nonexistent path: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err = resp.Body.Close(); err != nil {
+				t.Errorf("Failed to close resp body: %v", err)
+			}
+		}()
 
 		// Verify we get a 404 status code
 		if resp.StatusCode != http.StatusNotFound {
@@ -107,17 +129,23 @@ func Test_application_notFound(t *testing.T) {
 		}
 
 		// Get the document to check content (need to parse 404 responses manually)
-		resp404, err := client.Get(ctx, "/nonexistent")
+		var resp404 *http.Response
+		resp404, err = client.Get(ctx, "/nonexistent")
 		if err != nil {
 			t.Fatalf("Failed to get 404 response for nonexistent path: %v", err)
 		}
-		defer resp404.Body.Close()
+		defer func() {
+			if err = resp404.Body.Close(); err != nil {
+				t.Errorf("Failed to close resp404 body: %v", err)
+			}
+		}()
 
 		if resp404.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected 404 status for nonexistent path, got %d", resp404.StatusCode)
 		}
 
-		doc, err := goquery.NewDocumentFromReader(resp404.Body)
+		var doc *goquery.Document
+		doc, err = goquery.NewDocumentFromReader(resp404.Body)
 		if err != nil {
 			t.Fatalf("Failed to parse 404 document for nonexistent path: %v", err)
 		}
@@ -151,7 +179,11 @@ func Test_application_notFound_template_content(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get 404 response: %v", err)
 	}
-	defer resp404.Body.Close()
+	defer func() {
+		if err = resp404.Body.Close(); err != nil {
+			t.Errorf("Failed to close resp404 body: %v", err)
+		}
+	}()
 
 	if resp404.StatusCode != http.StatusNotFound {
 		t.Fatalf("Expected 404 status, got %d", resp404.StatusCode)
@@ -196,7 +228,7 @@ func Test_application_notFound_template_content(t *testing.T) {
 	})
 }
 
-// Helper function to check for custom 404 content
+// Helper function to check for custom 404 content.
 func checkCustom404Content(t *testing.T, doc *goquery.Document, context string) {
 	t.Helper()
 
