@@ -79,9 +79,3 @@ repomix-clipboard: repomix
 
 setup-git-hooks:
 	./scripts/setup-git-hooks.sh
-
-deploy-alloy:
-	cd ops/alloy && fly deploy --file-local="/etc/alloy/config.alloy=./config.alloy"
-
-deploy-logshipper:
-	cd ops/logshipper && fly deploy
