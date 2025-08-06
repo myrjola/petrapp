@@ -10,6 +10,10 @@ func (app *application) serverError(w http.ResponseWriter, r *http.Request, err 
 	app.render(w, r, http.StatusInternalServerError, "error", nil)
 }
 
+func (app *application) notFound(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, http.StatusNotFound, "not-found", newBaseTemplateData(r))
+}
+
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {

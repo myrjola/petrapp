@@ -1,0 +1,100 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.BaseTemplateData*/ -}}
+
+{{ define "page" }}
+<style {{ nonce }}>
+@scope {
+    .not-found-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: var(--size-4);
+        text-align: center;
+        background: var(--gray-0);
+    }
+
+    .not-found-content {
+        max-width: var(--size-15);
+        padding: var(--size-8) var(--size-6);
+        background: var(--white);
+        border-radius: var(--radius-3);
+        border: var(--border-size-1) solid var(--gray-3);
+    }
+
+    .not-found-title {
+        font-size: var(--font-size-6);
+        font-weight: var(--font-weight-7);
+        color: var(--gray-9);
+        margin-bottom: var(--size-2);
+        line-height: var(--font-lineheight-1);
+    }
+
+    .not-found-subtitle {
+        font-size: var(--font-size-4);
+        font-weight: var(--font-weight-5);
+        color: var(--gray-7);
+        margin-bottom: var(--size-4);
+        line-height: var(--font-lineheight-1);
+    }
+
+    .not-found-message {
+        font-size: var(--font-size-2);
+        color: var(--gray-6);
+        margin-bottom: var(--size-6);
+        line-height: var(--font-lineheight-3);
+    }
+
+    .not-found-actions {
+        display: flex;
+        gap: var(--size-3);
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .home-link {
+        background-color: var(--sky-6);
+        text-decoration: none;
+
+        &:hover {
+            background-color: var(--sky-7);
+        }
+    }
+
+    .back-link {
+        background-color: var(--gray-6);
+        text-decoration: none;
+
+        &:hover {
+            background-color: var(--gray-7);
+        }
+    }
+}
+</style>
+
+<div class="not-found-container">
+    <div class="not-found-content">
+        <h1 class="not-found-title">404</h1>
+        <h2 class="not-found-subtitle">Page Not Found</h2>
+        <p class="not-found-message">
+            The page you're looking for doesn't exist or has been moved.
+            You can go back to the previous page or return to the home page.
+        </p>
+        <div class="not-found-actions">
+            <a href="/" class="btn home-link">Go Home</a>
+            <button type="button" class="btn back-link">
+                <span>Go Back</span>
+                <script {{ nonce }}>
+                  document.currentScript.parentElement.addEventListener('click', function () {
+                    if (window.history.length > 1) {
+                        window.history.back();
+                    } else {
+                        window.location.href = '/';
+                    }
+                  });
+                </script>
+            </button>
+        </div>
+    </div>
+</div>
+{{ end }}
