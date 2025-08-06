@@ -28,13 +28,6 @@ func (app *application) routes() *http.ServeMux {
 		return mustSession(app.mustAdmin(next))
 	}
 
-	// File server
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("/", noAuth(cacheForever(fileServer)))
-
-	// Routes
-	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
-
 	mux.Handle("GET /workouts/{date}", mustSession(http.HandlerFunc(app.workoutGET)))
 	mux.Handle("POST /workouts/{date}/start", mustSession(http.HandlerFunc(app.workoutStartPOST)))
 	mux.Handle("POST /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletePOST)))
@@ -72,6 +65,13 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("GET /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseEditGET)))
 	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
 	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
+
+	// File server for static assets (must come first to avoid conflicts)
+	fileServer := http.FileServer(http.Dir("./ui/static/"))
+	mux.Handle("/", noAuth(cacheForever(fileServer)))
+
+	// Home route (more specific, so it will override the file server for exact match)
+	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
 
 	return mux
 }
