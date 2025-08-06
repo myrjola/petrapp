@@ -1,18 +1,76 @@
 {{ define "page" }}
-    <html lang="en">
-    <head><title>Error - Petra</title></head>
-    <body>
-    <h1>Error</h1>
-    <div>
-        <button type="button">
-            <span>Retry</span>
-            <script {{ nonce }}>
-              document.currentScript.parentElement.addEventListener('click', function () {
-                location.reload();
-              });
-            </script>
-        </button>
+<style {{ nonce }}>
+@scope {
+    .error-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: var(--size-4);
+        text-align: center;
+        background: var(--gray-0);
+    }
+
+    .error-content {
+        max-width: var(--size-15);
+        padding: var(--size-8) var(--size-6);
+        background: var(--white);
+        border-radius: var(--radius-3);
+        border: var(--border-size-1) solid var(--gray-3);
+    }
+
+    .error-title {
+        font-size: var(--font-size-6);
+        font-weight: var(--font-weight-7);
+        color: var(--gray-9);
+        margin-bottom: var(--size-4);
+        line-height: var(--font-lineheight-1);
+    }
+
+    .error-message {
+        font-size: var(--font-size-2);
+        color: var(--gray-6);
+        margin-bottom: var(--size-6);
+        line-height: var(--font-lineheight-3);
+    }
+
+    .error-actions {
+        display: flex;
+        gap: var(--size-3);
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .home-link {
+        background-color: var(--gray-6);
+        text-decoration: none;
+
+        &:hover {
+            background-color: var(--gray-7);
+        }
+    }
+}
+</style>
+
+<div class="error-container">
+    <div class="error-content">
+        <h1 class="error-title">Something went wrong</h1>
+        <p class="error-message">
+            We encountered an unexpected error while processing your request.
+            Please try again or return to the home page.
+        </p>
+        <div class="error-actions">
+            <button type="button">
+                <span>Retry</span>
+                <script {{ nonce }}>
+                  document.currentScript.parentElement.addEventListener('click', function () {
+                    location.reload();
+                  });
+                </script>
+            </button>
+            <a href="/" class="btn home-link">Go Home</a>
+        </div>
     </div>
-    </body>
-    </html>
+</div>
 {{ end }}
