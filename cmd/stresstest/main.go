@@ -308,7 +308,7 @@ func completeExerciseSets(ctx context.Context, client *e2etest.Client, dateStr, 
 
 	// Complete warmup if present
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button[type=submit]:contains('Warmup Done!')").Length() > 0
+		return s.Find("button[type=submit]:contains('Mark Warmup Complete')").Length() > 0
 	}).First()
 
 	if warmupForm.Length() > 0 {
@@ -459,6 +459,21 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	// Complete a set (CSRF form)
 	if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/exercises/"+exerciseID); err != nil {
 		return fmt.Errorf("failed to get exercise page: %w", err)
+	}
+
+	// Complete warmup first if present
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[type=submit]:contains('Mark Warmup Complete')").Length() > 0
+	}).First()
+
+	if warmupForm.Length() > 0 {
+		warmupAction, exists := warmupForm.Attr("action")
+		if !exists {
+			return errors.New("warmup form has no action attribute")
+		}
+		if doc, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+			return fmt.Errorf("failed to complete warmup: %w", err)
+		}
 	}
 
 	// Find set completion form
