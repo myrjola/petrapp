@@ -372,7 +372,8 @@
 
         <div class="sets-container" aria-label="Exercise sets">
 
-            {{ range $index, $set := .ExerciseSet.Sets }}
+            {{ range $index, $setDisplay := .SetsDisplay }}
+                {{ $set := $setDisplay.Set }}
                 <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }} active{{ end }}"
                      role="group"
                      aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
@@ -386,7 +387,7 @@
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
                         {{ else }}
                             <span class="reps"
-                                  aria-label="Target reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
+                                  aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
                         {{ end }}
                     </div>
 
@@ -422,7 +423,7 @@
                                             inputmode="numeric"
                                             pattern="[0-9]*"
                                             name="reps"
-                                            placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
+                                            placeholder="{{ $setDisplay.RepStr }}"
                                             {{ if $set.CompletedReps }}
                                                 value="{{ $set.CompletedReps }}"
                                             {{ end }}

@@ -12,14 +12,38 @@ import (
 	"github.com/myrjola/petrapp/internal/workout"
 )
 
+type setDisplay struct {
+	Set    workout.Set
+	RepStr string // Formatted rep string (e.g. "8" or "6-8")
+}
+
 type exerciseSetTemplateData struct {
 	BaseTemplateData
 	Date                 time.Time
 	ExerciseSet          workout.ExerciseSet
+	SetsDisplay          []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex int
 	EditingIndex         int        // Index of the set being edited
 	IsEditing            bool       // Whether we're in edit mode
 	LastCompletedAt      *time.Time // Timestamp of most recently completed set
+}
+
+func formatRepRange(minReps, maxReps int) string {
+	if minReps == maxReps {
+		return strconv.Itoa(minReps)
+	}
+	return fmt.Sprintf("%d-%d", minReps, maxReps)
+}
+
+func prepareSetsDisplay(sets []workout.Set) []setDisplay {
+	displays := make([]setDisplay, len(sets))
+	for i, set := range sets {
+		displays[i] = setDisplay{
+			Set:    set,
+			RepStr: formatRepRange(set.MinReps, set.MaxReps),
+		}
+	}
+	return displays
 }
 
 func getFirstIncompleteIndex(sets []workout.Set) int {
@@ -96,6 +120,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData:     newBaseTemplateData(r),
 		Date:                 date,
 		ExerciseSet:          exerciseSet,
+		SetsDisplay:          prepareSetsDisplay(exerciseSet.Sets),
 		FirstIncompleteIndex: getFirstIncompleteIndex(exerciseSet.Sets),
 		EditingIndex:         editingIndex,
 		IsEditing:            isEditing,

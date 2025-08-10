@@ -1,7 +1,8 @@
 
 .DEFAULT_GOAL := ci
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
-        migratetest repomix repomix-clipboard setup-git-hooks deploy-alloy deploy-logshipper
+        migratetest repomix repomix-clipboard setup-git-hooks \
+        lint-fix
 
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v1.64.6
@@ -79,3 +80,6 @@ repomix-clipboard: repomix
 
 setup-git-hooks:
 	./scripts/setup-git-hooks.sh
+
+lint-fix:
+	./custom-gcl run --fix
