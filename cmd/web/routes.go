@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 func (app *application) routes() *http.ServeMux {
@@ -74,7 +76,14 @@ func (app *application) routes() *http.ServeMux {
 	fileServer := http.FileServer(http.Dir("./ui/static/"))
 	mux.Handle("/", noAuth(cacheForever(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if this is a request for a static file that doesn't exist
-		staticPath := "./ui/static" + r.URL.Path
+		// Sanitize the URL path to prevent directory traversal attacks
+		cleanPath := filepath.Clean(r.URL.Path)
+		if strings.Contains(cleanPath, "..") {
+			// Path contains directory traversal, use 404 handler
+			session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
+			return
+		}
+		staticPath := filepath.Join("./ui/static", cleanPath)
 		if _, err := os.Stat(staticPath); os.IsNotExist(err) {
 			// File doesn't exist, use our custom 404 handler with session middleware
 			session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
