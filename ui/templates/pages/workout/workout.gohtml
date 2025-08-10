@@ -51,11 +51,13 @@
                             }
                         }
 
-                        {{ range .Session.ExerciseSets }}
+                    {{ range .Session.ExerciseSets }}
+
                         a.exercise[data-exercise-id="{{ .Exercise.ID }}"] {
                             view-transition-name: exercise-title-{{ .Exercise.ID }};
                         }
-                        {{ end }}
+
+                    {{ end }}
 
                         .add-exercise {
                             display: flex;

@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/logging"
 	"io"
 	"log/slog"
+
+	"github.com/myrjola/petrapp/internal/logging"
 )
 
 type Server struct {

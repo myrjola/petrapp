@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
 
 type BaseTemplateData struct {

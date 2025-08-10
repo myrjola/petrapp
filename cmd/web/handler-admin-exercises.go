@@ -3,11 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 // exerciseAdminTemplateData contains data for the exercise admin template.

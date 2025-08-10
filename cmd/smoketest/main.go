@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/logging"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func TestAuth(client *e2etest.Client) error {

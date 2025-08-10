@@ -3,12 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 type exerciseSetTemplateData struct {

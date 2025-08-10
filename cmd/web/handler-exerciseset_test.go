@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/PuerkitoBio/goquery"
-	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_application_exerciseSet(t *testing.T) {

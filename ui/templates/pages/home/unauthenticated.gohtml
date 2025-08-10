@@ -62,7 +62,7 @@
                             }
                         }
                     </style>
-                    <img src="/logo.svg" alt="Happy kettlebell" />
+                    <img src="/logo.svg" alt="Happy kettlebell"/>
                     <h1>
                         Petra
                     </h1>
@@ -79,26 +79,26 @@
                                 }
                             }
                         </style>
-                            <form method="post" action="/api/login/start">
-                                {{ csrf }}
-                                <button type="submit">Sign in</button>
-                                <script {{ nonce }}>
-                                  (async (form = me()) => {
-                                    const { loginUser } = await import("webauthn")
-                                    form.addEventListener("submit", loginUser)
-                                  })()
-                                </script>
-                            </form>
-                            <form action="/api/registration/start">
-                                {{ csrf }}
-                                <button type="submit">Register</button>
-                                <script {{ nonce }}>
-                                  (async (form = me()) => {
-                                    const { registerUser } = await import("webauthn")
-                                    form.addEventListener("submit", registerUser)
-                                  })()
-                                </script>
-                            </form>
+                        <form method="post" action="/api/login/start">
+                            {{ csrf }}
+                            <button type="submit">Sign in</button>
+                            <script {{ nonce }}>
+                              (async (form = me()) => {
+                                const {loginUser} = await import("webauthn")
+                                form.addEventListener("submit", loginUser)
+                              })()
+                            </script>
+                        </form>
+                        <form action="/api/registration/start">
+                            {{ csrf }}
+                            <button type="submit">Register</button>
+                            <script {{ nonce }}>
+                              (async (form = me()) => {
+                                const {registerUser} = await import("webauthn")
+                                form.addEventListener("submit", registerUser)
+                              })()
+                            </script>
+                        </form>
                     </div>
                 </div>
             </div>

@@ -1,9 +1,10 @@
 package sqlite
 
 import (
-	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
 	"testing"
+
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func TestDatabase_migrate(t *testing.T) {

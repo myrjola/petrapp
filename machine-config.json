@@ -4,17 +4,31 @@
       "name": "petra",
       "image": "scratch",
       "secrets": [
-        { "env_var": "AWS_ACCESS_KEY_ID" },
-        { "env_var": "AWS_ENDPOINT_URL_S3" },
-        { "env_var": "AWS_REGION" },
-        { "env_var": "AWS_SECRET_ACCESS_KEY" },
-        { "env_var": "BUCKET_NAME" }
+        {
+          "env_var": "AWS_ACCESS_KEY_ID"
+        },
+        {
+          "env_var": "AWS_ENDPOINT_URL_S3"
+        },
+        {
+          "env_var": "AWS_REGION"
+        },
+        {
+          "env_var": "AWS_SECRET_ACCESS_KEY"
+        },
+        {
+          "env_var": "BUCKET_NAME"
+        }
       ]
     },
     {
       "name": "parca",
       "image": "ghcr.io/parca-dev/parca:v0.24.0",
-      "cmd": ["/parca", "--storage-path=/data/parca", "--storage-enable-wal"],
+      "cmd": [
+        "/parca",
+        "--storage-path=/data/parca",
+        "--storage-enable-wal"
+      ],
       "files": [
         {
           "guest_path": "/parca.yaml",
@@ -22,11 +36,21 @@
         }
       ],
       "secrets": [
-        { "env_var": "AWS_ACCESS_KEY_ID" },
-        { "env_var": "AWS_ENDPOINT_URL_S3" },
-        { "env_var": "AWS_REGION" },
-        { "env_var": "AWS_SECRET_ACCESS_KEY" },
-        { "env_var": "BUCKET_NAME" }
+        {
+          "env_var": "AWS_ACCESS_KEY_ID"
+        },
+        {
+          "env_var": "AWS_ENDPOINT_URL_S3"
+        },
+        {
+          "env_var": "AWS_REGION"
+        },
+        {
+          "env_var": "AWS_SECRET_ACCESS_KEY"
+        },
+        {
+          "env_var": "BUCKET_NAME"
+        }
       ]
     }
   ]

@@ -5,10 +5,12 @@ Guidelines for working with database schema, migrations, and data access pattern
 ## Schema Architecture
 
 ### Declarative Schema Management
+
 - **All schema changes go in `schema.sql`** - this is the single source of truth
 - The migration system compares current database to `schema.sql` and automatically applies changes
 
 ### Schema Evolution Process
+
 1. **Update `schema.sql`** with your changes (new columns, tables, constraints, etc.)
 2. **Update Go models** in both domain (`internal/workout/models.go`) and repository layer
 3. **Update repository SQL queries** (SELECT, INSERT, UPDATE) to include new fields
@@ -19,6 +21,7 @@ Guidelines for working with database schema, migrations, and data access pattern
 ## Table Design Patterns
 
 ### STRICT Mode and Constraints
+
 Always use these patterns for new tables:
 
 ```sql
@@ -33,6 +36,7 @@ CREATE TABLE table_name
 ```
 
 ### Required Patterns
+
 - **Always use `STRICT` mode** for type safety
 - **Use WITHOUT ROWID** for tables that do not have an integer primary key
 - **Always include length constraints** for TEXT fields: `CHECK (LENGTH(field) < N)`

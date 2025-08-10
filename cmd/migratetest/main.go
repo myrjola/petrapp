@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func main() {

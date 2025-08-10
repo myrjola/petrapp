@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // repository contains the repositories for the domain-driven design aggregates.

@@ -2,10 +2,11 @@ package envstruct_test
 
 import (
 	"errors"
-	"github.com/google/go-cmp/cmp"
-	"github.com/myrjola/petrapp/internal/envstruct"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/myrjola/petrapp/internal/envstruct"
 )
 
 func TestPopulate(t *testing.T) {

@@ -5,6 +5,7 @@ This document provides specific information for developers working on the PetrAp
 ## Build/Configuration Instructions
 
 ### Prerequisites
+
 - Go
 - Make
 
@@ -13,6 +14,7 @@ This document provides specific information for developers working on the PetrAp
 ```bash
 make ci
 ```
+
 This builds the application and runs all tests, linters, and security checks.
 
 ### Environment Configuration
@@ -42,7 +44,8 @@ The application uses environment variables for configuration but the defaults sh
 
 ### Writing Tests
 
-1. **Test file naming**: Test files should be named with a `_test.go` suffix and placed in the same package as the code being tested.
+1. **Test file naming**: Test files should be named with a `_test.go` suffix and placed in the same package as the code
+   being tested.
 
 2. **Test function naming**: Test functions should be named `Test_FunctionName` or `TestStructName_MethodName`.
 
@@ -60,8 +63,10 @@ The application uses environment variables for configuration but the defaults sh
        // Helper code
    }
    ```
-6. **No assertion libraries**: Don't use testify or other assertion libraries. Our own helpers and go-cmp for struct comparison are enough. 
-7. **Prefer end-to-end tests**: Use the internal/e2etest package to create tests for the handlers. Feel free to add more helpers to the package as needed.:w
+6. **No assertion libraries**: Don't use testify or other assertion libraries. Our own helpers and go-cmp for struct
+   comparison are enough.
+7. **Prefer end-to-end tests**: Use the internal/e2etest package to create tests for the handlers. Feel free to add more
+   helpers to the package as needed.:w
 
 ### Example Test
 
@@ -98,18 +103,18 @@ func TestRef(t *testing.T) {
 ### Project Structure
 
 - `cmd/`: Contains the main application entry points
-  - `cmd/web/`: Main web application
-  - `cmd/migratetest/`: Database migration test utility
-  - `cmd/smoketest/`: Smoke test utility
+    - `cmd/web/`: Main web application
+    - `cmd/migratetest/`: Database migration test utility
+    - `cmd/smoketest/`: Smoke test utility
 - `internal/`: Internal packages not meant for external use
-  - `internal/workout/`: Workout-related functionality
-  - `internal/sqlite/`: Database access and migration
-  - `internal/contexthelpers/`: Context-related utilities
-  - `internal/webauthnhandler/`: WebAuthn authentication
-  - `internal/e2etest/`: End-to-end testing utilities
+    - `internal/workout/`: Workout-related functionality
+    - `internal/sqlite/`: Database access and migration
+    - `internal/contexthelpers/`: Context-related utilities
+    - `internal/webauthnhandler/`: WebAuthn authentication
+    - `internal/e2etest/`: End-to-end testing utilities
 - `ui/`: User interface files
-  - `ui/templates/`: HTML templates (using Go's html/template)
-  - `ui/static/`: Static assets (CSS, JS, images)
+    - `ui/templates/`: HTML templates (using Go's html/template)
+    - `ui/static/`: Static assets (CSS, JS, images)
 
 ### Database
 

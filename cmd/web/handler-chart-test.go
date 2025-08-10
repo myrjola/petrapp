@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/workout"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 // ExerciseProgressDataPoint represents a single data point for the exercise chart.

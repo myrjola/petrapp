@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/descope/virtualwebauthn"
-	"github.com/justinas/nosurf"
 	"io"
 	"net/http"
 	neturl "net/url"
 	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/descope/virtualwebauthn"
+	"github.com/justinas/nosurf"
 )
 
 // secFetchSiteTransport wraps an http.RoundTripper and adds the Sec-Fetch-Site header to all requests.

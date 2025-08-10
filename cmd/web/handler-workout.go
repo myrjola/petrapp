@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/workout"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 type workoutTemplateData struct {

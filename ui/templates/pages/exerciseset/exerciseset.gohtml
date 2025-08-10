@@ -298,16 +298,16 @@
 
           function initializeTimer() {
             const timerDisplay = document.getElementById('workout-timer');
-            {{ if .LastCompletedAt }}
+              {{ if .LastCompletedAt }}
             // Use the most recent set completion time
             const startTime = new Date('{{ .LastCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
-            {{ else if .ExerciseSet.WarmupCompletedAt }}
+              {{ else if .ExerciseSet.WarmupCompletedAt }}
             // Use warmup completion time as fallback
             const startTime = new Date('{{ .ExerciseSet.WarmupCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
-            {{ else }}
+              {{ else }}
             // Use current time if no previous timestamps
             const startTime = Date.now();
-            {{ end }}
+              {{ end }}
 
             function updateTimer() {
               const elapsed = Date.now() - startTime;
@@ -338,21 +338,28 @@
 
         <header class="exercise-header">
             <div class="header-row">
-                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link" aria-label="Back to workout">
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link"
+                   aria-label="Back to workout">
                     ← Back
                 </a>
             </div>
             <div class="header-row title-row">
-                <h1 class="exercise-title" data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+                <h1 class="exercise-title"
+                    data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
             </div>
             <div class="header-row actions-row">
                 <div>
                     {{ if .ExerciseSet.WarmupCompletedAt }}
-                        <span class="action-button warmup-button completed" aria-label="Warmup completed">✓ Warmup Done</span>
+                        <span class="action-button warmup-button completed"
+                              aria-label="Warmup completed">✓ Warmup Done</span>
                     {{ else }}
-                        <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete" style="display: inline;">
+                        <form method="post"
+                              action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete"
+                              style="display: inline;">
                             {{ csrf }}
-                            <button type="submit" class="action-button warmup-button" aria-label="Mark warmup complete">Warmup Complete</button>
+                            <button type="submit" class="action-button warmup-button" aria-label="Mark warmup complete">
+                                Warmup Complete
+                            </button>
                         </form>
                     {{ end }}
                     <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
@@ -371,13 +378,15 @@
                      aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
                     <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                            <span class="weight" aria-label="Weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
+                            <span class="weight"
+                                  aria-label="Weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
                         {{ end }}
                         {{ if $set.CompletedReps }}
                             <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
                         {{ else }}
-                            <span class="reps" aria-label="Target reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
+                            <span class="reps"
+                                  aria-label="Target reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
                         {{ end }}
                     </div>
 
@@ -402,7 +411,8 @@
                                                 required
                                                 aria-describedby="weight-help-{{ $index }}"
                                         >
-                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
+                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms
+                                        </div>
                                     </div>
                                 {{ end }}
                                 <div class="input-field">
@@ -421,7 +431,9 @@
                                             class="reps-input"
                                             aria-describedby="reps-help-{{ $index }}"
                                     >
-                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter number of repetitions completed</div>
+                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter number of repetitions
+                                        completed
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" class="submit-button"

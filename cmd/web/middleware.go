@@ -3,14 +3,15 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/justinas/nosurf"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"runtime/trace"
 	"time"
+
+	"github.com/justinas/nosurf"
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/logging"
 )
 
 type statusResponseWriter struct {

@@ -5,15 +5,16 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/myrjola/petrapp/internal/ptr"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"log/slog"
-	"net/http"
-	"sync"
-	"time"
 )
 
 type WebAuthnHandler struct {

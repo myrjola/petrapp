@@ -1,11 +1,12 @@
 package main
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"net/http"
-	"testing"
 )
 
 func Test_application_adminExercises(t *testing.T) {

@@ -3,13 +3,14 @@ package workout_test
 import (
 	"context"
 	"errors"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/myrjola/petrapp/internal/workout"
-	"strings"
-	"testing"
-	"time"
 )
 
 func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {

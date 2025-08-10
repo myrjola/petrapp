@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // Service handles the business logic for workout management.

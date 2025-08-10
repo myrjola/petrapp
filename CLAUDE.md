@@ -6,8 +6,10 @@ A fitness tracking web application built with Go, SQLite, and server-side render
 
 When implementing features, follow this architectural flow:
 
-1. **Database First** - Start with schema changes in `internal/sqlite/` (see [Database Guidelines](internal/sqlite/CLAUDE.md))
-2. **Domain Models** - Update business logic in `internal/workout/` (see [Domain Guidelines](internal/workout/CLAUDE.md))  
+1. **Database First** - Start with schema changes in `internal/sqlite/` (
+   see [Database Guidelines](internal/sqlite/CLAUDE.md))
+2. **Domain Models** - Update business logic in `internal/workout/` (
+   see [Domain Guidelines](internal/workout/CLAUDE.md))
 3. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
 4. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
 
@@ -21,6 +23,7 @@ make ci           # Run init, build, lint, test, sec - use for comprehensive ver
 ```
 
 **When to use specific commands:**
+
 - Use `make build` after adding new files or significant code changes
 - Use `make test` after implementing new features or modifying existing functionality
 - Use `make lint` before committing to catch style and complexity issues
@@ -36,8 +39,10 @@ make ci           # Run init, build, lint, test, sec - use for comprehensive ver
 ### Maintaining Test Compatibility
 
 When making UI changes:
+
 - Consider impact on existing tests that rely on DOM structure
-- Use specific selectors instead of generic ones (e.g., `.Find("form").FilterFunction()` instead of `.Find("form").First()`)
+- Use specific selectors instead of generic ones (e.g., `.Find("form").FilterFunction()` instead of
+  `.Find("form").First()`)
 - Look for unique identifiers like button text, form actions, or data attributes for reliable test selectors
 - When tests break due to DOM changes, update selectors to be more specific and resilient
 
@@ -60,6 +65,7 @@ When making UI changes:
 ## Following Conventions
 
 When making changes to files, first understand the file's code conventions:
+
 - NEVER assume that a given library is available - check neighboring files or go.mod first
 - When creating new components, examine existing ones for patterns and conventions
 - Always look at surrounding context (especially imports) to understand framework choices
@@ -70,7 +76,7 @@ When making changes to files, first understand the file's code conventions:
 For detailed guidance on specific areas:
 
 - **[Database Schema](internal/sqlite/CLAUDE.md)** - SQLite schema evolution and migration patterns
-- **[Domain Models](internal/workout/CLAUDE.md)** - Business logic, models, and service layer patterns  
+- **[Domain Models](internal/workout/CLAUDE.md)** - Business logic, models, and service layer patterns
 - **[Web Handlers](cmd/web/CLAUDE.md)** - HTTP handlers, routing, and middleware patterns
 - **[Templates & UI](ui/templates/CLAUDE.md)** - Go templates, CSS architecture, and design system
 

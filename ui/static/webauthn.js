@@ -66,7 +66,7 @@ async function createAttestationResponse(publicKey) {
     ...excludedCredential,
     id: bufferDecode(excludedCredential.id),
   }))
-  const credential = await navigator.credentials.create({ publicKey });
+  const credential = await navigator.credentials.create({publicKey});
   const {id, rawId, type, response: {attestationObject, clientDataJSON}} = credential;
   return JSON.stringify({
     id,
@@ -86,7 +86,7 @@ async function createAttestationResponse(publicKey) {
  * @returns {Promise<void>}
  */
 async function finishRegistration(attestationResponse, headers) {
-  const finishResp = await fetch("/api/registration/finish", { method: "post", headers, body: attestationResponse })
+  const finishResp = await fetch("/api/registration/finish", {method: "post", headers, body: attestationResponse})
   if (!finishResp.ok) {
     throw new Error("Finishing registration failed!");
   }
@@ -117,7 +117,7 @@ export async function registerUser(e) {
  */
 async function createAssertionResponse(publicKey) {
   publicKey.challenge = bufferDecode(/** @type {string} */ publicKey.challenge);
-  const assertion = await navigator.credentials.get({ publicKey });
+  const assertion = await navigator.credentials.get({publicKey});
   const {id, rawId, type, response: {authenticatorData, clientDataJSON, signature, userHandle}} = assertion;
   return JSON.stringify({
     id,
@@ -139,7 +139,7 @@ async function createAssertionResponse(publicKey) {
  * @returns {Promise<void>}
  */
 async function finishLogin(assertionResponse, headers) {
-  const finishResp = await fetch("/api/login/finish", { method: "post", headers, body: assertionResponse })
+  const finishResp = await fetch("/api/login/finish", {method: "post", headers, body: assertionResponse})
   if (!finishResp.ok) {
     throw new Error("Finishing login failed!");
   }

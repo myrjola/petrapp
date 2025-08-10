@@ -2,6 +2,7 @@ package e2etest
 
 import (
 	"fmt"
+
 	"github.com/PuerkitoBio/goquery"
 )
 

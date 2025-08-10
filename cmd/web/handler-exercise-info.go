@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/workout"
-	"github.com/yuin/goldmark"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/yuin/goldmark"
 )
 
 // exerciseInfoTemplateData contains data for the exercise info template.

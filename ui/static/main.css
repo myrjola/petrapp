@@ -236,6 +236,7 @@
         }
 
         /* Add a spinner to a button when submitting */
+
         form.submitting &[type=submit] {
             cursor: wait;
 

@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/myrjola/petrapp/internal/workout"
 	"net/http"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 const (

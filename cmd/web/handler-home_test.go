@@ -1,10 +1,11 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"testing"
 )
 
 func testLookupEnv(key string) (string, bool) {

@@ -14,10 +14,10 @@ CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 CREATE TABLE users
 (
     id           BLOB PRIMARY KEY CHECK (LENGTH(id) < 256),
-    display_name TEXT NOT NULL CHECK (LENGTH(display_name) < 64),
-    created      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+    display_name TEXT    NOT NULL CHECK (LENGTH(display_name) < 64),
+    created      TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created) = created),
-    updated      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+    updated      TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated),
     is_admin     INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1))
 ) WITHOUT ROWID, STRICT;
@@ -63,7 +63,7 @@ END;
 
 CREATE TABLE workout_preferences
 (
-    user_id         BLOB PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    user_id           BLOB PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
     monday_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (monday_minutes IN (0, 45, 60, 90)),
     tuesday_minutes   INTEGER NOT NULL DEFAULT 0 CHECK (tuesday_minutes IN (0, 45, 60, 90)),
     wednesday_minutes INTEGER NOT NULL DEFAULT 0 CHECK (wednesday_minutes IN (0, 45, 60, 90)),
@@ -75,10 +75,10 @@ CREATE TABLE workout_preferences
 
 CREATE TABLE exercises
 (
-    id       INTEGER PRIMARY KEY,
-    name     TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
-    category TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
-    exercise_type TEXT NOT NULL DEFAULT 'weighted' CHECK (exercise_type IN ('weighted', 'bodyweight')),
+    id                   INTEGER PRIMARY KEY,
+    name                 TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
+    category             TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
+    exercise_type        TEXT NOT NULL DEFAULT 'weighted' CHECK (exercise_type IN ('weighted', 'bodyweight')),
     description_markdown TEXT NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000)
 ) STRICT;
 
@@ -99,7 +99,8 @@ CREATE TABLE workout_exercise
     workout_user_id     BLOB    NOT NULL,
     workout_date        TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
     exercise_id         INTEGER NOT NULL,
-    warmup_completed_at TEXT    CHECK (warmup_completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', warmup_completed_at) = warmup_completed_at),
+    warmup_completed_at TEXT CHECK (warmup_completed_at IS NULL OR
+                                    STRFTIME('%Y-%m-%dT%H:%M:%fZ', warmup_completed_at) = warmup_completed_at),
 
     PRIMARY KEY (workout_user_id, workout_date, exercise_id),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
@@ -108,15 +109,15 @@ CREATE TABLE workout_exercise
 
 CREATE TABLE exercise_sets
 (
-    workout_user_id    BLOB    NOT NULL,
-    workout_date       TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
-    exercise_id        INTEGER NOT NULL,
-    set_number         INTEGER NOT NULL CHECK (set_number > 0),
-    weight_kg          REAL    CHECK (weight_kg IS NULL OR weight_kg >= 0),
-    min_reps           INTEGER NOT NULL CHECK (min_reps > 0),
-    max_reps           INTEGER NOT NULL CHECK (max_reps >= min_reps),
-    completed_reps     INTEGER,
-    completed_at       TEXT    CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    workout_user_id BLOB    NOT NULL,
+    workout_date    TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
+    exercise_id     INTEGER NOT NULL,
+    set_number      INTEGER NOT NULL CHECK (set_number > 0),
+    weight_kg       REAL CHECK (weight_kg IS NULL OR weight_kg >= 0),
+    min_reps        INTEGER NOT NULL CHECK (min_reps > 0),
+    max_reps        INTEGER NOT NULL CHECK (max_reps >= min_reps),
+    completed_reps  INTEGER,
+    completed_at    TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
 
     PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,

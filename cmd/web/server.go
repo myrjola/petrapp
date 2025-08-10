@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/e2etest"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/e2etest"
 )
 
 const defaultTimeout = 2 * time.Second

@@ -206,73 +206,73 @@
         </div>
 
         <script {{ nonce }}>
-            const chartContainer = document.getElementById('progress-chart');
-            const dataUrl = "/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}/progress-chart";
-            
-            // Load ECharts and chart data
-            async function loadExerciseChart() {
-                try {
-                    const [echarts, response] = await Promise.all([
-                        import("echarts"),
-                        fetch(dataUrl)
-                    ]);
-                    
-                    const dataset = await response.json();
-                    
-                    // Create ECharts option from dataset
-                    const option = {
-                        title: {
-                            text: dataset.exercise_name + ' Progress'
-                        },
-                        tooltip: {
-                            trigger: 'axis',
-                            formatter: function(params) {
-                                const point = params[0];
-                                const dataPoint = dataset.data_points[point.dataIndex];
-                                return dataPoint.date + '<br>' + 
-                                       dataPoint.max_weight + ' kg<br>' + 
-                                       'Sets:<br>' + dataPoint.sets;
-                            }
-                        },
-                        xAxis: {
-                            type: 'category',
-                            data: dataset.data_points.map(d => d.date),
-                            inverse: true
-                        },
-                        yAxis: {
-                            type: 'value',
-                            name: 'Weight (kg)'
-                        },
-                        series: [{
-                            name: 'Max Weight (kg)',
-                            type: 'line',
-                            data: dataset.data_points.map(d => d.max_weight),
-                            symbolSize: 6,
-                            lineStyle: {
-                                color: '#0ea5e9'
-                            },
-                            itemStyle: {
-                                color: '#0ea5e9'
-                            }
-                        }]
-                    };
-                    
-                    // Initialize chart
-                    const chart = echarts.init(chartContainer);
-                    chart.setOption(option);
-                    
-                    // Handle window resize
-                    window.addEventListener('resize', () => {
-                        chart.resize();
-                    });
-                    
-                } catch (error) {
-                    console.error('Error loading chart:', error);
-                    chartContainer.innerHTML = '<div class="chart-loading">Failed to load chart</div>';
-                }
+          const chartContainer = document.getElementById('progress-chart');
+          const dataUrl = "/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}/progress-chart";
+
+          // Load ECharts and chart data
+          async function loadExerciseChart() {
+            try {
+              const [echarts, response] = await Promise.all([
+                import("echarts"),
+                fetch(dataUrl)
+              ]);
+
+              const dataset = await response.json();
+
+              // Create ECharts option from dataset
+              const option = {
+                title: {
+                  text: dataset.exercise_name + ' Progress'
+                },
+                tooltip: {
+                  trigger: 'axis',
+                  formatter: function (params) {
+                    const point = params[0];
+                    const dataPoint = dataset.data_points[point.dataIndex];
+                    return dataPoint.date + '<br>' +
+                      dataPoint.max_weight + ' kg<br>' +
+                      'Sets:<br>' + dataPoint.sets;
+                  }
+                },
+                xAxis: {
+                  type: 'category',
+                  data: dataset.data_points.map(d => d.date),
+                  inverse: true
+                },
+                yAxis: {
+                  type: 'value',
+                  name: 'Weight (kg)'
+                },
+                series: [{
+                  name: 'Max Weight (kg)',
+                  type: 'line',
+                  data: dataset.data_points.map(d => d.max_weight),
+                  symbolSize: 6,
+                  lineStyle: {
+                    color: '#0ea5e9'
+                  },
+                  itemStyle: {
+                    color: '#0ea5e9'
+                  }
+                }]
+              };
+
+              // Initialize chart
+              const chart = echarts.init(chartContainer);
+              chart.setOption(option);
+
+              // Handle window resize
+              window.addEventListener('resize', () => {
+                chart.resize();
+              });
+
+            } catch (error) {
+              console.error('Error loading chart:', error);
+              chartContainer.innerHTML = '<div class="chart-loading">Failed to load chart</div>';
             }
-            
-            loadExerciseChart();
+          }
+
+          loadExerciseChart();
         </script>
     </main>
 {{ end }}

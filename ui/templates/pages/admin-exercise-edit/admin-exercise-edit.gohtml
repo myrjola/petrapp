@@ -12,7 +12,8 @@
             <div>
                 <label for="category">Category:</label>
                 <select id="category" name="category" required>
-                    <option value="full_body" {{ if eq .Exercise.Category "full_body" }}selected{{ end }}>Full Body</option>
+                    <option value="full_body" {{ if eq .Exercise.Category "full_body" }}selected{{ end }}>Full Body
+                    </option>
                     <option value="upper" {{ if eq .Exercise.Category "upper" }}selected{{ end }}>Upper Body</option>
                     <option value="lower" {{ if eq .Exercise.Category "lower" }}selected{{ end }}>Lower Body</option>
                 </select>
@@ -21,8 +22,11 @@
             <div>
                 <label for="exercise_type">Exercise Type:</label>
                 <select id="exercise_type" name="exercise_type" required>
-                    <option value="weighted" {{ if eq .Exercise.ExerciseType "weighted" }}selected{{ end }}>Weighted</option>
-                    <option value="bodyweight" {{ if eq .Exercise.ExerciseType "bodyweight" }}selected{{ end }}>Bodyweight</option>
+                    <option value="weighted" {{ if eq .Exercise.ExerciseType "weighted" }}selected{{ end }}>Weighted
+                    </option>
+                    <option value="bodyweight" {{ if eq .Exercise.ExerciseType "bodyweight" }}selected{{ end }}>
+                        Bodyweight
+                    </option>
                 </select>
             </div>
 

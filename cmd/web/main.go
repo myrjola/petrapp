@@ -3,6 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"time"
+
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/envstruct"
@@ -11,12 +18,6 @@ import (
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/webauthnhandler"
 	"github.com/myrjola/petrapp/internal/workout"
-	"io/fs"
-	"log/slog"
-	"net/http"
-	"os"
-	"os/signal"
-	"time"
 )
 
 type application struct {

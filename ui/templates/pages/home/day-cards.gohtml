@@ -136,7 +136,8 @@
                     {{ if .Action.StartWorkout }}
                         <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
                             {{ csrf }}
-                            <button type="submit" class="{{ if eq .Status "unscheduled" }}btn-secondary{{ else }}btn-primary{{ end }}">
+                            <button type="submit"
+                                    class="{{ if eq .Status "unscheduled" }}btn-secondary{{ else }}btn-primary{{ end }}">
                                 {{ .Action.Label }}
                             </button>
                         </form>

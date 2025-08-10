@@ -3,8 +3,9 @@ package webauthnhandler
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"time"
+
+	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 type user struct {

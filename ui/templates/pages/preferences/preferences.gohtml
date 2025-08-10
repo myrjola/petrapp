@@ -155,7 +155,7 @@
                             <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select">
                                 {{ $weekdayMinutes := .Minutes }}
                                 {{ range $.DurationOptions }}
-                                    <option value="{{ .Value }}" 
+                                    <option value="{{ .Value }}"
                                             {{ if eq .Value $weekdayMinutes }}selected{{ end }}>
                                         {{ .Label }}
                                     </option>

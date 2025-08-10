@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
 	"net/http"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/logging"
 )
 
 func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler {

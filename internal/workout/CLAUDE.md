@@ -5,6 +5,7 @@ Guidelines for working with domain models, business logic, and data access patte
 ## Architecture Overview
 
 ### Domain-Driven Design Structure
+
 - **Models** (`models.go`) - Pure domain entities and value objects
 - **Service** (`service.go`) - Business logic and workflow orchestration
 - **Repository** (`repository.go`) - Data access interfaces and aggregates
@@ -13,13 +14,14 @@ Guidelines for working with domain models, business logic, and data access patte
 ### Separation of Concerns
 
 - **Domain models** represent business concepts (Exercise, Session, Set)
-- **Repository aggregates** represent data persistence structure 
+- **Repository aggregates** represent data persistence structure
 - **Service layer** coordinates between domain and repository, handles business rules
 - **Generators** implement complex algorithms (workout creation, progression)
 
 ## Domain Models
 
 ### Core Entities
+
 ```go
 type Exercise struct {
     ID                    int
@@ -55,6 +57,7 @@ type Set struct {
 ```
 
 ### Strongly Typed Enums
+
 Always use typed constants with exhaustive validation:
 
 ```go
@@ -78,6 +81,7 @@ func (c Category) IsValid() bool {
 ```
 
 ### Model Validation Patterns
+
 - Use pointer types for nullable fields (`*int`, `*time.Time`)
 - Implement validation methods on domain models
 - Use builder patterns for complex model construction
@@ -86,6 +90,7 @@ func (c Category) IsValid() bool {
 ## Service Layer Patterns
 
 ### Business Logic Organization
+
 ```go
 type Service struct {
     repo         *repository
@@ -106,12 +111,14 @@ func (s *Service) StartWorkout(ctx context.Context, date time.Time) error {
 ```
 
 ### Error Handling
+
 - Use sentinel errors for business conditions: `var ErrNotFound = sql.ErrNoRows`
 - Wrap errors with context: `fmt.Errorf("operation description: %w", err)`
 - Check for specific errors using `errors.Is(err, ErrNotFound)`
 - Let service layer handle business validation, repository handles data access
 
 ### Context Propagation
+
 - Always pass `context.Context` as first parameter
 - Use context for cancellation, timeouts, and request-scoped values
 - Pass context down to repository methods
@@ -119,6 +126,7 @@ func (s *Service) StartWorkout(ctx context.Context, date time.Time) error {
 ## Repository Interface Patterns
 
 ### Aggregate-Based Design
+
 ```go
 // Repository aggregates represent data persistence structure
 type sessionAggregate struct {
@@ -139,6 +147,7 @@ type sessionRepository interface {
 ```
 
 ### Update Pattern with Function Parameter
+
 Use functional updates for transactional safety:
 
 ```go
@@ -163,6 +172,7 @@ err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, err
 ## Data Conversion Patterns
 
 ### Domain ↔ Aggregate Conversion
+
 ```go
 // Convert repository aggregate to domain model
 func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercise) (Session, error) {
@@ -188,6 +198,7 @@ func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercis
 ```
 
 ### Conversion Guidelines
+
 - Keep conversion logic in repository layer, not service layer
 - Handle missing data gracefully (use zero values or return errors)
 - Validate converted data before returning to service layer
@@ -196,12 +207,14 @@ func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercis
 ## Integration with Other Layers
 
 ### Service ↔ Handler Integration
+
 - Handlers call service methods with validated input
 - Service returns domain models to handlers
 - Handlers convert domain models to template data structures
 - Service handles all business validation and coordination
 
 ### Repository ↔ Database Integration
+
 - Repository implementations handle SQL queries and transactions
 - Convert between Go types and database types (time.Time ↔ string, etc.)
 - Handle database-specific constraints and validations
@@ -210,6 +223,7 @@ func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercis
 ## Common Patterns and Anti-Patterns
 
 ### ✅ Good Patterns
+
 - Inject dependencies through constructors
 - Use interfaces for testability and flexibility
 - Keep domain models focused on data and basic validation
@@ -217,6 +231,7 @@ func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercis
 - Separate concerns between domain, service, and repository layers
 
 ### ❌ Anti-Patterns
+
 - Don't put database logic in domain models
 - Don't put business logic in repository implementations
 - Don't use global variables or singletons
@@ -226,6 +241,7 @@ func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercis
 ## Error Handling Strategies
 
 ### Business Rule Violations
+
 ```go
 // Define sentinel errors for business conditions
 var (
@@ -241,6 +257,7 @@ if errors.Is(err, ErrWorkoutNotFound) {
 ```
 
 ### Validation and Input Sanitization
+
 - Validate at service layer before calling repository
 - Use domain model validation methods for business rules
 - Sanitize and normalize input data consistently
