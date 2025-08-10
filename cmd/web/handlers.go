@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"html/template"
 	"net/http"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
 
 // pageTemplate returns a template for the given page name.
@@ -63,13 +64,17 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 	return buf, nil
 }
 
-func (app *application) render(w http.ResponseWriter, r *http.Request, status int, file string, data any) {
+/*
+ * render renders the template residing in the /ui/templates/pages/{pageName} folder from the repository root and writes
+ * it to the response writer.
+ */
+func (app *application) render(w http.ResponseWriter, r *http.Request, status int, pageName string, data any) {
 	var (
 		buf *bytes.Buffer
 		err error
 	)
 
-	if buf, err = app.renderToBuf(r.Context(), file, data); err != nil {
+	if buf, err = app.renderToBuf(r.Context(), pageName, data); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
