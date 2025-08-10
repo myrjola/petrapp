@@ -114,6 +114,21 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to get exercise set page: %v", err)
 	}
 
+	// Complete the warmup first
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+	}).First()
+
+	if warmupForm.Length() > 0 {
+		warmupAction, exists := warmupForm.Attr("action")
+		if !exists {
+			t.Fatalf("Warmup form has no action attribute")
+		}
+		if doc, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+			t.Fatalf("Failed to submit warmup completion form: %v", err)
+		}
+	}
+
 	// Find the set completion form (which contains a button with type="submit" and text "Done!")
 	form := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
 		return s.Find("button[type=submit]:contains('Done!')").Length() > 0

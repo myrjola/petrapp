@@ -195,9 +195,9 @@
         --color-text-primary: var(--gray-9);
         --color-text-secondary: var(--gray-6);
         --color-text-muted: var(--gray-5);
-        --color-success: var(--lime-6);
+        --color-success: var(--lime-7);
         --color-success-bg: var(--lime-0);
-        --color-info: var(--sky-6);
+        --color-info: var(--sky-7);
         --color-info-bg: var(--sky-0);
     }
 }
