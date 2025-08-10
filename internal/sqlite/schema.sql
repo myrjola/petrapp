@@ -64,13 +64,6 @@ END;
 CREATE TABLE workout_preferences
 (
     user_id         BLOB PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    monday          INTEGER NOT NULL DEFAULT 0 CHECK (monday IN (0, 1)),
-    tuesday         INTEGER NOT NULL DEFAULT 0 CHECK (tuesday IN (0, 1)),
-    wednesday       INTEGER NOT NULL DEFAULT 0 CHECK (wednesday IN (0, 1)),
-    thursday        INTEGER NOT NULL DEFAULT 0 CHECK (thursday IN (0, 1)),
-    friday          INTEGER NOT NULL DEFAULT 0 CHECK (friday IN (0, 1)),
-    saturday        INTEGER NOT NULL DEFAULT 0 CHECK (saturday IN (0, 1)),
-    sunday          INTEGER NOT NULL DEFAULT 0 CHECK (sunday IN (0, 1)),
     monday_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (monday_minutes IN (0, 45, 60, 90)),
     tuesday_minutes   INTEGER NOT NULL DEFAULT 0 CHECK (tuesday_minutes IN (0, 45, 60, 90)),
     wednesday_minutes INTEGER NOT NULL DEFAULT 0 CHECK (wednesday_minutes IN (0, 45, 60, 90)),

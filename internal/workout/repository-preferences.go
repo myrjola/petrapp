@@ -59,29 +59,12 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (Preferences, err
 func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs Preferences) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
-	// Convert minutes to booleans for database storage
-	mondayBool := prefs.MondayMinutes > 0
-	tuesdayBool := prefs.TuesdayMinutes > 0
-	wednesdayBool := prefs.WednesdayMinutes > 0
-	thursdayBool := prefs.ThursdayMinutes > 0
-	fridayBool := prefs.FridayMinutes > 0
-	saturdayBool := prefs.SaturdayMinutes > 0
-	sundayBool := prefs.SundayMinutes > 0
-
 	_, err := r.db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO workout_preferences (
-			user_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday,
-			monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
+			user_id, monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
 			friday_minutes, saturday_minutes, sunday_minutes
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (user_id) DO UPDATE SET
-			monday = excluded.monday,
-			tuesday = excluded.tuesday,
-			wednesday = excluded.wednesday,
-			thursday = excluded.thursday,
-			friday = excluded.friday,
-			saturday = excluded.saturday,
-			sunday = excluded.sunday,
 			monday_minutes = excluded.monday_minutes,
 			tuesday_minutes = excluded.tuesday_minutes,
 			wednesday_minutes = excluded.wednesday_minutes,
@@ -90,8 +73,6 @@ func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs Preferences
 			saturday_minutes = excluded.saturday_minutes,
 			sunday_minutes = excluded.sunday_minutes`,
 		userID,
-		mondayBool, tuesdayBool, wednesdayBool, thursdayBool,
-		fridayBool, saturdayBool, sundayBool,
 		prefs.MondayMinutes, prefs.TuesdayMinutes, prefs.WednesdayMinutes, prefs.ThursdayMinutes,
 		prefs.FridayMinutes, prefs.SaturdayMinutes, prefs.SundayMinutes,
 	)
