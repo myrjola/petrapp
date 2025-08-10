@@ -348,6 +348,20 @@ UPDATE SET
     exercise_type = excluded.exercise_type,
     description_markdown = excluded.description_markdown;
 
+-- Migration: Convert existing boolean workout preferences to minutes
+-- If a day is marked as true (1), set it to 60 minutes, otherwise keep it as 0 (rest day)
+UPDATE workout_preferences 
+SET monday_minutes = CASE WHEN monday = 1 THEN 60 ELSE 0 END,
+    tuesday_minutes = CASE WHEN tuesday = 1 THEN 60 ELSE 0 END,
+    wednesday_minutes = CASE WHEN wednesday = 1 THEN 60 ELSE 0 END,
+    thursday_minutes = CASE WHEN thursday = 1 THEN 60 ELSE 0 END,
+    friday_minutes = CASE WHEN friday = 1 THEN 60 ELSE 0 END,
+    saturday_minutes = CASE WHEN saturday = 1 THEN 60 ELSE 0 END,
+    sunday_minutes = CASE WHEN sunday = 1 THEN 60 ELSE 0 END
+WHERE monday_minutes = 0 AND tuesday_minutes = 0 AND wednesday_minutes = 0 
+  AND thursday_minutes = 0 AND friday_minutes = 0 AND saturday_minutes = 0 
+  AND sunday_minutes = 0;
+
 INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
 VALUES (1, 'Forearms', 0),
        (1, 'Glutes', 1),

@@ -124,13 +124,23 @@ type Session struct {
 	ExerciseSets     []ExerciseSet
 }
 
-// Preferences stores which days of the week a user wants to work out.
+// Preferences stores how long a user wants to work out each day of the week.
+// A value of 0 means rest day (equivalent to false), any other value means workout day (equivalent to true).
 type Preferences struct {
-	Monday    bool
-	Tuesday   bool
-	Wednesday bool
-	Thursday  bool
-	Friday    bool
-	Saturday  bool
-	Sunday    bool
+	MondayMinutes    int
+	TuesdayMinutes   int
+	WednesdayMinutes int
+	ThursdayMinutes  int
+	FridayMinutes    int
+	SaturdayMinutes  int
+	SundayMinutes    int
 }
+
+// Helper methods to check if a day is a workout day (equivalent to the old boolean logic).
+func (p Preferences) Monday() bool    { return p.MondayMinutes > 0 }
+func (p Preferences) Tuesday() bool   { return p.TuesdayMinutes > 0 }
+func (p Preferences) Wednesday() bool { return p.WednesdayMinutes > 0 }
+func (p Preferences) Thursday() bool  { return p.ThursdayMinutes > 0 }
+func (p Preferences) Friday() bool    { return p.FridayMinutes > 0 }
+func (p Preferences) Saturday() bool  { return p.SaturdayMinutes > 0 }
+func (p Preferences) Sunday() bool    { return p.SundayMinutes > 0 }

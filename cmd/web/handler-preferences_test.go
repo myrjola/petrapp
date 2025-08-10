@@ -1,11 +1,13 @@
 package main
 
 import (
+	"net/http"
+	"strconv"
+	"testing"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"net/http"
-	"testing"
 )
 
 func Test_application_preferences(t *testing.T) {
@@ -48,23 +50,23 @@ func Test_application_preferences(t *testing.T) {
 		t.Error("Expected to be on preferences page")
 	}
 
-	// By default, all days should be unchecked
-	weekdays := map[string]bool{
-		"Monday":    false,
-		"Tuesday":   false,
-		"Wednesday": false,
-		"Thursday":  false,
-		"Friday":    false,
-		"Saturday":  false,
-		"Sunday":    false,
+	// By default, all days should be set to rest day (0 minutes)
+	weekdays := map[string]int{
+		"monday":    0,
+		"tuesday":   0,
+		"wednesday": 0,
+		"thursday":  0,
+		"friday":    0,
+		"saturday":  0,
+		"sunday":    0,
 	}
-	verifyChecked(t, doc, weekdays)
+	verifySelected(t, doc, weekdays)
 
 	// Can update preferences.
-	// Submit form with Monday and Wednesday checked
+	// Submit form with Monday at 60 minutes and Wednesday at 45 minutes
 	formData := map[string]string{
-		"Monday":    "true",
-		"Wednesday": "true",
+		"monday_minutes":    "60",
+		"wednesday_minutes": "45",
 	}
 	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
 		t.Fatalf("Failed to submit form: %v", err)
@@ -80,16 +82,16 @@ func Test_application_preferences(t *testing.T) {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
 
-	weekdays = map[string]bool{
-		"Monday":    true,
-		"Tuesday":   false,
-		"Wednesday": true,
-		"Thursday":  false,
-		"Friday":    false,
-		"Saturday":  false,
-		"Sunday":    false,
+	weekdaysAfterSubmit := map[string]int{
+		"monday":    60,
+		"tuesday":   0,
+		"wednesday": 45,
+		"thursday":  0,
+		"friday":    0,
+		"saturday":  0,
+		"sunday":    0,
 	}
-	verifyChecked(t, doc, weekdays)
+	verifySelected(t, doc, weekdaysAfterSubmit)
 
 	// First logout
 	if _, err = client.Logout(ctx); err != nil {
@@ -107,34 +109,53 @@ func Test_application_preferences(t *testing.T) {
 	}
 
 	// Verify preferences were persisted
-	weekdays = map[string]bool{
-		"Monday":    true,
-		"Tuesday":   false,
-		"Wednesday": true,
-		"Thursday":  false,
-		"Friday":    false,
-		"Saturday":  false,
-		"Sunday":    false,
+	weekdaysAfterPersistence := map[string]int{
+		"monday":    60,
+		"tuesday":   0,
+		"wednesday": 45,
+		"thursday":  0,
+		"friday":    0,
+		"saturday":  0,
+		"sunday":    0,
 	}
-	verifyChecked(t, doc, weekdays)
+	verifySelected(t, doc, weekdaysAfterPersistence)
 }
 
-func verifyChecked(t *testing.T, doc *goquery.Document, weekdays map[string]bool) {
+func verifySelected(t *testing.T, doc *goquery.Document, weekdays map[string]int) {
 	t.Helper()
-	var (
-		form *goquery.Selection
-		err  error
-	)
-	for day, shouldBeChecked := range weekdays {
-		if form, err = e2etest.FindForm(doc, "/preferences"); err != nil {
-			t.Fatalf("Failed to find form: %v", err)
+	form, err := e2etest.FindForm(doc, "/preferences")
+	if err != nil {
+		t.Fatalf("Failed to find form: %v", err)
+	}
+
+	for day, expectedMinutes := range weekdays {
+		selectName := day + "_minutes"
+		selectElement := form.Find("select[name='" + selectName + "']")
+		if selectElement.Length() == 0 {
+			t.Fatalf("Failed to find select element for %s", selectName)
 		}
-		var input *goquery.Selection
-		if input, err = e2etest.FindInputForLabel(form, day); err != nil {
-			t.Fatalf("Failed to find input for label %s: %v", day, err)
+
+		selectedOption := selectElement.Find("option[selected]")
+		if selectedOption.Length() == 0 {
+			// If no option is explicitly selected, find the first option (default)
+			selectedOption = selectElement.Find("option").First()
 		}
-		if got, want := input.Is("[checked]"), shouldBeChecked; got != want {
-			t.Errorf("Expected %s checked status to be %v, got %v", day, shouldBeChecked, got)
+
+		selectedValue := selectedOption.AttrOr("value", "")
+		if selectedValue == "" {
+			t.Fatalf("No selected value found for %s", selectName)
+		}
+
+		actualMinutes := 0
+		if selectedValue != "0" {
+			actualMinutes, err = strconv.Atoi(selectedValue)
+			if err != nil {
+				t.Fatalf("Failed to parse selected value %s for %s: %v", selectedValue, selectName, err)
+			}
+		}
+
+		if actualMinutes != expectedMinutes {
+			t.Errorf("Expected %s to have %d minutes selected, got %d", day, expectedMinutes, actualMinutes)
 		}
 	}
 }

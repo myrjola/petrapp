@@ -26,19 +26,19 @@ const (
 func isWorkoutScheduled(date time.Time, preferences workout.Preferences) bool {
 	switch date.Weekday() {
 	case time.Monday:
-		return preferences.Monday
+		return preferences.Monday()
 	case time.Tuesday:
-		return preferences.Tuesday
+		return preferences.Tuesday()
 	case time.Wednesday:
-		return preferences.Wednesday
+		return preferences.Wednesday()
 	case time.Thursday:
-		return preferences.Thursday
+		return preferences.Thursday()
 	case time.Friday:
-		return preferences.Friday
+		return preferences.Friday()
 	case time.Saturday:
-		return preferences.Saturday
+		return preferences.Saturday()
 	case time.Sunday:
-		return preferences.Sunday
+		return preferences.Sunday()
 	default:
 		return false
 	}

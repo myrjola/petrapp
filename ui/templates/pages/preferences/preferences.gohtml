@@ -48,30 +48,44 @@
                     border-radius: var(--radius-2);
                     border: var(--border-size-1) solid transparent;
                     transition: all 0.2s ease;
-                    cursor: pointer;
 
                     &:hover {
                         background-color: var(--color-surface);
                         border-color: var(--color-border);
                     }
 
-                    &:has(input:checked) {
+                    &:has(select:not([value="0"])) {
                         background-color: var(--color-surface-completed);
                         border-color: var(--color-success);
                     }
 
-                    input[type="checkbox"] {
-                        width: var(--size-5);
-                        height: var(--size-5);
-                        margin: 0;
-                        accent-color: var(--color-success);
-                        cursor: pointer;
-                    }
-
-                    .weekday-name {
+                    .weekday-label {
                         font-weight: var(--font-weight-5);
                         color: var(--color-text-primary);
                         font-size: var(--font-size-2);
+                        flex: 1;
+                    }
+
+                    .workout-duration {
+                        select {
+                            padding: var(--size-2) var(--size-3);
+                            border: var(--border-size-1) solid var(--color-border);
+                            border-radius: var(--radius-2);
+                            background: var(--color-surface);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-1);
+                            cursor: pointer;
+                            min-width: 8rem;
+
+                            &:focus {
+                                outline: 2px solid var(--color-success);
+                                outline-offset: 2px;
+                            }
+
+                            &:hover {
+                                border-color: var(--color-border-hover);
+                            }
+                        }
                     }
                 }
 
@@ -130,15 +144,20 @@
             {{ csrf }}
             <div class="weekdays-grid">
                 {{ range .Weekdays }}
-                    <label class="weekday-item">
-                        <input
-                                type="checkbox"
-                                name="{{ .ID }}"
-                                value="true"
-                                {{ if .Checked }}checked{{ end }}
-                        >
-                        <span class="weekday-name">{{ .Name }}</span>
-                    </label>
+                    <div class="weekday-item">
+                        <span class="weekday-label">{{ .Name }}</span>
+                        <div class="workout-duration">
+                            <select name="{{ .ID }}_minutes">
+                                {{ $weekdayMinutes := .Minutes }}
+                                {{ range $.DurationOptions }}
+                                    <option value="{{ .Value }}" 
+                                            {{ if eq .Value $weekdayMinutes }}selected{{ end }}>
+                                        {{ .Label }}
+                                    </option>
+                                {{ end }}
+                            </select>
+                        </div>
+                    </div>
                 {{ end }}
             </div>
             <button type="submit" class="save-button">Save Schedule</button>

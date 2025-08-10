@@ -203,19 +203,19 @@ func (g *generator) determineWorkoutCategory(t time.Time) Category {
 func (g *generator) isWorkoutDay(t time.Time) bool {
 	switch t.Weekday() {
 	case time.Monday:
-		return g.preferences.Monday
+		return g.preferences.Monday()
 	case time.Tuesday:
-		return g.preferences.Tuesday
+		return g.preferences.Tuesday()
 	case time.Wednesday:
-		return g.preferences.Wednesday
+		return g.preferences.Wednesday()
 	case time.Thursday:
-		return g.preferences.Thursday
+		return g.preferences.Thursday()
 	case time.Friday:
-		return g.preferences.Friday
+		return g.preferences.Friday()
 	case time.Saturday:
-		return g.preferences.Saturday
+		return g.preferences.Saturday()
 	case time.Sunday:
-		return g.preferences.Sunday
+		return g.preferences.Sunday()
 	default:
 		return false
 	}

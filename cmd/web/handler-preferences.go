@@ -2,45 +2,81 @@ package main
 
 import (
 	"fmt"
-	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
+	"strconv"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
-const TRUE = "true"
+const (
+	RestDayMinutes        = 0
+	FortyFiveMinutes      = 45
+	OneHourMinutes        = 60
+	OneAndHalfHourMinutes = 90
+)
 
 type weekdayPreference struct {
 	ID      string // lowercase ID for form field name
 	Name    string // Display name
-	Checked bool
+	Minutes int    // Selected workout duration in minutes
+}
+
+type workoutDurationOption struct {
+	Value int    // Minutes value
+	Label string // Display label
 }
 
 type preferencesTemplateData struct {
 	BaseTemplateData
-	Weekdays []weekdayPreference
+	Weekdays        []weekdayPreference
+	DurationOptions []workoutDurationOption
+}
+
+func getWorkoutDurationOptions() []workoutDurationOption {
+	return []workoutDurationOption{
+		{Value: RestDayMinutes, Label: "Rest day"},
+		{Value: FortyFiveMinutes, Label: "45 minutes"},
+		{Value: OneHourMinutes, Label: "1 hour"},
+		{Value: OneAndHalfHourMinutes, Label: "1.5 hours"},
+	}
 }
 
 func preferencesToWeekdays(prefs workout.Preferences) []weekdayPreference {
 	return []weekdayPreference{
-		{ID: "monday", Name: "Monday", Checked: prefs.Monday},
-		{ID: "tuesday", Name: "Tuesday", Checked: prefs.Tuesday},
-		{ID: "wednesday", Name: "Wednesday", Checked: prefs.Wednesday},
-		{ID: "thursday", Name: "Thursday", Checked: prefs.Thursday},
-		{ID: "friday", Name: "Friday", Checked: prefs.Friday},
-		{ID: "saturday", Name: "Saturday", Checked: prefs.Saturday},
-		{ID: "sunday", Name: "Sunday", Checked: prefs.Sunday},
+		{ID: "monday", Name: "Monday", Minutes: prefs.MondayMinutes},
+		{ID: "tuesday", Name: "Tuesday", Minutes: prefs.TuesdayMinutes},
+		{ID: "wednesday", Name: "Wednesday", Minutes: prefs.WednesdayMinutes},
+		{ID: "thursday", Name: "Thursday", Minutes: prefs.ThursdayMinutes},
+		{ID: "friday", Name: "Friday", Minutes: prefs.FridayMinutes},
+		{ID: "saturday", Name: "Saturday", Minutes: prefs.SaturdayMinutes},
+		{ID: "sunday", Name: "Sunday", Minutes: prefs.SundayMinutes},
+	}
+}
+
+func parseMinutes(value string) int {
+	minutes, err := strconv.Atoi(value)
+	if err != nil {
+		return 0 // Default to rest day if parsing fails
+	}
+	// Validate against allowed values
+	switch minutes {
+	case RestDayMinutes, FortyFiveMinutes, OneHourMinutes, OneAndHalfHourMinutes:
+		return minutes
+	default:
+		return RestDayMinutes // Default to rest day for invalid values
 	}
 }
 
 func weekdaysToPreferences(r *http.Request) workout.Preferences {
 	return workout.Preferences{
-		Monday:    r.Form.Get("monday") == TRUE,
-		Tuesday:   r.Form.Get("tuesday") == TRUE,
-		Wednesday: r.Form.Get("wednesday") == TRUE,
-		Thursday:  r.Form.Get("thursday") == TRUE,
-		Friday:    r.Form.Get("friday") == TRUE,
-		Saturday:  r.Form.Get("saturday") == TRUE,
-		Sunday:    r.Form.Get("sunday") == TRUE,
+		MondayMinutes:    parseMinutes(r.Form.Get("monday_minutes")),
+		TuesdayMinutes:   parseMinutes(r.Form.Get("tuesday_minutes")),
+		WednesdayMinutes: parseMinutes(r.Form.Get("wednesday_minutes")),
+		ThursdayMinutes:  parseMinutes(r.Form.Get("thursday_minutes")),
+		FridayMinutes:    parseMinutes(r.Form.Get("friday_minutes")),
+		SaturdayMinutes:  parseMinutes(r.Form.Get("saturday_minutes")),
+		SundayMinutes:    parseMinutes(r.Form.Get("sunday_minutes")),
 	}
 }
 
@@ -55,6 +91,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	data := preferencesTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Weekdays:         preferencesToWeekdays(prefs),
+		DurationOptions:  getWorkoutDurationOptions(),
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)
