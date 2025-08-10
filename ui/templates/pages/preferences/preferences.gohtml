@@ -59,14 +59,19 @@
                         border-color: var(--color-success);
                     }
 
-                    .weekday-label {
-                        font-weight: var(--font-weight-5);
-                        color: var(--color-text-primary);
-                        font-size: var(--font-size-2);
-                        flex: 1;
-                    }
-
                     .workout-duration {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                        width: 100%;
+
+                        .weekday-label {
+                            font-weight: var(--font-weight-5);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-2);
+                            flex: 1;
+                        }
+
                         select {
                             padding: var(--size-2) var(--size-3);
                             border: var(--border-size-1) solid var(--color-border);
@@ -145,9 +150,9 @@
             <div class="weekdays-grid">
                 {{ range .Weekdays }}
                     <div class="weekday-item">
-                        <span class="weekday-label">{{ .Name }}</span>
                         <div class="workout-duration">
-                            <select name="{{ .ID }}_minutes">
+                            <label for="{{ .ID }}_minutes_select" class="weekday-label">{{ .Name }}</label>
+                            <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select">
                                 {{ $weekdayMinutes := .Minutes }}
                                 {{ range $.DurationOptions }}
                                     <option value="{{ .Value }}" 

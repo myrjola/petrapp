@@ -30,7 +30,7 @@ func Test_application_exerciseSet(t *testing.T) {
 
 	// Set workout preferences
 	formData := map[string]string{
-		"monday_minutes": "60",
+		"Monday": "60",
 	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)

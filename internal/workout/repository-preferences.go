@@ -25,20 +25,14 @@ func newSQLitePreferenceRepository(db *sqlite.Database) *sqlitePreferencesReposi
 func (r *sqlitePreferencesRepository) Get(ctx context.Context) (Preferences, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
-	// We need to query both booleans and minutes from the database
-	var mondayBool, tuesdayBool, wednesdayBool, thursdayBool, fridayBool, saturdayBool, sundayBool bool
-	var mondayMinutes, tuesdayMinutes, wednesdayMinutes, thursdayMinutes, fridayMinutes, saturdayMinutes, sundayMinutes int
-
+	var prefs Preferences
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday,
-		       monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes, 
+		SELECT monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes, 
 		       friday_minutes, saturday_minutes, sunday_minutes
 		FROM workout_preferences 
 		WHERE user_id = ?`, userID).Scan(
-		&mondayBool, &tuesdayBool, &wednesdayBool, &thursdayBool,
-		&fridayBool, &saturdayBool, &sundayBool,
-		&mondayMinutes, &tuesdayMinutes, &wednesdayMinutes, &thursdayMinutes,
-		&fridayMinutes, &saturdayMinutes, &sundayMinutes,
+		&prefs.MondayMinutes, &prefs.TuesdayMinutes, &prefs.WednesdayMinutes, &prefs.ThursdayMinutes,
+		&prefs.FridayMinutes, &prefs.SaturdayMinutes, &prefs.SundayMinutes,
 	)
 
 	if errors.Is(err, ErrNotFound) {
@@ -58,32 +52,7 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (Preferences, err
 		return Preferences{}, fmt.Errorf("query workout preferences: %w", err)
 	}
 
-	// Convert database values to domain model
-	// Priority: if minutes is set and > 0, use it; otherwise convert boolean to minutes
-	prefs := Preferences{
-		MondayMinutes:    convertToMinutes(mondayBool, mondayMinutes),
-		TuesdayMinutes:   convertToMinutes(tuesdayBool, tuesdayMinutes),
-		WednesdayMinutes: convertToMinutes(wednesdayBool, wednesdayMinutes),
-		ThursdayMinutes:  convertToMinutes(thursdayBool, thursdayMinutes),
-		FridayMinutes:    convertToMinutes(fridayBool, fridayMinutes),
-		SaturdayMinutes:  convertToMinutes(saturdayBool, saturdayMinutes),
-		SundayMinutes:    convertToMinutes(sundayBool, sundayMinutes),
-	}
-
 	return prefs, nil
-}
-
-// convertToMinutes converts database boolean/minutes to domain minutes.
-func convertToMinutes(dayBool bool, dayMinutes int) int {
-	// If minutes is already set and > 0, use it
-	if dayMinutes > 0 {
-		return dayMinutes
-	}
-	// Otherwise, convert boolean: true -> 60 minutes, false -> 0 minutes
-	if dayBool {
-		return 60
-	}
-	return 0
 }
 
 // Set saves the workout preferences for a user.

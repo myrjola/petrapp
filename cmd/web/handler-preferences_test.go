@@ -65,8 +65,8 @@ func Test_application_preferences(t *testing.T) {
 	// Can update preferences.
 	// Submit form with Monday at 60 minutes and Wednesday at 45 minutes
 	formData := map[string]string{
-		"monday_minutes":    "60",
-		"wednesday_minutes": "45",
+		"Monday":    "60",
+		"Wednesday": "45",
 	}
 	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
 		t.Fatalf("Failed to submit form: %v", err)
