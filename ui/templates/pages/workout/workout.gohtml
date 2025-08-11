@@ -40,6 +40,11 @@
                             color: var(--lime-9);
                         }
 
+                        .exercise.started {
+                            background-color: var(--yellow-2);
+                            color: var(--yellow-11);
+                        }
+
                         a.exercise {
                             text-decoration: none;
                             background: var(--gray-1);
@@ -86,13 +91,17 @@
 
             {{ range .Session.ExerciseSets }}
                 {{ $allSetsCompleted := true }}
+                {{ $hasSomeCompleted := false }}
                 {{ range .Sets }}
                     {{ if eq .CompletedReps nil }}
                         {{ $allSetsCompleted = false }}
+                    {{ else }}
+                        {{ $hasSomeCompleted = true }}
                     {{ end }}
                 {{ end }}
+                {{ $isStarted := and $hasSomeCompleted (not $allSetsCompleted) }}
                 <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
-                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ end }}"
+                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ else if $isStarted }} started{{ end }}"
                    data-exercise-id="{{ .Exercise.ID }}">
                     {{ .Exercise.Name }}
                 </a>
