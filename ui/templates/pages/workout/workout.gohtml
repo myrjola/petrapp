@@ -13,6 +13,105 @@
             }
         </style>
 
+        <header class="workout-header">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-2);
+                        margin-bottom: var(--size-2);
+                    }
+
+                    h1 {
+                        font-size: var(--font-size-6);
+                        font-weight: var(--font-weight-7);
+                        color: var(--gray-9);
+                        margin: 0;
+                    }
+
+                    .workout-meta {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: center;
+                        flex-wrap: wrap;
+                    }
+
+                    .status-badge {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: var(--size-1);
+                        padding: var(--size-1) var(--size-2);
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-0);
+                        font-weight: var(--font-weight-6);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                    }
+
+                    .status-badge.completed {
+                        background: var(--lime-2);
+                        color: var(--lime-9);
+                    }
+
+                    .status-badge.in-progress {
+                        background: var(--yellow-2);
+                        color: var(--yellow-11);
+                    }
+
+                    .status-badge.not-started {
+                        background: var(--gray-2);
+                        color: var(--gray-9);
+                    }
+
+                    .progress-summary {
+                        color: var(--gray-7);
+                        font-size: var(--font-size-1);
+                    }
+                }
+            </style>
+
+            {{ $hasUpper := false }}
+            {{ $hasLower := false }}
+            {{ $hasFullBody := false }}
+            {{ range .Session.ExerciseSets }}
+                {{ if eq .Exercise.Category "upper" }}
+                    {{ $hasUpper = true }}
+                {{ else if eq .Exercise.Category "lower" }}
+                    {{ $hasLower = true }}
+                {{ else if eq .Exercise.Category "full_body" }}
+                    {{ $hasFullBody = true }}
+                {{ end }}
+            {{ end }}
+            
+            {{ $workoutType := "Full Body" }}
+            {{ if $hasFullBody }}
+                {{ $workoutType = "Full Body" }}
+            {{ else if and $hasUpper $hasLower }}
+                {{ $workoutType = "Full Body" }}
+            {{ else if $hasUpper }}
+                {{ $workoutType = "Upper Body" }}
+            {{ else if $hasLower }}
+                {{ $workoutType = "Lower Body" }}
+            {{ end }}
+            
+            <h1>{{ $workoutType }} Workout - {{ .Date.Format "Monday, January 2, 2006" }}</h1>
+            
+            <div class="workout-meta">
+                {{ if not .Session.CompletedAt.IsZero }}
+                    <span class="status-badge completed">Completed</span>
+                {{ else if not .Session.StartedAt.IsZero }}
+                    <span class="status-badge in-progress">In Progress</span>
+                {{ else }}
+                    <span class="status-badge not-started">Not Started</span>
+                {{ end }}
+
+                <span class="progress-summary">
+                    {{ len .Session.ExerciseSets }} exercises
+                </span>
+            </div>
+        </header>
+
         <div class="exercise-list">
             <style {{ nonce }}>
                 @scope {
