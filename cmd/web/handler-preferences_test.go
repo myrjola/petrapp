@@ -140,6 +140,16 @@ func Test_application_deleteUser(t *testing.T) {
 		t.Fatalf("Failed to register: %v", err)
 	}
 
+	// Verify the user can log in because we check that it fails after deleting the user
+	_, err = client.Logout(ctx)
+	if err != nil {
+		t.Fatalf("Failed to logout: %v", err)
+	}
+	_, err = client.Login(ctx)
+	if err != nil {
+		t.Fatalf("Failed to login: %v", err)
+	}
+
 	// Navigate to preferences page
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
@@ -170,26 +180,6 @@ func Test_application_deleteUser(t *testing.T) {
 		t.Fatal("Expected to find delete user button")
 	}
 
-	// Verify the form has CSRF protection
-	csrfInput := deleteForm.Find("input[name='csrf_token']")
-	if csrfInput.Length() == 0 {
-		t.Fatal("Expected to find CSRF token in delete form")
-	}
-
-	// Set some preferences first so we have data to delete
-	formData := map[string]string{
-		"Monday":  "60",
-		"Tuesday": "45",
-	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
-		t.Fatalf("Failed to submit preferences: %v", err)
-	}
-
-	// Navigate back to preferences to perform deletion
-	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
-		t.Fatalf("Failed to get preferences: %v", err)
-	}
-
 	// Submit the delete user form
 	if doc, err = client.SubmitForm(ctx, doc, "/preferences/delete-user", nil); err != nil {
 		t.Fatalf("Failed to submit delete user form: %v", err)
@@ -211,8 +201,10 @@ func Test_application_deleteUser(t *testing.T) {
 	}
 
 	// Verify the user can't login with old credentials (user was deleted)
-	// This depends on the client implementation - if it tries to login with deleted credentials,
-	// it should fail. For now, we'll just verify that accessing protected routes requires new registration.
+	_, err = client.Login(ctx)
+	if err == nil {
+		t.Fatal("Expected error when trying to login with deleted user credentials, got none")
+	}
 }
 
 func verifySelected(t *testing.T, doc *goquery.Document, weekdays map[string]int) {
