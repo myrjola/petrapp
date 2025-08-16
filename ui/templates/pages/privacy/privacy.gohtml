@@ -1,0 +1,123 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.privacyTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    padding: var(--size-8) var(--size-5);
+                    max-width: 50rem;
+                    margin: 0 auto;
+                    line-height: var(--font-lineheight-3);
+                }
+
+                h1 {
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-4);
+                    margin-bottom: var(--size-6);
+                    color: var(--gray-9);
+                }
+
+                h2 {
+                    font-size: var(--font-size-4);
+                    font-weight: var(--font-weight-3);
+                    margin-top: var(--size-6);
+                    margin-bottom: var(--size-4);
+                    color: var(--gray-8);
+                }
+
+                p {
+                    margin-bottom: var(--size-4);
+                    color: var(--gray-7);
+                }
+
+                ul {
+                    margin-bottom: var(--size-4);
+                    padding-left: var(--size-5);
+                }
+
+                li {
+                    margin-bottom: var(--size-2);
+                    color: var(--gray-7);
+                }
+
+                code {
+                    background: var(--gray-1);
+                    padding: var(--size-1) var(--size-2);
+                    border-radius: var(--radius-2);
+                    font-family: monospace;
+                    font-size: var(--font-size-1);
+                }
+
+                .back-link {
+                    display: inline-block;
+                    margin-bottom: var(--size-4);
+                    color: var(--sky-6);
+                    text-decoration: underline;
+                }
+
+                .back-link:hover {
+                    color: var(--sky-7);
+                }
+            }
+        </style>
+
+        <a href="/" class="back-link">← Back to Home</a>
+
+        <h1>Privacy & Security</h1>
+
+        <h2>Authentication & Privacy</h2>
+        <p>
+            Petra uses WebAuthn (Web Authentication) for secure, passwordless authentication. This technology provides several privacy benefits:
+        </p>
+        <ul>
+            <li><strong>No usernames required:</strong> Your identity is tied to your device's biometric authentication or security key, not a username or email address</li>
+            <li><strong>No passwords stored:</strong> We never store or have access to your passwords since authentication is handled directly by your device</li>
+            <li><strong>Phishing resistant:</strong> WebAuthn credentials are tied to our specific domain, making phishing attacks ineffective</li>
+            <li><strong>Private by design:</strong> Your biometric data never leaves your device - only cryptographic signatures are shared</li>
+        </ul>
+
+        <h2>Data We Store</h2>
+        <p>
+            Petra stores minimal data necessary for the fitness tracking functionality:
+        </p>
+        <ul>
+            <li><strong>Workout data:</strong> Your exercise sessions, sets, reps, and weights to track your progress</li>
+            <li><strong>Exercise preferences:</strong> Your customized exercise selections and difficulty preferences</li>
+            <li><strong>WebAuthn credentials:</strong> Cryptographic public keys and credential IDs for authentication (no biometric data)</li>
+            <li><strong>Session data:</strong> Temporary authentication tokens to keep you logged in</li>
+        </ul>
+        <p>
+            We do not store personal identifiers like names, email addresses, or any biometric data. All data is stored locally on our servers and is not shared with third parties.
+        </p>
+
+        <h2>Cookies & Security</h2>
+        <p>
+            Petra uses the following cookies to ensure security and functionality:
+        </p>
+        <ul>
+            <li><code>session</code> - Secure, HTTP-only session cookie that maintains your authenticated state. Expires when you close your browser or after a period of inactivity.</li>
+            <li><code>csrf_token</code> - Cross-Site Request Forgery protection token that prevents malicious websites from performing actions on your behalf. This cookie works with form tokens to ensure requests originate from legitimate pages.</li>
+        </ul>
+        <p>
+            Both cookies are set with secure flags (Secure, HttpOnly, SameSite) to prevent unauthorized access and ensure they're only transmitted over encrypted connections.
+        </p>
+
+        <h2>Data Security</h2>
+        <p>
+            Your data is protected through multiple security measures:
+        </p>
+        <ul>
+            <li><strong>HTTPS encryption:</strong> All data transmission is encrypted using TLS</li>
+            <li><strong>CSRF protection:</strong> All forms include tokens to prevent cross-site request forgery attacks</li>
+            <li><strong>Content Security Policy:</strong> Strict CSP headers prevent code injection attacks</li>
+            <li><strong>SQL injection prevention:</strong> All database queries use parameterized statements</li>
+            <li><strong>Secure session management:</strong> Sessions use cryptographically secure tokens with appropriate expiration</li>
+        </ul>
+
+        <h2>Data Retention</h2>
+        <p>
+            Your workout data is retained to provide historical tracking and progress analysis. You can request deletion of your data by clearing your browser's stored credentials, which will prevent future access to your account. WebAuthn credentials that are no longer used are automatically cleaned up over time.
+        </p>
+    </main>
+{{ end }}

@@ -83,3 +83,15 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 
 	_, _ = buf.WriteTo(w)
 }
+
+type privacyTemplateData struct {
+	BaseTemplateData
+}
+
+func (app *application) privacy(w http.ResponseWriter, r *http.Request) {
+	data := privacyTemplateData{
+		BaseTemplateData: newBaseTemplateData(r),
+	}
+
+	app.render(w, r, http.StatusOK, "privacy", data)
+}

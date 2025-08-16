@@ -69,6 +69,9 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
 	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
+	// Privacy page
+	mux.Handle("GET /privacy", session(http.HandlerFunc(app.privacy)))
+
 	// Home route (most specific)
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
 

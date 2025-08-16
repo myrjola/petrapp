@@ -101,6 +101,30 @@
                         </form>
                     </div>
                 </div>
+                <footer>
+                    <style {{ nonce }}>
+                        @scope {
+                            :scope {
+                                margin-top: var(--size-8);
+                                padding-top: var(--size-4);
+                                text-align: center;
+                                border-top: 1px solid var(--gray-3);
+                            }
+
+                            a {
+                                color: var(--gray-6);
+                                text-decoration: none;
+                                font-size: var(--font-size-1);
+                            }
+
+                            a:hover {
+                                color: var(--gray-8);
+                                text-decoration: underline;
+                            }
+                        }
+                    </style>
+                    <a href="/privacy">Privacy & Security</a>
+                </footer>
             </div>
         </div>
         {{ template "backdrop-blur-bottom" }}
