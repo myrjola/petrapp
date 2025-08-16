@@ -239,3 +239,21 @@ func (h *WebAuthnHandler) Logout(ctx context.Context) error {
 	h.sessionManager.Remove(ctx, string(userIDSessionKey))
 	return nil
 }
+
+func (h *WebAuthnHandler) DeleteUser(ctx context.Context) error {
+	userID := h.sessionManager.Get(ctx, string(userIDSessionKey))
+	if userID == nil {
+		return fmt.Errorf("no authenticated user in session")
+	}
+
+	userIDBytes, ok := userID.([]byte)
+	if !ok {
+		return fmt.Errorf("invalid user ID type in session")
+	}
+
+	if err := h.deleteUser(ctx, userIDBytes); err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+
+	return nil
+}

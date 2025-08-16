@@ -113,3 +113,21 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 
 	redirect(w, r, "/")
 }
+
+func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Delete the user and all their data
+	if err := app.webAuthnHandler.DeleteUser(ctx); err != nil {
+		app.serverError(w, r, fmt.Errorf("delete user: %w", err))
+		return
+	}
+
+	// Log the user out by clearing the session and redirect to home
+	if err := app.webAuthnHandler.Logout(ctx); err != nil {
+		app.serverError(w, r, fmt.Errorf("logout after user deletion: %w", err))
+		return
+	}
+
+	redirect(w, r, "/")
+}

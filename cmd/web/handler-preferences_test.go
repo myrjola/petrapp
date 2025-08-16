@@ -121,6 +121,100 @@ func Test_application_preferences(t *testing.T) {
 	verifySelected(t, doc, weekdaysAfterPersistence)
 }
 
+func Test_application_deleteUser(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	client := server.Client()
+
+	// First register to get authenticated
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Navigate to preferences page
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+
+	// Verify we can see the danger zone
+	dangerZone := doc.Find(".danger-zone")
+	if dangerZone.Length() == 0 {
+		t.Fatal("Expected to find danger zone section")
+	}
+
+	// Verify danger zone contains proper warning text
+	if dangerZone.Text() == "" ||
+		doc.Find(".danger-zone h2:contains('Danger Zone')").Length() == 0 ||
+		doc.Find(".danger-zone p:contains('Permanently delete')").Length() == 0 {
+		t.Error("Expected to find proper danger zone warning text")
+	}
+
+	// Find the delete user form
+	deleteForm := doc.Find("form[action='/preferences/delete-user']")
+	if deleteForm.Length() == 0 {
+		t.Fatal("Expected to find delete user form")
+	}
+
+	// Verify the delete button exists
+	deleteButton := deleteForm.Find("button:contains('Delete my data')")
+	if deleteButton.Length() == 0 {
+		t.Fatal("Expected to find delete user button")
+	}
+
+	// Verify the form has CSRF protection
+	csrfInput := deleteForm.Find("input[name='csrf_token']")
+	if csrfInput.Length() == 0 {
+		t.Fatal("Expected to find CSRF token in delete form")
+	}
+
+	// Set some preferences first so we have data to delete
+	formData := map[string]string{
+		"Monday":  "60",
+		"Tuesday": "45",
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("Failed to submit preferences: %v", err)
+	}
+
+	// Navigate back to preferences to perform deletion
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+
+	// Submit the delete user form
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/delete-user", nil); err != nil {
+		t.Fatalf("Failed to submit delete user form: %v", err)
+	}
+
+	// After deletion, user should be redirected to home page and logged out
+	if doc.Url.Path != "/" {
+		t.Errorf("Expected to be redirected to home page after deletion, got %q", doc.Url.Path)
+	}
+
+	// Trying to access preferences should now redirect to home (user not authenticated)
+	var resp *http.Response
+	resp, err = client.Get(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Failed to get preferences after deletion: %v", err)
+	}
+	if got, want := resp.Request.URL.Path, "/"; got != want {
+		t.Errorf("Expected redirect to %q after user deletion, got %q", want, got)
+	}
+
+	// Verify the user can't login with old credentials (user was deleted)
+	// This depends on the client implementation - if it tries to login with deleted credentials,
+	// it should fail. For now, we'll just verify that accessing protected routes requires new registration.
+}
+
 func verifySelected(t *testing.T, doc *goquery.Document, weekdays map[string]int) {
 	t.Helper()
 	form, err := e2etest.FindForm(doc, "/preferences")
