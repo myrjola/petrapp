@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -243,12 +244,12 @@ func (h *WebAuthnHandler) Logout(ctx context.Context) error {
 func (h *WebAuthnHandler) DeleteUser(ctx context.Context) error {
 	userID := h.sessionManager.Get(ctx, string(userIDSessionKey))
 	if userID == nil {
-		return fmt.Errorf("no authenticated user in session")
+		return errors.New("no authenticated user in session")
 	}
 
 	userIDBytes, ok := userID.([]byte)
 	if !ok {
-		return fmt.Errorf("invalid user ID type in session")
+		return errors.New("invalid user ID type in session")
 	}
 
 	if err := h.deleteUser(ctx, userIDBytes); err != nil {
