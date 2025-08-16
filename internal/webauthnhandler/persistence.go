@@ -173,3 +173,15 @@ func (h *WebAuthnHandler) getUserRole(ctx context.Context, userID []byte) (role,
 	}
 	return roleUser, nil
 }
+
+// deleteUser permanently removes a user and all associated data from the database.
+// Due to CASCADE DELETE constraints in the schema, this will automatically clean up
+// anything that refers to the user.
+func (h *WebAuthnHandler) deleteUser(ctx context.Context, userID []byte) error {
+	stmt := `DELETE FROM users WHERE id = ?`
+	_, err := h.database.ReadWrite.ExecContext(ctx, stmt, userID)
+	if err != nil {
+		return fmt.Errorf("delete user from database: %w", err)
+	}
+	return nil
+}

@@ -139,6 +139,48 @@
                         border-color: var(--gray-4);
                     }
                 }
+
+                .danger-zone {
+                    margin-top: var(--size-8);
+                    padding: var(--size-6);
+                    background: var(--red-1);
+                    border: var(--border-size-1) solid var(--red-4);
+                    border-radius: var(--radius-3);
+                }
+
+                .danger-zone h2 {
+                    font-size: var(--font-size-3);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin: 0 0 var(--size-3) 0;
+                }
+
+                .danger-zone p {
+                    color: var(--color-text-primary);
+                    margin-bottom: var(--size-4);
+                    font-size: var(--font-size-1);
+                    line-height: 1.5;
+                }
+
+                .delete-button {
+                    padding: var(--size-3) var(--size-5);
+                    background: var(--red-11);
+                    color: var(--white);
+                    border: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-5);
+                    font-size: var(--font-size-1);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--red-12);
+                    }
+
+                    &:active {
+                        background: var(--red-12);
+                    }
+                }
             }
         </style>
 
@@ -167,6 +209,18 @@
             </div>
             <button type="submit" class="save-button">Save Schedule</button>
         </form>
+
+        <div class="danger-zone">
+            <h2>Danger Zone</h2>
+            <p>Permanently delete your account and all your workout data. This action cannot be undone.</p>
+            <form action="/preferences/delete-user" method="post" 
+                  onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your workout data.')">
+                {{ csrf }}
+                <button type="submit" class="delete-button">
+                    Delete my data
+                </button>
+            </form>
+        </div>
 
         <footer class="footer-section">
             <form action="/api/logout" method="post">

@@ -56,6 +56,7 @@ func (app *application) routes() *http.ServeMux {
 
 	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
 	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
+	mux.Handle("POST /preferences/delete-user", mustSession(http.HandlerFunc(app.deleteUserPOST)))
 
 	mux.Handle("POST /api/registration/start", session(http.HandlerFunc(app.beginRegistration)))
 	mux.Handle("POST /api/registration/finish", session(http.HandlerFunc(app.finishRegistration)))
