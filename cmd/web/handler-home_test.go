@@ -121,7 +121,7 @@ func Test_crossOriginProtection(t *testing.T) {
 
 // containsStatusError checks if the error contains a specific HTTP status code.
 func containsStatusError(err error, statusCode int) bool {
-	return err != nil && 
+	return err != nil &&
 		(err.Error() == fmt.Sprintf("unexpected status code: %d", statusCode) ||
-		 strings.Contains(err.Error(), fmt.Sprintf("status code: %d", statusCode)))
+			strings.Contains(err.Error(), fmt.Sprintf("status code: %d", statusCode)))
 }
