@@ -21,7 +21,7 @@ Guidelines for working with HTTP handlers, routing, middleware, and web server c
 
 - Create dedicated structs for each template that embed `BaseTemplateData`
 - Transform all data in handlers before passing to templates - avoid complex template logic
-- Use `newBaseTemplateData(r)` to create base data with CSRF tokens and security context
+- Use `newBaseTemplateData(r)` to create base data with security context
 
 Example:
 

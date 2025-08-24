@@ -9,7 +9,6 @@ import (
 	"runtime/trace"
 	"time"
 
-	"github.com/justinas/nosurf"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/logging"
 )
@@ -191,25 +190,14 @@ func (app *application) mustAdmin(next http.Handler) http.Handler {
 func commonContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = contexthelpers.SetCurrentPath(r, r.URL.Path)
-		r = contexthelpers.SetCSRFToken(r, nosurf.Token(r))
 		next.ServeHTTP(w, r)
 	})
 }
 
-// noSurf implements CSRF protection using https://github.com/justinas/nosurf
-func (app *application) noSurf(next http.Handler) http.Handler {
-	csrfHandler := nosurf.New(next)
-	csrfHandler.SetFailureHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "csrf token validation failed")
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-	}))
-	csrfHandler.SetBaseCookie(http.Cookie{
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-	return csrfHandler
+// crossOriginProtection implements CSRF protection using Go 1.25's CrossOriginProtection.
+func (app *application) crossOriginProtection(next http.Handler) http.Handler {
+	protection := http.NewCrossOriginProtection()
+	return protection.Handler(next)
 }
 
 // timeout times out the request and cancels the context using http.TimeoutHandler.

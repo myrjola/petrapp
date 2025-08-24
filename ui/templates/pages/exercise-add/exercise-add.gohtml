@@ -119,7 +119,6 @@
                             </div>
                         </div>
                         <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/add-exercise">
-                            {{ csrf }}
                             <input type="hidden" name="exercise_id" value="{{ .ID }}">
                             <button type="submit" class="add-button">Add this exercise</button>
                         </form>

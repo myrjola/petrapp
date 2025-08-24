@@ -233,7 +233,6 @@
                 }
             </style>
             <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/complete">
-                {{ csrf }}
                 <button type="submit">Complete workout</button>
             </form>
         </div>

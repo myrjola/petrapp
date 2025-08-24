@@ -11,7 +11,7 @@ func (app *application) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	shared := func(next http.Handler) http.Handler {
-		return app.logAndTraceRequest(secureHeaders(app.noSurf(commonContext(app.timeout(next)))))
+		return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(commonContext(app.timeout(next)))))
 	}
 
 	noAuth := func(next http.Handler) http.Handler {

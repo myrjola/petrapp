@@ -82,7 +82,6 @@
 
         <div class="actions">
             <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                {{ csrf }}
                 <button type="submit" class="primary-button">Create Workout</button>
             </form>
             <a href="/" class="secondary-button">Back to Home</a>

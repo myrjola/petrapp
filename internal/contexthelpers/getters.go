@@ -31,15 +31,6 @@ func CurrentPath(ctx context.Context) string {
 	return currentPath
 }
 
-func CSRFToken(ctx context.Context) string {
-	csrfToken, ok := ctx.Value(CsrfTokenContextKey).(string)
-	if !ok {
-		return ""
-	}
-
-	return csrfToken
-}
-
 func CSPNonce(ctx context.Context) string {
 	cspNonce, ok := ctx.Value(CspNonceContextKey).(string)
 	if !ok {

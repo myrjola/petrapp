@@ -29,7 +29,7 @@ custom-gcl:
 sec:
 	go tool govulncheck ./...
 
-ci: init build lint test sec
+ci: init build lint-fix test sec
 
 build:
 	@echo "Building..."

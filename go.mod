@@ -9,7 +9,6 @@ require (
 	github.com/descope/virtualwebauthn v1.0.3
 	github.com/go-webauthn/webauthn v0.13.4
 	github.com/google/go-cmp v0.7.0
-	github.com/justinas/nosurf v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.30
 	github.com/openai/openai-go v1.12.0
 	github.com/yuin/goldmark v1.7.13

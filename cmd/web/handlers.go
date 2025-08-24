@@ -45,13 +45,9 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 
 	buf := new(bytes.Buffer)
 	nonce := fmt.Sprintf("nonce=\"%s\"", contexthelpers.CSPNonce(ctx))
-	csrf := fmt.Sprintf("<input type=\"hidden\" name=\"csrf_token\" value=\"%s\"/>", contexthelpers.CSRFToken(ctx))
 	t.Funcs(template.FuncMap{
 		"nonce": func() template.HTMLAttr {
 			return template.HTMLAttr(nonce) //nolint:gosec // we trust the nonce since it's not provided by user.
-		},
-		"csrf": func() template.HTML {
-			return template.HTML(csrf) //nolint:gosec // we trust the csrf since it's not provided by user.
 		},
 		"mdToHTML": func(markdown string) template.HTML {
 			return app.renderMarkdownToHTML(ctx, markdown)

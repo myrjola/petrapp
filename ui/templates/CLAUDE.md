@@ -23,13 +23,11 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 ### Security Functions (Always Available)
 
 - `{{ nonce }}` - CSP nonce attribute for style/script tags (required for CSP compliance)
-- `{{ csrf }}` - CSRF token input field for forms (required for state-changing operations)
 - `{{ mdToHTML "markdown content" }}` - Convert markdown to HTML
 
 ### Important Security Requirements
 
 - **NEVER use inline styles without nonce** - all `<style>` tags must include `{{ nonce }}`
-- **ALL forms must include `{{ csrf }}`** for CSRF protection
 - Use `{{ nonce }}` for any `<script>` tags as well
 
 Example:
@@ -39,10 +37,9 @@ Example:
     /* CSS here */
 </style>
 
-<form method="post">
-    {{ csrf }}
-    <!-- form fields -->
-</form>
+<script {{ nonce }}>
+    /* JS here */
+</script>
 ```
 
 ## CSS Architecture and Scoping
