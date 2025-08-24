@@ -75,9 +75,13 @@
         if (e.formData) {
           e.intercept({
             async handler() {
+              const body = new URLSearchParams(e.formData).toString()
               const result = await fetch(e.destination.url, {
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded"
+                },
                 method: "POST",
-                body: e.formData,
+                body,
               })
               const baseUrl = window.location.origin;
               const location = result.headers.get("Content-Location")
