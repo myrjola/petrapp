@@ -7,7 +7,7 @@ Personal trainer app
 ### Install dependencies, configure linting, and install git hooks
 
 ```
-make init
+make
 ```
 
 ### Start go server
