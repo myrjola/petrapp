@@ -134,9 +134,7 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
                                authenticator_aaguid        = EXCLUDED.authenticator_aaguid,
                                authenticator_sign_count    = EXCLUDED.authenticator_sign_count,
                                authenticator_clone_warning = EXCLUDED.authenticator_clone_warning,
-                               authenticator_attachment    = EXCLUDED.authenticator_attachment;
-                                 
-                                   `
+                               authenticator_attachment    = EXCLUDED.authenticator_attachment`
 	var encodedTransport []byte
 	encodedTransport, err = json.Marshal(credential.Transport)
 	if err != nil {
