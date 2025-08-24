@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func AuthenticateContext(r *http.Request, userID []byte, isAdmin bool) *http.Request {
+func AuthenticateContext(r *http.Request, userID int, isAdmin bool) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, IsAuthenticatedContextKey, true)
 	ctx = context.WithValue(ctx, AuthenticatedUserIDContextKey, userID)

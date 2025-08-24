@@ -249,7 +249,7 @@ func (r *sqliteSessionRepository) parseSessionRow(
 // loadExerciseSets fetches all exercise sets for a session.
 func (r *sqliteSessionRepository) loadExerciseSets(
 	ctx context.Context,
-	userID []byte,
+	userID int,
 	date time.Time,
 ) (_ []exerciseSetAggregate, err error) {
 	dateStr := formatDate(date)

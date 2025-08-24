@@ -13,10 +13,10 @@ func IsAuthenticated(ctx context.Context) bool {
 	return isAuthenticated
 }
 
-func AuthenticatedUserID(ctx context.Context) []byte {
-	userID, ok := ctx.Value(AuthenticatedUserIDContextKey).([]byte)
+func AuthenticatedUserID(ctx context.Context) int {
+	userID, ok := ctx.Value(AuthenticatedUserIDContextKey).(int)
 	if !ok {
-		return nil
+		return 0
 	}
 
 	return userID

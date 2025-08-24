@@ -13,14 +13,17 @@ CREATE INDEX sessions_expiry_idx ON sessions (expiry);
 
 CREATE TABLE users
 (
-    id           BLOB PRIMARY KEY CHECK (LENGTH(id) < 256),
-    display_name TEXT    NOT NULL CHECK (LENGTH(display_name) < 64),
-    created      TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+    id               INTEGER PRIMARY KEY,
+    webauthn_user_id BLOB    NOT NULL UNIQUE CHECK (LENGTH(webauthn_user_id) < 256),
+    display_name     TEXT    NOT NULL CHECK (LENGTH(display_name) < 64),
+    created          TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created) = created),
-    updated      TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+    updated          TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated),
-    is_admin     INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1))
-) WITHOUT ROWID, STRICT;
+    is_admin         INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1))
+) STRICT;
+
+CREATE INDEX users_webauthn_user_id_idx ON users (webauthn_user_id);
 
 CREATE TRIGGER users_updated_timestamp
     AFTER UPDATE
@@ -47,7 +50,7 @@ CREATE TABLE credentials
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created) = created),
     updated                     TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated),
-    user_id                     BLOB    NOT NULL REFERENCES users (id) ON DELETE CASCADE
+    user_id                     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE
 ) WITHOUT ROWID, STRICT;
 
 CREATE TRIGGER credentials_updated_timestamp
@@ -63,7 +66,7 @@ END;
 
 CREATE TABLE workout_preferences
 (
-    user_id           BLOB PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    user_id           INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
     monday_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (monday_minutes IN (0, 45, 60, 90)),
     tuesday_minutes   INTEGER NOT NULL DEFAULT 0 CHECK (tuesday_minutes IN (0, 45, 60, 90)),
     wednesday_minutes INTEGER NOT NULL DEFAULT 0 CHECK (wednesday_minutes IN (0, 45, 60, 90)),
@@ -84,7 +87,7 @@ CREATE TABLE exercises
 
 CREATE TABLE workout_sessions
 (
-    user_id           BLOB NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    user_id           INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     workout_date      TEXT NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
                                            DATE(workout_date, '+0 days') IS workout_date),
     difficulty_rating INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
@@ -96,7 +99,7 @@ CREATE TABLE workout_sessions
 
 CREATE TABLE workout_exercise
 (
-    workout_user_id     BLOB    NOT NULL,
+    workout_user_id     INTEGER NOT NULL,
     workout_date        TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
     exercise_id         INTEGER NOT NULL,
     warmup_completed_at TEXT CHECK (warmup_completed_at IS NULL OR
@@ -109,7 +112,7 @@ CREATE TABLE workout_exercise
 
 CREATE TABLE exercise_sets
 (
-    workout_user_id BLOB    NOT NULL,
+    workout_user_id INTEGER NOT NULL,
     workout_date    TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
     exercise_id     INTEGER NOT NULL,
     set_number      INTEGER NOT NULL CHECK (set_number > 0),
