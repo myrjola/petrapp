@@ -32,6 +32,16 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/cache@v4
+        with:
+          path: custom-gcl
+          key: ${{ runner.os }}-custom-gcl-${{ hashFiles('go.mod', '.custom-gcl.yml') }}
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@beta
