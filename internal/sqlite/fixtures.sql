@@ -422,3 +422,7 @@ VALUES (1, 'Forearms', 0),
        (21, 'Shoulders', 0),
        (21, 'Glutes', 0)
 ON CONFLICT(exercise_id, muscle_group_name) DO UPDATE SET is_primary = excluded.is_primary;
+
+INSERT INTO feature_flags (name, enabled)
+VALUES ('maintenance_mode', 0)
+ON CONFLICT(name) DO UPDATE SET enabled = excluded.enabled;

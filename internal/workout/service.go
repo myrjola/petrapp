@@ -681,3 +681,23 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 
 	return nil
 }
+
+// GetFeatureFlag retrieves a feature flag by name.
+func (s *Service) GetFeatureFlag(ctx context.Context, name string) (FeatureFlag, error) {
+	flag, err := s.repo.featureFlags.Get(ctx, name)
+	if err != nil {
+		return FeatureFlag{}, fmt.Errorf("get feature flag %s: %w", name, err)
+	}
+	return flag, nil
+}
+
+// IsMaintenanceModeEnabled checks if maintenance mode is enabled.
+func (s *Service) IsMaintenanceModeEnabled(ctx context.Context) bool {
+	flag, err := s.repo.featureFlags.Get(ctx, "maintenance_mode")
+	if err != nil {
+		// If we can't check the flag, assume maintenance is disabled for safety
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to check maintenance mode flag", slog.Any("error", err))
+		return false
+	}
+	return flag.Enabled
+}

@@ -217,3 +217,20 @@ func (app *application) timeout(next http.Handler) http.Handler {
 		http.TimeoutHandler(next, timeout, "timed out").ServeHTTP(w, r)
 	})
 }
+
+// maintenanceMode checks if maintenance mode is enabled and serves a maintenance page if so.
+func (app *application) maintenanceMode(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		
+		// Check if maintenance mode is enabled
+		if app.workoutService.IsMaintenanceModeEnabled(ctx) {
+			// Render the maintenance page
+			data := newBaseTemplateData(r)
+			app.render(w, r, http.StatusServiceUnavailable, "maintenance", data)
+			return
+		}
+		
+		next.ServeHTTP(w, r)
+	})
+}
