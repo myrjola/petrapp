@@ -144,3 +144,9 @@ func (p Preferences) Thursday() bool  { return p.ThursdayMinutes > 0 }
 func (p Preferences) Friday() bool    { return p.FridayMinutes > 0 }
 func (p Preferences) Saturday() bool  { return p.SaturdayMinutes > 0 }
 func (p Preferences) Sunday() bool    { return p.SundayMinutes > 0 }
+
+// FeatureFlag represents a feature flag that can toggle application features.
+type FeatureFlag struct {
+	Name    string
+	Enabled bool
+}

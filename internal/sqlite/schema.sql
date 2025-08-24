@@ -137,3 +137,13 @@ CREATE TABLE exercise_muscle_groups
 
     PRIMARY KEY (exercise_id, muscle_group_name)
 ) WITHOUT ROWID, STRICT;
+
+-------------------
+-- Feature flags --
+-------------------
+
+CREATE TABLE feature_flags
+(
+    name    TEXT PRIMARY KEY CHECK (LENGTH(name) < 256),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
+) WITHOUT ROWID, STRICT;

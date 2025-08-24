@@ -12,9 +12,10 @@ import (
 
 // repository contains the repositories for the domain-driven design aggregates.
 type repository struct {
-	prefs     preferencesRepository
-	sessions  sessionRepository
-	exercises exerciseRepository
+	prefs        preferencesRepository
+	sessions     sessionRepository
+	exercises    exerciseRepository
+	featureFlags featureFlagRepository
 }
 
 // preferencesRepository handles workout preferences.
@@ -61,6 +62,12 @@ type exerciseRepository interface {
 	Update(ctx context.Context, exerciseID int, updateFn func(ex *Exercise) (bool, error)) error
 	// ListMuscleGroups retrieves all available muscle groups.
 	ListMuscleGroups(ctx context.Context) ([]string, error)
+}
+
+// featureFlagRepository handles feature flags.
+type featureFlagRepository interface {
+	Get(ctx context.Context, name string) (FeatureFlag, error)
+	Set(ctx context.Context, flag FeatureFlag) error
 }
 
 // baseRepository contains common functionality for all repositories.
@@ -124,12 +131,14 @@ func (f *repositoryFactory) newRepository() *repository {
 	exerciseRepo := newSQLiteExerciseRepository(f.db)
 	preferencesRepo := newSQLitePreferenceRepository(f.db)
 	sessionRepo := newSQLiteSessionRepository(f.db)
+	featureFlagRepo := newSQLiteFeatureFlagRepository(f.db)
 
 	// Return a composite repository
 	return &repository{
-		prefs:     preferencesRepo,
-		sessions:  sessionRepo,
-		exercises: exerciseRepo,
+		prefs:        preferencesRepo,
+		sessions:     sessionRepo,
+		exercises:    exerciseRepo,
+		featureFlags: featureFlagRepo,
 	}
 }
 
