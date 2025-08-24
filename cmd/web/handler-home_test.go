@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -78,4 +80,48 @@ func checkButtonPresence(t *testing.T, doc *goquery.Document, buttonText string,
 	if count != expectedCount {
 		t.Errorf("Expected %d '%s' button(s), but found %d", expectedCount, buttonText, count)
 	}
+}
+
+func Test_crossOriginProtection(t *testing.T) {
+	ctx := t.Context()
+	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	// Create a malicious client that simulates cross-origin requests
+	maliciousClient, err := e2etest.NewClientWithSecFetchSite(
+		server.URL(),
+		"localhost",
+		server.URL(),
+		"cross-site", // This simulates a malicious cross-origin request
+	)
+	if err != nil {
+		t.Fatalf("Failed to create malicious client: %v", err)
+	}
+
+	// Get the home page to find a form that should be protected
+	doc, err := maliciousClient.GetDoc(ctx, "/")
+	if err != nil {
+		t.Fatalf("Failed to get home page: %v", err)
+	}
+
+	// Try to submit the registration form with cross-origin headers
+	// This should be blocked by the CSRF protection
+	_, err = maliciousClient.SubmitForm(ctx, doc, "/api/registration/start", nil)
+	if err == nil {
+		t.Error("Expected cross-origin form submission to be blocked, but it succeeded")
+	}
+
+	// The error should indicate that the request was blocked (likely a 403 or similar status)
+	if !containsStatusError(err, 403) && !containsStatusError(err, 400) {
+		t.Errorf("Expected status error 403 or 400 for blocked request, got: %v", err)
+	}
+}
+
+// containsStatusError checks if the error contains a specific HTTP status code.
+func containsStatusError(err error, statusCode int) bool {
+	return err != nil && 
+		(err.Error() == fmt.Sprintf("unexpected status code: %d", statusCode) ||
+		 strings.Contains(err.Error(), fmt.Sprintf("status code: %d", statusCode)))
 }
