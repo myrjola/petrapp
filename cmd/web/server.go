@@ -21,7 +21,7 @@ const defaultTimeout = 2 * time.Second
 func (app *application) configureAndStartServer(ctx context.Context, addr string, handler http.Handler) error {
 	var err error
 	shutdownComplete := make(chan struct{})
-	idleTimeout := time.Minute
+	idleTimeout := 2 * time.Minute //nolint:mnd // reverse proxy may keep connections open for a long time.
 	srv := &http.Server{
 		ErrorLog:          slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
 		Handler:           handler,
@@ -29,6 +29,7 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		ReadTimeout:       defaultTimeout,
 		WriteTimeout:      defaultTimeout,
 		ReadHeaderTimeout: time.Second,
+		MaxHeaderBytes:    1 << 20, //nolint:mnd // 1 MB
 	}
 	go func() {
 		sigint := make(chan os.Signal, 1)
@@ -52,7 +53,17 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 	}()
 
 	var listener net.Listener
-	if listener, err = net.Listen("tcp", addr); err != nil {
+	listenCfg := net.ListenConfig{
+		Control:   nil,
+		KeepAlive: idleTimeout,
+		KeepAliveConfig: net.KeepAliveConfig{
+			Enable:   true,
+			Idle:     idleTimeout,
+			Interval: 0,
+			Count:    0,
+		},
+	}
+	if listener, err = listenCfg.Listen(ctx, "tcp", addr); err != nil {
 		return fmt.Errorf("TCP listen: %w", err)
 	}
 	app.logger.LogAttrs(ctx, slog.LevelInfo, "starting server", slog.Any(e2etest.LogAddrKey, listener.Addr().String()))

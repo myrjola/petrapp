@@ -170,7 +170,7 @@ func (c *Client) newRequestWithContext(
 		req *http.Request
 		err error
 	)
-	if req, err = http.NewRequest(method, c.url+urlPath, body); err != nil {
+	if req, err = http.NewRequestWithContext(ctx, method, c.url+urlPath, body); err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	return req.WithContext(ctx), nil

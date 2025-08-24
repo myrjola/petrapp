@@ -5,14 +5,14 @@
         lint-fix
 
 export GOTOOLCHAIN := auto
-GOLANGCI_LINT_VERSION := v1.64.6
+GOLANGCI_LINT_VERSION := v2.4.0
 
 # Suppress linker warnings on macOS
 ifeq ($(shell uname -s),Darwin)
 	export CGO_LDFLAGS := -w
 endif
 
-init: gomod custom-gcl setup-git-hooks
+init: gomod bin/golangci-lint setup-git-hooks
 	@echo "Dependencies installed"
 
 gomod:
@@ -21,10 +21,9 @@ gomod:
 	go mod download
 	go mod verify
 
-custom-gcl:
-	@echo "Installing golangci-lint and building custom version for nilaway plugin to ./custom-gcl"
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
-	bin/golangci-lint custom
+bin/golangci-lint:
+	@echo "Installing golangci-lint..."
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- $(GOLANGCI_LINT_VERSION)
 
 sec:
 	go tool govulncheck ./...
@@ -44,7 +43,7 @@ test:
 
 lint:
 	@echo "Running linter..."
-	./custom-gcl run
+	./bin/golangci-lint run
 
 dev:
 	@echo "Running dev server with debug build..."
@@ -62,7 +61,6 @@ fly-sqlite3:
 clean:
 	@echo "Cleaning up..."
 	rm -rf bin
-	rm -rf custom-gcl
 
 migratetest: build
 	@echo "Deleting previous restored backup..."
@@ -82,4 +80,4 @@ setup-git-hooks:
 	./scripts/setup-git-hooks.sh
 
 lint-fix:
-	./custom-gcl run --fix
+	./bin/golangci-lint run --fix

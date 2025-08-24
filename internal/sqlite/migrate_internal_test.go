@@ -121,7 +121,7 @@ func TestDatabase_migrate(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
 			logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
-			db, err := connect(":memory:", logger)
+			db, err := connect(ctx, ":memory:", logger)
 			if err != nil {
 				t.Fatalf("Failed to connect to database: %v", err)
 			}
