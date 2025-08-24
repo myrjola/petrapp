@@ -222,7 +222,7 @@ func (app *application) timeout(next http.Handler) http.Handler {
 func (app *application) maintenanceMode(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		
+
 		// Check if maintenance mode is enabled
 		if app.workoutService.IsMaintenanceModeEnabled(ctx) {
 			// Render the maintenance page
@@ -230,7 +230,7 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 			app.render(w, r, http.StatusServiceUnavailable, "maintenance", data)
 			return
 		}
-		
+
 		next.ServeHTTP(w, r)
 	})
 }
