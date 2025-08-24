@@ -223,8 +223,8 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Check if maintenance mode is enabled
-		if app.workoutService.IsMaintenanceModeEnabled(ctx) {
+		// Check if maintenance mode is enabled (skip if workoutService is nil for tests)
+		if app.workoutService != nil && app.workoutService.IsMaintenanceModeEnabled(ctx) {
 			// Render the maintenance page
 			data := newBaseTemplateData(r)
 			app.render(w, r, http.StatusServiceUnavailable, "maintenance", data)
