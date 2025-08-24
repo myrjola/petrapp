@@ -16,9 +16,9 @@ When implementing features, follow this architectural flow:
 ## Build & Run Commands
 
 ```bash
-make build        # Build binary and tools - use after significant code changes
-make lint         # Run golangci-lint checks - use before committing changes  
-make test         # Run all tests with race detection - use after functionality changes
+make init         # Initializes the development environment - run once after cloning
+make lint-fix     # Run golangci-lint checks with automatic fixing enabled - use before committing changes
+make test         # Run all tests - use after functionality changes
 make ci           # Run init, build, lint, test, sec - use for comprehensive verification
 ```
 
