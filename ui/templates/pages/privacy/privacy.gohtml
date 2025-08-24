@@ -97,7 +97,6 @@
         </p>
         <ul>
             <li><code>session</code> - Secure, HTTP-only session cookie that maintains your authenticated state. Expires when you close your browser or after a period of inactivity.</li>
-            <li><code>csrf_token</code> - Cross-Site Request Forgery protection token that prevents malicious websites from performing actions on your behalf. This cookie works with form tokens to ensure requests originate from legitimate pages.</li>
         </ul>
         <p>
             Both cookies are set with secure flags (Secure, HttpOnly, SameSite) to prevent unauthorized access and ensure they're only transmitted over encrypted connections.
@@ -109,7 +108,7 @@
         </p>
         <ul>
             <li><strong>HTTPS encryption:</strong> All data transmission is encrypted using TLS</li>
-            <li><strong>CSRF protection:</strong> All forms include tokens to prevent cross-site request forgery attacks</li>
+            <li><strong>CSRF protection:</strong> Modern browser CSRF protection with SameSite="Lax" cookies and Sec-Fetch-Site header checking.</li>
             <li><strong>Content Security Policy:</strong> Strict CSP headers prevent code injection attacks</li>
             <li><strong>SQL injection prevention:</strong> All database queries use parameterized statements</li>
             <li><strong>Secure session management:</strong> Sessions use cryptographically secure tokens with appropriate expiration</li>

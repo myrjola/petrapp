@@ -188,7 +188,6 @@
         <p class="subtitle">Select the days you're planning to go to the gym</p>
 
         <form method="post" action="/preferences" class="schedule-form">
-            {{ csrf }}
             <div class="weekdays-grid">
                 {{ range .Weekdays }}
                     <div class="weekday-item">
@@ -215,7 +214,6 @@
             <p>Permanently delete your account and all your workout data. This action cannot be undone.</p>
             <form action="/preferences/delete-user" method="post" 
                   onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your workout data.')">
-                {{ csrf }}
                 <button type="submit" class="delete-button">
                     Delete my data
                 </button>
@@ -224,7 +222,6 @@
 
         <footer class="footer-section">
             <form action="/api/logout" method="post">
-                {{ csrf }}
                 <button type="submit" class="logout-button">
                     Log out
                 </button>

@@ -91,7 +91,6 @@
                             }
                         </style>
                         <form method="post" action="/api/login/start">
-                            {{ csrf }}
                             <button type="submit">Sign in</button>
                             <script {{ nonce }}>
                               (async (form = me()) => {
@@ -101,7 +100,6 @@
                             </script>
                         </form>
                         <form action="/api/registration/start">
-                            {{ csrf }}
                             <button type="submit">Register</button>
                             <script {{ nonce }}>
                               (async (form = me()) => {

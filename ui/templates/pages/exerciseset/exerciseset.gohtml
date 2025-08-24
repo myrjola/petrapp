@@ -417,7 +417,6 @@
                 </div>
                 <form method="post"
                       action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete">
-                    {{ csrf }}
                     <button type="submit" class="warmup-complete-button">
                         ✓ Mark Warmup Complete
                     </button>
@@ -459,7 +458,6 @@
                               id="form-{{ $index }}"
                               class="set-form"
                               aria-label="Complete set {{ $index }}">
-                            {{ csrf }}
                             <div class="form-inputs">
                                 {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
                                     <div class="input-field">

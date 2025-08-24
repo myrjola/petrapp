@@ -69,7 +69,6 @@
 
             {{ range .Difficulties }}
                 <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/feedback/{{ .Value }}">
-                    {{ csrf }}
                     <button type="submit">{{ .Label }}</button>
                 </form>
             {{ end }}
