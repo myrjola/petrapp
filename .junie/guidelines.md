@@ -134,7 +134,6 @@ The application uses WebAuthn for passwordless authentication:
 
 - The project uses golangci-lint for code quality checks
 - Run `make lint` to check for style issues
-- Git hooks are set up to run linting before commits
 
 ### Debugging
 

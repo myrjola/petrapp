@@ -1,8 +1,7 @@
 
 .DEFAULT_GOAL := ci
 .PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
-        migratetest repomix repomix-clipboard setup-git-hooks \
-        lint-fix
+        migratetest repomix repomix-clipboard setup-git-hooks lint-fix
 
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v2.4.0
@@ -12,7 +11,7 @@ ifeq ($(shell uname -s),Darwin)
 	export CGO_LDFLAGS := -w
 endif
 
-init: gomod bin/golangci-lint setup-git-hooks
+init: gomod bin/golangci-lint
 	@echo "Dependencies installed"
 
 gomod:

@@ -4,10 +4,11 @@ Personal trainer app
 
 ## Quickstart
 
-### Install dependencies, configure linting, and install git hooks
+### Install dependencies, configure linting, and optinally set up git hooks
 
 ```
 make
+make setup-git-hooks # if you want to develop straight to main branch
 ```
 
 ### Start go server
