@@ -3,10 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 )
 
 func (app *application) routes() (*http.ServeMux, error) {
@@ -87,35 +83,12 @@ func (app *application) routes() (*http.ServeMux, error) {
 	// Home route (most specific)
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
 
-	dir, err := findModuleDir()
-	if err != nil {
-		return nil, fmt.Errorf("findModuleDir: %w", err)
-	}
-	fileRoot := path.Join(dir, "ui", "static")
-	httpDir := http.Dir(fileRoot)
-
 	// File server with custom 404 handling
-	fileServer := http.FileServer(httpDir)
-	mux.Handle("/", noAuth(cacheForever(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Check if this is a request for a static file that doesn't exist
-			// Sanitize the URL path to prevent directory traversal attacks
-			cleanPath := filepath.Clean(r.URL.Path)
-			if strings.Contains(cleanPath, "..") {
-				// Path contains directory traversal, use 404 handler
-				session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
-				return
-			}
-			staticPath := filepath.Join(fileRoot, cleanPath)
-			if _, err = os.Stat(staticPath); os.IsNotExist(err) {
-				// File doesn't exist, use our custom 404 handler with session middleware
-				session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
-				return
-			}
-
-			// File exists, serve it normally
-			fileServer.ServeHTTP(w, r)
-		}))))
+	fileServerHandler, err := app.fileServerHandler()
+	if err != nil {
+		return nil, fmt.Errorf("fileServerHandler: %w", err)
+	}
+	mux.Handle("/", fileServerHandler)
 
 	return mux, nil
 }
