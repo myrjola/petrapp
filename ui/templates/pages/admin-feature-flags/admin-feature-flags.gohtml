@@ -38,13 +38,13 @@
                             <td>{{ .Name }}</td>
                             <td>
                                 {{ if .Enabled }}
-                                    <span style="color: green; font-weight: bold;">Enabled</span>
+                                    <span>Enabled</span>
                                 {{ else }}
-                                    <span style="color: red;">Disabled</span>
+                                    <span>Disabled</span>
                                 {{ end }}
                             </td>
                             <td>
-                                <form method="post" action="/admin/feature-flags/{{ .Name }}/toggle" style="display: inline;">
+                                <form method="post" action="/admin/feature-flags/{{ .Name }}/toggle">
                                     <button type="submit">
                                         {{ if .Enabled }}
                                             Disable
