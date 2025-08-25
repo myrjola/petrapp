@@ -701,3 +701,20 @@ func (s *Service) IsMaintenanceModeEnabled(ctx context.Context) bool {
 	}
 	return flag.Enabled
 }
+
+// ListFeatureFlags retrieves all feature flags.
+func (s *Service) ListFeatureFlags(ctx context.Context) ([]FeatureFlag, error) {
+	flags, err := s.repo.featureFlags.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list feature flags: %w", err)
+	}
+	return flags, nil
+}
+
+// SetFeatureFlag updates or creates a feature flag.
+func (s *Service) SetFeatureFlag(ctx context.Context, flag FeatureFlag) error {
+	if err := s.repo.featureFlags.Set(ctx, flag); err != nil {
+		return fmt.Errorf("set feature flag %s: %w", flag.Name, err)
+	}
+	return nil
+}

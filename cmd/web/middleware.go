@@ -223,8 +223,24 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		// Exclude health endpoints from maintenance checks.
+		if r.URL.Path == "/api/healthy" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Check if maintenance mode is enabled (skip if workoutService is nil for tests)
 		if app.workoutService != nil && app.workoutService.IsMaintenanceModeEnabled(ctx) {
+			// Allow admin access during maintenance.
+			isAdmin := contexthelpers.IsAdmin(r.Context())
+			if isAdmin {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Add Retry-After header for better HTTP compliance.
+			w.Header().Set("Retry-After", "300")
+
 			// Render the maintenance page
 			data := newBaseTemplateData(r)
 			app.render(w, r, http.StatusServiceUnavailable, "maintenance", data)

@@ -61,3 +61,36 @@ func (r *sqliteFeatureFlagRepository) Set(ctx context.Context, flag FeatureFlag)
 
 	return nil
 }
+
+// List retrieves all feature flags.
+func (r *sqliteFeatureFlagRepository) List(ctx context.Context) ([]FeatureFlag, error) {
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+		SELECT name, enabled
+		FROM feature_flags
+		ORDER BY name`)
+
+	if err != nil {
+		return nil, fmt.Errorf("query feature flags: %w", err)
+	}
+	defer rows.Close()
+
+	var flags []FeatureFlag
+	for rows.Next() {
+		var flag FeatureFlag
+		var enabled int
+
+		scanErr := rows.Scan(&flag.Name, &enabled)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan feature flag: %w", scanErr)
+		}
+
+		flag.Enabled = enabled == 1
+		flags = append(flags, flag)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate feature flags: %w", err)
+	}
+
+	return flags, nil
+}

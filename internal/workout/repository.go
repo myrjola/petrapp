@@ -68,6 +68,7 @@ type exerciseRepository interface {
 type featureFlagRepository interface {
 	Get(ctx context.Context, name string) (FeatureFlag, error)
 	Set(ctx context.Context, flag FeatureFlag) error
+	List(ctx context.Context) ([]FeatureFlag, error)
 }
 
 // baseRepository contains common functionality for all repositories.

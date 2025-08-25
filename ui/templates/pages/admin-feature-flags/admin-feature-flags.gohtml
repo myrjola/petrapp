@@ -1,0 +1,43 @@
+{{- /* gotype: github.com/myrjola/petrapp/cmd/web.featureFlagsAdminTemplateData */ -}}
+{{ define "page" }}
+    <main>
+        <h1>Feature Flags Administration</h1>
+        <section>
+            <h2>Feature Flags</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{ range .FeatureFlags }}
+                    <tr>
+                        <td>{{ .Name }}</td>
+                        <td>
+                            {{ if .Enabled }}
+                                <span style="color: green; font-weight: bold;">Enabled</span>
+                            {{ else }}
+                                <span style="color: red;">Disabled</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            <form method="post" action="/admin/feature-flags/{{ .Name }}/toggle" style="display: inline;">
+                                <button type="submit">
+                                    {{ if .Enabled }}
+                                        Disable
+                                    {{ else }}
+                                        Enable
+                                    {{ end }}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {{ end }}
+                </tbody>
+            </table>
+        </section>
+    </main>
+{{ end }}
