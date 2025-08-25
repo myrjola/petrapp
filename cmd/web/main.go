@@ -93,7 +93,10 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
 	}
 
-	routes := app.routes()
+	routes, err := app.routes()
+	if err != nil {
+		return fmt.Errorf("initialize routes: %w", err)
+	}
 
 	if err = app.configureAndStartServer(ctx, cfg.Addr, routes); err != nil {
 		return fmt.Errorf("start server: %w", err)

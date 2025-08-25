@@ -70,7 +70,10 @@ func Test_application_timeout(t *testing.T) {
 				app := &application{ //nolint:exhaustruct // this is a test
 					logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 				}
-				handler := app.routes()
+				handler, err := app.routes()
+				if err != nil {
+					t.Fatalf("Failed to set up routes: %v", err)
+				}
 
 				url := fmt.Sprintf("/api/test/timeout?sleep_ms=%d", tt.sleepMS)
 				req := httptest.NewRequest(http.MethodGet, url, nil)

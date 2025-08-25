@@ -11,11 +11,13 @@ import (
 
 type BaseTemplateData struct {
 	Authenticated bool
+	IsAdmin       bool
 }
 
 func newBaseTemplateData(r *http.Request) BaseTemplateData {
 	return BaseTemplateData{
 		Authenticated: contexthelpers.IsAuthenticated(r.Context()),
+		IsAdmin:       contexthelpers.IsAdmin(r.Context()),
 	}
 }
 

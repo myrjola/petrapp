@@ -1,22 +1,24 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
-func (app *application) routes() *http.ServeMux {
+func (app *application) routes() (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
-	shared := func(next http.Handler) http.Handler {
+	withoutMaintenanceMode := func(next http.Handler) http.Handler {
 		return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
-			commonContext(app.timeout(app.maintenanceMode(next))))))
+			commonContext(app.timeout(next)))))
+	}
+
+	shared := func(next http.Handler) http.Handler {
+		return withoutMaintenanceMode(app.maintenanceMode(next))
 	}
 
 	noAuth := func(next http.Handler) http.Handler {
-		return app.recoverPanic(shared(next))
+		return app.recoverPanic(withoutMaintenanceMode(next))
 	}
 
 	session := func(next http.Handler) http.Handler {
@@ -72,6 +74,9 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
 	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
+	mux.Handle("GET /admin/feature-flags", session(http.HandlerFunc(app.adminFeatureFlagsGET)))
+	mux.Handle("POST /admin/feature-flags/{name}/toggle", mustAdmin(http.HandlerFunc(app.adminFeatureFlagTogglePOST)))
+
 	// Privacy page
 	mux.Handle("GET /privacy", session(http.HandlerFunc(app.privacy)))
 
@@ -79,26 +84,11 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
 
 	// File server with custom 404 handling
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
-	mux.Handle("/", noAuth(cacheForever(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if this is a request for a static file that doesn't exist
-		// Sanitize the URL path to prevent directory traversal attacks
-		cleanPath := filepath.Clean(r.URL.Path)
-		if strings.Contains(cleanPath, "..") {
-			// Path contains directory traversal, use 404 handler
-			session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
-			return
-		}
-		staticPath := filepath.Join("./ui/static", cleanPath)
-		if _, err := os.Stat(staticPath); os.IsNotExist(err) {
-			// File doesn't exist, use our custom 404 handler with session middleware
-			session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
-			return
-		}
+	fileServerHandler, err := app.fileServerHandler()
+	if err != nil {
+		return nil, fmt.Errorf("fileServerHandler: %w", err)
+	}
+	mux.Handle("/", fileServerHandler)
 
-		// File exists, serve it normally
-		fileServer.ServeHTTP(w, r)
-	}))))
-
-	return mux
+	return mux, nil
 }
