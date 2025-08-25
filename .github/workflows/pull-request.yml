@@ -15,11 +15,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - uses: actions/cache@v4
-        with:
-          path: custom-gcl
-          key: ${{ runner.os }}-custom-gcl-${{ hashFiles('go.mod', '.custom-gcl.yml') }}
-
       - name: Build
         run: make ci
 
