@@ -72,7 +72,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
 	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
-	mux.Handle("GET /admin/feature-flags", mustAdmin(http.HandlerFunc(app.adminFeatureFlagsGET)))
+	mux.Handle("GET /admin/feature-flags", session(http.HandlerFunc(app.adminFeatureFlagsGET)))
 	mux.Handle("POST /admin/feature-flags/{name}/toggle", mustAdmin(http.HandlerFunc(app.adminFeatureFlagTogglePOST)))
 
 	// Privacy page

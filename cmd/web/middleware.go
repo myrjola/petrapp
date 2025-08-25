@@ -223,8 +223,14 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Exclude health endpoints from maintenance checks.
-		if r.URL.Path == "/api/healthy" {
+		// Exclude health endpoints and admin authentication paths from maintenance checks.
+		path := r.URL.Path
+		if path == "/api/healthy" ||
+			path == "/admin/feature-flags" ||
+			path == "/api/login/start" ||
+			path == "/api/login/finish" ||
+			path == "/api/registration/start" ||
+			path == "/api/registration/finish" {
 			next.ServeHTTP(w, r)
 			return
 		}
