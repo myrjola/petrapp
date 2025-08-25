@@ -11,11 +11,20 @@ import (
 
 // fileServerHandler creates a file server handler with custom 404 handling.
 func (app *application) fileServerHandler() (http.Handler, error) {
-	dir, err := findModuleDir()
-	if err != nil {
-		return nil, fmt.Errorf("findModuleDir: %w", err)
+	fileRoot := path.Join(".", "ui", "static")
+	var err error
+	if _, err = os.Stat(fileRoot); os.IsNotExist(err) {
+		var dir string
+		dir, err = findModuleDir()
+		if err != nil {
+			return nil, fmt.Errorf("findModuleDir: %w", err)
+		}
+		fileRoot = path.Join(dir, "ui", "static")
 	}
-	fileRoot := path.Join(dir, "ui", "static")
+	var stat os.FileInfo
+	if stat, err = os.Stat(fileRoot); os.IsNotExist(err) || !stat.IsDir() {
+		return nil, fmt.Errorf("file server root %s does not exist or is not a directory", fileRoot)
+	}
 	httpDir := http.Dir(fileRoot)
 
 	// File server with custom 404 handling
