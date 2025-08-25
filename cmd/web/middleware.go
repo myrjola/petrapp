@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"runtime/trace"
+	"strings"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
@@ -47,6 +48,24 @@ func (mw *statusResponseWriter) Write(b []byte) (int, error) {
 
 func (mw *statusResponseWriter) Unwrap() http.ResponseWriter {
 	return mw.ResponseWriter
+}
+
+// isStaticFile checks if the given path would be handled by the file server.
+// This includes requests for static assets, whether they exist or not.
+// The file server handles all requests that don't match more specific routes.
+func isStaticFile(path string) bool {
+	// These are handled by specific routes, not the file server
+	if strings.HasPrefix(path, "/workouts/") ||
+		strings.HasPrefix(path, "/api/") ||
+		strings.HasPrefix(path, "/admin/") ||
+		strings.HasPrefix(path, "/preferences") ||
+		strings.HasPrefix(path, "/privacy") ||
+		path == "/" {
+		return false
+	}
+
+	// Everything else would be handled by the file server
+	return true
 }
 
 func secureHeaders(next http.Handler) http.Handler {
@@ -223,14 +242,15 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Exclude health endpoints and admin authentication paths from maintenance checks.
+		// Exclude health endpoints, admin authentication paths, and static files from maintenance checks.
 		path := r.URL.Path
 		if path == "/api/healthy" ||
 			path == "/admin/feature-flags" ||
 			path == "/api/login/start" ||
 			path == "/api/login/finish" ||
 			path == "/api/registration/start" ||
-			path == "/api/registration/finish" {
+			path == "/api/registration/finish" ||
+			isStaticFile(path) {
 			next.ServeHTTP(w, r)
 			return
 		}
