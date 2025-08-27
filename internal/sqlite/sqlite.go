@@ -22,6 +22,9 @@ var schemaDefinition string
 //go:embed fixtures.sql
 var fixtures string
 
+//go:embed migrate_user_id_to_integer.sql
+var userIdMigration string
+
 type Database struct {
 	ReadWrite *sql.DB
 	ReadOnly  *sql.DB
@@ -42,6 +45,28 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 
 	if db, err = connect(ctx, url, logger); err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
+	}
+
+	// Migrate user_id column from BLOB to INTEGER. First, we check the type of the user_id column.
+	row := db.ReadWrite.QueryRowContext(ctx, `
+		SELECT type 
+		FROM PRAGMA_TABLE_INFO('users') 
+		WHERE name = 'id';`)
+	if row.Err() != nil {
+		return nil, fmt.Errorf("check user_id column type: %w", row.Err())
+	}
+	var userIdColumnType string
+	if err := row.Scan(&userIdColumnType); err != nil {
+		return nil, fmt.Errorf("scan user_id column type: %w", err)
+	}
+	if userIdColumnType == "BLOB" {
+		now := time.Now()
+		if _, err = db.ReadWrite.ExecContext(ctx, userIdMigration); err != nil {
+			return nil, fmt.Errorf("user id migration: %w", err)
+		}
+		duration := time.Since(now)
+		logger.LogAttrs(ctx, slog.LevelInfo, "migrating user_id column from BLOB to INTEGER",
+			slog.Duration("duration", duration))
 	}
 
 	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
