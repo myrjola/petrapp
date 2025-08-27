@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Get code
         uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@63da3ecc5e2793b98a3f2519b3d75d4f4c11cec2
+      - uses: superfly/flyctl-actions/setup-flyctl@v1
       - run: flyctl deploy --app ${{ inputs.fly_app }} --remote-only --image ${{ inputs.docker_image_uri }}
 
   # Can't pass env vars to reusable workflows directly.
