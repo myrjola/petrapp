@@ -15,15 +15,15 @@ import (
 func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		userID := h.sessionManager.GetBytes(r.Context(), string(userIDSessionKey))
+		webauthnUserID := h.sessionManager.GetBytes(r.Context(), string(userIDSessionKey))
 
 		// User has not yet authenticated.
-		if userID == nil {
+		if webauthnUserID == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		role, err := h.getUserRole(ctx, userID)
+		role, err := h.getUserRole(ctx, webauthnUserID)
 		switch {
 		case errors.Is(err, sql.ErrNoRows): // Do not authenticate if user does not exist.
 		case err != nil:
@@ -31,7 +31,15 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		default:
-			r = contexthelpers.AuthenticateContext(r, userID, role == roleAdmin)
+			// Get the integer user ID for context
+			var intUserID int
+			intUserID, err = h.getUserIntegerID(ctx, webauthnUserID)
+			if err != nil {
+				h.logger.LogAttrs(r.Context(), slog.LevelError, "unable to fetch user integer ID", slog.Any("error", err))
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			r = contexthelpers.AuthenticateContext(r, intUserID, role == roleAdmin)
 		}
 
 		// Add session information to logging context.
@@ -40,7 +48,7 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 		tokenHash := sha256.Sum256([]byte(token))
 		ctx = logging.WithAttrs(r.Context(),
 			slog.String("session_hash", hex.EncodeToString(tokenHash[:])),
-			slog.String("user_id", hex.EncodeToString(userID)),
+			slog.String("webauthn_user_id", hex.EncodeToString(webauthnUserID)),
 		)
 		r = r.WithContext(ctx)
 

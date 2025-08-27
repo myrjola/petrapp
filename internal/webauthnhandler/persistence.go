@@ -10,13 +10,15 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
+const selectUserStmt = `SELECT id FROM users WHERE webauthn_user_id = ?`
+
 func (h *WebAuthnHandler) upsertUser(ctx context.Context, user webauthn.User) error {
 	var err error
-	stmt := `INSERT INTO users (id, display_name)
-VALUES (:id, :display_name)
-ON CONFLICT (id) DO UPDATE SET display_name = :display_name`
+	stmt := `INSERT INTO users (webauthn_user_id, display_name)
+VALUES (:webauthn_user_id, :display_name)
+ON CONFLICT (webauthn_user_id) DO UPDATE SET display_name = :display_name`
 	if _, err = h.database.ReadWrite.ExecContext(ctx, stmt, user.WebAuthnID(), user.WebAuthnDisplayName()); err != nil {
-		return fmt.Errorf("db upsert user %s (id: %s): %w",
+		return fmt.Errorf("db upsert user %s (webauthn_user_id: %s): %w",
 			user.WebAuthnDisplayName(),
 			hex.EncodeToString(user.WebAuthnID()),
 			err)
@@ -24,16 +26,22 @@ ON CONFLICT (id) DO UPDATE SET display_name = :display_name`
 	return nil
 }
 
-func (h *WebAuthnHandler) getUser(ctx context.Context, id []byte) (*user, error) {
+func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user, error) {
 	var (
 		err  error
 		rows *sql.Rows
 	)
 
-	stmt := `SELECT id, display_name FROM users WHERE id = ?`
+	stmt := `SELECT webauthn_user_id, display_name FROM users WHERE webauthn_user_id = ?`
 	var user user
-	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, id).Scan(&user.id, &user.displayName); err != nil {
+	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(&user.id, &user.displayName); err != nil {
 		return nil, fmt.Errorf("read user: %w", err)
+	}
+
+	// Get the integer user ID for credential lookups
+	var intUserID int
+	if err = h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnID).Scan(&intUserID); err != nil {
+		return nil, fmt.Errorf("read user integer ID: %w", err)
 	}
 
 	// scan credentials
@@ -51,7 +59,7 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, id []byte) (*user, error)
        authenticator_attachment
 FROM credentials
 WHERE user_id = ?`
-	if rows, err = h.database.ReadOnly.QueryContext(ctx, stmt, id); err != nil {
+	if rows, err = h.database.ReadOnly.QueryContext(ctx, stmt, intUserID); err != nil {
 		return nil, fmt.Errorf("query credentials: %w", err)
 	}
 	defer func() {
@@ -95,7 +103,17 @@ WHERE user_id = ?`
 	return &user, nil
 }
 
-func (h *WebAuthnHandler) upsertCredential(ctx context.Context, userID []byte, credential *webauthn.Credential) error {
+func (h *WebAuthnHandler) upsertCredential(
+	ctx context.Context,
+	webauthnUserID []byte,
+	credential *webauthn.Credential,
+) error {
+	// First get the integer user ID
+	var intUserID int
+	if err := h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
+		return fmt.Errorf("get user integer ID: %w", err)
+	}
+
 	var err error
 	stmt := `INSERT INTO credentials (id,
                          user_id,
@@ -120,9 +138,7 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
                                authenticator_aaguid        = EXCLUDED.authenticator_aaguid,
                                authenticator_sign_count    = EXCLUDED.authenticator_sign_count,
                                authenticator_clone_warning = EXCLUDED.authenticator_clone_warning,
-                               authenticator_attachment    = EXCLUDED.authenticator_attachment;
-                                 
-                                   `
+                               authenticator_attachment    = EXCLUDED.authenticator_attachment`
 	var encodedTransport []byte
 	encodedTransport, err = json.Marshal(credential.Transport)
 	if err != nil {
@@ -132,7 +148,7 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
 		ctx,
 		stmt,
 		credential.ID,
-		userID,
+		intUserID,
 		credential.PublicKey,
 		credential.AttestationType,
 		string(encodedTransport),
@@ -146,8 +162,8 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
 		credential.Authenticator.Attachment,
 	)
 	if err != nil {
-		return fmt.Errorf("db upsert credential (user_id: %s, credential_id: %s): %w",
-			hex.EncodeToString(userID),
+		return fmt.Errorf("db upsert credential (webauthn_user_id: %s, credential_id: %s): %w",
+			hex.EncodeToString(webauthnUserID),
 			hex.EncodeToString(credential.ID),
 			err)
 	}
@@ -162,10 +178,10 @@ const (
 )
 
 // getUserRole returns the role of the user or sql.ErrNoRows if the user does not exist.
-func (h *WebAuthnHandler) getUserRole(ctx context.Context, userID []byte) (role, error) {
-	stmt := `SELECT is_admin FROM users WHERE id = ?`
+func (h *WebAuthnHandler) getUserRole(ctx context.Context, webauthnUserID []byte) (role, error) {
+	stmt := `SELECT is_admin FROM users WHERE webauthn_user_id = ?`
 	var isAdmin bool
-	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, userID).Scan(&isAdmin); err != nil {
+	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnUserID).Scan(&isAdmin); err != nil {
 		return roleUser, fmt.Errorf("query user role: %w", err)
 	}
 	if isAdmin {
@@ -174,12 +190,21 @@ func (h *WebAuthnHandler) getUserRole(ctx context.Context, userID []byte) (role,
 	return roleUser, nil
 }
 
+// getUserIntegerID returns the integer user ID for a given webauthn user ID.
+func (h *WebAuthnHandler) getUserIntegerID(ctx context.Context, webauthnUserID []byte) (int, error) {
+	var intUserID int
+	if err := h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
+		return 0, fmt.Errorf("query user integer ID: %w", err)
+	}
+	return intUserID, nil
+}
+
 // deleteUser permanently removes a user and all associated data from the database.
 // Due to CASCADE DELETE constraints in the schema, this will automatically clean up
 // anything that refers to the user.
-func (h *WebAuthnHandler) deleteUser(ctx context.Context, userID []byte) error {
-	stmt := `DELETE FROM users WHERE id = ?`
-	_, err := h.database.ReadWrite.ExecContext(ctx, stmt, userID)
+func (h *WebAuthnHandler) deleteUser(ctx context.Context, webauthnUserID []byte) error {
+	stmt := `DELETE FROM users WHERE webauthn_user_id = ?`
+	_, err := h.database.ReadWrite.ExecContext(ctx, stmt, webauthnUserID)
 	if err != nil {
 		return fmt.Errorf("delete user from database: %w", err)
 	}
