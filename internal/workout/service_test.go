@@ -24,13 +24,11 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		_ = db.Close()
 	}(db)
 
-	// Create a test user ID
-	userID := []byte("test-user-id")
-
 	// Insert a user first
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO users (id, display_name) VALUES (?, ?)",
-		userID, "Test User")
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("test-user-id"), "Test User").Scan(&userID)
 	if err != nil {
 		t.Fatalf("Failed to insert test user: %v", err)
 	}
@@ -175,12 +173,13 @@ func Test_AddExercise(t *testing.T) {
 	}(db)
 
 	// Create a test user ID
-	userID := []byte("test-user-id")
+	webauthnUserID := []byte("test-user-id")
 
 	// Insert a user first
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO users (id, display_name) VALUES (?, ?)",
-		userID, "Test User")
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		webauthnUserID, "Test User").Scan(&userID)
 	if err != nil {
 		t.Fatalf("Failed to insert test user: %v", err)
 	}

@@ -10,6 +10,8 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
+const selectUserStmt = `SELECT id FROM users WHERE webauthn_user_id = ?`
+
 func (h *WebAuthnHandler) upsertUser(ctx context.Context, user webauthn.User) error {
 	var err error
 	stmt := `INSERT INTO users (webauthn_user_id, display_name)
@@ -38,8 +40,7 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user
 
 	// Get the integer user ID for credential lookups
 	var intUserID int
-	stmt = `SELECT id FROM users WHERE webauthn_user_id = ?`
-	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(&intUserID); err != nil {
+	if err = h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnID).Scan(&intUserID); err != nil {
 		return nil, fmt.Errorf("read user integer ID: %w", err)
 	}
 
@@ -102,16 +103,19 @@ WHERE user_id = ?`
 	return &user, nil
 }
 
-func (h *WebAuthnHandler) upsertCredential(ctx context.Context, webauthnUserID []byte, credential *webauthn.Credential) error {
+func (h *WebAuthnHandler) upsertCredential(
+	ctx context.Context,
+	webauthnUserID []byte,
+	credential *webauthn.Credential,
+) error {
 	// First get the integer user ID
 	var intUserID int
-	stmt := `SELECT id FROM users WHERE webauthn_user_id = ?`
-	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnUserID).Scan(&intUserID); err != nil {
+	if err := h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
 		return fmt.Errorf("get user integer ID: %w", err)
 	}
 
 	var err error
-	stmt = `INSERT INTO credentials (id,
+	stmt := `INSERT INTO credentials (id,
                          user_id,
                          public_key,
                          attestation_type,
@@ -188,9 +192,8 @@ func (h *WebAuthnHandler) getUserRole(ctx context.Context, webauthnUserID []byte
 
 // getUserIntegerID returns the integer user ID for a given webauthn user ID.
 func (h *WebAuthnHandler) getUserIntegerID(ctx context.Context, webauthnUserID []byte) (int, error) {
-	stmt := `SELECT id FROM users WHERE webauthn_user_id = ?`
 	var intUserID int
-	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnUserID).Scan(&intUserID); err != nil {
+	if err := h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
 		return 0, fmt.Errorf("query user integer ID: %w", err)
 	}
 	return intUserID, nil

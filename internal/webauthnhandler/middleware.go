@@ -32,7 +32,8 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 			return
 		default:
 			// Get the integer user ID for context
-			intUserID, err := h.getUserIntegerID(ctx, webauthnUserID)
+			var intUserID int
+			intUserID, err = h.getUserIntegerID(ctx, webauthnUserID)
 			if err != nil {
 				h.logger.LogAttrs(r.Context(), slog.LevelError, "unable to fetch user integer ID", slog.Any("error", err))
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

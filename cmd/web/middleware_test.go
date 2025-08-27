@@ -75,7 +75,7 @@ func Test_application_timeout(t *testing.T) {
 				url := fmt.Sprintf("/api/test/timeout?sleep_ms=%d", tt.sleepMS)
 				req := httptest.NewRequest(http.MethodGet, url, nil)
 				if tt.isAdmin {
-					req = contexthelpers.AuthenticateContext(req, []byte("admin-user-id"), true)
+					req = contexthelpers.AuthenticateContext(req, 1, true)
 				}
 				w := newTimeoutResponseWriter()
 
