@@ -98,7 +98,7 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 	isInMemory := strings.Contains(url, ":memory:")
 	inMemoryConfig := ""
 	if isInMemory {
-		url = fmt.Sprintf("file:%s", rand.Text())
+		url = rand.Text()
 		inMemoryConfig = "mode=memory&cache=shared"
 	}
 	commonConfig := strings.Join([]string{
