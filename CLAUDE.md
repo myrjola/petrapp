@@ -71,6 +71,10 @@ When making changes to files, first understand the file's code conventions:
 - Always look at surrounding context (especially imports) to understand framework choices
 - Make changes in the most idiomatic way for the existing codebase
 
+## Fixing linter complaints
+
+- govet shadow is often fixed by reusing the earlier `err` variable instead of using different variable name.
+
 ## Specialized Guidelines
 
 For detailed guidance on specific areas:

@@ -25,7 +25,8 @@ func TestDatabase_createUserDB(t *testing.T) {
 			userID: 1,
 			setupSchema: `
 				CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
-				CREATE TABLE workouts (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, FOREIGN KEY (user_id) REFERENCES users(id));
+				CREATE TABLE workouts (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, 
+					FOREIGN KEY (user_id) REFERENCES users(id));
 			`,
 			setupData: []string{
 				"INSERT INTO users (id, name) VALUES (1, 'John Doe')",
@@ -46,7 +47,8 @@ func TestDatabase_createUserDB(t *testing.T) {
 			userID: 999,
 			setupSchema: `
 				CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
-				CREATE TABLE workouts (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, FOREIGN KEY (user_id) REFERENCES users(id));
+				CREATE TABLE workouts (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, 
+					FOREIGN KEY (user_id) REFERENCES users(id));
 			`,
 			setupData: []string{
 				"INSERT INTO users (id, name) VALUES (1, 'John Doe')",
@@ -64,9 +66,13 @@ func TestDatabase_createUserDB(t *testing.T) {
 			userID: 1,
 			setupSchema: `
 				CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);
-				CREATE TABLE workouts (date TEXT, user_id INTEGER, PRIMARY KEY (date, user_id), FOREIGN KEY (user_id) REFERENCES users(id)) WITHOUT ROWID;
+				CREATE TABLE workouts (date TEXT, user_id INTEGER, PRIMARY KEY (date, user_id), 
+					FOREIGN KEY (user_id) REFERENCES users(id)) WITHOUT ROWID;
 				CREATE TABLE exercises (id INTEGER PRIMARY KEY, name TEXT);
-				CREATE TABLE exercise_sets (workout_date TEXT, workout_user_id INTEGER, exercise_id INTEGER, PRIMARY KEY (workout_date, workout_user_id, exercise_id), FOREIGN KEY (workout_date, workout_user_id) REFERENCES workouts(date, user_id), FOREIGN KEY (exercise_id) REFERENCES exercises(id)) WITHOUT ROWID;
+				CREATE TABLE exercise_sets (workout_date TEXT, workout_user_id INTEGER, exercise_id INTEGER, 
+					PRIMARY KEY (workout_date, workout_user_id, exercise_id), 
+					FOREIGN KEY (workout_date, workout_user_id) REFERENCES workouts(date, user_id), 
+					FOREIGN KEY (exercise_id) REFERENCES exercises(id)) WITHOUT ROWID;
 				CREATE TABLE user_settings (user_id INTEGER PRIMARY KEY, theme TEXT, FOREIGN KEY (user_id) REFERENCES users(id));
 			`,
 			setupData: []string{
@@ -104,6 +110,7 @@ func TestDatabase_createUserDB(t *testing.T) {
 				"INSERT INTO workouts (id, user_id, name) VALUES (3, 2, 'Yoga Session')",
 			},
 			expectedTables: []string{},
+			expectedCounts: map[string]int{},
 			wantErr:        true,
 		},
 		{
@@ -171,7 +178,8 @@ func TestDatabase_createUserDB(t *testing.T) {
 			}
 
 			// Verify the exported database file exists
-			if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			_, statErr := os.Stat(dbPath)
+			if os.IsNotExist(statErr) {
 				t.Errorf("Exported database file does not exist at %s", dbPath)
 				return
 			}
@@ -184,7 +192,8 @@ func TestDatabase_createUserDB(t *testing.T) {
 			defer exportedDB.Close()
 
 			// Verify that only expected tables exist
-			rows, err := exportedDB.QueryContext(ctx, "SELECT name FROM sqlite_schema WHERE type = 'table' AND name != 'sqlite_stat1'")
+			query := "SELECT name FROM sqlite_schema WHERE type = 'table' AND name != 'sqlite_stat1'"
+			rows, err := exportedDB.QueryContext(ctx, query)
 			if err != nil {
 				t.Fatalf("Failed to query tables: %v", err)
 			}
@@ -193,15 +202,20 @@ func TestDatabase_createUserDB(t *testing.T) {
 			var actualTables []string
 			for rows.Next() {
 				var tableName string
-				if err := rows.Scan(&tableName); err != nil {
+				err = rows.Scan(&tableName)
+				if err != nil {
 					t.Fatalf("Failed to scan table name: %v", err)
 				}
 				actualTables = append(actualTables, tableName)
 			}
+			if err = rows.Err(); err != nil {
+				t.Fatalf("Failed to iterate rows: %v", err)
+			}
 
 			// Check that actual tables match expected tables
 			if len(actualTables) != len(tt.expectedTables) {
-				t.Errorf("Table count mismatch: got %d tables %v, want %d tables %v", len(actualTables), actualTables, len(tt.expectedTables), tt.expectedTables)
+				t.Errorf("Table count mismatch: got %d tables %v, want %d tables %v",
+					len(actualTables), actualTables, len(tt.expectedTables), tt.expectedTables)
 			}
 
 			expectedTableSet := make(map[string]bool)
@@ -218,8 +232,8 @@ func TestDatabase_createUserDB(t *testing.T) {
 			// Verify expected tables exist and have correct row counts
 			for _, tableName := range tt.expectedTables {
 				var count int
-				query := "SELECT COUNT(*) FROM " + tableName
-				err = exportedDB.QueryRowContext(ctx, query).Scan(&count)
+				countQuery := "SELECT COUNT(*) FROM " + tableName
+				err = exportedDB.QueryRowContext(ctx, countQuery).Scan(&count)
 				if err != nil {
 					t.Errorf("Failed to query table %s: %v", tableName, err)
 					continue
