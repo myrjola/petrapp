@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/myrjola/petrapp/internal/workout"
@@ -130,4 +133,49 @@ func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirect(w, r, "/")
+}
+
+func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Create the user database export
+	exportPath, err := app.workoutService.ExportUserData(ctx)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("export user data: %w", err))
+		return
+	}
+
+	// Clean up the temporary file when done
+	defer func() {
+		if removeErr := os.Remove(exportPath); removeErr != nil {
+			app.logger.LogAttrs(ctx, slog.LevelWarn, "failed to remove temporary export file",
+				slog.String("path", exportPath), slog.Any("error", removeErr))
+		}
+	}()
+
+	// Open the file for reading
+	file, err := os.Open(exportPath)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("open export file: %w", err))
+		return
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			app.logger.LogAttrs(ctx, slog.LevelWarn, "failed to close export file",
+				slog.String("path", exportPath), slog.Any("error", closeErr))
+		}
+	}()
+
+	// Set headers for file download
+	filename := filepath.Base(exportPath)
+	w.Header().Set("Content-Type", "application/x-sqlite3")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+
+	// Stream the file to the client
+	_, err = io.Copy(w, file)
+	if err != nil {
+		app.logger.LogAttrs(ctx, slog.LevelError, "failed to stream export file to client",
+			slog.String("path", exportPath), slog.Any("error", err))
+		return
+	}
 }

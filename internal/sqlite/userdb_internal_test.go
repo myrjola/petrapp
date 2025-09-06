@@ -9,7 +9,7 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
-func TestDatabase_createUserDB(t *testing.T) {
+func TestDatabase_CreateUserDB(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name           string
@@ -166,10 +166,10 @@ func TestDatabase_createUserDB(t *testing.T) {
 			// Create temporary directory for export
 			tempDir := t.TempDir()
 
-			// Call createUserDB
-			dbPath, err := db.createUserDB(ctx, tt.userID, tempDir)
+			// Call CreateUserDB
+			dbPath, err := db.CreateUserDB(ctx, tt.userID, tempDir)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("createUserDB() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CreateUserDB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
