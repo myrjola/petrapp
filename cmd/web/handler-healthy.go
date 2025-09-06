@@ -31,5 +31,5 @@ func (app *application) testTimeout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"status":"completed","slept_ms":` + sleepMsStr + `}`))
+	_, _ = w.Write([]byte(`{"status":"completed","slept_ms":` + strconv.Itoa(sleepMs) + `}`))
 }
