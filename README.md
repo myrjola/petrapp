@@ -59,11 +59,11 @@ command.
 
 ```
 # list databases
-fly ssh console -C "/dist/litestream databases"
+fly ssh console --user petrapp -C "/dist/litestream databases"
 # list snapshot generations of selected database
-fly ssh console -C "/dist/litestream snapshots /data/petrapp.sqlite3"
+fly ssh console --user petrapp -C "/dist/litestream snapshots /data/petrapp.sqlite3"
 # restore latest snapshot to /data/petrapp4.sqlite
-fly ssh console -C "/dist/litestream restore -o /data/petrapp4.sqlite -generation db5b998e60a203a3 /data/petrapp.sqlite3"
+fly ssh console --user petrapp -C "/dist/litestream restore -o /data/petrapp4.sqlite -generation db5b998e60a203a3 /data/petrapp.sqlite3"
 
 # Edit fly.toml env PETRAPP_SQLITE_URL = "/data/petrapp.sqlite3" before deploying to take new database into use
 vim fly.toml
