@@ -163,11 +163,9 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 				}
 			}
 
-			// Create temporary directory for export
-			tempDir := t.TempDir()
-
-			// Call CreateUserDB
-			dbPath, err := db.CreateUserDB(ctx, tt.userID, tempDir)
+			// Call CreateUserDB twice to ensure we don't have database export is already in use bug.
+			_, _ = db.CreateUserDB(ctx, tt.userID, t.TempDir())
+			dbPath, err := db.CreateUserDB(ctx, tt.userID, t.TempDir())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateUserDB() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -3,9 +3,11 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 const usersTableName = "users"
@@ -17,34 +19,32 @@ func (db *Database) CreateUserDB(ctx context.Context, userID int, basePath strin
 	exportPath := filepath.Join(basePath, fmt.Sprintf("user-db-%d.sqlite3", userID))
 	exportDsn := fmt.Sprintf("file:%s?mode=rwc", exportPath)
 
-	conn, err := db.setupExportConnection(ctx)
-	if err != nil {
-		return "", fmt.Errorf("setup export connection: %w", err)
-	}
+	var conn *sql.Conn
+	conn, err = db.ReadOnly.Conn(ctx)
 	defer func() {
-		if closeErr := conn.Close(); closeErr != nil && err == nil {
-			err = fmt.Errorf("close db connection: %w", closeErr)
+		// Close the sqlite connection so that the pragmas are reset when a new connection is created.
+		if rawErr := conn.Raw(func(_ any) error {
+			return driver.ErrBadConn // According to the sql.Conn.Raw docs, this prevents reusing the Conn.
+		}); rawErr != nil && !errors.Is(rawErr, driver.ErrBadConn) {
+			err = fmt.Errorf("close raw db connection: %w", errors.Join(rawErr, err))
+		}
+		if closeErr := conn.Close(); closeErr != nil && !errors.Is(closeErr, sql.ErrConnDone) {
+			err = fmt.Errorf("close db connection: %w", errors.Join(closeErr, err))
 		}
 	}()
 
-	return db.executeExport(ctx, conn, exportDsn, userID, exportPath)
-}
-
-// setupExportConnection prepares a database connection for export operations.
-func (db *Database) setupExportConnection(ctx context.Context) (*sql.Conn, error) {
-	conn, err := db.ReadOnly.Conn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get db connection: %w", err)
+		return "", fmt.Errorf("get db connection: %w", err)
 	}
 
 	if pragmaErr := db.configurePragmas(ctx, conn, false); pragmaErr != nil {
 		if closeErr := conn.Close(); closeErr != nil {
-			return nil, fmt.Errorf("configure pragmas: %w (close error: %w)", pragmaErr, closeErr)
+			return "", fmt.Errorf("configure pragmas: %w (close error: %w)", pragmaErr, closeErr)
 		}
-		return nil, fmt.Errorf("configure pragmas: %w", pragmaErr)
+		return "", fmt.Errorf("configure pragmas: %w", pragmaErr)
 	}
 
-	return conn, nil
+	return db.executeExport(ctx, conn, exportDsn, userID, exportPath)
 }
 
 // configurePragmas sets up the necessary PRAGMA settings for export operations.
@@ -76,19 +76,17 @@ func (db *Database) configurePragmas(ctx context.Context, conn *sql.Conn, readOn
 // executeExport performs the main export operation within a transaction.
 func (db *Database) executeExport(
 	ctx context.Context, conn *sql.Conn, exportDsn string, userID int, exportPath string,
-) (string, error) {
-	tx, err := conn.BeginTx(ctx, nil)
+) (_ string, err error) {
+	var tx *sql.Tx
+	tx, err = conn.BeginTx(ctx, nil)
 	if err != nil {
 		return "", fmt.Errorf("begin transaction: %w", err)
 	}
 
-	committed := false
 	defer func() {
-		if !committed {
-			_ = tx.Rollback() // Ignore rollback errors to preserve original error
+		if rollBackErr := tx.Rollback(); rollBackErr != nil && !errors.Is(rollBackErr, sql.ErrTxDone) {
+			err = errors.Join(fmt.Errorf("rollback tx: %w", rollBackErr), err)
 		}
-		// Restore original pragmas
-		_ = db.configurePragmas(ctx, conn, true) // Ignore pragma restoration errors
 	}()
 
 	_, err = tx.ExecContext(ctx, `ATTACH DATABASE ? AS export`, exportDsn)
@@ -116,16 +114,10 @@ func (db *Database) executeExport(
 		return "", fmt.Errorf("copy table data: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, `PRAGMA export.foreign_keys = ON`)
-	if err != nil {
-		return "", fmt.Errorf("re-enable foreign keys in export database: %w", err)
-	}
-
 	err = tx.Commit()
 	if err != nil {
 		return "", fmt.Errorf("commit export database: %w", err)
 	}
-	committed = true
 
 	return exportPath, nil
 }
@@ -285,7 +277,7 @@ func (db *Database) discoverUserRelatedTables(
 func (db *Database) checkTableForeignKeys(
 	ctx context.Context, tx *sql.Tx, tableName string, discovered map[string][]string,
 ) (bool, []string, error) {
-	fkRows, err := tx.QueryContext(ctx, `SELECT "table", "from", "to" FROM pragma_foreign_key_list(?)`, tableName)
+	fkRows, err := tx.QueryContext(ctx, `SELECT "table", "from", "to" FROM PRAGMA_FOREIGN_KEY_LIST(?)`, tableName)
 	if err != nil {
 		return false, nil, fmt.Errorf("query foreign keys: %w", err)
 	}
@@ -349,7 +341,7 @@ func (db *Database) findReferencedTables(
 
 // getTableReferences gets all tables referenced by the given table.
 func (db *Database) getTableReferences(ctx context.Context, tx *sql.Tx, tableName string) ([]string, error) {
-	fkRows, err := tx.QueryContext(ctx, `SELECT "table", "from", "to" FROM pragma_foreign_key_list(?)`, tableName)
+	fkRows, err := tx.QueryContext(ctx, `SELECT "table", "from", "to" FROM PRAGMA_FOREIGN_KEY_LIST(?)`, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("query foreign keys: %w", err)
 	}
@@ -390,7 +382,8 @@ func (db *Database) copyTableSchema(ctx context.Context, tx *sql.Tx, tableName s
 	}
 
 	// Replace the table name with export.tableName to create it in the export database
-	exportSQL := fmt.Sprintf("CREATE TABLE export.%s%s", tableName, createSQL[len("CREATE TABLE "+tableName):])
+	skipUntilLeftParens := strings.Index(createSQL, "(")
+	exportSQL := fmt.Sprintf("CREATE TABLE export.%s%s", tableName, createSQL[skipUntilLeftParens:])
 	_, err = tx.ExecContext(ctx, exportSQL)
 	if err != nil {
 		return fmt.Errorf("create table schema in export db: %w", err)
