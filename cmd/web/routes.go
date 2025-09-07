@@ -8,31 +8,28 @@ import (
 func (app *application) routes() (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
-	withoutMaintenanceMode := func(next http.Handler) http.Handler {
-		return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
-			commonContext(app.timeout(next)))))
-	}
-
-	shared := func(next http.Handler) http.Handler {
-		return withoutMaintenanceMode(app.maintenanceMode(next))
-	}
-
-	noAuth := func(next http.Handler) http.Handler {
-		return app.recoverPanic(withoutMaintenanceMode(next))
-	}
-
-	session := func(next http.Handler) http.Handler {
-		return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(
-			app.webAuthnHandler.AuthenticateMiddleware(shared(next)))))
-	}
-
-	mustSession := func(next http.Handler) http.Handler {
-		return session(app.mustAuthenticate(next))
-	}
-
-	mustAdmin := func(next http.Handler) http.Handler {
-		return mustSession(app.mustAdmin(next))
-	}
+	var (
+		withoutMaintenanceMode = func(next http.Handler) http.Handler {
+			return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
+				commonContext(app.timeout(next)))))
+		}
+		shared = func(next http.Handler) http.Handler {
+			return withoutMaintenanceMode(app.maintenanceMode(next))
+		}
+		noAuth = func(next http.Handler) http.Handler {
+			return app.recoverPanic(withoutMaintenanceMode(next))
+		}
+		session = func(next http.Handler) http.Handler {
+			return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(
+				app.webAuthnHandler.AuthenticateMiddleware(shared(next)))))
+		}
+		mustSession = func(next http.Handler) http.Handler {
+			return session(app.mustAuthenticate(next))
+		}
+		mustAdmin = func(next http.Handler) http.Handler {
+			return mustSession(app.mustAdmin(next))
+		}
+	)
 
 	mux.Handle("GET /workouts/{date}", mustSession(http.HandlerFunc(app.workoutGET)))
 	mux.Handle("POST /workouts/{date}/start", mustSession(http.HandlerFunc(app.workoutStartPOST)))
@@ -59,6 +56,7 @@ func (app *application) routes() (*http.ServeMux, error) {
 
 	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
 	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
+	mux.Handle("GET /preferences/export-data", mustSession(http.HandlerFunc(app.exportUserDataGET)))
 	mux.Handle("POST /preferences/delete-user", mustSession(http.HandlerFunc(app.deleteUserPOST)))
 
 	mux.Handle("POST /api/registration/start", session(http.HandlerFunc(app.beginRegistration)))

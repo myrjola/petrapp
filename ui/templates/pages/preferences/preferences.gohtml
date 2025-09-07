@@ -140,6 +140,49 @@
                     }
                 }
 
+                .data-export-section {
+                    margin-top: var(--size-8);
+                    padding: var(--size-6);
+                    background: var(--color-surface-elevated);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                }
+
+                .data-export-section h2 {
+                    font-size: var(--font-size-3);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin: 0 0 var(--size-3) 0;
+                }
+
+                .data-export-section p {
+                    color: var(--color-text-secondary);
+                    margin-bottom: var(--size-4);
+                    font-size: var(--font-size-1);
+                    line-height: 1.5;
+                }
+
+                .export-button {
+                    display: inline-block;
+                    padding: var(--size-3) var(--size-5);
+                    background: var(--sky-6);
+                    color: var(--white);
+                    text-decoration: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-5);
+                    font-size: var(--font-size-1);
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--sky-7);
+                    }
+
+                    &:active {
+                        background: var(--sky-8);
+                    }
+                }
+
                 .danger-zone {
                     margin-top: var(--size-8);
                     padding: var(--size-6);
@@ -208,6 +251,14 @@
             </div>
             <button type="submit" class="save-button">Save Schedule</button>
         </form>
+
+        <div class="data-export-section">
+            <h2>Export Your Data</h2>
+            <p>Download all your workout data as a SQLite database file for your personal records or data portability.</p>
+            <a href="/preferences/export-data" class="export-button" download>
+                Download My Data
+            </a>
+        </div>
 
         <div class="danger-zone">
             <h2>Danger Zone</h2>

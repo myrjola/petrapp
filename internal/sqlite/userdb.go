@@ -10,10 +10,10 @@ import (
 
 const usersTableName = "users"
 
-// createUserDB exports the data for a specific user into a separate SQLite database file.
+// CreateUserDB exports the data for a specific user into a separate SQLite database file.
 //
 // This can be used for providing the user with all their data to comply with GDPR.
-func (db *Database) createUserDB(ctx context.Context, userID int, basePath string) (_ string, err error) {
+func (db *Database) CreateUserDB(ctx context.Context, userID int, basePath string) (_ string, err error) {
 	exportPath := filepath.Join(basePath, fmt.Sprintf("user-db-%d.sqlite3", userID))
 	exportDsn := fmt.Sprintf("file:%s?mode=rwc", exportPath)
 

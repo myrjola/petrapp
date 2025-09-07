@@ -5,14 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // Service handles the business logic for workout management.
 type Service struct {
 	repo         *repository
+	db           *sqlite.Database
 	logger       *slog.Logger
 	openaiAPIKey string
 }
@@ -22,6 +25,7 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 	factory := newRepositoryFactory(db, logger)
 	return &Service{
 		repo:         factory.newRepository(),
+		db:           db,
 		logger:       logger,
 		openaiAPIKey: openaiAPIKey,
 	}
@@ -717,4 +721,23 @@ func (s *Service) SetFeatureFlag(ctx context.Context, flag FeatureFlag) error {
 		return fmt.Errorf("set feature flag %s: %w", flag.Name, err)
 	}
 	return nil
+}
+
+// ExportUserData creates a SQLite database export containing all data for the authenticated user.
+// This method is intended for GDPR compliance and allows users to download their complete data.
+func (s *Service) ExportUserData(ctx context.Context) (string, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	if userID == 0 {
+		return "", errors.New("no authenticated user found in context")
+	}
+
+	tempDir := os.TempDir()
+
+	// Call the database's createUserDB method
+	exportPath, err := s.db.CreateUserDB(ctx, userID, tempDir)
+	if err != nil {
+		return "", fmt.Errorf("create user database: %w", err)
+	}
+
+	return exportPath, nil
 }
