@@ -10,6 +10,6 @@ dbs:
         secret-access-key: ${AWS_SECRET_ACCESS_KEY}
 addr: ":9090"
 logging:
-  level: WARN
+  level: info
   type: text
   stderr: false
