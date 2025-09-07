@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func Test_application_preferences(t *testing.T) {
@@ -161,7 +161,7 @@ func Test_application_exportUserData(t *testing.T) {
 		t.Fatalf("Start workout form not found for today's date: %s", today)
 	}
 
-	if doc, err = client.SubmitForm(ctx, doc, fmt.Sprintf("/workouts/%s/start", today), formData); err != nil {
+	if _, err = client.SubmitForm(ctx, doc, fmt.Sprintf("/workouts/%s/start", today), formData); err != nil {
 		t.Fatalf("Failed to start workout: %v", err)
 	}
 
@@ -195,7 +195,7 @@ func Test_application_exportUserData(t *testing.T) {
 	// Read the SQLite data into a temporary file
 	tempDir := t.TempDir()
 	tempFile := filepath.Join(tempDir, "user-export.sqlite3")
-	
+
 	file, err := os.Create(tempFile)
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
@@ -208,7 +208,7 @@ func Test_application_exportUserData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to copy export data to temp file: %v", err)
 	}
-	
+
 	// Close the file so we can open it with sql.Open
 	if err = file.Close(); err != nil {
 		t.Fatalf("Failed to close temp file: %v", err)
