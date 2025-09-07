@@ -1,13 +1,21 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func Test_application_preferences(t *testing.T) {
@@ -119,6 +127,141 @@ func Test_application_preferences(t *testing.T) {
 		"sunday":    0,
 	}
 	verifySelected(t, doc, weekdaysAfterPersistence)
+}
+
+func Test_application_exportUserData(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	client := server.Client()
+
+	// First register to get authenticated
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Start a workout to generate some data for the user
+	today := time.Now().Format("2006-01-02")
+	formData := map[string]string{}
+	if doc, err = client.GetDoc(ctx, "/"); err != nil {
+		t.Fatalf("Failed to get home page: %v", err)
+	}
+
+	// Find and submit the start workout form for today
+	startForm := doc.Find(fmt.Sprintf("form[action='/workouts/%s/start']", today))
+	if startForm.Length() == 0 {
+		t.Fatalf("Start workout form not found for today's date: %s", today)
+	}
+
+	if doc, err = client.SubmitForm(ctx, doc, fmt.Sprintf("/workouts/%s/start", today), formData); err != nil {
+		t.Fatalf("Failed to start workout: %v", err)
+	}
+
+	// Export the user's data
+	var resp *http.Response
+	resp, err = client.Get(ctx, "/preferences/export-data")
+	if err != nil {
+		t.Fatalf("Failed to export user data: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	// Verify we got a successful response
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	// Verify the content type is SQLite
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "application/x-sqlite3" {
+		t.Errorf("Expected Content-Type application/x-sqlite3, got %s", contentType)
+	}
+
+	// Verify Content-Disposition header for download
+	contentDisposition := resp.Header.Get("Content-Disposition")
+	if !strings.Contains(contentDisposition, "attachment") || !strings.Contains(contentDisposition, ".sqlite3") {
+		t.Errorf("Expected Content-Disposition header with attachment and .sqlite3 filename, got %s", contentDisposition)
+	}
+
+	// Read the SQLite data into a temporary file
+	tempDir := t.TempDir()
+	tempFile := filepath.Join(tempDir, "user-export.sqlite3")
+	
+	file, err := os.Create(tempFile)
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to copy export data to temp file: %v", err)
+	}
+	
+	// Close the file so we can open it with sql.Open
+	if err = file.Close(); err != nil {
+		t.Fatalf("Failed to close temp file: %v", err)
+	}
+
+	// Open the downloaded SQLite file and verify contents
+	db, err := sql.Open("sqlite3", tempFile)
+	if err != nil {
+		t.Fatalf("Failed to open SQLite file: %v", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	// Verify there's a single user
+	var userCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM users").Scan(&userCount)
+	if err != nil {
+		t.Fatalf("Failed to query users table: %v", err)
+	}
+	if userCount != 1 {
+		t.Errorf("Expected 1 user in export, got %d", userCount)
+	}
+
+	// Verify there's a single workout session
+	var sessionCount int
+	err = db.QueryRow("SELECT COUNT(*) FROM workout_sessions").Scan(&sessionCount)
+	if err != nil {
+		t.Fatalf("Failed to query workout_sessions table: %v", err)
+	}
+	if sessionCount != 1 {
+		t.Errorf("Expected 1 workout session in export, got %d", sessionCount)
+	}
+
+	// Verify the session has the correct date (today)
+	var sessionDate string
+	err = db.QueryRow("SELECT workout_date FROM workout_sessions LIMIT 1").Scan(&sessionDate)
+	if err != nil {
+		t.Fatalf("Failed to query session date: %v", err)
+	}
+	if sessionDate != today {
+		t.Errorf("Expected session date %s, got %s", today, sessionDate)
+	}
+
+	// Verify the session is started (has started_at timestamp)
+	var startedAt sql.NullString
+	err = db.QueryRow("SELECT started_at FROM workout_sessions LIMIT 1").Scan(&startedAt)
+	if err != nil {
+		t.Fatalf("Failed to query session started_at: %v", err)
+	}
+	if !startedAt.Valid || startedAt.String == "" {
+		t.Error("Expected session to be started (started_at should not be NULL or empty)")
+	}
 }
 
 func Test_application_deleteUser(t *testing.T) {
