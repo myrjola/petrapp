@@ -11,5 +11,5 @@ dbs:
 addr: ":9090"
 logging:
   level: info
-  type: text
+  type: json
   stderr: false
