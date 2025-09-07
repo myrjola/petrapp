@@ -21,6 +21,7 @@ func Test_application_addWorkout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -93,6 +94,7 @@ func Test_application_workoutNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 

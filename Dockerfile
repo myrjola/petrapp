@@ -35,7 +35,7 @@ RUN filehash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
 # -----------------------------------------------------------------------------
 #  Dependency image for litestream
 # -----------------------------------------------------------------------------
-FROM --platform=linux/amd64 litestream/litestream:0.3.13 AS litestream
+FROM --platform=linux/amd64 litestream/litestream:0.5.0-beta1 AS litestream
 
 # -----------------------------------------------------------------------------
 #  Final stage using Alpine

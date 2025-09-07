@@ -11,9 +11,11 @@ import (
 )
 
 type Server struct {
-	url    string
-	client *Client
-	db     *sql.DB
+	url        string
+	client     *Client
+	db         *sql.DB
+	cancel     context.CancelCauseFunc
+	serverDone chan struct{}
 }
 
 // LogAddrKey is the key used to log the address the server is listening on.
@@ -27,6 +29,8 @@ const LogDsnKey = "sqlDsn"
 // logSink is the writer to which the server logs are written. You usually want to use testhelpers.NewWriter.
 // lookupEnv is a function that returns the value of an environment variable. It has same signature as [os.LookupEnv].
 // run is the function that starts the server. We expect the server to log the address it's listening on to LogAddrKey.
+//
+// Remember to t.Cleanup(server.Shutdown).
 func StartServer(
 	ctx context.Context,
 	logSink io.Writer,
@@ -34,6 +38,7 @@ func StartServer(
 	run func(context.Context, *slog.Logger, func(string) (string, bool)) error,
 ) (*Server, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
+	serverDone := make(chan struct{})
 
 	// We need to grab the dynamically allocated port from the log output.
 	addrCh := make(chan string, 1)
@@ -55,6 +60,7 @@ func StartServer(
 
 	// Start the server and wait for it to be ready.
 	go func() {
+		defer close(serverDone)
 		if err := run(ctx, logger, lookupEnv); err != nil {
 			cancel(err)
 		}
@@ -86,11 +92,16 @@ func StartServer(
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	return &Server{
-		url:    serverURL,
-		client: client,
-		db:     db,
-	}, nil
+
+	server := &Server{
+		url:        serverURL,
+		client:     client,
+		db:         db,
+		cancel:     cancel,
+		serverDone: serverDone,
+	}
+
+	return server, nil
 }
 
 func (s *Server) Client() *Client {
@@ -103,4 +114,9 @@ func (s *Server) URL() string {
 
 func (s *Server) DB() *sql.DB {
 	return s.db
+}
+
+func (s *Server) Shutdown() {
+	s.cancel(nil)
+	<-s.serverDone
 }

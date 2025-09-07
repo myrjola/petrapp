@@ -19,6 +19,7 @@ func Test_application_notFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -167,6 +168,7 @@ func Test_application_notFound_template_content(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 

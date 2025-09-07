@@ -22,6 +22,9 @@ var schemaDefinition string
 //go:embed fixtures.sql
 var fixtures string
 
+//go:embed migrate_user_id_to_integer.sql
+var userIDMigration string
+
 type Database struct {
 	ReadWrite *sql.DB
 	ReadOnly  *sql.DB
@@ -44,6 +47,11 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
+	err = migrateUserIDToInteger(ctx, db, logger)
+	if err != nil {
+		return nil, fmt.Errorf("migrateUserIDToInteger: %w", err)
+	}
+
 	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
 		return nil, fmt.Errorf("migrateTo: %w", err)
 	}
@@ -56,6 +64,32 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 	go db.startDatabaseOptimizer(ctx)
 
 	return db, nil
+}
+
+func migrateUserIDToInteger(ctx context.Context, db *Database, logger *slog.Logger) error {
+	// First, we check the type of the user_id column.
+	var userIDColumnType string
+	err := db.ReadWrite.QueryRowContext(ctx, `
+		SELECT type 
+		FROM PRAGMA_TABLE_INFO('users') 
+		WHERE name = 'id';`).Scan(&userIDColumnType)
+	if errors.Is(err, sql.ErrNoRows) {
+		// No users table, nothing to migrate.
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("check user_id column type: %w", err)
+	}
+	if userIDColumnType == "BLOB" {
+		now := time.Now()
+		if _, err = db.ReadWrite.ExecContext(ctx, userIDMigration); err != nil {
+			return fmt.Errorf("user id migration: %w", err)
+		}
+		duration := time.Since(now)
+		logger.LogAttrs(ctx, slog.LevelInfo, "migrating user_id column from BLOB to INTEGER",
+			slog.Duration("duration", duration))
+	}
+	return nil
 }
 
 //nolint:gochecknoglobals // once is used to ensure that the SQLite driver is registered only once.

@@ -24,6 +24,7 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 		}
 
 		role, err := h.getUserRole(ctx, webauthnUserID)
+		var intUserID int
 		switch {
 		case errors.Is(err, sql.ErrNoRows): // Do not authenticate if user does not exist.
 		case err != nil:
@@ -32,7 +33,6 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 			return
 		default:
 			// Get the integer user ID for context
-			var intUserID int
 			intUserID, err = h.getUserIntegerID(ctx, webauthnUserID)
 			if err != nil {
 				h.logger.LogAttrs(r.Context(), slog.LevelError, "unable to fetch user integer ID", slog.Any("error", err))
@@ -48,7 +48,7 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 		tokenHash := sha256.Sum256([]byte(token))
 		ctx = logging.WithAttrs(r.Context(),
 			slog.String("session_hash", hex.EncodeToString(tokenHash[:])),
-			slog.String("webauthn_user_id", hex.EncodeToString(webauthnUserID)),
+			slog.Int("user_id", intUserID),
 		)
 		r = r.WithContext(ctx)
 

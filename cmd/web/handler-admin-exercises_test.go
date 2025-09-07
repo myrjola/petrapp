@@ -20,6 +20,7 @@ func Test_application_adminExercises(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
