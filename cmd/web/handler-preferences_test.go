@@ -21,6 +21,7 @@ func Test_application_preferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -132,6 +133,7 @@ func Test_application_deleteUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 

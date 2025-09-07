@@ -30,6 +30,7 @@ func Test_application_home(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -88,6 +89,7 @@ func Test_crossOriginProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	// Create a malicious client that simulates cross-origin requests
 	maliciousClient, err := e2etest.NewClientWithSecFetchSite(

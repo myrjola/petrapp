@@ -19,6 +19,7 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -103,6 +104,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
+	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -129,6 +131,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
+		t.Cleanup(nonAdminServer.Shutdown)
 		nonAdminClient := nonAdminServer.Client()
 
 		// Register a regular user
@@ -221,6 +224,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
+		t.Cleanup(nonAdminServer.Shutdown)
 		nonAdminClient := nonAdminServer.Client()
 
 		// Enable maintenance mode in the non-admin server DB
@@ -272,6 +276,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
+		t.Cleanup(nonAdminServer.Shutdown)
 		nonAdminClient := nonAdminServer.Client()
 
 		// Enable maintenance mode in the non-admin server DB
@@ -311,6 +316,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
+		t.Cleanup(nonAdminServer.Shutdown)
 		nonAdminClient := nonAdminServer.Client()
 
 		// Register a regular user

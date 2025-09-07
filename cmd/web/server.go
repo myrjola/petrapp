@@ -37,17 +37,26 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		signal.Notify(sigint, os.Interrupt)
 		signal.Notify(sigint, syscall.SIGTERM)
 
-		<-sigint
-		app.logger.LogAttrs(ctx, slog.LevelInfo, "shutting down server")
+		var shutdownReason string
+		select {
+		case <-sigint:
+			shutdownReason = "signal"
+		case <-ctx.Done():
+			shutdownReason = "context"
+		}
 
-		// We received an interrupt signal, shut down.
+		// Create a new context for logging since the original might be cancelled
+		logCtx := context.Background()
+		app.logger.LogAttrs(logCtx, slog.LevelInfo, "shutting down server", slog.String("reason", shutdownReason))
+
+		// We received an interrupt signal or context cancellation, shut down.
 		var shutdownContext context.Context
 		var cancel context.CancelFunc
 		shutdownContext, cancel = context.WithTimeout(context.Background(), defaultTimeout)
 		defer cancel()
-		if err = srv.Shutdown(shutdownContext); err != nil {
-			err = fmt.Errorf("shutdown server: %w", err)
-			app.logger.LogAttrs(ctx, slog.LevelError, "error shutting down server", slog.Any("error", err))
+		if shutdownErr := srv.Shutdown(shutdownContext); shutdownErr != nil {
+			shutdownErr = fmt.Errorf("shutdown server: %w", shutdownErr)
+			app.logger.LogAttrs(logCtx, slog.LevelError, "error shutting down server", slog.Any("error", shutdownErr))
 		}
 		close(shutdownComplete)
 	}()
