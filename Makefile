@@ -65,7 +65,7 @@ migratetest: build
 	@echo "Deleting previous restored backup..."
 	rm -rf restored.sqlite3* .restored.sqlite3-litestream/
 	@echo "Restoring database from backup..."
-	litestream restore --config litestream.yml restored.sqlite3
+	litestream restore -v --config litestream.yml restored.sqlite3
 	@echo "Running migration test..."
 	bin/migratetest
 
