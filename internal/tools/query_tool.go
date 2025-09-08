@@ -60,14 +60,11 @@ func (t *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*Quer
 		return nil, t.SanitizeError(err)
 	}
 
-	// Apply row limit
-	limitedQuery := t.EnforceRowLimit(query)
-
 	// Set timeout and execute query
 	ctx, cancel := context.WithTimeout(ctx, t.maxExecutionTime)
 	defer cancel()
 
-	return t.executeQueryInTransaction(ctx, limitedQuery)
+	return t.executeQueryInTransaction(ctx, query)
 }
 
 // executeQueryInTransaction executes the query within a read-only transaction.
@@ -92,11 +89,11 @@ func (t *SecureQueryTool) executeQueryInTransaction(ctx context.Context, query s
 		}
 	}()
 
-	return t.collectQueryResults(rows)
+	return t.collectQueryResults(ctx, rows)
 }
 
 // collectQueryResults processes rows and returns structured results.
-func (t *SecureQueryTool) collectQueryResults(rows *sql.Rows) (*QueryResult, error) {
+func (t *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Rows) (*QueryResult, error) {
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, t.SanitizeError(fmt.Errorf("failed to get columns: %w", err))
@@ -105,7 +102,13 @@ func (t *SecureQueryTool) collectQueryResults(rows *sql.Rows) (*QueryResult, err
 	var resultRows [][]interface{}
 	rowCount := 0
 
-	for rows.Next() && rowCount < t.maxRowsReturned {
+	for rows.Next() {
+		// Check if we've reached the row limit
+		if rowCount >= t.maxRowsReturned {
+			// Stop processing more rows to enforce the limit
+			break
+		}
+
 		row, scanErr := t.scanRow(rows, len(columns))
 		if scanErr != nil {
 			return nil, scanErr
@@ -190,24 +193,6 @@ func (t *SecureQueryTool) ValidateSQL(query string) error {
 	}
 
 	return nil
-}
-
-// EnforceRowLimit adds or modifies LIMIT clause to ensure row limits are enforced.
-func (t *SecureQueryTool) EnforceRowLimit(query string) string {
-	// Simple approach: if query doesn't contain LIMIT, add it
-	// If it contains LIMIT with a higher value, replace it with our max
-	cleanQuery := strings.TrimSpace(query)
-
-	limitRegex := regexp.MustCompile(`(?i)\bLIMIT\s+(\d+)`)
-	matches := limitRegex.FindStringSubmatch(cleanQuery)
-
-	if len(matches) > 0 {
-		// Query has LIMIT, replace if higher than our max
-		return limitRegex.ReplaceAllString(cleanQuery, fmt.Sprintf("LIMIT %d", t.maxRowsReturned))
-	}
-
-	// No LIMIT clause found, add one
-	return fmt.Sprintf("%s LIMIT %d", cleanQuery, t.maxRowsReturned)
 }
 
 // SanitizeError removes sensitive information from error messages.

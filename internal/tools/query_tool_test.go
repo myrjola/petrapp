@@ -272,49 +272,6 @@ func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 	}
 }
 
-func TestSecureQueryTool_EnforceRowLimit(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger).WithMaxRows(100)
-
-	testCases := []struct {
-		input    string
-		expected string
-		desc     string
-	}{
-		{
-			input:    "SELECT * FROM users",
-			expected: "SELECT * FROM users LIMIT 100",
-			desc:     "query without LIMIT",
-		},
-		{
-			input:    "SELECT * FROM users LIMIT 200",
-			expected: "SELECT * FROM users LIMIT 100",
-			desc:     "query with higher LIMIT",
-		},
-		{
-			input:    "SELECT * FROM users LIMIT 50",
-			expected: "SELECT * FROM users LIMIT 100",
-			desc:     "query with lower LIMIT",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			result := tool.EnforceRowLimit(tc.input)
-			if result != tc.expected {
-				t.Errorf("expected %q, got %q", tc.expected, result)
-			}
-		})
-	}
-}
-
 func TestSecureQueryTool_RowLimitEnforcement(t *testing.T) {
 	db := setupTestDB(t)
 	defer func() {
