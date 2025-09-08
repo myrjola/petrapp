@@ -213,21 +213,26 @@ func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
 
 	logger := slog.Default()
 	tool := tools.NewSecureQueryTool(db, logger)
+	ctx := context.Background()
 
 	allowedQueries := []string{
 		"SELECT * FROM users",
 		"SELECT id, name FROM users WHERE id = 1",
 		"SELECT COUNT(*) FROM exercises",
 		"SELECT u.name, w.date FROM users u JOIN workouts w ON u.id = w.user_id",
-		"SELECT * FROM users UNION SELECT * FROM exercises",
+		"SELECT id, name FROM users UNION SELECT id, name FROM exercises",
 		"WITH user_workouts AS (SELECT user_id, COUNT(*) as workout_count FROM workouts GROUP BY user_id) " +
 			"SELECT u.name, uw.workout_count FROM users u JOIN user_workouts uw ON u.id = uw.user_id",
 	}
 
 	for _, query := range allowedQueries {
 		t.Run(query, func(t *testing.T) {
-			if err := tool.ValidateSQL(query); err != nil {
-				t.Errorf("expected query to be allowed, got error: %v", err)
+			result, err := tool.ExecuteQuery(ctx, query)
+			if err != nil {
+				t.Errorf("expected query to execute successfully, got error: %v", err)
+			}
+			if result == nil {
+				t.Error("expected result to not be nil")
 			}
 		})
 	}
@@ -243,6 +248,7 @@ func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 
 	logger := slog.Default()
 	tool := tools.NewSecureQueryTool(db, logger)
+	ctx := context.Background()
 
 	forbiddenQueries := []struct {
 		query string
@@ -270,7 +276,8 @@ func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 
 	for _, tc := range forbiddenQueries {
 		t.Run(tc.desc, func(t *testing.T) {
-			if err := tool.ValidateSQL(tc.query); err == nil {
+			_, err := tool.ExecuteQuery(ctx, tc.query)
+			if err == nil {
 				t.Errorf("expected query to be forbidden: %s", tc.query)
 			}
 		})

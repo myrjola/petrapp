@@ -9,8 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/xwb1989/sqlparser"
 )
 
 // SecureQueryTool executes SQL queries safely with security constraints.
@@ -55,8 +53,8 @@ func (t *SecureQueryTool) WithMaxRows(maxRows int) *SecureQueryTool {
 
 // ExecuteQuery executes a SQL query with security constraints.
 func (t *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*QueryResult, error) {
-	// Validate SQL query
-	if err := t.ValidateSQL(query); err != nil {
+	// Basic validation for dangerous operations
+	if err := t.validateDangerousOperations(query); err != nil {
 		return nil, t.SanitizeError(err)
 	}
 
@@ -64,12 +62,13 @@ func (t *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*Quer
 	ctx, cancel := context.WithTimeout(ctx, t.maxExecutionTime)
 	defer cancel()
 
-	return t.executeQueryInTransaction(ctx, query)
+	return t.executeQueryWithPragma(ctx, query)
 }
 
-// executeQueryInTransaction executes the query within a read-only transaction.
-func (t *SecureQueryTool) executeQueryInTransaction(ctx context.Context, query string) (*QueryResult, error) {
-	tx, err := t.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelDefault})
+// executeQueryWithPragma executes the query using a transaction with query_only pragma.
+func (t *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query string) (*QueryResult, error) {
+	// Begin transaction and set pragma within transaction scope
+	tx, err := t.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, t.SanitizeError(fmt.Errorf("failed to begin transaction: %w", err))
 	}
@@ -79,6 +78,12 @@ func (t *SecureQueryTool) executeQueryInTransaction(ctx context.Context, query s
 		}
 	}()
 
+	// Set read-only pragma within transaction
+	if _, pragmaErr := tx.ExecContext(ctx, `PRAGMA QUERY_ONLY = TRUE`); pragmaErr != nil {
+		return nil, t.SanitizeError(fmt.Errorf("failed to enable read-only mode: %w", pragmaErr))
+	}
+
+	// Execute query
 	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return nil, t.SanitizeError(fmt.Errorf("query execution failed: %w", err))
@@ -150,45 +155,18 @@ func (t *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]interface{
 	return values, nil
 }
 
-// ValidateSQL validates that the query is safe to execute.
-func (t *SecureQueryTool) ValidateSQL(query string) error {
+// validateDangerousOperations checks for specific dangerous operations that bypass pragma protection.
+func (t *SecureQueryTool) validateDangerousOperations(query string) error {
 	// Remove comments and normalize whitespace
 	cleanQuery := strings.TrimSpace(query)
 	if cleanQuery == "" {
 		return errors.New("empty query")
 	}
 
-	// Check if this is a CTE (WITH clause) query
-	if t.isCTEQuery(cleanQuery) {
-		return t.validateCTEQuery(cleanQuery)
-	}
-
-	// Parse the SQL statement
-	stmt, err := sqlparser.Parse(cleanQuery)
-	if err != nil {
-		return fmt.Errorf("invalid SQL syntax: %w", err)
-	}
-
-	// Only allow SELECT statements
-	switch stmt.(type) {
-	case *sqlparser.Select:
-		// This is allowed
-	case *sqlparser.Union:
-		// UNION statements with SELECT are allowed
-	default:
-		return errors.New("only SELECT queries are allowed")
-	}
-
-	// Check for dangerous operations using case-insensitive regex
+	// Check for dangerous operations that could bypass pragma restrictions
 	dangerousPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`(?i)\bATTACH\s+DATABASE\b`),
 		regexp.MustCompile(`(?i)\bPRAGMA\b`),
-		regexp.MustCompile(`(?i)\bLOAD_EXTENSION\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+TEMP\s+TABLE\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+TEMPORARY\s+TABLE\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+VIEW\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+TRIGGER\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+INDEX\b`),
 	}
 
 	for _, pattern := range dangerousPatterns {
@@ -200,68 +178,6 @@ func (t *SecureQueryTool) ValidateSQL(query string) error {
 	return nil
 }
 
-// isCTEQuery checks if the query starts with a WITH clause.
-func (t *SecureQueryTool) isCTEQuery(query string) bool {
-	trimmed := strings.TrimSpace(strings.ToUpper(query))
-	return strings.HasPrefix(trimmed, "WITH ")
-}
-
-// validateCTEQuery validates that a CTE query only contains SELECT operations.
-func (t *SecureQueryTool) validateCTEQuery(query string) error {
-	// Check for dangerous operations first
-	dangerousPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`(?i)\bATTACH\s+DATABASE\b`),
-		regexp.MustCompile(`(?i)\bPRAGMA\b`),
-		regexp.MustCompile(`(?i)\bLOAD_EXTENSION\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+TEMP\s+TABLE\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+TEMPORARY\s+TABLE\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+VIEW\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+TRIGGER\b`),
-		regexp.MustCompile(`(?i)\bCREATE\s+INDEX\b`),
-		regexp.MustCompile(`(?i)\bINSERT\b`),
-		regexp.MustCompile(`(?i)\bUPDATE\b`),
-		regexp.MustCompile(`(?i)\bDELETE\b`),
-		regexp.MustCompile(`(?i)\bDROP\b`),
-		regexp.MustCompile(`(?i)\bALTER\b`),
-	}
-
-	for _, pattern := range dangerousPatterns {
-		if pattern.MatchString(query) {
-			return errors.New("query contains restricted operations")
-		}
-	}
-
-	// Basic validation: ensure the query contains only WITH and SELECT keywords for main operations
-	// Remove string literals and comments to avoid false positives
-	cleanQuery := t.removeStringLiterals(query)
-
-	// Check that we have the required structure: WITH ... SELECT
-	withRegex := regexp.MustCompile(`(?i)^WITH\s+`)
-	selectRegex := regexp.MustCompile(`(?i)\bSELECT\b`)
-
-	if !withRegex.MatchString(cleanQuery) {
-		return errors.New("invalid CTE structure: missing WITH clause")
-	}
-
-	if !selectRegex.MatchString(cleanQuery) {
-		return errors.New("invalid CTE structure: missing SELECT statement")
-	}
-
-	return nil
-}
-
-// removeStringLiterals removes string literals from query to avoid false positive matches.
-func (t *SecureQueryTool) removeStringLiterals(query string) string {
-	// Remove single-quoted strings
-	singleQuoteRegex := regexp.MustCompile(`'[^']*'`)
-	cleaned := singleQuoteRegex.ReplaceAllString(query, "''")
-
-	// Remove double-quoted strings
-	doubleQuoteRegex := regexp.MustCompile(`"[^"]*"`)
-	cleaned = doubleQuoteRegex.ReplaceAllString(cleaned, `""`)
-
-	return cleaned
-}
 
 // SanitizeError removes sensitive information from error messages.
 func (t *SecureQueryTool) SanitizeError(err error) error {
