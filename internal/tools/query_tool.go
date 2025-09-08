@@ -158,6 +158,11 @@ func (t *SecureQueryTool) ValidateSQL(query string) error {
 		return errors.New("empty query")
 	}
 
+	// Check if this is a CTE (WITH clause) query
+	if t.isCTEQuery(cleanQuery) {
+		return t.validateCTEQuery(cleanQuery)
+	}
+
 	// Parse the SQL statement
 	stmt, err := sqlparser.Parse(cleanQuery)
 	if err != nil {
@@ -193,6 +198,69 @@ func (t *SecureQueryTool) ValidateSQL(query string) error {
 	}
 
 	return nil
+}
+
+// isCTEQuery checks if the query starts with a WITH clause.
+func (t *SecureQueryTool) isCTEQuery(query string) bool {
+	trimmed := strings.TrimSpace(strings.ToUpper(query))
+	return strings.HasPrefix(trimmed, "WITH ")
+}
+
+// validateCTEQuery validates that a CTE query only contains SELECT operations.
+func (t *SecureQueryTool) validateCTEQuery(query string) error {
+	// Check for dangerous operations first
+	dangerousPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)\bATTACH\s+DATABASE\b`),
+		regexp.MustCompile(`(?i)\bPRAGMA\b`),
+		regexp.MustCompile(`(?i)\bLOAD_EXTENSION\b`),
+		regexp.MustCompile(`(?i)\bCREATE\s+TEMP\s+TABLE\b`),
+		regexp.MustCompile(`(?i)\bCREATE\s+TEMPORARY\s+TABLE\b`),
+		regexp.MustCompile(`(?i)\bCREATE\s+VIEW\b`),
+		regexp.MustCompile(`(?i)\bCREATE\s+TRIGGER\b`),
+		regexp.MustCompile(`(?i)\bCREATE\s+INDEX\b`),
+		regexp.MustCompile(`(?i)\bINSERT\b`),
+		regexp.MustCompile(`(?i)\bUPDATE\b`),
+		regexp.MustCompile(`(?i)\bDELETE\b`),
+		regexp.MustCompile(`(?i)\bDROP\b`),
+		regexp.MustCompile(`(?i)\bALTER\b`),
+	}
+
+	for _, pattern := range dangerousPatterns {
+		if pattern.MatchString(query) {
+			return errors.New("query contains restricted operations")
+		}
+	}
+
+	// Basic validation: ensure the query contains only WITH and SELECT keywords for main operations
+	// Remove string literals and comments to avoid false positives
+	cleanQuery := t.removeStringLiterals(query)
+
+	// Check that we have the required structure: WITH ... SELECT
+	withRegex := regexp.MustCompile(`(?i)^WITH\s+`)
+	selectRegex := regexp.MustCompile(`(?i)\bSELECT\b`)
+
+	if !withRegex.MatchString(cleanQuery) {
+		return errors.New("invalid CTE structure: missing WITH clause")
+	}
+
+	if !selectRegex.MatchString(cleanQuery) {
+		return errors.New("invalid CTE structure: missing SELECT statement")
+	}
+
+	return nil
+}
+
+// removeStringLiterals removes string literals from query to avoid false positive matches.
+func (t *SecureQueryTool) removeStringLiterals(query string) string {
+	// Remove single-quoted strings
+	singleQuoteRegex := regexp.MustCompile(`'[^']*'`)
+	cleaned := singleQuoteRegex.ReplaceAllString(query, "''")
+
+	// Remove double-quoted strings
+	doubleQuoteRegex := regexp.MustCompile(`"[^"]*"`)
+	cleaned = doubleQuoteRegex.ReplaceAllString(cleaned, `""`)
+
+	return cleaned
 }
 
 // SanitizeError removes sensitive information from error messages.

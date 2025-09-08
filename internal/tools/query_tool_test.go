@@ -220,6 +220,8 @@ func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
 		"SELECT COUNT(*) FROM exercises",
 		"SELECT u.name, w.date FROM users u JOIN workouts w ON u.id = w.user_id",
 		"SELECT * FROM users UNION SELECT * FROM exercises",
+		"WITH user_workouts AS (SELECT user_id, COUNT(*) as workout_count FROM workouts GROUP BY user_id) " +
+			"SELECT u.name, uw.workout_count FROM users u JOIN user_workouts uw ON u.id = uw.user_id",
 	}
 
 	for _, query := range allowedQueries {
@@ -259,6 +261,9 @@ func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 		{"CREATE VIEW test_view AS SELECT * FROM users", "CREATE VIEW"},
 		{"CREATE TRIGGER test_trigger AFTER INSERT ON users BEGIN SELECT 1; END", "CREATE TRIGGER"},
 		{"CREATE INDEX idx_test ON users(name)", "CREATE INDEX"},
+		{"WITH malicious AS (SELECT * FROM users) INSERT INTO users (name, email) VALUES ('hacker', 'hack@evil.com')",
+			"CTE with INSERT"},
+		{"WITH evil AS (SELECT * FROM users) UPDATE users SET name = 'hacked'", "CTE with UPDATE"},
 		{"", "empty query"},
 		{"   ", "whitespace only query"},
 	}
