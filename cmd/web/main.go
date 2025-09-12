@@ -13,6 +13,7 @@ import (
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/envstruct"
+	"github.com/myrjola/petrapp/internal/flightrecorder"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -26,6 +27,7 @@ type application struct {
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
 	workoutService  *workout.Service
+	flightRecorder  *flightrecorder.Service
 }
 
 type config struct {
@@ -85,12 +87,29 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
+	// Initialize flight recorder service.
+	flightRecorderService, err := flightrecorder.New(flightrecorder.Config{
+		Logger:   logger,
+		MinAge:   0, // Use default
+		MaxBytes: 0, // Use default
+	})
+	if err != nil {
+		return fmt.Errorf("new flight recorder: %w", err)
+	}
+
+	// Start flight recording.
+	if err = flightRecorderService.Start(ctx); err != nil {
+		return fmt.Errorf("start flight recorder: %w", err)
+	}
+	defer flightRecorderService.Stop(ctx)
+
 	app := application{
 		logger:          logger,
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
 		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
+		flightRecorder:  flightRecorderService,
 	}
 
 	routes, err := app.routes()
