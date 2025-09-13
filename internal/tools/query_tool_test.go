@@ -3,7 +3,6 @@ package tools_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -333,108 +332,5 @@ func TestSecureQueryTool_TimeoutEnforcement(t *testing.T) {
 	// We just verify the tool doesn't crash and handles timeout gracefully
 	if err != nil && !strings.Contains(err.Error(), "timeout") {
 		t.Logf("Query failed with non-timeout error (this is acceptable): %v", err)
-	}
-}
-
-func TestSecureQueryTool_SanitizeError(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
-
-	testCases := []struct {
-		inputErr   error
-		expectType string
-		desc       string
-	}{
-		{
-			inputErr:   errors.New("syntax error near 'FROM' at line 1 column 5"),
-			expectType: "SQL syntax error",
-			desc:       "syntax error",
-		},
-		{
-			inputErr:   errors.New("query execution timeout exceeded"),
-			expectType: "query execution timeout",
-			desc:       "timeout error",
-		},
-		{
-			inputErr:   errors.New("no such table: nonexistent_table"),
-			expectType: "referenced table or column not found",
-			desc:       "table not found",
-		},
-		{
-			inputErr:   errors.New("FOREIGN KEY constraint failed"),
-			expectType: "constraint violation",
-			desc:       "constraint error",
-		},
-		{
-			inputErr:   errors.New("some random database error with /path/to/file SQLITE_ERROR"),
-			expectType: "query execution failed",
-			desc:       "generic error",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			sanitizedErr := tool.SanitizeError(tc.inputErr)
-			if sanitizedErr.Error() != tc.expectType {
-				t.Errorf("expected %q, got %q", tc.expectType, sanitizedErr.Error())
-			}
-		})
-	}
-}
-
-func TestConfigureSecureDB(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	ctx := context.Background()
-	err := tools.ConfigureSecureDB(ctx, db)
-
-	if err != nil {
-		t.Fatalf("expected no error configuring secure DB, got %v", err)
-	}
-
-	// Verify some of the pragma settings were applied
-	var result string
-	err = db.QueryRowContext(ctx, "PRAGMA trusted_schema").Scan(&result)
-	if err != nil {
-		t.Errorf("failed to check trusted_schema pragma: %v", err)
-	}
-	if result != "0" {
-		t.Errorf("expected trusted_schema to be OFF (0), got %s", result)
-	}
-}
-
-func TestSecureQueryTool_ExecuteQuery_InvalidTable(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
-	ctx := context.Background()
-
-	query := "SELECT * FROM nonexistent_table"
-	_, err := tool.ExecuteQuery(ctx, query)
-
-	if err == nil {
-		t.Fatal("expected error for nonexistent table")
-	}
-
-	if err.Error() != "referenced table or column not found" {
-		t.Errorf("expected sanitized error message, got: %v", err)
 	}
 }

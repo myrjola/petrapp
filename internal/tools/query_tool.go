@@ -40,68 +40,68 @@ func NewSecureQueryTool(db *sql.DB, logger *slog.Logger) *SecureQueryTool {
 }
 
 // WithTimeout configures the maximum execution time for queries.
-func (t *SecureQueryTool) WithTimeout(timeout time.Duration) *SecureQueryTool {
-	t.maxExecutionTime = timeout
-	return t
+func (sqt *SecureQueryTool) WithTimeout(timeout time.Duration) *SecureQueryTool {
+	sqt.maxExecutionTime = timeout
+	return sqt
 }
 
 // WithMaxRows configures the maximum number of rows to return.
-func (t *SecureQueryTool) WithMaxRows(maxRows int) *SecureQueryTool {
-	t.maxRowsReturned = maxRows
-	return t
+func (sqt *SecureQueryTool) WithMaxRows(maxRows int) *SecureQueryTool {
+	sqt.maxRowsReturned = maxRows
+	return sqt
 }
 
 // ExecuteQuery executes a SQL query with security constraints.
-func (t *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*QueryResult, error) {
+func (sqt *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*QueryResult, error) {
 	// Basic validation for dangerous operations
-	if err := t.validateDangerousOperations(query); err != nil {
-		return nil, t.SanitizeError(err)
+	if err := sqt.validateDangerousOperations(query); err != nil {
+		return nil, err
 	}
 
 	// Set timeout and execute query
-	ctx, cancel := context.WithTimeout(ctx, t.maxExecutionTime)
+	ctx, cancel := context.WithTimeout(ctx, sqt.maxExecutionTime)
 	defer cancel()
 
-	return t.executeQueryWithPragma(ctx, query)
+	return sqt.executeQueryWithPragma(ctx, query)
 }
 
 // executeQueryWithPragma executes the query using a transaction with query_only pragma.
-func (t *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query string) (*QueryResult, error) {
+func (sqt *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query string) (*QueryResult, error) {
 	// Begin transaction and set pragma within transaction scope
-	tx, err := t.db.BeginTx(ctx, nil)
+	tx, err := sqt.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, t.SanitizeError(fmt.Errorf("failed to begin transaction: %w", err))
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			t.logger.ErrorContext(ctx, "failed to rollback transaction", "error", rollbackErr)
+			sqt.logger.ErrorContext(ctx, "failed to rollback transaction", "error", rollbackErr)
 		}
 	}()
 
 	// Set read-only pragma within transaction
 	if _, pragmaErr := tx.ExecContext(ctx, `PRAGMA QUERY_ONLY = TRUE`); pragmaErr != nil {
-		return nil, t.SanitizeError(fmt.Errorf("failed to enable read-only mode: %w", pragmaErr))
+		return nil, fmt.Errorf("failed to enable read-only mode: %w", pragmaErr)
 	}
 
 	// Execute query
 	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
-		return nil, t.SanitizeError(fmt.Errorf("query execution failed: %w", err))
+		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			t.logger.ErrorContext(ctx, "failed to close rows", "error", closeErr)
+			sqt.logger.ErrorContext(ctx, "failed to close rows", "error", closeErr)
 		}
 	}()
 
-	return t.collectQueryResults(ctx, rows)
+	return sqt.collectQueryResults(ctx, rows)
 }
 
 // collectQueryResults processes rows and returns structured results.
-func (t *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Rows) (*QueryResult, error) {
+func (sqt *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Rows) (*QueryResult, error) {
 	columns, err := rows.Columns()
 	if err != nil {
-		return nil, t.SanitizeError(fmt.Errorf("failed to get columns: %w", err))
+		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
 
 	var resultRows [][]interface{}
@@ -109,12 +109,12 @@ func (t *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Rows)
 
 	for rows.Next() {
 		// Check if we've reached the row limit
-		if rowCount >= t.maxRowsReturned {
+		if rowCount >= sqt.maxRowsReturned {
 			// Stop processing more rows to enforce the limit
 			break
 		}
 
-		row, scanErr := t.scanRow(rows, len(columns))
+		row, scanErr := sqt.scanRow(rows, len(columns))
 		if scanErr != nil {
 			return nil, scanErr
 		}
@@ -123,7 +123,7 @@ func (t *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Rows)
 	}
 
 	if rowsErr := rows.Err(); rowsErr != nil {
-		return nil, t.SanitizeError(fmt.Errorf("row iteration error: %w", rowsErr))
+		return nil, fmt.Errorf("row iteration error: %w", rowsErr)
 	}
 
 	return &QueryResult{
@@ -134,7 +134,7 @@ func (t *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Rows)
 }
 
 // scanRow scans a single row and converts values for JSON compatibility.
-func (t *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]interface{}, error) {
+func (sqt *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]interface{}, error) {
 	values := make([]interface{}, columnCount)
 	valuePtrs := make([]interface{}, columnCount)
 	for i := range values {
@@ -142,7 +142,7 @@ func (t *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]interface{
 	}
 
 	if scanErr := rows.Scan(valuePtrs...); scanErr != nil {
-		return nil, t.SanitizeError(fmt.Errorf("failed to scan row: %w", scanErr))
+		return nil, fmt.Errorf("failed to scan row: %w", scanErr)
 	}
 
 	// Convert byte slices to strings for JSON compatibility
@@ -156,7 +156,7 @@ func (t *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]interface{
 }
 
 // validateDangerousOperations checks for specific dangerous operations that bypass pragma protection.
-func (t *SecureQueryTool) validateDangerousOperations(query string) error {
+func (sqt *SecureQueryTool) validateDangerousOperations(query string) error {
 	// Remove comments and normalize whitespace
 	cleanQuery := strings.TrimSpace(query)
 	if cleanQuery == "" {
@@ -172,59 +172,6 @@ func (t *SecureQueryTool) validateDangerousOperations(query string) error {
 	for _, pattern := range dangerousPatterns {
 		if pattern.MatchString(cleanQuery) {
 			return errors.New("query contains restricted operations")
-		}
-	}
-
-	return nil
-}
-
-
-// SanitizeError removes sensitive information from error messages.
-func (t *SecureQueryTool) SanitizeError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	errMsg := err.Error()
-
-	// Remove file paths and internal details
-	sanitizedMsg := regexp.MustCompile(`/[^\s]*`).ReplaceAllString(errMsg, "[path]")
-	sanitizedMsg = regexp.MustCompile(`line \d+`).ReplaceAllString(sanitizedMsg, "line [number]")
-	sanitizedMsg = regexp.MustCompile(`column \d+`).ReplaceAllString(sanitizedMsg, "column [number]")
-
-	// Remove specific SQLite error codes that might leak information
-	_ = regexp.MustCompile(`SQLITE_[A-Z_]+`).ReplaceAllString(sanitizedMsg, "database error")
-
-	// Keep the message generic but helpful
-	switch {
-	case strings.Contains(strings.ToLower(errMsg), "syntax"):
-		return errors.New("SQL syntax error")
-	case strings.Contains(strings.ToLower(errMsg), "timeout"):
-		return errors.New("query execution timeout")
-	case strings.Contains(strings.ToLower(errMsg), "no such"):
-		return errors.New("referenced table or column not found")
-	case strings.Contains(strings.ToLower(errMsg), "constraint"):
-		return errors.New("constraint violation")
-	default:
-		return errors.New("query execution failed")
-	}
-}
-
-// ConfigureSecureDB applies security settings to a database connection.
-func ConfigureSecureDB(ctx context.Context, db *sql.DB) error {
-	// Apply security-focused PRAGMA settings
-	securityPragmas := []string{
-		"PRAGMA trusted_schema = OFF",
-		"PRAGMA ignore_check_constraints = OFF",
-		"PRAGMA max_page_count = 10000",
-		"PRAGMA temp_store = MEMORY",
-		"PRAGMA secure_delete = ON",
-		"PRAGMA cell_size_check = ON",
-	}
-
-	for _, pragma := range securityPragmas {
-		if _, err := db.ExecContext(ctx, pragma); err != nil {
-			return fmt.Errorf("failed to set security pragma %q: %w", pragma, err)
 		}
 	}
 
