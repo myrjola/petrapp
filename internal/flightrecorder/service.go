@@ -129,11 +129,8 @@ func (s *Service) Stop(ctx context.Context) {
 
 	s.flightRecorder.Stop()
 	s.started = false
-	
-	// Only log if the context is not cancelled to avoid test writer issues
-	if ctx.Err() == nil {
-		s.logger.LogAttrs(ctx, slog.LevelInfo, "flight recorder stopped")
-	}
+
+	s.logger.LogAttrs(ctx, slog.LevelInfo, "flight recorder stopped")
 }
 
 // CaptureTimeoutTrace captures a trace when a request times out.
@@ -168,22 +165,22 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) 
 	// Generate filename with timestamp and request info
 	timestamp := time.Unix(now, 0).UTC().Format("20060102-150405")
 	filename := fmt.Sprintf("timeout-%s-%s-%s.trace", timestamp, method, sanitizePath(path))
-	filepath := filepath.Join(s.tracesDirectory, filename)
+	fPath := filepath.Join(s.tracesDirectory, filename)
 
 	// Create and write the trace file
-	file, err := os.Create(filepath)
+	file, err := os.Create(fPath)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelError, "failed to create trace file",
 			slog.String("method", method),
 			slog.String("path", path),
-			slog.String("file", filepath),
+			slog.String("file", fPath),
 			slog.Any("error", err))
 		return
 	}
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil {
 			s.logger.LogAttrs(ctx, slog.LevelError, "failed to close trace file",
-				slog.String("file", filepath),
+				slog.String("file", fPath),
 				slog.Any("error", closeErr))
 		}
 	}()
@@ -194,7 +191,7 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) 
 		s.logger.LogAttrs(ctx, slog.LevelError, "failed to write trace",
 			slog.String("method", method),
 			slog.String("path", path),
-			slog.String("file", filepath),
+			slog.String("file", fPath),
 			slog.Any("error", err))
 		return
 	}
@@ -202,7 +199,7 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) 
 	s.logger.LogAttrs(ctx, slog.LevelWarn, "captured timeout trace",
 		slog.String("method", method),
 		slog.String("path", path),
-		slog.String("file", filepath),
+		slog.String("file", fPath),
 		slog.Int64("bytes", bytesWritten))
 }
 

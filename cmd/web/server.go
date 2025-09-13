@@ -58,10 +58,10 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 			shutdownErr = fmt.Errorf("shutdown server: %w", shutdownErr)
 			app.logger.LogAttrs(logCtx, slog.LevelError, "error shutting down server", slog.Any("error", shutdownErr))
 		}
-		
+
 		// Stop flight recorder after server shutdown
 		app.flightRecorder.Stop(logCtx)
-		
+
 		close(shutdownComplete)
 	}()
 
@@ -86,12 +86,4 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 	<-shutdownComplete
 
 	return nil
-}
-
-// startAndWaitForShutdown starts the application and waits for shutdown signals.
-// It coordinates shutdown of both the HTTP server and flight recorder.
-func (app *application) startAndWaitForShutdown(ctx context.Context, addr string, handler http.Handler) error {
-	// The flight recorder shutdown is now integrated into the server shutdown
-	// in configureAndStartServer, so we just need to start the server
-	return app.configureAndStartServer(ctx, addr, handler)
 }

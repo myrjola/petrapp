@@ -124,7 +124,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("initialize routes: %w", err)
 	}
 
-	return app.startAndWaitForShutdown(ctx, cfg.Addr, routes)
+	return app.configureAndStartServer(ctx, cfg.Addr, routes)
 }
 
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {

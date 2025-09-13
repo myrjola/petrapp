@@ -102,6 +102,7 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 			proto  = r.Proto
 			method = r.Method
 			uri    = r.URL.RequestURI()
+			path   = r.URL.Path
 		)
 
 		ctx := r.Context()
@@ -124,7 +125,6 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		if !trace.IsEnabled() {
 			next.ServeHTTP(sw, r)
 		} else {
-			path := r.URL.Path
 			taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
 			traceCtx, task := trace.NewTask(ctx, taskName)
 
@@ -148,6 +148,10 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		}
 		app.logger.LogAttrs(r.Context(), level, "request completed",
 			slog.Int("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
+		// If we have a flight recorder, capture a trace if the request timed out.
+		if sw.statusCode == http.StatusServiceUnavailable && app.flightRecorder != nil {
+			go app.flightRecorder.CaptureTimeoutTrace(context.Background(), method, path)
+		}
 	})
 }
 
@@ -203,7 +207,6 @@ func (app *application) crossOriginProtection(next http.Handler) http.Handler {
 
 // timeout times out the request and cancels the context using http.TimeoutHandler.
 // Admins get a longer timeout so that they can call external services.
-// Captures flight recorder traces when requests timeout.
 func (app *application) timeout(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := http.NewResponseController(w)
@@ -216,53 +219,7 @@ func (app *application) timeout(next http.Handler) http.Handler {
 				return
 			}
 		}
-
-		// Create a custom timeout handler that captures traces on timeout.
-		timeoutHandler := app.createTimeoutHandlerWithTracing(next, timeout, r.Method, r.URL.Path)
-		timeoutHandler.ServeHTTP(w, r)
-	})
-}
-
-// createTimeoutHandlerWithTracing creates a timeout handler that captures flight recorder
-// traces when a timeout occurs.
-func (app *application) createTimeoutHandlerWithTracing(
-	next http.Handler, timeout time.Duration, method, path string,
-) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), timeout)
-		defer cancel()
-
-		done := make(chan struct{})
-		panicChan := make(chan interface{}, 1)
-
-		go func() {
-			defer func() {
-				if p := recover(); p != nil {
-					panicChan <- p
-				}
-			}()
-
-			r = r.WithContext(ctx)
-			next.ServeHTTP(w, r)
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			// Request completed successfully.
-			return
-		case p := <-panicChan:
-			// Panic occurred in handler.
-			panic(p)
-		case <-ctx.Done():
-			// Context was cancelled (timeout occurred).
-			if app.flightRecorder != nil {
-				go app.flightRecorder.CaptureTimeoutTrace(context.Background(), method, path)
-			}
-
-			// Return timeout error.
-			http.Error(w, "timed out", http.StatusGatewayTimeout)
-		}
+		http.TimeoutHandler(next, timeout, "timed out").ServeHTTP(w, r)
 	})
 }
 
