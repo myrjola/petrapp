@@ -11,6 +11,7 @@ import (
 type Writer struct {
 	t        *testing.T
 	testDone chan struct{}
+	testName string
 }
 
 // NewWriter creates a new Writer that writes to t.Log.
@@ -19,6 +20,7 @@ func NewWriter(t *testing.T) io.Writer {
 	w := &Writer{
 		t:        t,
 		testDone: make(chan struct{}),
+		testName: t.Name(),
 	}
 	// Close the writer when the test finishes to prevent data races
 	t.Cleanup(func() {
@@ -32,7 +34,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 	select {
 	// If the test has finished, panic to catch server shutdown issues
 	case <-w.testDone:
-		panic("testwriter: attempted to write after test completion. Did you remember to t.Cleanup(server.Shutdown)?")
+		panic("testwriter: attempted to write after test completion in " + w.testName)
 	default:
 		// Remove trailing newlines to avoid double-spacing in test output.
 		output := strings.TrimSuffix(string(p), "\n")

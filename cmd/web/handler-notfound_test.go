@@ -15,11 +15,10 @@ func Test_application_notFound(t *testing.T) {
 		ctx = t.Context()
 	)
 
-	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -164,11 +163,10 @@ func Test_application_notFound_template_content(t *testing.T) {
 		doc *goquery.Document
 	)
 
-	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 

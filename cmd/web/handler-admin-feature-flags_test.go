@@ -15,11 +15,10 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 		ctx = t.Context()
 		doc *goquery.Document
 	)
-	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -100,11 +99,10 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 	var (
 		ctx = t.Context()
 	)
-	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -127,7 +125,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 
 	t.Run("Regular user sees maintenance page when enabled", func(t *testing.T) {
 		// Create a new client without admin privileges
-		nonAdminServer, serverErr := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+		nonAdminServer, serverErr := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
@@ -220,7 +218,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 
 	t.Run("Authentication APIs bypass maintenance mode", func(t *testing.T) {
 		// Create a new client without admin privileges to test auth API access
-		nonAdminServer, serverErr := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+		nonAdminServer, serverErr := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
@@ -272,7 +270,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 
 	t.Run("Static files bypass maintenance mode", func(t *testing.T) {
 		// Create a new client without admin privileges to test static file access
-		nonAdminServer, serverErr := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+		nonAdminServer, serverErr := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}
@@ -312,7 +310,7 @@ func Test_application_maintenanceMode_integration(t *testing.T) {
 		}
 
 		// Create a new client without admin privileges
-		nonAdminServer, serverErr := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+		nonAdminServer, serverErr := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 		if serverErr != nil {
 			t.Fatalf("Failed to start non-admin server: %v", serverErr)
 		}

@@ -83,7 +83,7 @@
                     {{ $hasFullBody = true }}
                 {{ end }}
             {{ end }}
-            
+
             {{ $workoutType := "Full Body" }}
             {{ if $hasFullBody }}
                 {{ $workoutType = "Full Body" }}
@@ -94,9 +94,9 @@
             {{ else if $hasLower }}
                 {{ $workoutType = "Lower Body" }}
             {{ end }}
-            
+
             <h1>{{ $workoutType }} Workout - {{ .Date.Format "Monday, January 2, 2006" }}</h1>
-            
+
             <div class="workout-meta">
                 {{ if not .Session.CompletedAt.IsZero }}
                     <span class="status-badge completed">Completed</span>

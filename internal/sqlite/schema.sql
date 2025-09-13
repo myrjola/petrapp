@@ -88,8 +88,8 @@ CREATE TABLE exercises
 CREATE TABLE workout_sessions
 (
     user_id           INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    workout_date      TEXT NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
-                                           DATE(workout_date, '+0 days') IS workout_date),
+    workout_date      TEXT    NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
+                                              DATE(workout_date, '+0 days') IS workout_date),
     difficulty_rating INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
     started_at        TEXT CHECK (started_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', started_at) = started_at),
     completed_at      TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),

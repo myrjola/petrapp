@@ -16,6 +16,8 @@ func testLookupEnv(key string) (string, bool) {
 		return ":memory:", true
 	case "PETRAPP_ADDR":
 		return "localhost:0", true
+	case "PETRAPP_TRACES_DIRECTORY":
+		return "", true // Use default (empty string means use module root)
 	default:
 		return "", false
 	}
@@ -26,11 +28,10 @@ func Test_application_home(t *testing.T) {
 		ctx = t.Context()
 		doc *goquery.Document
 	)
-	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -85,11 +86,10 @@ func checkButtonPresence(t *testing.T, doc *goquery.Document, buttonText string,
 
 func Test_crossOriginProtection(t *testing.T) {
 	ctx := t.Context()
-	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	// Create a malicious client that simulates cross-origin requests
 	maliciousClient, err := e2etest.NewClientWithSecFetchSite(
