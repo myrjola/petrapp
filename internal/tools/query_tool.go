@@ -3,9 +3,9 @@ package tools
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -16,7 +16,6 @@ type SecureQueryTool struct {
 	db               *sql.DB
 	maxExecutionTime time.Duration
 	maxRowsReturned  int
-	logger           *slog.Logger
 }
 
 // QueryResult represents the result of a query execution.
@@ -27,7 +26,7 @@ type QueryResult struct {
 }
 
 // NewSecureQueryTool creates a new SecureQueryTool instance.
-func NewSecureQueryTool(db *sql.DB, logger *slog.Logger) *SecureQueryTool {
+func NewSecureQueryTool(db *sql.DB) *SecureQueryTool {
 	const defaultTimeout = 5 * time.Second
 	const defaultMaxRows = 1000
 
@@ -35,7 +34,6 @@ func NewSecureQueryTool(db *sql.DB, logger *slog.Logger) *SecureQueryTool {
 		db:               db,
 		maxExecutionTime: defaultTimeout,
 		maxRowsReturned:  defaultMaxRows,
-		logger:           logger,
 	}
 }
 
@@ -66,22 +64,40 @@ func (sqt *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*Qu
 }
 
 // executeQueryWithPragma executes the query using a transaction with query_only pragma.
-func (sqt *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query string) (*QueryResult, error) {
-	// Begin transaction and set pragma within transaction scope
-	tx, err := sqt.db.BeginTx(ctx, nil)
+func (sqt *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query string) (_ *QueryResult, err error) {
+	// We use a dedicated connection to ensure the PRAGMA settings are applied and reverted correctly.
+	var (
+		conn *sql.Conn
+	)
+	conn, err = sqt.db.Conn(ctx)
+	defer func() {
+		// Close the sqlite connection so that the pragmas are reset when a new connection is created.
+		if rawErr := conn.Raw(func(_ any) error {
+			return driver.ErrBadConn // According to the sql.Conn.Raw docs, this prevents reusing the Conn.
+		}); rawErr != nil && !errors.Is(rawErr, driver.ErrBadConn) {
+			err = fmt.Errorf("close raw db connection: %w", errors.Join(rawErr, err))
+			return
+		}
+		if closeErr := conn.Close(); closeErr != nil && !errors.Is(closeErr, sql.ErrConnDone) {
+			err = fmt.Errorf("close db connection: %w", errors.Join(closeErr, err))
+		}
+	}()
+
+	// Set read-only pragma to prevent writing to the database
+	if _, pragmaErr := conn.ExecContext(ctx, `PRAGMA QUERY_ONLY = TRUE`); pragmaErr != nil {
+		return nil, fmt.Errorf("failed to enable read-only mode: %w", pragmaErr)
+	}
+
+	// Begin transaction
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			sqt.logger.ErrorContext(ctx, "failed to rollback transaction", "error", rollbackErr)
+			err = fmt.Errorf("rollback transaction: %w", errors.Join(rollbackErr, err))
 		}
 	}()
-
-	// Set read-only pragma within transaction
-	if _, pragmaErr := tx.ExecContext(ctx, `PRAGMA QUERY_ONLY = TRUE`); pragmaErr != nil {
-		return nil, fmt.Errorf("failed to enable read-only mode: %w", pragmaErr)
-	}
 
 	// Execute query
 	rows, err := tx.QueryContext(ctx, query)
@@ -90,11 +106,17 @@ func (sqt *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query st
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			sqt.logger.ErrorContext(ctx, "failed to close rows", "error", closeErr)
+			err = fmt.Errorf("close rows: %w", errors.Join(closeErr, err))
 		}
 	}()
 
-	return sqt.collectQueryResults(ctx, rows)
+	var result *QueryResult
+	result, err = sqt.collectQueryResults(ctx, rows)
+	if err != nil {
+		return nil, fmt.Errorf("collect query results: %w", err)
+	}
+
+	return result, nil
 }
 
 // collectQueryResults processes rows and returns structured results.

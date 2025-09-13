@@ -3,7 +3,6 @@ package tools_test
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +21,11 @@ func setupTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
+	t.Cleanup(func() {
+		if closeErr := db.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
+	})
 
 	// Create test schema
 	schema := `
@@ -90,52 +94,10 @@ func setupTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestNewSecureQueryTool(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
-
-	// Test that the tool was created successfully (private fields can't be accessed)
-	if tool == nil {
-		t.Error("expected non-nil tool")
-	}
-}
-
-func TestSecureQueryTool_Configuration(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger).
-		WithTimeout(10 * time.Second).
-		WithMaxRows(500)
-
-	// Test that configuration was applied successfully (private fields can't be accessed)
-	if tool == nil {
-		t.Error("expected non-nil tool after configuration")
-	}
-}
-
 func TestSecureQueryTool_ExecuteQuery_ValidSelect(t *testing.T) {
 	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
 
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
+	tool := tools.NewSecureQueryTool(db)
 	ctx := context.Background()
 
 	query := "SELECT id, name, email FROM users WHERE id = 1"
@@ -166,18 +128,11 @@ func TestSecureQueryTool_ExecuteQuery_ValidSelect(t *testing.T) {
 
 func TestSecureQueryTool_ExecuteQuery_ComplexQuery(t *testing.T) {
 	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
+	tool := tools.NewSecureQueryTool(db)
 	ctx := context.Background()
 
 	query := `
-		SELECT e.name as exercise_name, MAX(es.weight_kg) as max_weight
+		SELECT e.name AS exercise_name, MAX(es.weight_kg) AS max_weight
 		FROM exercises e
 		JOIN exercise_sets es ON e.id = es.exercise_id
 		JOIN workouts w ON es.workout_id = w.id
@@ -203,17 +158,6 @@ func TestSecureQueryTool_ExecuteQuery_ComplexQuery(t *testing.T) {
 }
 
 func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
-	ctx := context.Background()
-
 	allowedQueries := []string{
 		"SELECT * FROM users",
 		"SELECT id, name FROM users WHERE id = 1",
@@ -226,6 +170,10 @@ func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
 
 	for _, query := range allowedQueries {
 		t.Run(query, func(t *testing.T) {
+			db := setupTestDB(t)
+			tool := tools.NewSecureQueryTool(db)
+			ctx := context.Background()
+
 			result, err := tool.ExecuteQuery(ctx, query)
 			if err != nil {
 				t.Errorf("expected query to execute successfully, got error: %v", err)
@@ -238,17 +186,6 @@ func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
 }
 
 func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
-	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
-
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger)
-	ctx := context.Background()
-
 	forbiddenQueries := []struct {
 		query string
 		desc  string
@@ -275,6 +212,9 @@ func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 
 	for _, tc := range forbiddenQueries {
 		t.Run(tc.desc, func(t *testing.T) {
+			db := setupTestDB(t)
+			tool := tools.NewSecureQueryTool(db)
+			ctx := context.Background()
 			_, err := tool.ExecuteQuery(ctx, tc.query)
 			if err == nil {
 				t.Errorf("expected query to be forbidden: %s", tc.query)
@@ -285,14 +225,8 @@ func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 
 func TestSecureQueryTool_RowLimitEnforcement(t *testing.T) {
 	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
 
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger).WithMaxRows(2)
+	tool := tools.NewSecureQueryTool(db).WithMaxRows(2)
 	ctx := context.Background()
 
 	// Query that would return more than 2 rows without limit
@@ -314,14 +248,8 @@ func TestSecureQueryTool_RowLimitEnforcement(t *testing.T) {
 
 func TestSecureQueryTool_TimeoutEnforcement(t *testing.T) {
 	db := setupTestDB(t)
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Errorf("failed to close database: %v", closeErr)
-		}
-	}()
 
-	logger := slog.Default()
-	tool := tools.NewSecureQueryTool(db, logger).WithTimeout(1 * time.Millisecond)
+	tool := tools.NewSecureQueryTool(db).WithTimeout(1 * time.Millisecond)
 	ctx := context.Background()
 
 	// This query might timeout depending on timing, but we mainly want to test that timeout is respected
