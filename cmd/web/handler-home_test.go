@@ -16,6 +16,8 @@ func testLookupEnv(key string) (string, bool) {
 		return ":memory:", true
 	case "PETRAPP_ADDR":
 		return "localhost:0", true
+	case "PETRAPP_TRACES_DIRECTORY":
+		return "", true // Use default (empty string means use module root)
 	default:
 		return "", false
 	}

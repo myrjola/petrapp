@@ -11,11 +11,15 @@ import (
 )
 
 func TestService_StartStop(t *testing.T) {
+	// Create temporary trace directory
+	traceDir := t.TempDir()
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	service, err := flightrecorder.New(flightrecorder.Config{
-		Logger:   logger,
-		MinAge:   0, // Use default
-		MaxBytes: 0, // Use default
+		Logger:          logger,
+		MinAge:          0, // Use default
+		MaxBytes:        0, // Use default
+		TracesDirectory: traceDir,
 	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -33,11 +37,15 @@ func TestService_StartStop(t *testing.T) {
 }
 
 func TestService_CaptureTimeoutTrace(t *testing.T) {
+	// Create temporary trace directory
+	traceDir := t.TempDir()
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	service, err := flightrecorder.New(flightrecorder.Config{
-		Logger:   logger,
-		MinAge:   0, // Use default
-		MaxBytes: 0, // Use default
+		Logger:          logger,
+		MinAge:          0, // Use default
+		MaxBytes:        0, // Use default
+		TracesDirectory: traceDir,
 	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -48,13 +56,6 @@ func TestService_CaptureTimeoutTrace(t *testing.T) {
 		t.Fatalf("Start() error = %v", err)
 	}
 	defer service.Stop(ctx)
-
-	// Create the traces directory
-	traceDir := "traces"
-	if err = os.MkdirAll(traceDir, 0755); err != nil {
-		t.Fatalf("failed to create trace directory: %v", err)
-	}
-	defer os.RemoveAll(traceDir)
 
 	// Capture a trace
 	service.CaptureTimeoutTrace(ctx, "GET", "/test/path")
@@ -89,11 +90,16 @@ func TestService_CaptureTimeoutTrace(t *testing.T) {
 func TestService_CooldownPreventsCapture(t *testing.T) {
 	// This test is simplified since we can't access private fields from external package
 	// We'll test that the service can start and stop without errors
+
+	// Create temporary trace directory
+	traceDir := t.TempDir()
+
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	service, err := flightrecorder.New(flightrecorder.Config{
-		Logger:   logger,
-		MinAge:   0, // Use default
-		MaxBytes: 0, // Use default
+		Logger:          logger,
+		MinAge:          0, // Use default
+		MaxBytes:        0, // Use default
+		TracesDirectory: traceDir,
 	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -104,13 +110,6 @@ func TestService_CooldownPreventsCapture(t *testing.T) {
 		t.Fatalf("Start() error = %v", err)
 	}
 	defer service.Stop(ctx)
-
-	// Create trace directory
-	traceDir := "traces"
-	if err = os.MkdirAll(traceDir, 0755); err != nil {
-		t.Fatalf("failed to create trace directory: %v", err)
-	}
-	defer os.RemoveAll(traceDir)
 
 	// Capture first trace
 	service.CaptureTimeoutTrace(ctx, "POST", "/cooldown/test")

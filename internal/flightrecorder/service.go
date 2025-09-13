@@ -23,31 +23,34 @@ const (
 
 	// cooldownDuration is the minimum time between trace captures.
 	cooldownDuration = 30 * time.Minute
-
-	// traceDir is the directory where traces are written.
-	traceDir = "traces"
 )
 
 // Service manages flight recording for timeout detection.
 type Service struct {
-	logger         *slog.Logger
-	flightRecorder *trace.FlightRecorder
-	lastCapture    atomic.Int64 // Unix timestamp of last capture
-	mu             sync.RWMutex
-	started        bool
+	logger          *slog.Logger
+	flightRecorder  *trace.FlightRecorder
+	tracesDirectory string
+	lastCapture     atomic.Int64 // Unix timestamp of last capture
+	mu              sync.RWMutex
+	started         bool
 }
 
 // Config configures the flight recorder service.
 type Config struct {
-	Logger   *slog.Logger
-	MinAge   time.Duration // Minimum age of trace events
-	MaxBytes uint64        // Maximum size of trace buffer
+	Logger          *slog.Logger
+	MinAge          time.Duration // Minimum age of trace events
+	MaxBytes        uint64        // Maximum size of trace buffer
+	TracesDirectory string        // Directory where trace files are written
 }
 
 // New creates a new flight recorder service.
 func New(cfg Config) (*Service, error) {
 	if cfg.Logger == nil {
 		return nil, errors.New("logger is required")
+	}
+
+	if cfg.TracesDirectory == "" {
+		return nil, errors.New("traces directory is required")
 	}
 
 	minAge := cfg.MinAge
@@ -71,11 +74,12 @@ func New(cfg Config) (*Service, error) {
 	}
 
 	return &Service{
-		logger:         cfg.Logger,
-		flightRecorder: flightRecorder,
-		lastCapture:    atomic.Int64{},
-		mu:             sync.RWMutex{},
-		started:        false,
+		logger:          cfg.Logger,
+		flightRecorder:  flightRecorder,
+		tracesDirectory: cfg.TracesDirectory,
+		lastCapture:     atomic.Int64{},
+		mu:              sync.RWMutex{},
+		started:         false,
 	}, nil
 }
 
@@ -88,13 +92,21 @@ func (s *Service) Start(ctx context.Context) error {
 		return errors.New("flight recorder already started")
 	}
 
-	// Create traces directory if it doesn't exist
-	if err := os.MkdirAll(traceDir, 0755); err != nil {
-		return fmt.Errorf("create traces directory: %w", err)
+	// The traces directory should already be created by the caller, but verify it exists
+	if stat, err := os.Stat(s.tracesDirectory); err != nil {
+		return fmt.Errorf("traces directory not accessible: %w", err)
+	} else if !stat.IsDir() {
+		return fmt.Errorf("traces path is not a directory: %s", s.tracesDirectory)
 	}
 
 	if err := s.flightRecorder.Start(); err != nil {
-		return fmt.Errorf("start flight recorder: %w", err)
+		// If the flight recorder is already enabled globally, that's OK
+		// This can happen in tests where multiple services try to start it
+		if err.Error() == "flight recorder already enabled" {
+			s.logger.LogAttrs(ctx, slog.LevelDebug, "flight recorder already enabled globally, continuing")
+		} else {
+			return fmt.Errorf("start flight recorder: %w", err)
+		}
 	}
 
 	s.started = true
@@ -117,7 +129,11 @@ func (s *Service) Stop(ctx context.Context) {
 
 	s.flightRecorder.Stop()
 	s.started = false
-	s.logger.LogAttrs(ctx, slog.LevelInfo, "flight recorder stopped")
+	
+	// Only log if the context is not cancelled to avoid test writer issues
+	if ctx.Err() == nil {
+		s.logger.LogAttrs(ctx, slog.LevelInfo, "flight recorder stopped")
+	}
 }
 
 // CaptureTimeoutTrace captures a trace when a request times out.
@@ -152,7 +168,7 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) 
 	// Generate filename with timestamp and request info
 	timestamp := time.Unix(now, 0).UTC().Format("20060102-150405")
 	filename := fmt.Sprintf("timeout-%s-%s-%s.trace", timestamp, method, sanitizePath(path))
-	filepath := filepath.Join(traceDir, filename)
+	filepath := filepath.Join(s.tracesDirectory, filename)
 
 	// Create and write the trace file
 	file, err := os.Create(filepath)

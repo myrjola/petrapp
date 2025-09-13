@@ -43,6 +43,8 @@ type config struct {
 	PProfAddr string `env:"PETRAPP_PPROF_ADDR" envDefault:""`
 	// TemplatePath is the path to the directory containing the HTML templates.
 	TemplatePath string `env:"PETRAPP_TEMPLATE_PATH" envDefault:""`
+	// TracesDirectory is the path to the directory where trace files are written.
+	TracesDirectory string `env:"PETRAPP_TRACES_DIRECTORY" envDefault:""`
 	// OpenAIAPIKey is optional. It's used to authenticate with the OpenAI API.
 	OpenAIAPIKey string `env:"OPENAI_API_KEY" envDefault:""`
 }
@@ -70,6 +72,11 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("resolve template path: %w", err)
 	}
 
+	var tracesDirectory string
+	if tracesDirectory, err = resolveAndCreateTracesDirectory(cfg.TracesDirectory); err != nil {
+		return fmt.Errorf("resolve traces directory: %w", err)
+	}
+
 	db, err := sqlite.NewDatabase(ctx, cfg.SqliteURL, logger)
 	if err != nil {
 		return fmt.Errorf("open db (url: %s): %w", cfg.SqliteURL, err)
@@ -89,9 +96,10 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	// Initialize flight recorder service.
 	flightRecorderService, err := flightrecorder.New(flightrecorder.Config{
-		Logger:   logger,
-		MinAge:   0, // Use default
-		MaxBytes: 0, // Use default
+		Logger:          logger,
+		MinAge:          0, // Use default
+		MaxBytes:        0, // Use default
+		TracesDirectory: tracesDirectory,
 	})
 	if err != nil {
 		return fmt.Errorf("new flight recorder: %w", err)
@@ -101,7 +109,6 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	if err = flightRecorderService.Start(ctx); err != nil {
 		return fmt.Errorf("start flight recorder: %w", err)
 	}
-	defer flightRecorderService.Stop(ctx)
 
 	app := application{
 		logger:          logger,
@@ -117,10 +124,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("initialize routes: %w", err)
 	}
 
-	if err = app.configureAndStartServer(ctx, cfg.Addr, routes); err != nil {
-		return fmt.Errorf("start server: %w", err)
-	}
-	return nil
+	return app.startAndWaitForShutdown(ctx, cfg.Addr, routes)
 }
 
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
