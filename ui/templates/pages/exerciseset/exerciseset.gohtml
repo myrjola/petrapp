@@ -413,7 +413,8 @@
             <div class="warmup-banner">
                 <div class="warmup-message">Complete your warmup first</div>
                 <div class="warmup-description">
-                    Warming up properly prepares your muscles and joints for exercise, reducing injury risk and improving performance.
+                    Warming up properly prepares your muscles and joints for exercise, reducing injury risk and
+                    improving performance.
                 </div>
                 <form method="post"
                       action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete">
@@ -431,7 +432,8 @@
             </div>
         {{ end }}
 
-        <div class="sets-container{{ if not .ExerciseSet.WarmupCompletedAt }} disabled{{ end }}" aria-label="Exercise sets"{{ if not .ExerciseSet.WarmupCompletedAt }} aria-disabled="true"{{ end }}>
+        <div class="sets-container{{ if not .ExerciseSet.WarmupCompletedAt }} disabled{{ end }}"
+             aria-label="Exercise sets"{{ if not .ExerciseSet.WarmupCompletedAt }} aria-disabled="true"{{ end }}>
 
             {{ range $index, $setDisplay := .SetsDisplay }}
                 {{ $set := $setDisplay.Set }}

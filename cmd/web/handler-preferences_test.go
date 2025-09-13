@@ -25,11 +25,10 @@ func Test_application_preferences(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 
@@ -137,7 +136,7 @@ func Test_application_exportUserData(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -272,11 +271,10 @@ func Test_application_deleteUser(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t.Context(), testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 

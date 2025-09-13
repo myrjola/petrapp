@@ -31,9 +31,12 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		ReadHeaderTimeout: time.Second,
 		MaxHeaderBytes:    1 << 20, //nolint:mnd // 1 MB
 	}
-	go func() {
-		sigint := make(chan os.Signal, 1)
 
+	// Create a shutdown goroutine that handles graceful shutdown
+	go func() {
+		defer close(shutdownComplete)
+
+		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt)
 		signal.Notify(sigint, syscall.SIGTERM)
 
@@ -47,6 +50,7 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 
 		// Create a new context for logging since the original might be cancelled
 		logCtx := context.Background()
+		now := time.Now()
 		app.logger.LogAttrs(logCtx, slog.LevelInfo, "shutting down server", slog.String("reason", shutdownReason))
 
 		// We received an interrupt signal or context cancellation, shut down.
@@ -58,7 +62,13 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 			shutdownErr = fmt.Errorf("shutdown server: %w", shutdownErr)
 			app.logger.LogAttrs(logCtx, slog.LevelError, "error shutting down server", slog.Any("error", shutdownErr))
 		}
-		close(shutdownComplete)
+
+		// Stop flight recorder after server shutdown
+		if app.flightRecorder != nil {
+			app.flightRecorder.Stop(logCtx)
+		}
+
+		app.logger.LogAttrs(logCtx, slog.LevelInfo, "server shut down", slog.Duration("duration", time.Since(now)))
 	}()
 
 	var listener net.Listener
@@ -79,6 +89,8 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 	if err = srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server serve: %w", err)
 	}
+
+	// Wait for the shutdown goroutine to complete all cleanup work
 	<-shutdownComplete
 
 	return nil

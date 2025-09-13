@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"log/slog"
@@ -101,6 +102,7 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 			proto  = r.Proto
 			method = r.Method
 			uri    = r.URL.RequestURI()
+			path   = r.URL.Path
 		)
 
 		ctx := r.Context()
@@ -123,7 +125,6 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		if !trace.IsEnabled() {
 			next.ServeHTTP(sw, r)
 		} else {
-			path := r.URL.Path
 			taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
 			traceCtx, task := trace.NewTask(ctx, taskName)
 
@@ -147,6 +148,12 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		}
 		app.logger.LogAttrs(r.Context(), level, "request completed",
 			slog.Int("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
+
+		// If we have a flight recorder, capture a trace if the request timed out.
+		flightRecorderCtx := context.WithoutCancel(ctx)
+		if sw.statusCode == http.StatusServiceUnavailable && app.flightRecorder != nil {
+			go app.flightRecorder.CaptureTimeoutTrace(flightRecorderCtx)
+		}
 	})
 }
 
