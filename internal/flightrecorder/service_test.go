@@ -58,7 +58,7 @@ func TestService_CaptureTimeoutTrace(t *testing.T) {
 	defer service.Stop(ctx)
 
 	// Capture a trace
-	service.CaptureTimeoutTrace(ctx, "GET", "/test/path")
+	service.CaptureTimeoutTrace(ctx)
 
 	// Check that a trace file was created
 	entries, err := os.ReadDir(traceDir)
@@ -78,12 +78,6 @@ func TestService_CaptureTimeoutTrace(t *testing.T) {
 	}
 	if !strings.HasSuffix(filename, ".trace") {
 		t.Errorf("expected filename to end with '.trace', got %s", filename)
-	}
-	if !strings.Contains(filename, "GET") {
-		t.Errorf("expected filename to contain method 'GET', got %s", filename)
-	}
-	if !strings.Contains(filename, "_test_path") {
-		t.Errorf("expected filename to contain sanitized path '_test_path', got %s", filename)
 	}
 }
 
@@ -112,10 +106,10 @@ func TestService_CooldownPreventsCapture(t *testing.T) {
 	defer service.Stop(ctx)
 
 	// Capture first trace
-	service.CaptureTimeoutTrace(ctx, "POST", "/cooldown/test")
+	service.CaptureTimeoutTrace(ctx)
 
 	// Immediately try to capture another trace (should be blocked by cooldown)
-	service.CaptureTimeoutTrace(ctx, "POST", "/cooldown/test2")
+	service.CaptureTimeoutTrace(ctx)
 
 	// Check that only one trace file was created (due to cooldown)
 	entries, err := os.ReadDir(traceDir)
@@ -126,41 +120,4 @@ func TestService_CooldownPreventsCapture(t *testing.T) {
 	if len(entries) > 1 {
 		t.Error("expected cooldown to prevent rapid successive captures")
 	}
-}
-
-func TestSanitizePath(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"/test/path", "_test_path"},
-		{"/users/{id}", "_users_{id}"},
-		{"path<with>invalid:chars", "path_with_invalid_chars"},
-		{"normal_path", "normal_path"},
-		{`path\with\backslashes`, "path_with_backslashes"},
-		{"path?query=test", "path_query=test"},
-		{"path*wild", "path_wild"},
-	}
-
-	for _, tt := range tests {
-		result := testSanitizePath(tt.input)
-		if result != tt.expected {
-			t.Errorf("sanitizePath(%q) = %q, expected %q", tt.input, result, tt.expected)
-		}
-	}
-}
-
-// testSanitizePath is a copy of the private sanitizePath function for testing.
-func testSanitizePath(path string) string {
-	// Replace path separators and other problematic characters
-	result := ""
-	for _, r := range path {
-		switch r {
-		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
-			result += "_"
-		default:
-			result += string(r)
-		}
-	}
-	return result
 }

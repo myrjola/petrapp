@@ -72,11 +72,6 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("resolve template path: %w", err)
 	}
 
-	var tracesDirectory string
-	if tracesDirectory, err = resolveAndCreateTracesDirectory(cfg.TracesDirectory); err != nil {
-		return fmt.Errorf("resolve traces directory: %w", err)
-	}
-
 	db, err := sqlite.NewDatabase(ctx, cfg.SqliteURL, logger)
 	if err != nil {
 		return fmt.Errorf("open db (url: %s): %w", cfg.SqliteURL, err)
@@ -94,20 +89,20 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
-	// Initialize flight recorder service.
-	flightRecorderService, err := flightrecorder.New(flightrecorder.Config{
-		Logger:          logger,
-		MinAge:          0, // Use default
-		MaxBytes:        0, // Use default
-		TracesDirectory: tracesDirectory,
-	})
-	if err != nil {
-		return fmt.Errorf("new flight recorder: %w", err)
-	}
-
-	// Start flight recording.
-	if err = flightRecorderService.Start(ctx); err != nil {
-		return fmt.Errorf("start flight recorder: %w", err)
+	var flightRecorderService *flightrecorder.Service
+	if cfg.TracesDirectory != "" {
+		if flightRecorderService, err = flightrecorder.New(flightrecorder.Config{
+			Logger:          logger,
+			MinAge:          0, // Use default
+			MaxBytes:        0, // Use default
+			TracesDirectory: cfg.TracesDirectory,
+		}); err != nil {
+			return fmt.Errorf("new flight recorder: %w", err)
+		}
+		// Start flight recording.
+		if err = flightRecorderService.Start(ctx); err != nil {
+			return fmt.Errorf("start flight recorder: %w", err)
+		}
 	}
 
 	app := application{

@@ -61,7 +61,7 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		}
 
 		// Stop flight recorder after server shutdown
-		if app.flightRecorder == nil {
+		if app.flightRecorder != nil {
 			app.flightRecorder.Stop(logCtx)
 		}
 

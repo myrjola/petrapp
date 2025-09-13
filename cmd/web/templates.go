@@ -68,24 +68,3 @@ func resolveAndVerifyTemplatePath(templatePath string) (string, error) {
 	}
 	return templatePath, nil
 }
-
-// resolveAndCreateTracesDirectory resolves the traces directory path and creates it if needed.
-//
-// If the tracesDirectory is empty, it will create a 'traces' directory in the module root.
-func resolveAndCreateTracesDirectory(tracesDirectory string) (string, error) {
-	var err error
-	if tracesDirectory == "" {
-		var modulePath string
-		if modulePath, err = findModuleDir(); err != nil {
-			return "", fmt.Errorf("find module dir: %w", err)
-		}
-		tracesDirectory = filepath.Join(modulePath, "traces")
-	}
-
-	// Create the directory if it doesn't exist
-	if err = os.MkdirAll(tracesDirectory, 0755); err != nil {
-		return "", fmt.Errorf("create traces directory: %w", err)
-	}
-
-	return tracesDirectory, nil
-}

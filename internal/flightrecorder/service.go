@@ -50,6 +50,15 @@ func New(cfg Config) (*Service, error) {
 		return nil, errors.New("traces directory is required")
 	}
 
+	if stat, err := os.Stat(cfg.TracesDirectory); err != nil {
+		// Create the directory if it doesn't exist
+		if err = os.MkdirAll(cfg.TracesDirectory, 0500); err != nil {
+			return nil, fmt.Errorf("create traces directory: %w", err)
+		}
+	} else if !stat.IsDir() {
+		return nil, fmt.Errorf("traces path is not a directory: %s", cfg.TracesDirectory)
+	}
+
 	minAge := cfg.MinAge
 	if minAge == 0 {
 		minAge = defaultMinAge
@@ -80,13 +89,6 @@ func New(cfg Config) (*Service, error) {
 
 // Start begins flight recording.
 func (s *Service) Start(ctx context.Context) error {
-	// The traces directory should already be created by the caller, but verify it exists
-	if stat, err := os.Stat(s.tracesDirectory); err != nil {
-		return fmt.Errorf("traces directory not accessible: %w", err)
-	} else if !stat.IsDir() {
-		return fmt.Errorf("traces path is not a directory: %s", s.tracesDirectory)
-	}
-
 	if err := s.flightRecorder.Start(); err != nil {
 		return fmt.Errorf("start flight recorder: %w", err)
 	}
@@ -159,19 +161,4 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context) {
 	s.logger.LogAttrs(ctx, slog.LevelWarn, "captured timeout trace",
 		slog.String("file", fPath),
 		slog.Int64("bytes", bytesWritten))
-}
-
-// sanitizePath removes characters that are problematic in filenames.
-func sanitizePath(path string) string {
-	// Replace path separators and other problematic characters
-	result := ""
-	for _, r := range path {
-		switch r {
-		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
-			result += "_"
-		default:
-			result += string(r)
-		}
-	}
-	return result
 }
