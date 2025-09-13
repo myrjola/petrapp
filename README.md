@@ -74,6 +74,8 @@ fly deploy
 
 ### Performance investigation
 
+#### pprof
+
 Use [pprof](https://pkg.go.dev/net/http/pprof) for perfomance investigation.
 
 Proxy the pprof server to your local machine.
@@ -92,6 +94,37 @@ Capture a goroutine stack traces.
 
 ```sh
 go tool pprof -top "http://localhost:6060/debug/pprof/goroutine"
+```
+
+#### Flight Controller for automatic trace capture
+
+When a request times out, the app writes a [trace](https://pkg.go.dev/runtime/trace) to a file and logs something like the following line: 
+
+```json
+{
+  "time": "2025-09-13T10:02:11.604995985+03:00",
+  "level": "WARN",
+  "msg": "captured timeout trace",
+  "service_name": "pr-29-myrjola-petrapp",
+  "file": "/data/traces/timeout-20250913-070211.trace",
+  "bytes": 709652,
+  "trace_id": "HBGYTREFLURSGLEQGR2OX4XEBK",
+  "proto": "HTTP/1.1",
+  "method": "GET",
+  "uri": "/api/test/timeout?sleep_ms=3000"
+}
+```
+
+This file can be downloaded with the following replacing FLY_APP and file name with service_name and file from the log line:
+
+```
+FLY_APP=pr-29-myrjola-petrapp fly sftp get /data/traces/timeout-20250913-070211.trace
+```
+
+Once you have the file, you can analyze it with:
+
+```
+go tool trace timeout-20250913-070211.trace
 ```
 
 ### CI/CD and preview environments
