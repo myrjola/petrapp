@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/trace"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -31,8 +30,6 @@ type Service struct {
 	flightRecorder  *trace.FlightRecorder
 	tracesDirectory string
 	lastCapture     atomic.Int64 // Unix timestamp of last capture
-	mu              sync.RWMutex
-	started         bool
 }
 
 // Config configures the flight recorder service.
@@ -78,20 +75,11 @@ func New(cfg Config) (*Service, error) {
 		flightRecorder:  flightRecorder,
 		tracesDirectory: cfg.TracesDirectory,
 		lastCapture:     atomic.Int64{},
-		mu:              sync.RWMutex{},
-		started:         false,
 	}, nil
 }
 
 // Start begins flight recording.
 func (s *Service) Start(ctx context.Context) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.started {
-		return errors.New("flight recorder already started")
-	}
-
 	// The traces directory should already be created by the caller, but verify it exists
 	if stat, err := os.Stat(s.tracesDirectory); err != nil {
 		return fmt.Errorf("traces directory not accessible: %w", err)
@@ -100,16 +88,9 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	if err := s.flightRecorder.Start(); err != nil {
-		// If the flight recorder is already enabled globally, that's OK
-		// This can happen in tests where multiple services try to start it
-		if err.Error() == "flight recorder already enabled" {
-			s.logger.LogAttrs(ctx, slog.LevelDebug, "flight recorder already enabled globally, continuing")
-		} else {
-			return fmt.Errorf("start flight recorder: %w", err)
-		}
+		return fmt.Errorf("start flight recorder: %w", err)
 	}
 
-	s.started = true
 	s.logger.LogAttrs(ctx, slog.LevelInfo, "flight recorder started",
 		slog.String("min_age", defaultMinAge.String()),
 		slog.Uint64("max_bytes", defaultMaxBytes),
@@ -120,37 +101,20 @@ func (s *Service) Start(ctx context.Context) error {
 
 // Stop ends flight recording.
 func (s *Service) Stop(ctx context.Context) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.started {
-		return
-	}
-
 	s.flightRecorder.Stop()
-	s.started = false
 
 	s.logger.LogAttrs(ctx, slog.LevelInfo, "flight recorder stopped")
 }
 
 // CaptureTimeoutTrace captures a trace when a request times out.
 // It respects the cooldown period to avoid overwhelming the filesystem.
-func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) {
-	s.mu.RLock()
-	if !s.started || !s.flightRecorder.Enabled() {
-		s.mu.RUnlock()
-		return
-	}
-	s.mu.RUnlock()
-
+func (s *Service) CaptureTimeoutTrace(ctx context.Context) {
 	// Check cooldown period
 	now := time.Now().Unix()
 	lastCapture := s.lastCapture.Load()
 
 	if lastCapture > 0 && time.Unix(now, 0).Sub(time.Unix(lastCapture, 0)) < cooldownDuration {
 		s.logger.LogAttrs(ctx, slog.LevelDebug, "skipping trace capture due to cooldown",
-			slog.String("method", method),
-			slog.String("path", path),
 			slog.Time("last_capture", time.Unix(lastCapture, 0)),
 			slog.Duration("remaining_cooldown", cooldownDuration-time.Unix(now, 0).Sub(time.Unix(lastCapture, 0))))
 		return
@@ -164,15 +128,13 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) 
 
 	// Generate filename with timestamp and request info
 	timestamp := time.Unix(now, 0).UTC().Format("20060102-150405")
-	filename := fmt.Sprintf("timeout-%s-%s-%s.trace", timestamp, method, sanitizePath(path))
+	filename := fmt.Sprintf("timeout-%s.trace", timestamp)
 	fPath := filepath.Join(s.tracesDirectory, filename)
 
 	// Create and write the trace file
 	file, err := os.Create(fPath)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelError, "failed to create trace file",
-			slog.String("method", method),
-			slog.String("path", path),
 			slog.String("file", fPath),
 			slog.Any("error", err))
 		return
@@ -189,16 +151,12 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context, method, path string) 
 	bytesWritten, err := s.flightRecorder.WriteTo(file)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelError, "failed to write trace",
-			slog.String("method", method),
-			slog.String("path", path),
 			slog.String("file", fPath),
 			slog.Any("error", err))
 		return
 	}
 
 	s.logger.LogAttrs(ctx, slog.LevelWarn, "captured timeout trace",
-		slog.String("method", method),
-		slog.String("path", path),
 		slog.String("file", fPath),
 		slog.Int64("bytes", bytesWritten))
 }

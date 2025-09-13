@@ -148,9 +148,11 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		}
 		app.logger.LogAttrs(r.Context(), level, "request completed",
 			slog.Int("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
+
 		// If we have a flight recorder, capture a trace if the request timed out.
+		flightRecorderCtx := context.WithoutCancel(ctx)
 		if sw.statusCode == http.StatusServiceUnavailable && app.flightRecorder != nil {
-			go app.flightRecorder.CaptureTimeoutTrace(context.Background(), method, path)
+			go app.flightRecorder.CaptureTimeoutTrace(flightRecorderCtx)
 		}
 	})
 }

@@ -47,6 +47,7 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 
 		// Create a new context for logging since the original might be cancelled
 		logCtx := context.Background()
+		now := time.Now()
 		app.logger.LogAttrs(logCtx, slog.LevelInfo, "shutting down server", slog.String("reason", shutdownReason))
 
 		// We received an interrupt signal or context cancellation, shut down.
@@ -60,7 +61,11 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		}
 
 		// Stop flight recorder after server shutdown
-		app.flightRecorder.Stop(logCtx)
+		if app.flightRecorder == nil {
+			app.flightRecorder.Stop(logCtx)
+		}
+
+		app.logger.LogAttrs(logCtx, slog.LevelInfo, "server shut down", slog.Duration("duration", time.Since(now)))
 
 		close(shutdownComplete)
 	}()
