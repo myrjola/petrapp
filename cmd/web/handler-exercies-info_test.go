@@ -17,11 +17,10 @@ func Test_application_exerciseInfo(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
-	t.Cleanup(server.Shutdown)
 
 	client := server.Client()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"testing"
 
 	"github.com/myrjola/petrapp/internal/logging"
 )
@@ -29,14 +30,21 @@ const LogDsnKey = "sqlDsn"
 // logSink is the writer to which the server logs are written. You usually want to use testhelpers.NewWriter.
 // lookupEnv is a function that returns the value of an environment variable. It has same signature as [os.LookupEnv].
 // run is the function that starts the server. We expect the server to log the address it's listening on to LogAddrKey.
-//
-// Remember to t.Cleanup(server.Shutdown).
 func StartServer(
-	ctx context.Context,
+	t *testing.T,
 	logSink io.Writer,
 	lookupEnv func(string) (string, bool),
 	run func(context.Context, *slog.Logger, func(string) (string, bool)) error,
 ) (*Server, error) {
+	var (
+		server *Server
+		ctx    = t.Context()
+	)
+	t.Cleanup(func() {
+		if server != nil {
+			server.Shutdown()
+		}
+	})
 	ctx, cancel := context.WithCancelCause(ctx)
 	serverDone := make(chan struct{})
 
@@ -93,7 +101,7 @@ func StartServer(
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	server := &Server{
+	server = &Server{
 		url:        serverURL,
 		client:     client,
 		db:         db,
