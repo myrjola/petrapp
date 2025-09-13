@@ -31,9 +31,12 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		ReadHeaderTimeout: time.Second,
 		MaxHeaderBytes:    1 << 20, //nolint:mnd // 1 MB
 	}
-	go func() {
-		sigint := make(chan os.Signal, 1)
 
+	// Create a shutdown goroutine that handles graceful shutdown
+	go func() {
+		defer close(shutdownComplete)
+
+		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt)
 		signal.Notify(sigint, syscall.SIGTERM)
 
@@ -66,8 +69,6 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		}
 
 		app.logger.LogAttrs(logCtx, slog.LevelInfo, "server shut down", slog.Duration("duration", time.Since(now)))
-
-		close(shutdownComplete)
 	}()
 
 	var listener net.Listener
@@ -88,6 +89,8 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 	if err = srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server serve: %w", err)
 	}
+
+	// Wait for the shutdown goroutine to complete all cleanup work
 	<-shutdownComplete
 
 	return nil
