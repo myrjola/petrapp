@@ -32,11 +32,11 @@
 - Include exact file paths in descriptions
 
 ## Phase 3.1: Setup
-- [ ] T001 Create database schema for conversations table in `internal/sqlite/schema.sql`
-- [ ] T002 Create database schema for chat_messages table in `internal/sqlite/schema.sql`
-- [ ] T003 Create database schema for message_visualizations table in `internal/sqlite/schema.sql`
-- [ ] T004 Initialize chatbot service structure in `internal/chatbot/service.go`
-- [ ] T005 [P] Configure OpenAI client setup in `internal/chatbot/llm_client.go`
+- [X] T001 Create database schema for conversations table in `internal/sqlite/schema.sql`
+- [X] T002 Create database schema for chat_messages table in `internal/sqlite/schema.sql`
+- [X] T003 Create database schema for message_visualizations table in `internal/sqlite/schema.sql`
+- [X] T004 Initialize chatbot service structure in `internal/chatbot/service.go`
+- [X] T005 [P] Configure OpenAI client setup in `internal/chatbot/llm_client.go`
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
