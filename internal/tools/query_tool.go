@@ -89,7 +89,10 @@ func (sqt *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query st
 	}
 
 	// Begin transaction
-	tx, err := conn.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
+		ReadOnly:  true,
+		Isolation: sql.LevelDefault,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
