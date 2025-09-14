@@ -19,6 +19,7 @@ func (db *Database) CreateUserDB(ctx context.Context, userID int, basePath strin
 	exportPath := filepath.Join(basePath, fmt.Sprintf("user-db-%d.sqlite3", userID))
 	exportDsn := fmt.Sprintf("file:%s?mode=rwc", exportPath)
 
+	// We use a dedicated connection to ensure the PRAGMA settings are applied and reverted correctly.
 	var conn *sql.Conn
 	conn, err = db.ReadOnly.Conn(ctx)
 	defer func() {
@@ -27,6 +28,7 @@ func (db *Database) CreateUserDB(ctx context.Context, userID int, basePath strin
 			return driver.ErrBadConn // According to the sql.Conn.Raw docs, this prevents reusing the Conn.
 		}); rawErr != nil && !errors.Is(rawErr, driver.ErrBadConn) {
 			err = fmt.Errorf("close raw db connection: %w", errors.Join(rawErr, err))
+			return
 		}
 		if closeErr := conn.Close(); closeErr != nil && !errors.Is(closeErr, sql.ErrConnDone) {
 			err = fmt.Errorf("close db connection: %w", errors.Join(closeErr, err))
