@@ -75,11 +75,45 @@ type ChatbotService struct {
 ```
 
 ### Handler Pattern
+Following PetrApp's POST-Redirect-GET pattern:
 
 ```go
-func (app *application) chatbotHandler(w http.ResponseWriter, r *http.Request) {
+// GET handler renders the chat interface
+func (app *application) chatGET(w http.ResponseWriter, r *http.Request) {
+    conversationID := r.PathValue("conversationID")
+
+    // Fetch conversation and messages
+    conversation, err := app.chatbotService.GetConversation(r.Context(), conversationID)
+    if err != nil {
+        app.serverError(w, r, err)
+        return
+    }
+
+    data := &chatTemplateData{
+        Conversation: conversation,
+        Messages:     conversation.Messages,
+    }
+    app.render(w, r, http.StatusOK, "chat", data)
+}
+
+// POST handler processes message and redirects
+func (app *application) chatMessagePOST(w http.ResponseWriter, r *http.Request) {
+    conversationID := r.PathValue("conversationID")
     userID := contexthelpers.UserID(r.Context())
-    // Implementation follows existing patterns
+
+    if err := r.ParseForm(); err != nil {
+        app.serverError(w, r, err)
+        return
+    }
+
+    message := r.Form.Get("message")
+    if err := app.chatbotService.SendMessage(r.Context(), conversationID, userID, message); err != nil {
+        app.serverError(w, r, err)
+        return
+    }
+
+    // Redirect to conversation page to show updated messages
+    redirect(w, r, fmt.Sprintf("/chat/%s", conversationID))
 }
 ```
 
