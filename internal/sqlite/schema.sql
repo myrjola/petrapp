@@ -141,6 +141,63 @@ CREATE TABLE exercise_muscle_groups
     PRIMARY KEY (exercise_id, muscle_group_name)
 ) WITHOUT ROWID, STRICT;
 
+--------------------
+-- AI Trainer Chat --
+--------------------
+
+CREATE TABLE conversations
+(
+    id              INTEGER PRIMARY KEY,
+    user_id         INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    title           TEXT CHECK (title IS NULL OR LENGTH(title) < 201),
+    created_at      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at),
+    updated_at      TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated_at) = updated_at),
+    is_active       INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    context_summary TEXT
+) STRICT;
+
+CREATE INDEX idx_conversations_user_id ON conversations (user_id);
+CREATE INDEX idx_conversations_updated_at ON conversations (updated_at);
+
+CREATE TRIGGER conversations_updated_timestamp
+    AFTER UPDATE
+    ON conversations
+BEGIN
+    UPDATE conversations SET updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE id = old.id;
+END;
+
+CREATE TABLE chat_messages
+(
+    id                INTEGER PRIMARY KEY,
+    conversation_id   INTEGER NOT NULL REFERENCES conversations (id) ON DELETE CASCADE,
+    message_type      TEXT NOT NULL CHECK (message_type IN ('user', 'assistant')),
+    content           TEXT NOT NULL CHECK (LENGTH(content) <= 10000),
+    created_at        TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at),
+    token_count       INTEGER CHECK (token_count IS NULL OR token_count >= 0),
+    error_message     TEXT,
+    query_executed    TEXT,
+    execution_time_ms INTEGER CHECK (execution_time_ms IS NULL OR execution_time_ms >= 0)
+) STRICT;
+
+CREATE INDEX idx_chat_messages_conversation ON chat_messages (conversation_id, created_at);
+CREATE INDEX idx_chat_messages_type ON chat_messages (message_type);
+
+CREATE TABLE message_visualizations
+(
+    id           INTEGER PRIMARY KEY,
+    message_id   INTEGER NOT NULL REFERENCES chat_messages (id) ON DELETE CASCADE,
+    chart_type   TEXT NOT NULL CHECK (chart_type IN ('line', 'bar', 'scatter', 'pie', 'heatmap')),
+    chart_config TEXT NOT NULL,
+    data_query   TEXT NOT NULL CHECK (LENGTH(data_query) > 0),
+    created_at   TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at)
+) STRICT;
+
+CREATE INDEX idx_message_visualizations_message ON message_visualizations (message_id);
+
 -------------------
 -- Feature flags --
 -------------------
