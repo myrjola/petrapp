@@ -51,18 +51,20 @@ The PetrApp codebase already contains substantial enabling functionality for imp
 - D3.js - would require new library integration
 
 ### 5. User Interface Integration
-**Decision**: Chat widget embedded in existing pages with WebSocket for real-time
+**Decision**: Separate Go HTML template page using POST-Redirect-GET pattern
 **Rationale**:
-- Maintains consistency with existing UI
-- WebSocket enables streaming responses
-- Progressive enhancement approach
+- Follows existing PetrApp patterns for server-rendered pages
+- Simple form-based interaction without JavaScript complexity
+- POST-Redirect-GET prevents duplicate submissions
+- Easier to implement and maintain
 **Alternatives considered**:
-- Separate chat page - disrupts user workflow
-- Polling-based updates - higher latency
+- WebSocket streaming - adds complexity without immediate need
+- Embedded chat widget - disrupts existing page flow
 
 ## Architecture Patterns Discovered
 
 ### Service Layer Pattern
+
 ```go
 type ChatbotService struct {
     db           *sql.DB
@@ -73,6 +75,7 @@ type ChatbotService struct {
 ```
 
 ### Handler Pattern
+
 ```go
 func (app *application) chatbotHandler(w http.ResponseWriter, r *http.Request) {
     userID := contexthelpers.UserID(r.Context())
@@ -122,10 +125,10 @@ From the original specification, the following items are now resolved:
 ## Next Steps
 
 1. Design conversation and message data models
-2. Create OpenAPI contracts for chat endpoints
+2. Create HTTP endpoints for chat functionality
 3. Define LLM function schemas for tool calling
-4. Plan WebSocket protocol for streaming
-5. Design conversation UI component
+4. Design conversation UI templates (conversation list, chat interface)
+5. Implement POST-Redirect-GET pattern for message handling
 
 ## Risk Mitigation
 
@@ -139,7 +142,7 @@ From the original specification, the following items are now resolved:
 **Mitigation**: userdb isolation and context-based filtering
 
 **Risk**: Long response times
-**Mitigation**: Streaming responses, query optimization, caching
+**Mitigation**: Context timeouts, query optimization, loading indicators
 
 ## Conclusion
 
