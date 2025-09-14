@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/chatbot"
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
@@ -163,7 +164,7 @@ func TestExerciseInfoTool_GetExerciseInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set user context
-			userCtx := context.WithValue(ctx, "user_id", userID)
+			userCtx := context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 
 			// This will fail because ExerciseInfoTool doesn't exist yet
 			// That's expected for TDD - we write the test first, then implement
@@ -308,7 +309,7 @@ func TestExerciseInfoTool_UserIsolation(t *testing.T) {
 	}
 
 	// Test that user1 sees their own history
-	user1Ctx := context.WithValue(ctx, "user_id", user1ID)
+	user1Ctx := context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, user1ID)
 	result1, err := tool.GetExerciseInfo(user1Ctx, chatbot.ExerciseInfoRequest{
 		ExerciseName:   "Bench Press",
 		IncludeHistory: true,
@@ -328,7 +329,7 @@ func TestExerciseInfoTool_UserIsolation(t *testing.T) {
 	}
 
 	// Test that user2 sees only their own history
-	user2Ctx := context.WithValue(ctx, "user_id", user2ID)
+	user2Ctx := context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, user2ID)
 	result2, err := tool.GetExerciseInfo(user2Ctx, chatbot.ExerciseInfoRequest{
 		ExerciseName:   "Bench Press",
 		IncludeHistory: true,
@@ -390,7 +391,7 @@ func TestExerciseInfoTool_SecurityValidation(t *testing.T) {
 
 	for _, tc := range maliciousInputs {
 		t.Run(tc.name, func(t *testing.T) {
-			userCtx := context.WithValue(ctx, "user_id", userID)
+			userCtx := context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 			result, err := tool.GetExerciseInfo(userCtx, chatbot.ExerciseInfoRequest{
 				ExerciseName:   tc.exerciseName,
 				IncludeHistory: false,

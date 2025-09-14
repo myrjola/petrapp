@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/chatbot"
+	"github.com/myrjola/petrapp/internal/chatbot/tools"
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
@@ -152,7 +154,7 @@ func TestGenerateVisualizationTool_CreateChart(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set user context
-			userCtx := context.WithValue(ctx, "user_id", userID)
+			userCtx := context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 
 			// This will fail because GenerateVisualizationTool doesn't exist yet
 			// That's expected for TDD - we write the test first, then implement
@@ -161,7 +163,7 @@ func TestGenerateVisualizationTool_CreateChart(t *testing.T) {
 				t.Skip("GenerateVisualizationTool not implemented yet (expected for TDD)")
 			}
 
-			result, err := tool.GenerateVisualization(userCtx, chatbot.VisualizationRequest{
+			result, err := tool.GenerateVisualization(userCtx, tools.GenerateVisualizationParams{
 				ChartType:    tc.chartType,
 				Title:        tc.title,
 				XAxisLabel:   tc.xAxisLabel,
@@ -219,7 +221,7 @@ func TestGenerateVisualizationTool_EChartsConfig(t *testing.T) {
 		t.Skip("GenerateVisualizationTool not implemented yet (expected for TDD)")
 	}
 
-	result, err := tool.GenerateVisualization(ctx, chatbot.VisualizationRequest{
+	result, err := tool.GenerateVisualization(ctx, tools.GenerateVisualizationParams{
 		ChartType: "line",
 		Title:     "Sample Chart",
 		DataQuery: "SELECT 1 as x, 2 as y",
@@ -283,7 +285,7 @@ func TestGenerateVisualizationTool_DataSecurity(t *testing.T) {
 
 	for _, tc := range maliciousQueries {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tool.GenerateVisualization(ctx, chatbot.VisualizationRequest{
+			_, err := tool.GenerateVisualization(ctx, tools.GenerateVisualizationParams{
 				ChartType: "line",
 				Title:     "Malicious Chart",
 				DataQuery: tc.query,

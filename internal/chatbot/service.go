@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/myrjola/petrapp/internal/chatbot/tools"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
@@ -105,4 +106,126 @@ func (s *Service) SendMessage(ctx context.Context, conversationID int, content s
 	}
 
 	return savedAssistantMessage, nil
+}
+
+// GetGenerateVisualizationTool returns the visualization tool for generating charts.
+func (s *Service) GetGenerateVisualizationTool() *tools.VisualizationTool {
+	return tools.NewVisualizationTool(s.db, s.logger)
+}
+
+// GetCalculateStatisticsTool returns the statistics tool for calculating workout metrics.
+func (s *Service) GetCalculateStatisticsTool() *StatisticsToolWrapper {
+	tool := tools.NewStatisticsTool(s.db, s.logger)
+	return &StatisticsToolWrapper{tool: tool}
+}
+
+// GetExerciseInfoTool returns the exercise info tool for retrieving exercise details.
+func (s *Service) GetExerciseInfoTool() *ExerciseInfoToolWrapper {
+	tool := tools.NewExerciseInfoTool(s.db, s.logger)
+	return &ExerciseInfoToolWrapper{tool: tool}
+}
+
+// GetQueryWorkoutDataTool returns the workout data query tool.
+func (s *Service) GetQueryWorkoutDataTool() *tools.WorkoutDataQueryTool {
+	return tools.NewWorkoutDataQueryTool(s.db, s.logger)
+}
+
+// StatisticsToolWrapper wraps the statistics tool to provide type conversion.
+type StatisticsToolWrapper struct {
+	tool *tools.StatisticsTool
+}
+
+// CalculateStatistics calculates statistical metrics with type conversion.
+func (w *StatisticsToolWrapper) CalculateStatistics(ctx context.Context, request StatisticsRequest) (*StatisticsResult, error) {
+	// Convert from chatbot types to tool types
+	params := tools.StatisticsParams{
+		MetricType:   request.MetricType,
+		ExerciseName: request.ExerciseName,
+	}
+
+	if request.DateRange != nil {
+		params.DateRange = &tools.DateRange{
+			StartDate: request.DateRange.StartDate,
+			EndDate:   request.DateRange.EndDate,
+		}
+	}
+
+	// Call the tool
+	result, err := w.tool.CalculateStatistics(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert back to chatbot types
+	return &StatisticsResult{
+		MetricType:   result.MetricType,
+		ExerciseName: result.ExerciseName,
+		Value:        result.Value,
+		Description:  result.Description,
+		UserID:       result.UserID,
+	}, nil
+}
+
+// ToOpenAIFunction delegates to the wrapped tool.
+func (w *StatisticsToolWrapper) ToOpenAIFunction() map[string]interface{} {
+	return w.tool.ToOpenAIFunction()
+}
+
+// ExecuteFunction delegates to the wrapped tool.
+func (w *StatisticsToolWrapper) ExecuteFunction(ctx context.Context, functionName string, argumentsJSON string) (string, error) {
+	return w.tool.ExecuteFunction(ctx, functionName, argumentsJSON)
+}
+
+// ExerciseInfoToolWrapper wraps the exercise info tool to provide type conversion.
+type ExerciseInfoToolWrapper struct {
+	tool *tools.ExerciseInfoTool
+}
+
+// GetExerciseInfo retrieves exercise information with type conversion.
+func (w *ExerciseInfoToolWrapper) GetExerciseInfo(ctx context.Context, request ExerciseInfoRequest) (*ExerciseInfoResult, error) {
+	// Convert from chatbot types to tool types
+	params := tools.ExerciseInfoParams{
+		ExerciseName:   request.ExerciseName,
+		IncludeHistory: request.IncludeHistory,
+	}
+
+	// Call the tool
+	result, err := w.tool.GetExerciseInfo(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert back to chatbot types
+	chatbotResult := &ExerciseInfoResult{
+		ExerciseName:        result.ExerciseName,
+		Category:            result.Category,
+		ExerciseType:        result.ExerciseType,
+		Description:         result.Description,
+		MuscleGroups:        result.MuscleGroups,
+		PrimaryMuscleGroups: result.PrimaryMuscleGroups,
+	}
+
+	// Convert user history if present
+	if result.UserHistory != nil {
+		chatbotResult.UserHistory = &ExerciseHistory{
+			FirstPerformed: result.UserHistory.FirstPerformed,
+			LastPerformed:  result.UserHistory.LastPerformed,
+			TotalSessions:  result.UserHistory.TotalSessions,
+			PersonalRecord: result.UserHistory.PersonalRecord,
+			AverageWeight:  result.UserHistory.AverageWeight,
+			TotalVolume:    result.UserHistory.TotalVolume,
+		}
+	}
+
+	return chatbotResult, nil
+}
+
+// ToOpenAIFunction delegates to the wrapped tool.
+func (w *ExerciseInfoToolWrapper) ToOpenAIFunction() map[string]interface{} {
+	return w.tool.ToOpenAIFunction()
+}
+
+// ExecuteFunction delegates to the wrapped tool.
+func (w *ExerciseInfoToolWrapper) ExecuteFunction(ctx context.Context, functionName string, argumentsJSON string) (string, error) {
+	return w.tool.ExecuteFunction(ctx, functionName, argumentsJSON)
 }
