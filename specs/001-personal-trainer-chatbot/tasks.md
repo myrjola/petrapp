@@ -52,27 +52,27 @@
 - [X] T015 [P] Integration test visualization generation in `internal/chatbot/visualization_integration_test.go`
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
-- [ ] T016 [P] Conversation model in `internal/chatbot/models/conversation.go`
-- [ ] T017 [P] ChatMessage model in `internal/chatbot/models/message.go`
-- [ ] T018 [P] MessageVisualization model in `internal/chatbot/models/visualization.go`
-- [ ] T019 ConversationService CRUD operations in `internal/chatbot/service.go`
-- [ ] T020 [P] LLM function tool: query_workout_data in `internal/chatbot/tools/query_tool.go`
-- [ ] T021 [P] LLM function tool: generate_visualization in `internal/chatbot/tools/visualization_tool.go`
-- [ ] T022 [P] LLM function tool: calculate_statistics in `internal/chatbot/tools/statistics_tool.go`
-- [ ] T023 [P] LLM function tool: get_exercise_info in `internal/chatbot/tools/exercise_info_tool.go`
-- [ ] T024 [P] LLM function tool: generate_workout_recommendation in `internal/chatbot/tools/recommendation_tool.go`
-- [ ] T025 [P] LLM function tool: analyze_workout_pattern in `internal/chatbot/tools/pattern_tool.go`
-- [ ] T026 OpenAI GPT-4 integration with function calling in `internal/chatbot/llm_client.go`
+- [X] T016 [P] Conversation model in `internal/chatbot/models/conversation.go`
+- [X] T017 [P] ChatMessage model in `internal/chatbot/models/message.go`
+- [X] T018 [P] MessageVisualization model in `internal/chatbot/models/visualization.go`
+- [X] T019 ConversationService CRUD operations in `internal/chatbot/service.go`
+- [X] T020 [P] LLM function tool: query_workout_data in `internal/chatbot/tools/query_tool.go`
+- [X] T021 [P] LLM function tool: generate_visualization in `internal/chatbot/tools/visualization_tool.go`
+- [X] T022 [P] LLM function tool: calculate_statistics in `internal/chatbot/tools/statistics_tool.go`
+- [X] T023 [P] LLM function tool: get_exercise_info in `internal/chatbot/tools/exercise_info_tool.go`
+- [X] T024 [P] LLM function tool: generate_workout_recommendation in `internal/chatbot/tools/recommendation_tool.go`
+- [X] T025 [P] LLM function tool: analyze_workout_pattern in `internal/chatbot/tools/pattern_tool.go`
+- [X] T026 OpenAI GPT-4 integration with function calling in `internal/chatbot/llm_client.go`
 
 ## Phase 3.4: Integration
-- [ ] T027 GET /chat HTTP handler for conversation list in `cmd/web/chat_handlers.go`
-- [ ] T028 GET /chat/{conversationID} HTTP handler for conversation view in `cmd/web/chat_handlers.go`
-- [ ] T029 POST /chat/{conversationID}/message HTTP handler for message sending in `cmd/web/chat_handlers.go`
+- [X] T027 GET /chat HTTP handler for conversation list in `cmd/web/chat_handlers.go`
+- [X] T028 GET /chat/{conversationID} HTTP handler for conversation view in `cmd/web/chat_handlers.go`
+- [X] T029 POST /chat/{conversationID}/message HTTP handler for message sending in `cmd/web/chat_handlers.go`
 - [ ] T030 Chat UI template with conversation list in `ui/templates/pages/chat-list.gohtml`
 - [ ] T031 Chat conversation template with message history in `ui/templates/pages/chat-conversation.gohtml`
 - [ ] T032 ECharts visualization rendering in conversation template using existing pattern
-- [ ] T033 Add chat routes to main router in `cmd/web/routes.go`
-- [ ] T034 Add authentication middleware for chat endpoints in chat handlers
+- [X] T033 Add chat routes to main router in `cmd/web/routes.go`
+- [X] T034 Add authentication middleware for chat endpoints in chat handlers
 
 ## Phase 3.5: Polish
 - [ ] T035 [P] Performance test for 100 concurrent conversations in `test/performance/chatbot_test.go`

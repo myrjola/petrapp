@@ -132,7 +132,7 @@ func TestVisualizationIntegration_EndToEndVisualizationFlow(t *testing.T) {
 			// Verify different chart types for different purposes
 			chartTypes := make(map[string]bool)
 			for _, viz := range assistantMessage.Visualizations {
-				chartTypes[viz.ChartType] = true
+				chartTypes[string(viz.ChartType)] = true
 			}
 
 			if len(chartTypes) < 2 {

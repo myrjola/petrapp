@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/chatbot"
+	"github.com/myrjola/petrapp/internal/chatbot/tools"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
@@ -98,7 +99,11 @@ func TestQueryWorkoutDataTool_ExecuteQuery(t *testing.T) {
 				t.Skip("QueryWorkoutDataTool not implemented yet (expected for TDD)")
 			}
 
-			result, err := tool.ExecuteQuery(userCtx, tc.query, tc.description)
+			params := tools.QueryWorkoutDataParams{
+				Query:       tc.query,
+				Description: tc.description,
+			}
+			result, err := tool.QueryWorkoutData(userCtx, params)
 
 			if tc.expectError {
 				if err == nil {
@@ -164,7 +169,11 @@ func TestQueryWorkoutDataTool_UserIsolation(t *testing.T) {
 
 	// Test that user1 can only see their own data
 	user1Ctx := context.WithValue(ctx, "user_id", user1ID)
-	result, err := tool.ExecuteQuery(user1Ctx, "SELECT COUNT(*) as count FROM workout_sessions", "Count workouts")
+	params1 := tools.QueryWorkoutDataParams{
+		Query:       "SELECT COUNT(*) as count FROM workout_sessions",
+		Description: "Count workouts",
+	}
+	result, err := tool.QueryWorkoutData(user1Ctx, params1)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -179,7 +188,11 @@ func TestQueryWorkoutDataTool_UserIsolation(t *testing.T) {
 
 	// Test that user2 can only see their own data
 	user2Ctx := context.WithValue(ctx, "user_id", user2ID)
-	result2, err := tool.ExecuteQuery(user2Ctx, "SELECT COUNT(*) as count FROM workout_sessions", "Count workouts")
+	params2 := tools.QueryWorkoutDataParams{
+		Query:       "SELECT COUNT(*) as count FROM workout_sessions",
+		Description: "Count workouts",
+	}
+	result2, err := tool.QueryWorkoutData(user2Ctx, params2)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -225,7 +238,11 @@ func TestQueryWorkoutDataTool_SecurityValidation(t *testing.T) {
 
 	for _, tc := range maliciousQueries {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tool.ExecuteQuery(ctx, tc.query, "Malicious query")
+			params := tools.QueryWorkoutDataParams{
+				Query:       tc.query,
+				Description: "Malicious query",
+			}
+			_, err := tool.QueryWorkoutData(ctx, params)
 			if err == nil {
 				t.Errorf("expected malicious query to be blocked: %s", tc.query)
 			}

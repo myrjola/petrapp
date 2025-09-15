@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/myrjola/petrapp/internal/chatbot"
 	"github.com/myrjola/petrapp/internal/sqlite"
