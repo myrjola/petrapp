@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"strings"
 	"time"
-
-	"github.com/openai/openai-go"
 )
 
 // OpenAIErrorType represents different types of OpenAI API errors.
@@ -228,37 +226,37 @@ func (eh *ErrorHandler) extractRetryAfter(err error) *time.Duration {
 }
 
 func (eh *ErrorHandler) logError(ctx context.Context, err *OpenAIError, operation string) {
-	fields := []slog.Attr{
-		slog.String("operation", operation),
-		slog.String("error_type", string(err.Type)),
-		slog.String("error_message", err.Message),
-		slog.Bool("retryable", err.Retryable),
+	args := []any{
+		"operation", operation,
+		"error_type", string(err.Type),
+		"error_message", err.Message,
+		"retryable", err.Retryable,
 	}
 
 	if err.StatusCode > 0 {
-		fields = append(fields, slog.Int("status_code", err.StatusCode))
+		args = append(args, "status_code", err.StatusCode)
 	}
 
 	if err.Code != "" {
-		fields = append(fields, slog.String("error_code", err.Code))
+		args = append(args, "error_code", err.Code)
 	}
 
 	if err.RequestID != "" {
-		fields = append(fields, slog.String("request_id", err.RequestID))
+		args = append(args, "request_id", err.RequestID)
 	}
 
 	if err.RetryAfter != nil {
-		fields = append(fields, slog.Duration("retry_after", *err.RetryAfter))
+		args = append(args, "retry_after", *err.RetryAfter)
 	}
 
 	// Log level based on error severity
 	switch err.Type {
 	case ErrorTypeAuthentication, ErrorTypePermission, ErrorTypeQuotaExceeded:
-		eh.logger.ErrorContext(ctx, "Critical OpenAI API error", fields...)
+		eh.logger.ErrorContext(ctx, "Critical OpenAI API error", args...)
 	case ErrorTypeRateLimit, ErrorTypeServer, ErrorTypeTimeout:
-		eh.logger.WarnContext(ctx, "Retryable OpenAI API error", fields...)
+		eh.logger.WarnContext(ctx, "Retryable OpenAI API error", args...)
 	default:
-		eh.logger.InfoContext(ctx, "OpenAI API error", fields...)
+		eh.logger.InfoContext(ctx, "OpenAI API error", args...)
 	}
 }
 
@@ -266,7 +264,7 @@ func (eh *ErrorHandler) logError(ctx context.Context, err *OpenAIError, operatio
 func (eh *ErrorHandler) RetryableOperation(ctx context.Context, operation string, fn func() error) error {
 	var lastErr *OpenAIError
 
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := range 3 {
 		err := fn()
 		if err == nil {
 			return nil
@@ -297,7 +295,7 @@ func (eh *ErrorHandler) RetryableOperation(ctx context.Context, operation string
 	return lastErr
 }
 
-// Circuit breaker states
+// Circuit breaker states.
 type CircuitState int
 
 const (

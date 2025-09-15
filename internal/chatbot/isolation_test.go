@@ -35,7 +35,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 			t.Fatalf("Failed to insert user%d: %v", i+1, err)
 		}
 		userIDs[i] = userID
-		userContexts[i] = context.WithValue(ctx, "user_id", userID)
+		userContexts[i] := context.WithValue(ctx, "user_id", userID)
 	}
 
 	service := chatbot.NewService(db, logger, "test-api-key")

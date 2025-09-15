@@ -84,9 +84,9 @@ func NewTokenUsageMonitor(db *sqlite.Database, logger *slog.Logger) *TokenUsageM
 
 // CheckRateLimit validates if user can make a request given their usage.
 func (tm *TokenUsageMonitor) CheckRateLimit(ctx context.Context, estimatedTokens int) error {
-	userID, err := contexthelpers.GetUserID(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get user ID: %w", err)
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	if userID == 0 {
+		return errors.New("user not authenticated")
 	}
 
 	usage, err := tm.getUserUsage(ctx, userID)
@@ -146,16 +146,16 @@ func (tm *TokenUsageMonitor) CheckRateLimit(ctx context.Context, estimatedTokens
 
 // RecordUsage records token usage for a user.
 func (tm *TokenUsageMonitor) RecordUsage(ctx context.Context, entry TokenUsageEntry) error {
-	userID, err := contexthelpers.GetUserID(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get user ID: %w", err)
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	if userID == 0 {
+		return errors.New("user not authenticated")
 	}
 
 	entry.UserID = userID
 	entry.Timestamp = time.Now()
 
 	// Insert into database
-	_, err = tm.db.ReadWrite.ExecContext(ctx, `
+	_, err := tm.db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO token_usage (
 			user_id, conversation_id, message_id, tokens_used,
 			request_type, model, timestamp, response_time_ms
@@ -192,9 +192,9 @@ func (tm *TokenUsageMonitor) RecordUsage(ctx context.Context, entry TokenUsageEn
 
 // GetUserUsage returns current usage statistics for a user.
 func (tm *TokenUsageMonitor) GetUserUsage(ctx context.Context) (*UserUsage, error) {
-	userID, err := contexthelpers.GetUserID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user ID: %w", err)
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	if userID == 0 {
+		return nil, errors.New("user not authenticated")
 	}
 
 	return tm.getUserUsage(ctx, userID)

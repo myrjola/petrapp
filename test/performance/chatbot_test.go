@@ -3,6 +3,7 @@ package performance
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +22,8 @@ func TestChatbot_ConcurrentConversations(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	logger := testhelpers.NewLogger(t)
+	writer := testhelpers.NewWriter(t)
+	logger := slog.New(slog.NewTextHandler(writer, nil))
 
 	// Create test database
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
@@ -42,8 +44,11 @@ func TestChatbot_ConcurrentConversations(t *testing.T) {
 
 	// Create test users
 	userIDs := make([]int, numConcurrentConversations)
-	for i := 0; i < numConcurrentConversations; i++ {
-		userID, err := testhelpers.InsertUser(db, fmt.Sprintf("user%d@test.com", i))
+	for i := range numConcurrentConversations {
+		var userID int
+		err := db.ReadWrite.QueryRowContext(ctx,
+			"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+			[]byte(fmt.Sprintf("user%d", i)), fmt.Sprintf("User %d", i)).Scan(&userID)
 		if err != nil {
 			t.Fatalf("Failed to create user %d: %v", i, err)
 		}
@@ -62,7 +67,7 @@ func TestChatbot_ConcurrentConversations(t *testing.T) {
 
 	// Launch concurrent conversations
 	var wg sync.WaitGroup
-	for i := 0; i < numConcurrentConversations; i++ {
+	for i := range numConcurrentConversations {
 		wg.Add(1)
 		go func(userIndex int) {
 			defer wg.Done()
@@ -160,10 +165,11 @@ type testResult struct {
 }
 
 func runConversationTest(ctx context.Context, service *chatbot.Service, userID, userIndex, messageCount int, results chan<- testResult) {
-	userCtx := context.WithValue(ctx, "user_id", userID)
 	result := testResult{
 		ConversationID: userIndex,
 	}
+
+	userCtx := context.WithValue(ctx, "user_id", userID)
 
 	// Create conversation
 	conversation, err := service.CreateConversation(userCtx, fmt.Sprintf("Performance Test Conversation %d", userIndex))
@@ -177,7 +183,7 @@ func runConversationTest(ctx context.Context, service *chatbot.Service, userID, 
 	var totalLatency time.Duration
 
 	// Send messages
-	for i := 0; i < messageCount; i++ {
+	for i := range messageCount {
 		select {
 		case <-ctx.Done():
 			results <- result
@@ -188,7 +194,7 @@ func runConversationTest(ctx context.Context, service *chatbot.Service, userID, 
 		message := fmt.Sprintf("Test message %d from user %d", i+1, userIndex)
 
 		start := time.Now()
-		_, err := service.ProcessMessage(userCtx, conversation.ID, message)
+		_, err := service.SendMessage(userCtx, conversation.ID, message)
 		latency := time.Since(start)
 
 		if err != nil {
