@@ -1,0 +1,151 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.chatListTemplateData*/ -}}
+
+{{ define "page" }}
+    <div class="chat-list">
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: var(--size-4);
+                }
+
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: var(--size-4);
+                }
+
+                .title {
+                    font-size: var(--font-size-6);
+                    font-weight: var(--font-weight-6);
+                    color: var(--gray-9);
+                }
+
+                .new-chat-button {
+                    background: var(--lime-6);
+                    color: white;
+                    padding: var(--size-2) var(--size-4);
+                    border-radius: var(--radius-2);
+                    text-decoration: none;
+                    font-weight: var(--font-weight-5);
+                    transition: background-color 0.2s ease;
+                }
+
+                .new-chat-button:hover {
+                    background: var(--lime-7);
+                }
+
+                .conversation-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                }
+
+                .conversation-card {
+                    background: var(--gray-1);
+                    border: var(--border-size-1) solid var(--gray-3);
+                    border-radius: var(--radius-3);
+                    padding: var(--size-4);
+                    text-decoration: none;
+                    color: inherit;
+                    transition: all 0.2s ease;
+                }
+
+                .conversation-card:hover {
+                    background: var(--gray-2);
+                    border-color: var(--lime-6);
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                }
+
+                .conversation-title {
+                    font-size: var(--font-size-4);
+                    font-weight: var(--font-weight-5);
+                    color: var(--gray-9);
+                    margin-bottom: var(--size-2);
+                }
+
+                .conversation-preview {
+                    color: var(--gray-7);
+                    font-size: var(--font-size-2);
+                    line-height: 1.4;
+                    margin-bottom: var(--size-2);
+                }
+
+                .conversation-meta {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-size: var(--font-size-1);
+                    color: var(--gray-6);
+                }
+
+                .message-count {
+                    background: var(--gray-3);
+                    padding: var(--size-1) var(--size-2);
+                    border-radius: var(--radius-round);
+                    font-weight: var(--font-weight-5);
+                }
+
+                .empty-state {
+                    text-align: center;
+                    padding: var(--size-8) var(--size-4);
+                    color: var(--gray-6);
+                }
+
+                .empty-state h3 {
+                    font-size: var(--font-size-4);
+                    margin-bottom: var(--size-2);
+                    color: var(--gray-7);
+                }
+
+                .empty-state p {
+                    margin-bottom: var(--size-4);
+                }
+            }
+        </style>
+
+        <div class="header">
+            <h1 class="title">Your Conversations</h1>
+            <a href="/chat/new" class="new-chat-button">New Chat</a>
+        </div>
+
+        {{ if .Conversations }}
+            <div class="conversation-list">
+                {{ range .Conversations }}
+                    <a href="/chat/{{ .ID }}" class="conversation-card">
+                        <div class="conversation-title">
+                            {{ if .Title }}
+                                {{ .Title }}
+                            {{ else }}
+                                Conversation #{{ .ID }}
+                            {{ end }}
+                        </div>
+                        <div class="conversation-preview">
+                            {{ if .LastMessage }}
+                                {{ .LastMessage }}
+                            {{ else }}
+                                No messages yet
+                            {{ end }}
+                        </div>
+                        <div class="conversation-meta">
+                            <span>{{ .CreatedAt.Format "Jan 2, 2006" }}</span>
+                            <span class="message-count">{{ .MessageCount }} messages</span>
+                        </div>
+                    </a>
+                {{ end }}
+            </div>
+        {{ else }}
+            <div class="empty-state">
+                <h3>No conversations yet</h3>
+                <p>Start your first conversation with your AI personal trainer!</p>
+                <a href="/chat/new" class="new-chat-button">Start First Chat</a>
+            </div>
+        {{ end }}
+    </div>
+{{ end }}

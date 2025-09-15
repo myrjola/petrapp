@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
+	"github.com/myrjola/petrapp/internal/chatbot"
 	"github.com/myrjola/petrapp/internal/envstruct"
 	"github.com/myrjola/petrapp/internal/flightrecorder"
 	"github.com/myrjola/petrapp/internal/logging"
@@ -27,6 +28,7 @@ type application struct {
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
 	workoutService  *workout.Service
+	chatbotService  *chatbot.Service
 	flightRecorder  *flightrecorder.Service
 }
 
@@ -111,6 +113,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
 		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
+		chatbotService:  chatbot.NewService(db, logger, cfg.OpenAIAPIKey),
 		flightRecorder:  flightRecorderService,
 	}
 

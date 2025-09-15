@@ -59,6 +59,10 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("GET /preferences/export-data", mustSession(http.HandlerFunc(app.exportUserDataGET)))
 	mux.Handle("POST /preferences/delete-user", mustSession(http.HandlerFunc(app.deleteUserPOST)))
 
+	mux.Handle("GET /chat", mustSession(http.HandlerFunc(app.chatGET)))
+	mux.Handle("GET /chat/{conversationID}", mustSession(http.HandlerFunc(app.chatConversationGET)))
+	mux.Handle("POST /chat/{conversationID}/message", mustSession(http.HandlerFunc(app.chatMessagePOST)))
+
 	mux.Handle("POST /api/registration/start", session(http.HandlerFunc(app.beginRegistration)))
 	mux.Handle("POST /api/registration/finish", session(http.HandlerFunc(app.finishRegistration)))
 	mux.Handle("POST /api/login/start", session(http.HandlerFunc(app.beginLogin)))
