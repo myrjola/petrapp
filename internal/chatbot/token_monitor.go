@@ -2,6 +2,7 @@ package chatbot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
