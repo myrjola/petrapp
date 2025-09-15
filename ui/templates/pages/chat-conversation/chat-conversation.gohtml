@@ -1,0 +1,459 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.chatConversationTemplateData*/ -}}
+
+{{ define "page" }}
+    <div class="chat-conversation">
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    display: flex;
+                    flex-direction: column;
+                    height: calc(100vh - var(--size-8));
+                    max-width: 1000px;
+                    margin: 0 auto;
+                    padding: var(--size-4);
+                    gap: var(--size-4);
+                }
+
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding-bottom: var(--size-3);
+                    border-bottom: var(--border-size-1) solid var(--gray-3);
+                }
+
+                .title {
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-6);
+                    color: var(--gray-9);
+                }
+
+                .back-link {
+                    color: var(--gray-7);
+                    text-decoration: none;
+                    font-size: var(--font-size-2);
+                }
+
+                .back-link:hover {
+                    color: var(--lime-7);
+                }
+
+                .messages-container {
+                    flex: 1;
+                    overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                    padding: var(--size-2) 0;
+                }
+
+                .message {
+                    display: flex;
+                    flex-direction: column;
+                    max-width: 80%;
+                }
+
+                .message.user {
+                    align-self: flex-end;
+                    align-items: flex-end;
+                }
+
+                .message.assistant {
+                    align-self: flex-start;
+                    align-items: flex-start;
+                }
+
+                .message-content {
+                    background: var(--gray-2);
+                    padding: var(--size-3);
+                    border-radius: var(--radius-3);
+                    margin-bottom: var(--size-1);
+                    word-wrap: break-word;
+                    line-height: 1.5;
+                }
+
+                .message.user .message-content {
+                    background: var(--lime-6);
+                    color: white;
+                }
+
+                .message.assistant .message-content {
+                    background: var(--gray-2);
+                    color: var(--gray-9);
+                }
+
+                .message-meta {
+                    font-size: var(--font-size-1);
+                    color: var(--gray-6);
+                    padding: 0 var(--size-2);
+                }
+
+                .visualization-container {
+                    margin-top: var(--size-3);
+                    padding: var(--size-4);
+                    background: var(--gray-1);
+                    border-radius: var(--radius-3);
+                    border: var(--border-size-1) solid var(--gray-3);
+                }
+
+                .visualization-title {
+                    font-size: var(--font-size-3);
+                    font-weight: var(--font-weight-5);
+                    color: var(--gray-8);
+                    margin-bottom: var(--size-3);
+                }
+
+                .chart-container {
+                    width: 100%;
+                    height: 400px;
+                    min-height: 400px;
+                }
+
+                .input-container {
+                    display: flex;
+                    gap: var(--size-2);
+                    padding-top: var(--size-3);
+                    border-top: var(--border-size-1) solid var(--gray-3);
+                }
+
+                .message-input {
+                    flex: 1;
+                    padding: var(--size-3);
+                    border: var(--border-size-1) solid var(--gray-4);
+                    border-radius: var(--radius-3);
+                    font-size: var(--font-size-3);
+                    min-height: 60px;
+                    resize: vertical;
+                    font-family: inherit;
+                }
+
+                .message-input:focus {
+                    outline: none;
+                    border-color: var(--lime-6);
+                    box-shadow: 0 0 0 2px var(--lime-2);
+                }
+
+                .send-button {
+                    background: var(--lime-6);
+                    color: white;
+                    padding: var(--size-3) var(--size-4);
+                    border: none;
+                    border-radius: var(--radius-3);
+                    font-weight: var(--font-weight-5);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+                    align-self: flex-end;
+                }
+
+                .send-button:hover {
+                    background: var(--lime-7);
+                }
+
+                .send-button:disabled {
+                    background: var(--gray-5);
+                    cursor: not-allowed;
+                }
+
+                .empty-state {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
+                    text-align: center;
+                    color: var(--gray-6);
+                    gap: var(--size-3);
+                }
+
+                .empty-state h3 {
+                    font-size: var(--font-size-4);
+                    color: var(--gray-7);
+                }
+
+                .typing-indicator {
+                    display: none;
+                    align-items: center;
+                    gap: var(--size-2);
+                    color: var(--gray-6);
+                    font-style: italic;
+                    padding: var(--size-2);
+                }
+
+                .typing-dots {
+                    display: flex;
+                    gap: var(--size-1);
+                }
+
+                .typing-dot {
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 50%;
+                    background: var(--gray-5);
+                    animation: pulse 1.4s ease-in-out infinite both;
+                }
+
+                .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+                .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+                @keyframes pulse {
+                    0%, 80%, 100% {
+                        transform: scale(0);
+                    }
+                    40% {
+                        transform: scale(1);
+                    }
+                }
+            }
+        </style>
+
+        <div class="header">
+            <h1 class="title">
+                {{ if .Conversation.Title }}
+                    {{ .Conversation.Title }}
+                {{ else }}
+                    Conversation #{{ .Conversation.ID }}
+                {{ end }}
+            </h1>
+            <a href="/chat" class="back-link">← Back to Conversations</a>
+        </div>
+
+        <div class="messages-container" id="messages-container">
+            {{ if .Messages }}
+                {{ range .Messages }}
+                    <div class="message {{ .Role }}">
+                        <div class="message-content">
+                            {{ .Content }}
+                        </div>
+                        <div class="message-meta">
+                            {{ .CreatedAt.Format "Jan 2, 3:04 PM" }}
+                        </div>
+                        {{ if .VisualizationData }}
+                            <div class="visualization-container">
+                                <div class="visualization-title">{{ .VisualizationTitle }}</div>
+                                <div class="chart-container" id="chart-{{ .ID }}"></div>
+                            </div>
+                        {{ end }}
+                    </div>
+                {{ end }}
+            {{ else }}
+                <div class="empty-state">
+                    <h3>Start a conversation</h3>
+                    <p>Ask me anything about your workouts, nutrition, or fitness goals!</p>
+                </div>
+            {{ end }}
+
+            <div class="typing-indicator" id="typing-indicator">
+                <span>AI is thinking</span>
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        </div>
+
+        <form class="input-container" method="POST" action="/chat/{{ .Conversation.ID }}/message" id="message-form">
+            <textarea
+                class="message-input"
+                name="content"
+                placeholder="Ask me about your workouts, nutrition, or fitness goals..."
+                required
+                id="message-input"></textarea>
+            <button type="submit" class="send-button" id="send-button">Send</button>
+        </form>
+
+        <script {{ nonce }}>
+            // Auto-scroll to bottom when page loads
+            const container = document.getElementById('messages-container');
+            container.scrollTop = container.scrollHeight;
+
+            // Handle form submission
+            const form = document.getElementById('message-form');
+            const input = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const typingIndicator = document.getElementById('typing-indicator');
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const content = input.value.trim();
+                if (!content) return;
+
+                // Disable input while sending
+                input.disabled = true;
+                sendButton.disabled = true;
+                sendButton.textContent = 'Sending...';
+
+                // Show typing indicator
+                typingIndicator.style.display = 'flex';
+
+                // Add user message to UI immediately
+                addMessageToUI('user', content, new Date());
+
+                // Send message
+                fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Add assistant response
+                        if (data.message) {
+                            addMessageToUI('assistant', data.message.content, new Date(data.message.created_at));
+
+                            // Render visualization if present
+                            if (data.message.visualization_data) {
+                                renderVisualization(data.message.id, data.message.visualization_data, data.message.visualization_title);
+                            }
+                        }
+                    } else {
+                        console.error('Error sending message:', data.error);
+                        alert('Error sending message. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error sending message. Please try again.');
+                })
+                .finally(() => {
+                    // Re-enable input
+                    input.disabled = false;
+                    sendButton.disabled = false;
+                    sendButton.textContent = 'Send';
+                    input.value = '';
+
+                    // Hide typing indicator
+                    typingIndicator.style.display = 'none';
+
+                    // Focus back on input
+                    input.focus();
+                });
+            });
+
+            // Handle Enter key (but allow Shift+Enter for new lines)
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    form.dispatchEvent(new Event('submit'));
+                }
+            });
+
+            function addMessageToUI(role, content, timestamp) {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${role}`;
+
+                messageElement.innerHTML = `
+                    <div class="message-content">${escapeHtml(content)}</div>
+                    <div class="message-meta">${formatTime(timestamp)}</div>
+                `;
+
+                // Insert before typing indicator
+                container.insertBefore(messageElement, typingIndicator);
+                container.scrollTop = container.scrollHeight;
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function formatTime(date) {
+                return new Intl.DateTimeFormat('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit'
+                }).format(date);
+            }
+
+            async function renderVisualization(messageId, data, title) {
+                try {
+                    const echarts = await import("echarts");
+                    const chartElement = document.getElementById(`chart-${messageId}`);
+
+                    if (!chartElement) {
+                        console.error('Chart container not found for message', messageId);
+                        return;
+                    }
+
+                    const chart = echarts.init(chartElement);
+
+                    // Parse visualization data if it's a string
+                    let chartData;
+                    try {
+                        chartData = typeof data === 'string' ? JSON.parse(data) : data;
+                    } catch (e) {
+                        console.error('Failed to parse visualization data:', e);
+                        return;
+                    }
+
+                    // Create ECharts option from the visualization data
+                    const option = {
+                        title: {
+                            text: title || 'Workout Visualization',
+                            left: 'center',
+                            textStyle: {
+                                fontSize: 16,
+                                fontWeight: 'normal'
+                            }
+                        },
+                        tooltip: {
+                            trigger: 'axis',
+                            axisPointer: {
+                                type: 'cross'
+                            }
+                        },
+                        legend: {
+                            top: 30,
+                            data: chartData.legend || []
+                        },
+                        xAxis: {
+                            type: chartData.xAxis?.type || 'category',
+                            data: chartData.xAxis?.data || [],
+                            name: chartData.xAxis?.name || ''
+                        },
+                        yAxis: {
+                            type: chartData.yAxis?.type || 'value',
+                            name: chartData.yAxis?.name || ''
+                        },
+                        series: chartData.series || [],
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            containLabel: true
+                        }
+                    };
+
+                    chart.setOption(option);
+
+                    // Handle window resize
+                    window.addEventListener('resize', () => {
+                        chart.resize();
+                    });
+
+                } catch (error) {
+                    console.error('Error rendering visualization:', error);
+                    const chartElement = document.getElementById(`chart-${messageId}`);
+                    if (chartElement) {
+                        chartElement.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--red-7);">Error loading visualization</div>';
+                    }
+                }
+            }
+
+            // Initialize existing visualizations when page loads
+            document.addEventListener('DOMContentLoaded', async function() {
+                {{ range .Messages }}
+                    {{ if .VisualizationData }}
+                        await renderVisualization({{ .ID }}, {{{ .VisualizationData }}}, '{{ .VisualizationTitle }}');
+                    {{ end }}
+                {{ end }}
+            });
+        </script>
+    </div>
+{{ end }}

@@ -68,20 +68,20 @@
 - [X] T027 GET /chat HTTP handler for conversation list in `cmd/web/chat_handlers.go`
 - [X] T028 GET /chat/{conversationID} HTTP handler for conversation view in `cmd/web/chat_handlers.go`
 - [X] T029 POST /chat/{conversationID}/message HTTP handler for message sending in `cmd/web/chat_handlers.go`
-- [ ] T030 Chat UI template with conversation list in `ui/templates/pages/chat-list.gohtml`
-- [ ] T031 Chat conversation template with message history in `ui/templates/pages/chat-conversation.gohtml`
-- [ ] T032 ECharts visualization rendering in conversation template using existing pattern
+- [X] T030 Chat UI template with conversation list in `ui/templates/pages/chat-list.gohtml`
+- [X] T031 Chat conversation template with message history in `ui/templates/pages/chat-conversation.gohtml`
+- [X] T032 ECharts visualization rendering in conversation template using existing pattern
 - [X] T033 Add chat routes to main router in `cmd/web/routes.go`
 - [X] T034 Add authentication middleware for chat endpoints in chat handlers
 
 ## Phase 3.5: Polish
-- [ ] T035 [P] Performance test for 100 concurrent conversations in `test/performance/chatbot_test.go`
-- [ ] T036 [P] Unit tests for message validation in `internal/chatbot/models/message_test.go`
-- [ ] T037 [P] Unit tests for conversation state management in `internal/chatbot/models/conversation_test.go`
-- [ ] T038 Security audit for user data isolation in all chatbot components
-- [ ] T039 Token usage monitoring and rate limiting implementation
-- [ ] T040 Error handling for OpenAI API failures and timeouts
-- [ ] T041 Run quickstart.md validation scenarios
+- [X] T035 [P] Performance test for 100 concurrent conversations in `test/performance/chatbot_test.go`
+- [X] T036 [P] Unit tests for message validation in `internal/chatbot/models/message_test.go`
+- [X] T037 [P] Unit tests for conversation state management in `internal/chatbot/models/conversation_test.go`
+- [X] T038 Security audit for user data isolation in all chatbot components
+- [X] T039 Token usage monitoring and rate limiting implementation
+- [X] T040 Error handling for OpenAI API failures and timeouts
+- [X] T041 Run quickstart.md validation scenarios
 
 ## Dependencies
 - Database migrations (T001-T003) before models (T016-T018)

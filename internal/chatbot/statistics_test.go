@@ -2,7 +2,7 @@ package chatbot_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/chatbot"

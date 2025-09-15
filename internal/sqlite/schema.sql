@@ -196,7 +196,25 @@ CREATE TABLE message_visualizations
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at)
 ) STRICT;
 
+CREATE TABLE token_usage
+(
+    id                INTEGER PRIMARY KEY,
+    user_id           INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    conversation_id   INTEGER REFERENCES conversations (id) ON DELETE CASCADE,
+    message_id        INTEGER REFERENCES chat_messages (id) ON DELETE CASCADE,
+    tokens_used       INTEGER NOT NULL CHECK (tokens_used >= 0),
+    request_type      TEXT NOT NULL CHECK (request_type IN ('chat', 'visualization', 'analysis', 'recommendation')),
+    model             TEXT NOT NULL CHECK (LENGTH(model) < 100),
+    timestamp         TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', timestamp) = timestamp),
+    response_time_ms  INTEGER CHECK (response_time_ms IS NULL OR response_time_ms >= 0)
+) STRICT;
+
 CREATE INDEX idx_message_visualizations_message ON message_visualizations (message_id);
+
+CREATE INDEX idx_token_usage_user_date ON token_usage (user_id, DATE(timestamp));
+CREATE INDEX idx_token_usage_conversation ON token_usage (conversation_id);
+CREATE INDEX idx_token_usage_timestamp ON token_usage (timestamp);
 
 -------------------
 -- Feature flags --

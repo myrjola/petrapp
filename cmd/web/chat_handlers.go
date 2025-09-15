@@ -34,7 +34,7 @@ func (app *application) chatGET(w http.ResponseWriter, r *http.Request) {
 		Conversations:    conversations,
 	}
 
-	app.render(w, r, http.StatusOK, "chat", data)
+	app.render(w, r, http.StatusOK, "chat-list", data)
 }
 
 // chatConversationGET handles GET requests for viewing a specific conversation.
