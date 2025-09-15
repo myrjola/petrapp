@@ -61,7 +61,7 @@ func NewExerciseInfoTool(db *sqlite.Database, logger *slog.Logger) *ExerciseInfo
 // 1. Exercise information is retrieved from the database
 // 2. Muscle groups are correctly categorized as primary/secondary
 // 3. User history is included if requested and user is authenticated
-// 4. All queries are secured and user-isolated
+// 4. All queries are secured and user-isolated.
 func (t *ExerciseInfoTool) GetExerciseInfo(ctx context.Context, params ExerciseInfoParams) (*ExerciseInfoResult, error) {
 	// Validate input
 	if strings.TrimSpace(params.ExerciseName) == "" {

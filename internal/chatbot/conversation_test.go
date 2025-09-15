@@ -10,7 +10,7 @@ import (
 )
 
 // Integration test for conversation creation and management
-// This test MUST fail initially as the repository methods are not yet implemented
+// This test MUST fail initially as the repository methods are not yet implemented.
 func TestConversationIntegration_CreateAndManage(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -155,7 +155,7 @@ func TestConversationIntegration_CreateAndManage(t *testing.T) {
 	})
 }
 
-// Test conversation activity tracking
+// Test conversation activity tracking.
 func TestConversationIntegration_ActivityTracking(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -211,7 +211,7 @@ func TestConversationIntegration_ActivityTracking(t *testing.T) {
 	})
 }
 
-// Test user isolation for conversations
+// Test user isolation for conversations.
 func TestConversationIntegration_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -328,7 +328,7 @@ func TestConversationIntegration_UserIsolation(t *testing.T) {
 	})
 }
 
-// Test error cases for conversation operations
+// Test error cases for conversation operations.
 func TestConversationIntegration_ErrorCases(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

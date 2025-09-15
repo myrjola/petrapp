@@ -12,7 +12,7 @@ import (
 )
 
 // Contract test for generate_visualization LLM function
-// This test MUST fail initially as the function is not yet implemented
+// This test MUST fail initially as the function is not yet implemented.
 func TestGenerateVisualizationTool_CreateChart(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -202,7 +202,7 @@ func TestGenerateVisualizationTool_CreateChart(t *testing.T) {
 	}
 }
 
-// Test ECharts configuration generation
+// Test ECharts configuration generation.
 func TestGenerateVisualizationTool_EChartsConfig(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -254,7 +254,7 @@ func TestGenerateVisualizationTool_EChartsConfig(t *testing.T) {
 	}
 }
 
-// Test data security and user isolation
+// Test data security and user isolation.
 func TestGenerateVisualizationTool_DataSecurity(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -298,7 +298,7 @@ func TestGenerateVisualizationTool_DataSecurity(t *testing.T) {
 	}
 }
 
-// Helper function to check if a string contains a substring
+// Helper function to check if a string contains a substring.
 func contains(str, substr string) bool {
 	return len(str) >= len(substr) && (str == substr || str[0:len(substr)] == substr ||
 		(len(str) > len(substr) && (str[len(str)-len(substr):] == substr ||

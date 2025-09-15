@@ -11,7 +11,7 @@ import (
 )
 
 // Contract test for get_exercise_info LLM function
-// This test MUST fail initially as the function is not yet implemented
+// This test MUST fail initially as the function is not yet implemented.
 func TestExerciseInfoTool_GetExerciseInfo(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -232,7 +232,7 @@ func TestExerciseInfoTool_GetExerciseInfo(t *testing.T) {
 	}
 }
 
-// Test that exercise info properly isolates user data
+// Test that exercise info properly isolates user data.
 func TestExerciseInfoTool_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -349,7 +349,7 @@ func TestExerciseInfoTool_UserIsolation(t *testing.T) {
 	}
 }
 
-// Test exercise lookup validation and security
+// Test exercise lookup validation and security.
 func TestExerciseInfoTool_SecurityValidation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

@@ -109,7 +109,7 @@ func NewVisualizationTool(db *sqlite.Database, logger *slog.Logger) *Visualizati
 // This function ensures that:
 // 1. Only valid chart types are allowed
 // 2. All queries are automatically filtered by user_id for security
-// 3. Generated ECharts configuration is stored in the database
+// 3. Generated ECharts configuration is stored in the database.
 func (t *VisualizationTool) GenerateVisualization(ctx context.Context, params GenerateVisualizationParams) (*GenerateVisualizationResult, error) {
 	// Get user ID from context
 	userID := contexthelpers.AuthenticatedUserID(ctx)

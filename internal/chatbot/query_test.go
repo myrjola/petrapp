@@ -11,7 +11,7 @@ import (
 )
 
 // Contract test for query_workout_data LLM function
-// This test MUST fail initially as the function is not yet implemented
+// This test MUST fail initially as the function is not yet implemented.
 func TestQueryWorkoutDataTool_ExecuteQuery(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -121,7 +121,7 @@ func TestQueryWorkoutDataTool_ExecuteQuery(t *testing.T) {
 	}
 }
 
-// Test that the query function properly isolates user data
+// Test that the query function properly isolates user data.
 func TestQueryWorkoutDataTool_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -206,7 +206,7 @@ func TestQueryWorkoutDataTool_UserIsolation(t *testing.T) {
 	}
 }
 
-// Test query validation and security
+// Test query validation and security.
 func TestQueryWorkoutDataTool_SecurityValidation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

@@ -53,7 +53,7 @@ func NewWorkoutPatternTool(db *sqlite.Database, logger *slog.Logger) *WorkoutPat
 // This function ensures that:
 // 1. Only authenticated users can access their own data
 // 2. All database queries are securely executed with user isolation
-// 3. Pattern analysis is meaningful and actionable
+// 3. Pattern analysis is meaningful and actionable.
 func (t *WorkoutPatternTool) AnalyzePattern(ctx context.Context, params PatternAnalysisParams) (*PatternAnalysisResult, error) {
 	// Get user ID from context
 	userID := contexthelpers.AuthenticatedUserID(ctx)
@@ -605,7 +605,7 @@ func (t *WorkoutPatternTool) analyzeRecoveryTime(ctx context.Context, userID int
 				recoveryTimes := []float64{}
 
 				// Sort workout dates
-				for i := 0; i < len(workouts)-1; i++ {
+				for i := range len(workouts) - 1 {
 					for j := i + 1; j < len(workouts); j++ {
 						if workouts[i].After(workouts[j]) {
 							workouts[i], workouts[j] = workouts[j], workouts[i]

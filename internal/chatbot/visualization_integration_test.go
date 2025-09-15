@@ -12,7 +12,7 @@ import (
 )
 
 // Integration test for visualization generation within the chatbot flow
-// This test MUST fail initially as the repository methods are not yet implemented
+// This test MUST fail initially as the repository methods are not yet implemented.
 func TestVisualizationIntegration_EndToEndVisualizationFlow(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -177,7 +177,7 @@ func TestVisualizationIntegration_EndToEndVisualizationFlow(t *testing.T) {
 	})
 }
 
-// Test visualization integration with message history
+// Test visualization integration with message history.
 func TestVisualizationIntegration_VisualizationHistory(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -246,9 +246,7 @@ func TestVisualizationIntegration_VisualizationHistory(t *testing.T) {
 			// Verify chronological ordering
 			var vizTimestamps []chatbot.Visualization
 			for _, msg := range messages {
-				for _, viz := range msg.Visualizations {
-					vizTimestamps = append(vizTimestamps, viz)
-				}
+				vizTimestamps = append(vizTimestamps, msg.Visualizations...)
 			}
 
 			for i := 1; i < len(vizTimestamps); i++ {
@@ -315,7 +313,7 @@ func TestVisualizationIntegration_VisualizationHistory(t *testing.T) {
 	})
 }
 
-// Test user isolation for visualizations
+// Test user isolation for visualizations.
 func TestVisualizationIntegration_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -420,7 +418,7 @@ func TestVisualizationIntegration_UserIsolation(t *testing.T) {
 	})
 }
 
-// Helper function to setup comprehensive test data for visualization testing
+// Helper function to setup comprehensive test data for visualization testing.
 func setupVisualizationTestData(t *testing.T, db *sqlite.Database, userID int) {
 	ctx := context.Background()
 
@@ -455,8 +453,8 @@ func setupVisualizationTestData(t *testing.T, db *sqlite.Database, userID int) {
 	}
 
 	// Insert workout sessions with progression over 8 weeks
-	for week := 0; week < 8; week++ {
-		for day := 0; day < 3; day++ { // 3 workouts per week
+	for week := range 8 {
+		for day := range 3 { // 3 workouts per week
 			workoutDate := "2024-01-" + fmt.Sprintf("%02d", 1+week*7+day*2)
 
 			_, err = db.ReadWrite.ExecContext(ctx, `
@@ -496,13 +494,13 @@ func setupVisualizationTestData(t *testing.T, db *sqlite.Database, userID int) {
 	}
 }
 
-// Helper function to setup different test data for second user
+// Helper function to setup different test data for second user.
 func setupDifferentVisualizationTestData(t *testing.T, db *sqlite.Database, userID int) {
 	ctx := context.Background()
 
 	// Insert different workout pattern for user2 (less frequent, different exercises)
-	for week := 0; week < 8; week++ {
-		for day := 0; day < 2; day++ { // Only 2 workouts per week
+	for week := range 8 {
+		for day := range 2 { // Only 2 workouts per week
 			workoutDate := "2024-01-" + fmt.Sprintf("%02d", 2+week*7+day*3)
 
 			_, err := db.ReadWrite.ExecContext(ctx, `
@@ -540,7 +538,7 @@ func setupDifferentVisualizationTestData(t *testing.T, db *sqlite.Database, user
 	}
 }
 
-// Helper function to check case-insensitive substring
+// Helper function to check case-insensitive substring.
 func containsIgnoreCase(str, substr string) bool {
 	// Convert to lowercase and check
 	lowerStr := strings.ToLower(str)

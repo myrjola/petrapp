@@ -22,7 +22,7 @@ func setupTestDatabase(t *testing.T) *sqlite.Database {
 	t.Helper()
 
 	// Create a temporary database file for testing
-	tempFile, err := os.CreateTemp("", "test_workout_*.db")
+	tempFile, err := os.CreateTemp(t.TempDir(), "test_workout_*.db")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}

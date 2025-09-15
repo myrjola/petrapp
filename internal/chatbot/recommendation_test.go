@@ -10,7 +10,7 @@ import (
 )
 
 // Contract test for generate_workout_recommendation LLM function
-// This test MUST fail initially as the function is not yet implemented
+// This test MUST fail initially as the function is not yet implemented.
 func TestWorkoutRecommendationTool_GenerateRecommendation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -376,7 +376,7 @@ func TestWorkoutRecommendationTool_GenerateRecommendation(t *testing.T) {
 	}
 }
 
-// Test that recommendations are personalized based on user history
+// Test that recommendations are personalized based on user history.
 func TestWorkoutRecommendationTool_Personalization(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -531,7 +531,7 @@ func TestWorkoutRecommendationTool_Personalization(t *testing.T) {
 	}
 }
 
-// Test recommendation security and validation
+// Test recommendation security and validation.
 func TestWorkoutRecommendationTool_SecurityValidation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -612,7 +612,7 @@ func TestWorkoutRecommendationTool_SecurityValidation(t *testing.T) {
 	}
 }
 
-// Helper function to create int pointer
+// Helper function to create int pointer.
 func intPtr(i int) *int {
 	return &i
 }

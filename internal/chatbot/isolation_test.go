@@ -10,7 +10,7 @@ import (
 )
 
 // Integration test for comprehensive user data isolation
-// This test MUST fail initially as the repository methods are not yet implemented
+// This test MUST fail initially as the repository methods are not yet implemented.
 func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -26,7 +26,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 	userIDs := make([]int, 3)
 	userContexts := make([]context.Context, 3)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var userID int
 		err = db.ReadWrite.QueryRowContext(ctx,
 			"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
@@ -35,7 +35,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 			t.Fatalf("Failed to insert user%d: %v", i+1, err)
 		}
 		userIDs[i] = userID
-		userContexts[i] = context.WithValue(ctx, "user_id", userID)
+		userContexts[i] := context.WithValue(ctx, "user_id", userID)
 	}
 
 	service := chatbot.NewService(db, logger, "test-api-key")
@@ -44,7 +44,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 		// Each user creates multiple conversations
 		userConversations := make([][]chatbot.Conversation, 3)
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			userConversations[i] = make([]chatbot.Conversation, 2)
 
 			// User creates 2 conversations
@@ -62,7 +62,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 		}
 
 		// Verify each user can only see their own conversations
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			conversations, err := service.GetUserConversations(userContexts[i])
 			if err != nil {
 				t.Errorf("unexpected error getting conversations for user%d: %v", i+1, err)
@@ -93,7 +93,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 			}
 
 			// Should not be able to access other users' conversations by ID
-			for j := 0; j < 3; j++ {
+			for j := range 3 {
 				if i == j {
 					continue
 				}
@@ -112,7 +112,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 		userMessages := make([][]string, 3)
 		conversations := make([]chatbot.Conversation, 3)
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			conv, err := service.CreateConversation(userContexts[i], "Message Isolation Test")
 			if err != nil {
 				t.Skip("CreateConversation not implemented yet (expected for TDD)")
@@ -135,7 +135,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 		}
 
 		// Verify message isolation
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			messages, err := service.GetConversationMessages(userContexts[i], conversations[i].ID)
 			if err != nil {
 				t.Errorf("unexpected error getting messages for user%d: %v", i+1, err)
@@ -160,7 +160,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 					}
 
 					// Should not contain other users' messages
-					for j := 0; j < 3; j++ {
+					for j := range 3 {
 						if i == j {
 							continue
 						}
@@ -178,7 +178,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 			}
 
 			// Should not be able to access other users' conversation messages
-			for j := 0; j < 3; j++ {
+			for j := range 3 {
 				if i == j {
 					continue
 				}
@@ -217,7 +217,7 @@ func TestUserDataIsolation_ComprehensiveIsolation(t *testing.T) {
 	})
 }
 
-// Test isolation under concurrent access
+// Test isolation under concurrent access.
 func TestUserDataIsolation_ConcurrentAccess(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -314,7 +314,7 @@ func TestUserDataIsolation_ConcurrentAccess(t *testing.T) {
 		errors := make(chan error, 2)
 
 		go func() {
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				_, err := service.SendMessage(user1Ctx, conv1.ID, "User1 concurrent message")
 				if err != nil {
 					errors <- err
@@ -325,7 +325,7 @@ func TestUserDataIsolation_ConcurrentAccess(t *testing.T) {
 		}()
 
 		go func() {
-			for i := 0; i < 5; i++ {
+			for range 5 {
 				_, err := service.SendMessage(user2Ctx, conv2.ID, "User2 concurrent message")
 				if err != nil {
 					errors <- err
@@ -372,7 +372,7 @@ func TestUserDataIsolation_ConcurrentAccess(t *testing.T) {
 	})
 }
 
-// Test isolation with invalid user contexts
+// Test isolation with invalid user contexts.
 func TestUserDataIsolation_InvalidUserContexts(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -444,7 +444,7 @@ func TestUserDataIsolation_InvalidUserContexts(t *testing.T) {
 	})
 }
 
-// Test data leakage prevention through database queries
+// Test data leakage prevention through database queries.
 func TestUserDataIsolation_DatabaseQueryIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

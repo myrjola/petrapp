@@ -56,7 +56,7 @@ func NewStatisticsTool(db *sqlite.Database, logger *slog.Logger) *StatisticsTool
 // This function ensures that:
 // 1. Only authenticated users can access their own data
 // 2. All database queries are securely executed with user isolation
-// 3. Statistical calculations are accurate and meaningful
+// 3. Statistical calculations are accurate and meaningful.
 func (t *StatisticsTool) CalculateStatistics(ctx context.Context, params StatisticsParams) (*StatisticsResult, error) {
 	// Get user ID from context
 	userID := contexthelpers.AuthenticatedUserID(ctx)

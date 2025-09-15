@@ -11,7 +11,7 @@ import (
 )
 
 // Contract test for calculate_statistics LLM function
-// This test MUST fail initially as the function is not yet implemented
+// This test MUST fail initially as the function is not yet implemented.
 func TestCalculateStatisticsTool_CalculateMetrics(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -246,7 +246,7 @@ func TestCalculateStatisticsTool_CalculateMetrics(t *testing.T) {
 	}
 }
 
-// Test specific statistical calculations
+// Test specific statistical calculations.
 func TestCalculateStatisticsTool_SpecificCalculations(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -291,7 +291,7 @@ func TestCalculateStatisticsTool_SpecificCalculations(t *testing.T) {
 			},
 			validateResult: func(result *chatbot.StatisticsResult) error {
 				if result.ExerciseName == "" {
-					return fmt.Errorf("expected exercise name in personal record result")
+					return errors.New("expected exercise name in personal record result")
 				}
 				return nil
 			},
@@ -324,7 +324,7 @@ func TestCalculateStatisticsTool_SpecificCalculations(t *testing.T) {
 	}
 }
 
-// Test user data isolation for statistics
+// Test user data isolation for statistics.
 func TestCalculateStatisticsTool_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -387,7 +387,7 @@ func TestCalculateStatisticsTool_UserIsolation(t *testing.T) {
 	}
 }
 
-// Helper function to setup personal record test data
+// Helper function to setup personal record test data.
 func setupPersonalRecordData(db *sqlite.Database, userID int) error {
 	ctx := context.Background()
 

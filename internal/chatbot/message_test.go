@@ -10,7 +10,7 @@ import (
 )
 
 // Integration test for message processing and conversation flow
-// This test MUST fail initially as the repository methods are not yet implemented
+// This test MUST fail initially as the repository methods are not yet implemented.
 func TestMessageIntegration_SendAndRetrieve(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -153,7 +153,7 @@ func TestMessageIntegration_SendAndRetrieve(t *testing.T) {
 	})
 }
 
-// Test message metadata and tracking
+// Test message metadata and tracking.
 func TestMessageIntegration_MessageMetadata(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -223,7 +223,7 @@ func TestMessageIntegration_MessageMetadata(t *testing.T) {
 	})
 }
 
-// Test user isolation for messages
+// Test user isolation for messages.
 func TestMessageIntegration_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -304,7 +304,7 @@ func TestMessageIntegration_UserIsolation(t *testing.T) {
 	})
 }
 
-// Test message content validation and sanitization
+// Test message content validation and sanitization.
 func TestMessageIntegration_ContentValidation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -409,7 +409,7 @@ func TestMessageIntegration_ContentValidation(t *testing.T) {
 	})
 }
 
-// Test error scenarios for message operations
+// Test error scenarios for message operations.
 func TestMessageIntegration_ErrorScenarios(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

@@ -50,7 +50,7 @@ func NewWorkoutDataQueryTool(db *sqlite.Database, logger *slog.Logger) *WorkoutD
 // This function ensures that:
 // 1. Only SELECT statements are allowed
 // 2. All queries are automatically filtered by user_id for security
-// 3. SQL injection protection is enforced
+// 3. SQL injection protection is enforced.
 func (t *WorkoutDataQueryTool) QueryWorkoutData(ctx context.Context, params QueryWorkoutDataParams) (*QueryWorkoutDataResult, error) {
 	// Get user ID from context
 	userID := contexthelpers.AuthenticatedUserID(ctx)

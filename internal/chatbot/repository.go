@@ -68,7 +68,7 @@ func (f *repositoryFactory) newRepository() *repository {
 	}
 }
 
-// Placeholder implementations - these will be implemented in Phase 3.3
+// Placeholder implementations - these will be implemented in Phase 3.3.
 type conversationRepositoryImpl struct {
 	db     *sqlite.Database
 	logger *slog.Logger

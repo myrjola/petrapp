@@ -11,7 +11,7 @@ import (
 )
 
 // Contract test for analyze_workout_pattern LLM function
-// This test MUST fail initially as the function is not yet implemented
+// This test MUST fail initially as the function is not yet implemented.
 func TestWorkoutPatternTool_AnalyzePattern(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -74,8 +74,8 @@ func TestWorkoutPatternTool_AnalyzePattern(t *testing.T) {
 	baseDate := time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC)
 
 	// Create consistent workout pattern - 3x per week for 8 weeks
-	for week := 0; week < 8; week++ {
-		for day := 0; day < 3; day++ {
+	for week := range 8 {
+		for day := range 3 {
 			workoutDate := baseDate.AddDate(0, 0, week*7+day*2) // Mon, Wed, Fri pattern
 			difficultyRating := 3 + (week % 3)                  // Varying difficulty: 3, 4, 5, 3, 4, 5...
 
@@ -92,8 +92,8 @@ func TestWorkoutPatternTool_AnalyzePattern(t *testing.T) {
 
 	// Insert exercises with progressive overload pattern
 	workoutDates := []string{}
-	for week := 0; week < 8; week++ {
-		for day := 0; day < 3; day++ {
+	for week := range 8 {
+		for day := range 3 {
 			workoutDate := baseDate.AddDate(0, 0, week*7+day*2)
 			workoutDates = append(workoutDates, workoutDate.Format("2006-01-02"))
 		}
@@ -374,7 +374,7 @@ func TestWorkoutPatternTool_AnalyzePattern(t *testing.T) {
 	}
 }
 
-// Test specific pattern analysis scenarios with known data
+// Test specific pattern analysis scenarios with known data.
 func TestWorkoutPatternTool_SpecificPatterns(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -434,7 +434,7 @@ func TestWorkoutPatternTool_SpecificPatterns(t *testing.T) {
 	})
 }
 
-// Test that pattern analysis properly isolates user data
+// Test that pattern analysis properly isolates user data.
 func TestWorkoutPatternTool_UserIsolation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -472,7 +472,7 @@ func TestWorkoutPatternTool_UserIsolation(t *testing.T) {
 
 	// User1 has consistent workout pattern - every other day for past 20 days
 	baseDate := time.Now().AddDate(0, 0, -20)
-	for i := 0; i < 10; i++ { // 10 workouts over 20 days = very consistent
+	for i := range 10 { // 10 workouts over 20 days = very consistent
 		workoutDate := baseDate.AddDate(0, 0, i*2)
 		_, err = db.ReadWrite.ExecContext(ctx, `
 			INSERT INTO workout_sessions (user_id, workout_date, started_at, completed_at, difficulty_rating) VALUES
@@ -576,7 +576,7 @@ func TestWorkoutPatternTool_UserIsolation(t *testing.T) {
 	}
 }
 
-// Test pattern analysis security and validation
+// Test pattern analysis security and validation.
 func TestWorkoutPatternTool_SecurityValidation(t *testing.T) {
 	ctx := context.Background()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
