@@ -174,9 +174,9 @@ func TestWorkoutPatternTool_AnalyzePattern(t *testing.T) {
 	}
 
 	// Insert some recent missed workouts to test consistency analysis
-	missedDate1 := baseDate.AddDate(0, 0, 60) // 2 weeks ago
-	missedDate2 := baseDate.AddDate(0, 0, 62) // 10 days ago
 	// These dates have no workout_sessions, creating gaps in the pattern
+	_ = baseDate.AddDate(0, 0, 60) // 2 weeks ago (missed workout)
+	_ = baseDate.AddDate(0, 0, 62) // 10 days ago (missed workout)
 
 	// Create chatbot service
 	service := chatbot.NewService(db, logger, "test-api-key")

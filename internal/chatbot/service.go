@@ -7,6 +7,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/chatbot/tools"
 	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/openai/openai-go"
 )
 
 // Service handles the business logic for AI chatbot conversations.
@@ -20,12 +21,22 @@ type Service struct {
 // NewService creates a new chatbot service.
 func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
 	factory := newRepositoryFactory(db, logger)
-	return &Service{
+	service := &Service{
 		repo:   factory.newRepository(),
 		db:     db,
 		logger: logger,
 		llm:    newLLMClient(openaiAPIKey, logger),
 	}
+
+	// Register all function calling tools
+	service.llm.RegisterTool(service.GetQueryWorkoutDataTool())
+	service.llm.RegisterTool(service.GetGenerateVisualizationTool())
+	service.llm.RegisterTool(service.GetCalculateStatisticsTool())
+	service.llm.RegisterTool(service.GetExerciseInfoTool())
+	service.llm.RegisterTool(service.GetWorkoutRecommendationTool())
+	service.llm.RegisterTool(service.GetWorkoutPatternTool())
+
+	return service
 }
 
 // CreateConversation creates a new conversation for the user.
@@ -93,11 +104,42 @@ func (s *Service) SendMessage(ctx context.Context, conversationID int, content s
 		s.logger.WarnContext(ctx, "failed to update conversation activity", "conversation_id", conversationID, "error", err)
 	}
 
-	// Generate AI response (placeholder for now)
+	// Get conversation history for context
+	messages, err := s.repo.messages.ListByConversation(ctx, conversationID)
+	if err != nil {
+		return ChatMessage{}, fmt.Errorf("get conversation history: %w", err)
+	}
+
+	// Build chat request with conversation history
+	systemPrompt := s.llm.GetSystemPrompt()
+	chatRequest := ChatRequest{
+		SystemPrompt: &systemPrompt,
+		Messages:     s.buildChatMessages(messages),
+	}
+
+	// Generate AI response
+	response, err := s.llm.GenerateResponse(ctx, chatRequest)
+	if err != nil {
+		return ChatMessage{}, fmt.Errorf("generate AI response: %w", err)
+	}
+
+	// Handle response content
+	var assistantContent string
+	if response.Content != nil {
+		assistantContent = *response.Content
+	} else {
+		assistantContent = "I understand your request, but I need more information to provide a helpful response."
+	}
+
+	// TODO: Add function calling support when OpenAI client is properly configured
+
+	// Create assistant message
+	tokenCount := int(response.TokenUsage.TotalTokens)
 	assistantMessage := ChatMessage{
 		ConversationID: conversationID,
 		MessageType:    MessageTypeAssistant,
-		Content:        "This is a placeholder response. AI integration will be implemented in the LLM client.",
+		Content:        assistantContent,
+		TokenCount:     &tokenCount,
 	}
 
 	savedAssistantMessage, err := s.repo.messages.Create(ctx, assistantMessage)
@@ -106,6 +148,22 @@ func (s *Service) SendMessage(ctx context.Context, conversationID int, content s
 	}
 
 	return savedAssistantMessage, nil
+}
+
+// buildChatMessages converts ChatMessage slice to OpenAI message format.
+func (s *Service) buildChatMessages(messages []ChatMessage) []openai.ChatCompletionMessageParamUnion {
+	var result []openai.ChatCompletionMessageParamUnion
+
+	for _, msg := range messages {
+		switch msg.MessageType {
+		case MessageTypeUser:
+			result = append(result, openai.UserMessage(msg.Content))
+		case MessageTypeAssistant:
+			result = append(result, openai.AssistantMessage(msg.Content))
+		}
+	}
+
+	return result
 }
 
 // GetGenerateVisualizationTool returns the visualization tool for generating charts.
@@ -128,6 +186,18 @@ func (s *Service) GetExerciseInfoTool() *ExerciseInfoToolWrapper {
 // GetQueryWorkoutDataTool returns the workout data query tool.
 func (s *Service) GetQueryWorkoutDataTool() *tools.WorkoutDataQueryTool {
 	return tools.NewWorkoutDataQueryTool(s.db, s.logger)
+}
+
+// GetWorkoutRecommendationTool returns the workout recommendation tool for generating workouts.
+func (s *Service) GetWorkoutRecommendationTool() *WorkoutRecommendationToolWrapper {
+	tool := tools.NewWorkoutRecommendationTool(s.db, s.logger)
+	return &WorkoutRecommendationToolWrapper{tool: tool}
+}
+
+// GetWorkoutPatternTool returns the workout pattern analysis tool.
+func (s *Service) GetWorkoutPatternTool() *WorkoutPatternToolWrapper {
+	tool := tools.NewWorkoutPatternTool(s.db, s.logger)
+	return &WorkoutPatternToolWrapper{tool: tool}
 }
 
 // StatisticsToolWrapper wraps the statistics tool to provide type conversion.
@@ -227,5 +297,118 @@ func (w *ExerciseInfoToolWrapper) ToOpenAIFunction() map[string]interface{} {
 
 // ExecuteFunction delegates to the wrapped tool.
 func (w *ExerciseInfoToolWrapper) ExecuteFunction(ctx context.Context, functionName string, argumentsJSON string) (string, error) {
+	return w.tool.ExecuteFunction(ctx, functionName, argumentsJSON)
+}
+
+// WorkoutRecommendationToolWrapper wraps the workout recommendation tool to provide type conversion.
+type WorkoutRecommendationToolWrapper struct {
+	tool *tools.WorkoutRecommendationTool
+}
+
+// GenerateRecommendation generates a workout recommendation with type conversion.
+func (w *WorkoutRecommendationToolWrapper) GenerateRecommendation(ctx context.Context, request WorkoutRecommendationRequest) (*WorkoutRecommendationResult, error) {
+	// Convert from chatbot types to tool types
+	params := tools.WorkoutRecommendationParams{
+		WorkoutType:        request.WorkoutType,
+		DurationMinutes:    request.DurationMinutes,
+		EquipmentAvailable: request.EquipmentAvailable,
+		AvoidMuscleGroups:  request.AvoidMuscleGroups,
+	}
+
+	// Call the tool
+	result, err := w.tool.GenerateRecommendation(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert back to chatbot types
+	chatbotResult := &WorkoutRecommendationResult{
+		WorkoutType:       result.WorkoutType,
+		EstimatedDuration: result.EstimatedDuration,
+		Notes:             result.Notes,
+		CooldownTips:      result.CooldownTips,
+	}
+
+	// Convert exercises
+	for _, exercise := range result.Exercises {
+		chatbotExercise := RecommendedExercise{
+			ExerciseName:      exercise.ExerciseName,
+			Sets:              exercise.Sets,
+			MinReps:           exercise.MinReps,
+			MaxReps:           exercise.MaxReps,
+			RecommendedWeight: exercise.RecommendedWeight,
+			RestSeconds:       exercise.RestSeconds,
+			Notes:             exercise.Notes,
+			MuscleGroups:      exercise.MuscleGroups,
+		}
+		chatbotResult.Exercises = append(chatbotResult.Exercises, chatbotExercise)
+	}
+
+	// Convert warmup exercises if present
+	for _, exercise := range result.WarmupExercises {
+		chatbotExercise := RecommendedExercise{
+			ExerciseName:      exercise.ExerciseName,
+			Sets:              exercise.Sets,
+			MinReps:           exercise.MinReps,
+			MaxReps:           exercise.MaxReps,
+			RecommendedWeight: exercise.RecommendedWeight,
+			RestSeconds:       exercise.RestSeconds,
+			Notes:             exercise.Notes,
+			MuscleGroups:      exercise.MuscleGroups,
+		}
+		chatbotResult.WarmupExercises = append(chatbotResult.WarmupExercises, chatbotExercise)
+	}
+
+	return chatbotResult, nil
+}
+
+// ToOpenAIFunction delegates to the wrapped tool.
+func (w *WorkoutRecommendationToolWrapper) ToOpenAIFunction() map[string]interface{} {
+	return w.tool.ToOpenAIFunction()
+}
+
+// ExecuteFunction delegates to the wrapped tool.
+func (w *WorkoutRecommendationToolWrapper) ExecuteFunction(ctx context.Context, functionName string, argumentsJSON string) (string, error) {
+	return w.tool.ExecuteFunction(ctx, functionName, argumentsJSON)
+}
+
+// WorkoutPatternToolWrapper wraps the workout pattern tool to provide type conversion.
+type WorkoutPatternToolWrapper struct {
+	tool *tools.WorkoutPatternTool
+}
+
+// AnalyzePattern analyzes workout patterns with type conversion.
+func (w *WorkoutPatternToolWrapper) AnalyzePattern(ctx context.Context, request WorkoutPatternRequest) (*WorkoutPatternResult, error) {
+	// Convert from chatbot types to tool types
+	params := tools.PatternAnalysisParams{
+		AnalysisType: request.AnalysisType,
+		LookbackDays: request.LookbackDays,
+	}
+
+	// Call the tool
+	result, err := w.tool.AnalyzePattern(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert back to chatbot types
+	return &WorkoutPatternResult{
+		AnalysisType:    result.AnalysisType,
+		LookbackDays:    result.LookbackDays,
+		Summary:         result.Summary,
+		Insights:        result.Insights,
+		Recommendations: result.Recommendations,
+		MetricsData:     result.MetricsData,
+		Score:           result.Score,
+	}, nil
+}
+
+// ToOpenAIFunction delegates to the wrapped tool.
+func (w *WorkoutPatternToolWrapper) ToOpenAIFunction() map[string]interface{} {
+	return w.tool.ToOpenAIFunction()
+}
+
+// ExecuteFunction delegates to the wrapped tool.
+func (w *WorkoutPatternToolWrapper) ExecuteFunction(ctx context.Context, functionName string, argumentsJSON string) (string, error) {
 	return w.tool.ExecuteFunction(ctx, functionName, argumentsJSON)
 }
