@@ -33,20 +33,31 @@ func (app *application) reportingAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the report
-	var data map[string]any
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		app.logger.LogAttrs(r.Context(), slog.LevelError, "Failed to parse report",
-			slog.String("error", err.Error()),
-			slog.String("body", string(body)))
-		http.Error(w, "Bad request", http.StatusBadRequest)
-		return
+	// Parse the report - can be either an array or an object
+	var payload any
+	var dataArray []map[string]any
+	var dataObject map[string]any
+
+	// Try parsing as array first.
+	err = json.Unmarshal(body, &dataArray)
+	if err == nil {
+		payload = dataArray
+	} else {
+		// Try parsing as object.
+		err = json.Unmarshal(body, &dataObject)
+		if err != nil {
+			app.logger.LogAttrs(r.Context(), slog.LevelError, "Failed to parse report",
+				slog.String("error", err.Error()),
+				slog.String("body", string(body)))
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		payload = dataObject
 	}
 
 	// Log the report with the payload
 	app.logger.LogAttrs(r.Context(), slog.LevelWarn, "Report received via Reporting API",
-		slog.Any("payload", data),
+		slog.Any("payload", payload),
 		slog.String("user_agent", r.Header.Get("User-Agent")))
 
 	// Respond with 204 No Content as per Reporting API specification

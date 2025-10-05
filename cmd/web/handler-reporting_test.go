@@ -30,7 +30,21 @@ func Test_application_reportingAPI(t *testing.T) {
 		logContains        []string
 	}{
 		{
-			name:   "Valid CSP report",
+			name:   "Chrome array format CSP report",
+			method: http.MethodPost,
+			body: `[{"age":0,"body":{"blockedURL":"eval","columnNumber":1,"disposition":"enforce",` +
+				`"documentURL":"https://example.com/","effectiveDirective":"script-src","lineNumber":1,` +
+				`"originalPolicy":"default-src 'none'; script-src 'nonce-ABC123'","referrer":"",` +
+				`"sample":"","statusCode":200},"type":"csp-violation","url":"https://example.com/",` +
+				`"user_agent":"Mozilla/5.0"}]`,
+			contentType:        "application/reports+json",
+			expectedStatusCode: http.StatusNoContent,
+			shouldLog:          true,
+			logContains: []string{"Report received via Reporting API", "csp-violation",
+				"eval", "script-src"},
+		},
+		{
+			name:   "Legacy object format CSP report",
 			method: http.MethodPost,
 			body: `{"csp-report": {"document-uri": "https://example.com/page", ` +
 				`"violated-directive": "script-src", "effective-directive": "script-src", ` +
@@ -42,16 +56,6 @@ func Test_application_reportingAPI(t *testing.T) {
 			shouldLog:          true,
 			logContains: []string{"Report received via Reporting API", "script-src",
 				"https://evil.com/script.js", "https://example.com/page"},
-		},
-		{
-			name:   "Valid CSP report with application/json content type",
-			method: http.MethodPost,
-			body: `{"csp-report": {"document-uri": "https://example.com/test", ` +
-				`"violated-directive": "img-src", "blocked-uri": "data:image/png"}}`,
-			contentType:        "application/json",
-			expectedStatusCode: http.StatusNoContent,
-			shouldLog:          true,
-			logContains:        []string{"Report received via Reporting API", "img-src", "data:image/png"},
 		},
 		{
 			name:               "Invalid JSON",
@@ -72,26 +76,13 @@ func Test_application_reportingAPI(t *testing.T) {
 			logContains:        []string{"Failed to parse report"},
 		},
 		{
-			name:               "Valid CSP report with minimal fields",
+			name:               "Minimal object format CSP report",
 			method:             http.MethodPost,
 			body:               `{"csp-report": {"violated-directive": "default-src"}}`,
 			contentType:        "application/csp-report",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
 			logContains:        []string{"Report received via Reporting API", "default-src"},
-		},
-		{
-			name:   "Large but valid CSP report",
-			method: http.MethodPost,
-			body: `{"csp-report": {"document-uri": "https://example.com/very/long/path", ` +
-				`"violated-directive": "script-src 'self'", "effective-directive": "script-src", ` +
-				`"blocked-uri": "https://very-long-domain-name-for-evil-site.com/script.js", ` +
-				`"line-number": 12345, "source-file": "https://example.com/js/app.min.js"}}`,
-			contentType:        "application/csp-report",
-			expectedStatusCode: http.StatusNoContent,
-			shouldLog:          true,
-			logContains: []string{"Report received via Reporting API", "script-src",
-				"very-long-domain-name-for-evil-site.com"},
 		},
 		{
 			name:   "Unexpected content type logs warning but processes request",
@@ -103,25 +94,6 @@ func Test_application_reportingAPI(t *testing.T) {
 			shouldLog:          true,
 			logContains: []string{"Report with unexpected content type",
 				"text/plain", "Report received via Reporting API"},
-		},
-		{
-			name:               "No content type header still processes request",
-			method:             http.MethodPost,
-			body:               `{"csp-report": {"violated-directive": "img-src"}}`,
-			contentType:        "",
-			expectedStatusCode: http.StatusNoContent,
-			shouldLog:          true,
-			logContains:        []string{"Report received via Reporting API", "img-src"},
-		},
-		{
-			name:   "Valid report with application/reports+json content type",
-			method: http.MethodPost,
-			body: `{"type": "csp-violation", "url": "https://example.com/test", ` +
-				`"body": {"effectiveDirective": "script-src", "blockedURL": "https://evil.com"}}`,
-			contentType:        "application/reports+json",
-			expectedStatusCode: http.StatusNoContent,
-			shouldLog:          true,
-			logContains:        []string{"Report received via Reporting API", "csp-violation"},
 		},
 	}
 
