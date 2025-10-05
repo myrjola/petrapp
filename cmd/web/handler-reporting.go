@@ -14,7 +14,7 @@ func (app *application) reportingAPI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && contentType != "application/csp-report" &&
 		contentType != "application/json" && contentType != "application/reports+json" {
-		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "Report with unexpected content type",
+		app.logger.LogAttrs(r.Context(), slog.LevelError, "Report with unexpected content type",
 			slog.String("content_type", contentType))
 	}
 
