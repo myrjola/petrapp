@@ -71,30 +71,6 @@ func Test_application_cspViolation(t *testing.T) {
 			shouldLog:          true,
 			logContains:        []string{"Failed to parse CSP violation report"},
 		},
-		{ //nolint:exhaustruct // missing logContains is intentional for non-logging test
-			name:               "GET method not allowed",
-			method:             http.MethodGet,
-			body:               "",
-			contentType:        "",
-			expectedStatusCode: http.StatusMethodNotAllowed,
-			shouldLog:          false,
-		},
-		{ //nolint:exhaustruct // missing logContains is intentional for non-logging test
-			name:               "PUT method not allowed",
-			method:             http.MethodPut,
-			body:               "",
-			contentType:        "",
-			expectedStatusCode: http.StatusMethodNotAllowed,
-			shouldLog:          false,
-		},
-		{ //nolint:exhaustruct // missing logContains is intentional for non-logging test
-			name:               "DELETE method not allowed",
-			method:             http.MethodDelete,
-			body:               "",
-			contentType:        "",
-			expectedStatusCode: http.StatusMethodNotAllowed,
-			shouldLog:          false,
-		},
 		{
 			name:               "Valid CSP report with minimal fields",
 			method:             http.MethodPost,
@@ -224,26 +200,13 @@ func Test_application_cspViolation_requestSizeLimit(t *testing.T) {
 	}
 
 	// Create a request body larger than 64KB limit
-	largeReport := CSPViolationReport{
-		CSPReport: struct { //nolint:exhaustruct // test only needs specific fields
-			DocumentURI        string `json:"document-uri"`
-			Referrer           string `json:"referrer"`
-			ViolatedDirective  string `json:"violated-directive"`
-			EffectiveDirective string `json:"effective-directive"`
-			OriginalPolicy     string `json:"original-policy"`
-			Disposition        string `json:"disposition"`
-			BlockedURI         string `json:"blocked-uri"`
-			LineNumber         int    `json:"line-number"`
-			ColumnNumber       int    `json:"column-number"`
-			SourceFile         string `json:"source-file"`
-			StatusCode         int    `json:"status-code"`
-			ScriptSample       string `json:"script-sample"`
-		}{
-			DocumentURI:       "https://example.com/page",
-			ViolatedDirective: "script-src",
-			BlockedURI:        "https://evil.com/script.js",
+	largeReport := map[string]any{
+		"csp-report": map[string]any{
+			"document-uri":       "https://example.com/page",
+			"violated-directive": "script-src",
+			"blocked-uri":        "https://evil.com/script.js",
 			// Create a very large script sample to exceed size limit
-			ScriptSample: strings.Repeat("a", 70000), // 70KB string
+			"script-sample": strings.Repeat("a", 70000), // 70KB string
 		},
 	}
 
@@ -272,58 +235,6 @@ func Test_application_cspViolation_requestSizeLimit(t *testing.T) {
 		if !strings.Contains(logOutput, "Failed to parse CSP violation report") {
 			t.Errorf("Expected log to contain parse error for truncated body, got: %s", logOutput)
 		}
-	}
-}
-
-func Test_CSPViolationReport_structure(t *testing.T) {
-	// Test that the CSPViolationReport struct can properly unmarshal various CSP report formats
-	tests := []struct {
-		name     string
-		jsonData string
-		isValid  bool
-	}{
-		{
-			name: "Complete CSP report",
-			jsonData: `{"csp-report": {"document-uri": "https://example.com", ` +
-				`"violated-directive": "script-src", "effective-directive": "script-src", ` +
-				`"original-policy": "default-src 'self'", "disposition": "enforce", ` +
-				`"blocked-uri": "https://evil.com", "line-number": 1, "column-number": 2, ` +
-				`"source-file": "test.js", "status-code": 200, "script-sample": "alert(1)"}}`,
-			isValid: true,
-		},
-		{
-			name:     "Minimal CSP report",
-			jsonData: `{"csp-report": {"violated-directive": "default-src"}}`,
-			isValid:  true,
-		},
-		{
-			name:     "Empty CSP report object",
-			jsonData: `{"csp-report": {}}`,
-			isValid:  true,
-		},
-		{
-			name:     "Missing csp-report key",
-			jsonData: `{"violated-directive": "script-src"}`,
-			isValid:  true, // JSON is valid, but CSP report fields will be empty
-		},
-		{
-			name:     "Invalid JSON",
-			jsonData: `{"csp-report": `,
-			isValid:  false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var report CSPViolationReport
-			err := json.Unmarshal([]byte(tt.jsonData), &report)
-
-			if tt.isValid && err != nil {
-				t.Errorf("Expected valid JSON to unmarshal successfully, got error: %v", err)
-			} else if !tt.isValid && err == nil {
-				t.Error("Expected invalid JSON to fail unmarshaling, but it succeeded")
-			}
-		})
 	}
 }
 

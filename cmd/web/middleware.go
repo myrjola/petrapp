@@ -65,9 +65,10 @@ font-src 'none';
 object-src 'none';
 manifest-src 'self';
 base-uri 'none';
-report-uri /api/csp;`, cspNonce, cspNonce)
+report-uri /api/csp; report-to csp-endpoint;`, cspNonce, cspNonce)
 
 		w.Header().Set("Content-Security-Policy", csp)
+		w.Header().Set("Report-To", `{"group":"csp-endpoint","max_age":86400,"endpoints":[{"url":"/api/csp"}]}`)
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")
