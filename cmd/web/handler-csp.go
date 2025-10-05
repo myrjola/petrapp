@@ -9,9 +9,10 @@ import (
 
 // cspViolation handles CSP violation reports.
 func (app *application) cspViolation(w http.ResponseWriter, r *http.Request) {
-	// Validate content type (should be application/csp-report or application/json)
+	// Validate content type (should be application/csp-report, application/json, or application/reports+json)
 	contentType := r.Header.Get("Content-Type")
-	if contentType != "" && contentType != "application/csp-report" && contentType != "application/json" {
+	if contentType != "" && contentType != "application/csp-report" &&
+		contentType != "application/json" && contentType != "application/reports+json" {
 		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "CSP violation report with unexpected content type",
 			slog.String("content_type", contentType))
 	}
