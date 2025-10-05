@@ -33,8 +33,19 @@ func (app *application) cspViolation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate content type (should be application/csp-report or application/json)
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "" && contentType != "application/csp-report" && contentType != "application/json" {
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "CSP violation report with unexpected content type",
+			slog.String("content_type", contentType))
+	}
+
+	// Limit request body size to prevent abuse (64KB should be sufficient for CSP reports)
+	const maxBodySize = 64 * 1024
+	limitedReader := io.LimitReader(r.Body, maxBodySize)
+
 	// Read the request body
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		app.logger.LogAttrs(r.Context(), slog.LevelError, "Failed to read CSP violation request body",
 			slog.String("error", err.Error()))
