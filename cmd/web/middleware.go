@@ -64,7 +64,8 @@ form-action 'self';
 font-src 'none';
 object-src 'none';
 manifest-src 'self';
-base-uri 'none';`, cspNonce, cspNonce)
+base-uri 'none';
+report-uri /api/csp;`, cspNonce, cspNonce)
 
 		w.Header().Set("Content-Security-Policy", csp)
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
