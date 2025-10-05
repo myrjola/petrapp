@@ -34,6 +34,12 @@ jobs:
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
+        # Optional: Skip review for certain conditions
+        if: |
+          !contains(github.event.pull_request.title, '[skip-review]') &&
+          !contains(github.event.pull_request.title, '[WIP]') &&
+          !contains(github.event.head_commit.message, '[skip-review]') &&
+          !contains(github.event.head_commit.message, '[WIP]')
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
