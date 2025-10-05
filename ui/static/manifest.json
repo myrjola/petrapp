@@ -10,11 +10,6 @@
       "type": "image/svg+xml"
     },
     {
-      "src": "/logo-180.png",
-      "sizes": "180x180",
-      "type": "image/png"
-    },
-    {
       "src": "/logo.png",
       "sizes": "512x512",
       "type": "image/png"
