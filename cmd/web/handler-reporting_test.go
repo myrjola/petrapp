@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func Test_application_cspViolation(t *testing.T) {
+func Test_application_reportingAPI(t *testing.T) {
 	// Create a minimal application for testing with a logger that captures output
 	var logBuffer bytes.Buffer
 	app := &application{ //nolint:exhaustruct // this is a test
@@ -40,7 +40,7 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "application/csp-report",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
-			logContains: []string{"CSP violation detected", "script-src",
+			logContains: []string{"Report received via Reporting API", "script-src",
 				"https://evil.com/script.js", "https://example.com/page"},
 		},
 		{
@@ -51,7 +51,7 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "application/json",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
-			logContains:        []string{"CSP violation detected", "img-src", "data:image/png"},
+			logContains:        []string{"Report received via Reporting API", "img-src", "data:image/png"},
 		},
 		{
 			name:               "Invalid JSON",
@@ -60,7 +60,7 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "application/csp-report",
 			expectedStatusCode: http.StatusBadRequest,
 			shouldLog:          true,
-			logContains:        []string{"Failed to parse CSP violation report"},
+			logContains:        []string{"Failed to parse report"},
 		},
 		{
 			name:               "Empty body",
@@ -69,7 +69,7 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "application/csp-report",
 			expectedStatusCode: http.StatusBadRequest,
 			shouldLog:          true,
-			logContains:        []string{"Failed to parse CSP violation report"},
+			logContains:        []string{"Failed to parse report"},
 		},
 		{
 			name:               "Valid CSP report with minimal fields",
@@ -78,7 +78,7 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "application/csp-report",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
-			logContains:        []string{"CSP violation detected", "default-src"},
+			logContains:        []string{"Report received via Reporting API", "default-src"},
 		},
 		{
 			name:   "Large but valid CSP report",
@@ -90,7 +90,7 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "application/csp-report",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
-			logContains: []string{"CSP violation detected", "script-src",
+			logContains: []string{"Report received via Reporting API", "script-src",
 				"very-long-domain-name-for-evil-site.com"},
 		},
 		{
@@ -101,8 +101,8 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "text/plain",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
-			logContains: []string{"CSP violation report with unexpected content type",
-				"text/plain", "CSP violation detected"},
+			logContains: []string{"Report with unexpected content type",
+				"text/plain", "Report received via Reporting API"},
 		},
 		{
 			name:               "No content type header still processes request",
@@ -111,7 +111,17 @@ func Test_application_cspViolation(t *testing.T) {
 			contentType:        "",
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
-			logContains:        []string{"CSP violation detected", "img-src"},
+			logContains:        []string{"Report received via Reporting API", "img-src"},
+		},
+		{
+			name:   "Valid report with application/reports+json content type",
+			method: http.MethodPost,
+			body: `{"type": "csp-violation", "url": "https://example.com/test", ` +
+				`"body": {"effectiveDirective": "script-src", "blockedURL": "https://evil.com"}}`,
+			contentType:        "application/reports+json",
+			expectedStatusCode: http.StatusNoContent,
+			shouldLog:          true,
+			logContains:        []string{"Report received via Reporting API", "csp-violation"},
 		},
 	}
 
@@ -121,7 +131,7 @@ func Test_application_cspViolation(t *testing.T) {
 			logBuffer.Reset()
 
 			// Create request
-			req := httptest.NewRequest(tt.method, "/api/csp", strings.NewReader(tt.body))
+			req := httptest.NewRequest(tt.method, "/api/reports", strings.NewReader(tt.body))
 			if tt.contentType != "" {
 				req.Header.Set("Content-Type", tt.contentType)
 			}
@@ -131,7 +141,7 @@ func Test_application_cspViolation(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// Call the handler
-			app.cspViolation(w, req)
+			app.reportingAPI(w, req)
 
 			// Check status code
 			if w.Code != tt.expectedStatusCode {
@@ -161,7 +171,7 @@ func Test_application_cspViolation(t *testing.T) {
 	}
 }
 
-func Test_application_cspViolation_readError(t *testing.T) {
+func Test_application_reportingAPI_readError(t *testing.T) {
 	// Create a minimal application for testing
 	var logBuffer bytes.Buffer
 	app := &application{ //nolint:exhaustruct // this is a test
@@ -171,12 +181,12 @@ func Test_application_cspViolation_readError(t *testing.T) {
 	}
 
 	// Create a request with a body that will fail to read
-	req := httptest.NewRequest(http.MethodPost, "/api/csp", &errorReader{})
+	req := httptest.NewRequest(http.MethodPost, "/api/reports", &errorReader{})
 	req.Header.Set("Content-Type", "application/csp-report")
 
 	w := httptest.NewRecorder()
 
-	app.cspViolation(w, req)
+	app.reportingAPI(w, req)
 
 	// Should return 400 due to read error
 	if w.Code != http.StatusBadRequest {
@@ -185,12 +195,12 @@ func Test_application_cspViolation_readError(t *testing.T) {
 
 	// Should log the read error
 	logOutput := logBuffer.String()
-	if !strings.Contains(logOutput, "Failed to read CSP violation request body") {
+	if !strings.Contains(logOutput, "Failed to read report request body") {
 		t.Errorf("Expected log to contain read error message, got: %s", logOutput)
 	}
 }
 
-func Test_application_cspViolation_requestSizeLimit(t *testing.T) {
+func Test_application_reportingAPI_requestSizeLimit(t *testing.T) {
 	// Create a minimal application for testing
 	var logBuffer bytes.Buffer
 	app := &application{ //nolint:exhaustruct // this is a test
@@ -212,15 +222,15 @@ func Test_application_cspViolation_requestSizeLimit(t *testing.T) {
 
 	largeBody, err := json.Marshal(largeReport)
 	if err != nil {
-		t.Fatalf("Failed to marshal large CSP report: %v", err)
+		t.Fatalf("Failed to marshal large report: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/csp", bytes.NewReader(largeBody))
+	req := httptest.NewRequest(http.MethodPost, "/api/reports", bytes.NewReader(largeBody))
 	req.Header.Set("Content-Type", "application/csp-report")
 
 	w := httptest.NewRecorder()
 
-	app.cspViolation(w, req)
+	app.reportingAPI(w, req)
 
 	// The request should still succeed but the body will be truncated
 	// This tests that our size limit prevents excessive memory usage
@@ -232,7 +242,7 @@ func Test_application_cspViolation_requestSizeLimit(t *testing.T) {
 	// If it's a 400, it should be due to JSON parsing error from truncated body
 	if w.Code == http.StatusBadRequest {
 		logOutput := logBuffer.String()
-		if !strings.Contains(logOutput, "Failed to parse CSP violation report") {
+		if !strings.Contains(logOutput, "Failed to parse report") {
 			t.Errorf("Expected log to contain parse error for truncated body, got: %s", logOutput)
 		}
 	}

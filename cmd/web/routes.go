@@ -65,7 +65,7 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("POST /api/login/finish", session(http.HandlerFunc(app.finishLogin)))
 	mux.Handle("POST /api/logout", session(http.HandlerFunc(app.logout)))
 	mux.Handle("GET /api/healthy", session(http.HandlerFunc(app.healthy)))
-	mux.Handle("POST /api/csp", noAuth(http.HandlerFunc(app.cspViolation)))
+	mux.Handle("POST /api/reports", noAuth(http.HandlerFunc(app.reportingAPI)))
 	mux.Handle("GET /api/test/timeout", noAuth(http.HandlerFunc(app.testTimeout)))
 
 	mux.Handle("GET /admin/exercises", mustAdmin(http.HandlerFunc(app.adminExercisesGET)))
