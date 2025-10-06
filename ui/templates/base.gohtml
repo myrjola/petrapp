@@ -172,6 +172,151 @@
         })
       })
     </script>
+    <script {{ nonce }}>
+      // Pull-to-refresh functionality for PWA mode.
+      (function() {
+        // Check if we're running as a PWA.
+        const isPWA = () => {
+          return window.matchMedia('(display-mode: standalone)').matches ||
+                 window.navigator.standalone === true;
+        };
+
+        if (!isPWA()) {
+          return;
+        }
+
+        let touchStartY = 0;
+        let touchCurrentY = 0;
+        let pullDistance = 0;
+        let isRefreshing = false;
+        let refreshThreshold = 80;
+        let pullIndicator = null;
+
+        // Create pull indicator element.
+        const createPullIndicator = () => {
+          const indicator = document.createElement('div');
+          indicator.style.cssText = `
+            position: fixed;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: var(--gray-9);
+            border-radius: var(--radius-round);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: top 0.3s ease, transform 0.3s ease;
+            z-index: 9999;
+            color: var(--gray-0);
+            font-size: var(--font-size-5);
+          `;
+          indicator.innerHTML = '↓';
+          document.body.appendChild(indicator);
+          return indicator;
+        };
+
+        // Initialize pull indicator on first pull.
+        const getPullIndicator = () => {
+          if (!pullIndicator) {
+            pullIndicator = createPullIndicator();
+          }
+          return pullIndicator;
+        };
+
+        // Update indicator position and appearance.
+        const updateIndicator = (distance) => {
+          const indicator = getPullIndicator();
+          const position = Math.min(distance - 60, 20);
+          indicator.style.top = position + 'px';
+
+          if (distance >= refreshThreshold) {
+            indicator.innerHTML = '↻';
+            indicator.style.transform = 'translateX(-50%) rotate(180deg)';
+          } else {
+            indicator.innerHTML = '↓';
+            indicator.style.transform = 'translateX(-50%) rotate(0deg)';
+          }
+        };
+
+        // Hide indicator.
+        const hideIndicator = () => {
+          if (pullIndicator) {
+            pullIndicator.style.top = '-60px';
+            pullIndicator.style.transform = 'translateX(-50%) rotate(0deg)';
+          }
+        };
+
+        // Check if user is at the top of the page.
+        const isAtTop = () => {
+          return window.scrollY === 0;
+        };
+
+        // Handle touch start.
+        document.addEventListener('touchstart', (e) => {
+          if (isRefreshing || !isAtTop()) {
+            return;
+          }
+          touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        // Handle touch move.
+        document.addEventListener('touchmove', (e) => {
+          if (isRefreshing || !isAtTop()) {
+            return;
+          }
+
+          touchCurrentY = e.touches[0].clientY;
+          pullDistance = touchCurrentY - touchStartY;
+
+          // Only show indicator if pulling down.
+          if (pullDistance > 0) {
+            updateIndicator(pullDistance);
+          }
+        }, { passive: true });
+
+        // Handle touch end.
+        document.addEventListener('touchend', () => {
+          if (isRefreshing || !isAtTop()) {
+            return;
+          }
+
+          // Trigger refresh if pulled past threshold.
+          if (pullDistance >= refreshThreshold) {
+            isRefreshing = true;
+            const indicator = getPullIndicator();
+            indicator.innerHTML = '↻';
+            indicator.style.animation = 'spin 1s linear infinite';
+
+            // Add spin animation if not already defined.
+            if (!document.querySelector('#pull-refresh-styles')) {
+              const style = document.createElement('style');
+              style.id = 'pull-refresh-styles';
+              style.textContent = `
+                @keyframes spin {
+                  from { transform: translateX(-50%) rotate(0deg); }
+                  to { transform: translateX(-50%) rotate(360deg); }
+                }
+              `;
+              document.head.appendChild(style);
+            }
+
+            // Reload page after a short delay.
+            setTimeout(() => {
+              window.location.reload();
+            }, 300);
+          } else {
+            hideIndicator();
+          }
+
+          // Reset values.
+          touchStartY = 0;
+          touchCurrentY = 0;
+          pullDistance = 0;
+        }, { passive: true });
+      })();
+    </script>
     {{ template "page" . }}
     </body>
     </html>
