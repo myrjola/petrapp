@@ -172,6 +172,30 @@
         })
       })
     </script>
+    <style {{ nonce }}>
+      .pull-refresh-indicator {
+        position: fixed;
+        top: -60px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 40px;
+        background: var(--gray-9);
+        border-radius: var(--radius-round);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: top 0.3s ease, transform 0.3s ease;
+        z-index: 9999;
+        color: var(--gray-0);
+        font-size: var(--font-size-5);
+      }
+
+      @keyframes pull-refresh-spin {
+        from { transform: translateX(-50%) rotate(0deg); }
+        to { transform: translateX(-50%) rotate(360deg); }
+      }
+    </style>
     <script {{ nonce }}>
       // Pull-to-refresh functionality for PWA mode.
       (function() {
@@ -195,23 +219,7 @@
         // Create pull indicator element.
         const createPullIndicator = () => {
           const indicator = document.createElement('div');
-          indicator.style.cssText = `
-            position: fixed;
-            top: -60px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 40px;
-            height: 40px;
-            background: var(--gray-9);
-            border-radius: var(--radius-round);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: top 0.3s ease, transform 0.3s ease;
-            z-index: 9999;
-            color: var(--gray-0);
-            font-size: var(--font-size-5);
-          `;
+          indicator.className = 'pull-refresh-indicator';
           indicator.innerHTML = '↓';
           document.body.appendChild(indicator);
           return indicator;
@@ -287,20 +295,7 @@
             isRefreshing = true;
             const indicator = getPullIndicator();
             indicator.innerHTML = '↻';
-            indicator.style.animation = 'spin 1s linear infinite';
-
-            // Add spin animation if not already defined.
-            if (!document.querySelector('#pull-refresh-styles')) {
-              const style = document.createElement('style');
-              style.id = 'pull-refresh-styles';
-              style.textContent = `
-                @keyframes spin {
-                  from { transform: translateX(-50%) rotate(0deg); }
-                  to { transform: translateX(-50%) rotate(360deg); }
-                }
-              `;
-              document.head.appendChild(style);
-            }
+            indicator.style.animation = 'pull-refresh-spin 1s linear infinite';
 
             // Reload page after a short delay.
             setTimeout(() => {
