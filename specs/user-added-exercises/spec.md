@@ -128,6 +128,12 @@ ADD COLUMN user_id INTEGER REFERENCES users (id) ON DELETE CASCADE;
 -- Add index for efficient user exercise queries
 CREATE INDEX exercises_user_id_idx ON exercises (user_id);
 
+-- Remove the existing UNIQUE constraint on name and add composite constraint
+-- This allows multiple users to create exercises with the same name
+DROP INDEX IF EXISTS sqlite_autoindex_exercises_1;
+ALTER TABLE exercises DROP CONSTRAINT IF EXISTS name;
+CREATE UNIQUE INDEX exercises_name_user_id_unique ON exercises (name, user_id);
+
 -- System exercises have NULL user_id
 -- User exercises have their creator's user_id
 ```
@@ -190,6 +196,64 @@ WHERE id = ? AND user_id = ?;
 2. **Data Isolation**: User queries must filter by user_id to prevent data leaks
 3. **GDPR Compliance**: User data export must include their custom exercises
 4. **Context Validation**: Always extract user_id from authenticated context, never from request parameters
+
+### Repository Layer Security Patterns
+
+**Error Handling for Authorization Failures:**
+- Repository methods return `ErrNotFound` for both non-existent exercises and unauthorized access attempts
+- This prevents user enumeration attacks (attacker cannot distinguish between "exercise doesn't exist" vs "exercise exists but you can't access it")
+- This is an intentional security design decision to avoid information leakage
+
+**Unauthenticated User Handling:**
+- `getUserIDFromContext()` returns 0 (zero) for unauthenticated requests
+- Queries like `WHERE user_id IS NULL OR user_id = ?` with value 0 will only return system exercises
+- Since no user can have user_id = 0 (SQLite INTEGER PRIMARY KEY starts at 1), this safely restricts unauthenticated users to system exercises only
+
+### Input Sanitization
+
+**Markdown Content Security:**
+- Exercise descriptions are stored as markdown (max 20000 characters)
+- The application uses the `goldmark` markdown renderer (github.com/yuin/goldmark)
+- **Note**: Goldmark does NOT sanitize HTML by default and allows raw HTML passthrough
+- **Mitigation**: The application's Content Security Policy (CSP) provides defense-in-depth protection:
+  - `script-src` requires cryptographic nonce - inline scripts without nonce are blocked
+  - `object-src 'none'` prevents object/embed tag injection
+  - `base-uri 'none'` prevents base tag hijacking attacks
+  - `default-src 'none'` with explicit allowlists for each resource type
+- **Accepted Risk**: While goldmark allows HTML passthrough, the strict CSP prevents XSS exploitation
+- **Future Enhancement**: Consider adding explicit HTML sanitization with bluemonday or disabling raw HTML in goldmark for additional defense-in-depth
+
+**Input Validation:**
+- Exercise names: max 124 characters, must be unique per user
+- Description markdown: max 20000 characters
+- Category: enum validation (full_body, upper, lower)
+- Exercise type: enum validation (weighted, bodyweight)
+- Rate limiting should be implemented to prevent exercise creation abuse
+
+### Required Security Tests
+
+The following security test scenarios must be implemented:
+
+1. **Cross-User Access Prevention:**
+   - User A cannot GET user B's exercise by ID (should return 404)
+   - User A cannot UPDATE user B's exercise (should return 404)
+   - User A cannot DELETE user B's exercise (should return 404)
+   - Unauthenticated user cannot see any user exercises (only system exercises)
+
+2. **Context Authentication:**
+   - Verify that user_id is extracted from authenticated context, not request parameters
+   - Test that manipulating URL parameters cannot bypass ownership checks
+   - Test that forged user_id in request body is ignored
+
+3. **Data Isolation:**
+   - List queries for User A do not return User B's exercises
+   - Search/filter operations respect user boundaries
+   - Exercise counts and statistics don't leak information about other users' exercises
+
+4. **Cascading Deletion:**
+   - Deleting a user cascades to delete their exercises
+   - Deleting a user's exercise cascades to remove it from their workout history
+   - Verify no orphaned records remain after cascading deletes
 
 ## Migration Strategy
 

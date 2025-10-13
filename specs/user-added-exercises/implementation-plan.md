@@ -13,19 +13,33 @@ This document provides a step-by-step implementation plan for adding user-specif
 **Tasks**:
 1. Update `schema.sql` to add `user_id` column to exercises table
    ```sql
+   -- Add user_id column to exercises table
    ALTER TABLE exercises
    ADD COLUMN user_id INTEGER REFERENCES users (id) ON DELETE CASCADE;
 
+   -- Add index for efficient user exercise queries
    CREATE INDEX exercises_user_id_idx ON exercises (user_id);
+
+   -- Remove the existing UNIQUE constraint on name and add composite constraint
+   -- This allows multiple users to create exercises with the same name
+   DROP INDEX IF EXISTS sqlite_autoindex_exercises_1;
+   ALTER TABLE exercises DROP CONSTRAINT IF EXISTS name;
+   CREATE UNIQUE INDEX exercises_name_user_id_unique ON exercises (name, user_id);
    ```
 
-2. Update `fixtures.sql` to explicitly set `user_id = NULL` for system exercises
+2. Update the exercises table definition in `schema.sql`
+   - Change `name TEXT NOT NULL UNIQUE` to `name TEXT NOT NULL`
+   - Add `UNIQUE (name, user_id)` constraint after the column definitions
+   - This allows system exercises (user_id = NULL) and user exercises to have duplicate names across users
+
+3. Update `fixtures.sql` to explicitly set `user_id = NULL` for system exercises
    - While NULL is default, being explicit in fixtures improves clarity
    - Helps document the system exercise convention
 
-3. Test schema migration
+4. Test schema migration
    - Run `make test` to ensure migration system accepts changes
    - Verify that existing exercises remain unaffected (user_id = NULL)
+   - Test that the composite unique constraint allows duplicate names for different users
 
 **Files to Modify**:
 - `internal/sqlite/schema.sql`
@@ -51,6 +65,9 @@ This document provides a step-by-step implementation plan for adding user-specif
        return contexthelpers.AuthenticatedUserID(ctx)
    }
    ```
+   - **Important**: This returns 0 for unauthenticated requests
+   - Since SQLite INTEGER PRIMARY KEY starts at 1, user_id = 0 safely restricts to system exercises
+   - Queries like `WHERE user_id IS NULL OR user_id = ?` with value 0 only return system exercises
 
 2. **Update `List()` method** (`internal/workout/repository-exercises.go`)
    - Modify query to return system exercises + user's exercises
@@ -71,6 +88,10 @@ This document provides a step-by-step implementation plan for adding user-specif
        return Exercise{}, ErrNotFound
    }
    ```
+   - **Security Pattern**: Return `ErrNotFound` for authorization failures (not a distinct "forbidden" error)
+   - This prevents user enumeration attacks - attackers cannot distinguish between:
+     - "Exercise doesn't exist" vs "Exercise exists but you can't access it"
+   - This is an intentional security design decision to avoid information leakage
 
 4. **Update `Create()` method** (`internal/workout/repository-exercises.go`)
    - Extract user_id from context
@@ -239,9 +260,23 @@ This document provides a step-by-step implementation plan for adding user-specif
    - Workout usage with user exercises
 
 3. **Security Tests**
-   - Verify users cannot access other users' exercises
-   - Verify users cannot edit other users' exercises
-   - Test URL manipulation attempts
+   - **Cross-User Access Prevention:**
+     - User A cannot GET user B's exercise by ID (should return 404/ErrNotFound)
+     - User A cannot UPDATE user B's exercise (should return 404/ErrNotFound)
+     - User A cannot DELETE user B's exercise (should return 404/ErrNotFound)
+     - Unauthenticated user cannot see any user exercises (only system exercises)
+   - **Context Authentication:**
+     - Verify that user_id is extracted from authenticated context, not request parameters
+     - Test that manipulating URL parameters cannot bypass ownership checks
+     - Test that forged user_id in request body is ignored
+   - **Data Isolation:**
+     - List queries for User A do not return User B's exercises
+     - Search/filter operations respect user boundaries
+     - Exercise counts and statistics don't leak information about other users' exercises
+   - **Cascading Deletion:**
+     - Deleting a user cascades to delete their exercises
+     - Deleting a user's exercise cascades to remove it from their workout history
+     - Verify no orphaned records remain after cascading deletes
 
 4. **Performance Tests**
    - Measure query performance with user filtering
