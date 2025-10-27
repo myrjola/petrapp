@@ -443,7 +443,7 @@
                     <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
                             <span class="weight"
-                                  aria-label="Weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
+                                  aria-label="Weight">{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }} kg</span>
                         {{ end }}
                         {{ if $set.CompletedReps }}
                             <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
@@ -469,7 +469,7 @@
                                                 inputmode="decimal"
                                                 pattern="[0-9,\.]*"
                                                 name="weight"
-                                                value="{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }}"
+                                                value="{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }}"
                                                 step="0.5"
                                                 required
                                                 aria-describedby="weight-help-{{ $index }}"

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
@@ -26,6 +27,11 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 		},
 		"mdToHTML": func() string {
 			panic("not implemented")
+		},
+		"formatFloat": func(f float64) string {
+			// Format float to remove trailing zeros and unnecessary precision.
+			// This handles the floating point rounding errors like 60.900000000000006.
+			return strconv.FormatFloat(f, 'f', -1, 64)
 		},
 	}).ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
 		return nil, fmt.Errorf("new template: %w", err)
@@ -51,6 +57,11 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 		},
 		"mdToHTML": func(markdown string) template.HTML {
 			return app.renderMarkdownToHTML(ctx, markdown)
+		},
+		"formatFloat": func(f float64) string {
+			// Format float to remove trailing zeros and unnecessary precision.
+			// This handles the floating point rounding errors like 60.900000000000006.
+			return strconv.FormatFloat(f, 'f', -1, 64)
 		},
 	})
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {
