@@ -1,6 +1,6 @@
 module github.com/myrjola/petrapp
 
-go 1.25.0
+go 1.25.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
