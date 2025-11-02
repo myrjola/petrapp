@@ -94,6 +94,13 @@ export async function registerUser(e) {
     await finishRegistration(attestationResponse)
   } catch (err) {
     console.error(err)
+    // Reset form state on error.
+    const form = e.target
+    form.classList.remove('submitting')
+    const submitButton = form.querySelector("button[type=submit]")
+    if (submitButton) {
+      submitButton.disabled = false
+    }
     throw new Error("Registration failed!");
   }
 }
@@ -146,6 +153,13 @@ export async function loginUser(e) {
     await finishLogin(assertionResponse)
   } catch (err) {
     console.error(err)
+    // Reset form state on error.
+    const form = e.target
+    form.classList.remove('submitting')
+    const submitButton = form.querySelector("button[type=submit]")
+    if (submitButton) {
+      submitButton.disabled = false
+    }
     throw new Error("Login failed!");
   }
 }
