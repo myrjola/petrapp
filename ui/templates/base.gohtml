@@ -23,6 +23,162 @@
               }
             }
         </script>
+        <script {{ nonce }}>
+          /**
+           * Dynamic View Transitions for Exercise Navigation
+           *
+           * Implements smooth view transitions when navigating between workout list
+           * and exercise detail pages by dynamically setting view-transition-name
+           * based on the navigation context.
+           */
+
+          // Check for Navigation API support (needed for Safari and Firefox)
+          const hasNavigationAPI = typeof navigation !== 'undefined' && navigation.activation;
+
+          // URL pattern constants for readability and maintainability
+          const WORKOUT_LIST_PATH_REGEX = /^\/workouts\/\d{4}-\d{2}-\d{2}$/;
+          const EXERCISE_DETAIL_PATH_REGEX = /^\/workouts\/\d{4}-\d{2}-\d{2}\/exercises\/[^/]+$/;
+          const EXERCISE_INFO_PATH_REGEX = /^\/workouts\/\d{4}-\d{2}-\d{2}\/exercises\/[^/]+\/info$/;
+
+          /**
+           * Check if a URL is a workout list page.
+           * @param {string} url - The URL to check
+           * @returns {boolean}
+           */
+          function isWorkoutListPage(url) {
+            const path = new URL(url).pathname;
+            return WORKOUT_LIST_PATH_REGEX.test(path);
+          }
+
+          /**
+           * Check if a URL is an exercise detail page.
+           * @param {string} url - The URL to check
+           * @returns {boolean}
+           */
+          function isExerciseDetailPage(url) {
+            const path = new URL(url).pathname;
+            return EXERCISE_DETAIL_PATH_REGEX.test(path);
+          }
+
+          /**
+           * Check if a URL is an exercise info page.
+           * @param {string} url - The URL to check
+           * @returns {boolean}
+           */
+          function isExerciseInfoPage(url) {
+            const path = new URL(url).pathname;
+            return EXERCISE_INFO_PATH_REGEX.test(path);
+          }
+
+          /**
+           * Extract exercise ID from a URL.
+           * @param {string} url - The URL to extract from
+           * @returns {string|null} The exercise ID or null if not found
+           */
+          function extractExerciseId(url) {
+            const path = new URL(url).pathname;
+            const match = path.match(/\/exercises\/([^/]+)/);
+            return match ? match[1] : null;
+          }
+
+          /**
+           * Set view transition name on an exercise link.
+           * @param {string} exerciseId - The exercise ID
+           * @returns {HTMLElement|null} The exercise link element or null if not found
+           */
+          function setExerciseTransitionName(exerciseId) {
+            const exerciseLink = document.querySelector(`a[data-exercise-id="${exerciseId}"]`);
+            if (exerciseLink) {
+              exerciseLink.style.viewTransitionName = `exercise-title-${exerciseId}`;
+            }
+            return exerciseLink;
+          }
+
+          /**
+           * Remove view transition name from an exercise link.
+           * @param {HTMLElement} exerciseLink - The exercise link element
+           */
+          function removeExerciseTransitionName(exerciseLink) {
+            if (exerciseLink) {
+              exerciseLink.style.viewTransitionName = 'none';
+            }
+          }
+
+          /**
+           * Clean up all exercise transition names (for BFCache restoration).
+           */
+          function cleanupAllTransitionNames() {
+            document.querySelectorAll('a[data-exercise-id]').forEach(link => {
+              link.style.viewTransitionName = 'none';
+            });
+          }
+
+          // OLD PAGE LOGIC - Set view-transition-name when navigating away
+          window.addEventListener('pageswap', async (e) => {
+            if (!e.viewTransition || !hasNavigationAPI) return;
+
+            const targetUrl = new URL(e.activation.entry.url);
+
+            // Navigating from workout list to exercise detail/info page
+            if (isWorkoutListPage(window.location.href) &&
+              (isExerciseDetailPage(targetUrl.href) || isExerciseInfoPage(targetUrl.href))) {
+
+              const exerciseId = extractExerciseId(targetUrl);
+              if (!exerciseId) return;
+
+              const exerciseLink = setExerciseTransitionName(exerciseId);
+              if (!exerciseLink) return;
+
+              try {
+                // Wait for transition to complete before cleanup
+                await e.viewTransition.ready;
+              } finally {
+                // Always clean up, even if transition is interrupted
+                // (this is important for BFCache)
+                removeExerciseTransitionName(exerciseLink);
+              }
+            }
+          });
+
+          // NEW PAGE LOGIC - Set view-transition-name when arriving at page
+          window.addEventListener('pagereveal', async (e) => {
+            if (!e.viewTransition || !hasNavigationAPI) return;
+
+            // Check if we have Navigation API support and previous URL
+            if (!navigation.activation.from) return;
+
+            const currentURL = new URL(navigation.activation.entry.url);
+            const fromURL = new URL(navigation.activation.from.url);
+
+            // Navigating from exercise detail/info page back to workout list
+            if ((isExerciseDetailPage(fromURL.href) || isExerciseInfoPage(fromURL.href)) &&
+              isWorkoutListPage(currentURL.href)) {
+
+              const exerciseId = extractExerciseId(fromURL);
+              if (!exerciseId) return;
+
+              const exerciseLink = setExerciseTransitionName(exerciseId);
+              if (!exerciseLink) return;
+
+              try {
+                // Wait for transition snapshots to be taken
+                await e.viewTransition.ready;
+              } finally {
+                // Always clean up after snapshots, even if transition is interrupted
+                // (this prepares us for the next navigation)
+                removeExerciseTransitionName(exerciseLink);
+              }
+            }
+          });
+
+          // BFCache restoration handler - clean up any lingering transition names
+          window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+              // Page was restored from BFCache, clean up any transition names
+              cleanupAllTransitionNames();
+            }
+          });
+        </script>
     </head>
     <body>
     <script {{ nonce }}>

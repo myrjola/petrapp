@@ -155,14 +155,6 @@
                             }
                         }
 
-                    {{ range .Session.ExerciseSets }}
-
-                        a.exercise[data-exercise-id="{{ .Exercise.ID }}"] {
-                            view-transition-name: exercise-title-{{ .Exercise.ID }};
-                        }
-
-                    {{ end }}
-
                         .add-exercise {
                             display: flex;
                             justify-content: center;
