@@ -11,6 +11,25 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 - All pages extend the base template which provides the HTML structure
 - Include gotype comments at the top: `{{- /*gotype: github.com/myrjola/petrapp/cmd/web.TemplateDataType*/ -}}`
 
+### JavaScript in Templates
+
+**ALWAYS prefer inline scripts in templates over static JavaScript files.**
+
+- Include JavaScript directly in template files using `<script {{ nonce }}>` tags
+- Inline scripts provide better developer experience (no cache busting needed)
+- Static files in `/ui/static/` are cached with fingerprinted filenames for performance
+- Changing static files requires renaming them to bust the cache
+- Inline scripts update immediately when templates are reloaded
+
+**When to use inline scripts:**
+- Page-specific JavaScript logic
+- Scripts that benefit from template context or dynamic values
+- Any JavaScript that may need frequent updates during development
+
+**When to use static files:**
+- Large third-party libraries (e.g., echarts, webauthn)
+- Scripts that rarely change and benefit from long-term caching
+
 ### Template Rendering Flow
 
 - Handlers call `app.render(w, r, statusCode, "template-name", data)`
