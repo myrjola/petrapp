@@ -83,24 +83,30 @@ async function finishRegistration(attestationResponse) {
 }
 
 /**
+ * Resets form state after a failed submission.
+ * @param form {HTMLFormElement}
+ */
+function resetFormState(form) {
+  form.classList.remove('submitting')
+  const submitButton = form.querySelector("button[type=submit]")
+  if (submitButton) {
+    submitButton.disabled = false
+  }
+}
+
+/**
  * Registers a user using Webauthn.
  * @param e {SubmitEvent}
  */
 export async function registerUser(e) {
+  e.preventDefault()
   try {
-    e.preventDefault()
     const credentialCreationOptions = await submitForm(e.target)
     const attestationResponse = await createAttestationResponse(credentialCreationOptions.publicKey)
     await finishRegistration(attestationResponse)
   } catch (err) {
     console.error(err)
-    // Reset form state on error.
-    const form = e.target
-    form.classList.remove('submitting')
-    const submitButton = form.querySelector("button[type=submit]")
-    if (submitButton) {
-      submitButton.disabled = false
-    }
+    resetFormState(e.target)
     throw new Error("Registration failed!");
   }
 }
@@ -153,13 +159,7 @@ export async function loginUser(e) {
     await finishLogin(assertionResponse)
   } catch (err) {
     console.error(err)
-    // Reset form state on error.
-    const form = e.target
-    form.classList.remove('submitting')
-    const submitButton = form.querySelector("button[type=submit]")
-    if (submitButton) {
-      submitButton.disabled = false
-    }
+    resetFormState(e.target)
     throw new Error("Login failed!");
   }
 }
