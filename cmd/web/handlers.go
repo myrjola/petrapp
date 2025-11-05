@@ -55,7 +55,8 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 	var err error
 	// We need to initialize the FuncMap before parsing the files. These will be overridden in the render function.
 	var t *template.Template
-	if t, err = template.New(pageName).Funcs(app.baseTemplateFuncs()).ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
+	t = template.New(pageName).Funcs(app.baseTemplateFuncs())
+	if t, err = t.ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
 		return nil, fmt.Errorf("new template: %w", err)
 	}
 	return t, nil
