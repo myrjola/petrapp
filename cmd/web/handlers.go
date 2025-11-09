@@ -11,6 +11,40 @@ import (
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
 
+// formatFloat formats a float to remove trailing zeros and unnecessary precision.
+// This handles the floating point rounding errors like 60.900000000000006.
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// baseTemplateFuncs returns the base template.FuncMap with placeholder implementations.
+// Context-dependent functions (nonce, mdToHTML) must be overridden with actual implementations.
+func (app *application) baseTemplateFuncs() template.FuncMap {
+	return template.FuncMap{
+		"nonce": func() string {
+			panic("not implemented")
+		},
+		"mdToHTML": func() string {
+			panic("not implemented")
+		},
+		"formatFloat": formatFloat,
+	}
+}
+
+// contextTemplateFuncs returns template.FuncMap with context-dependent function implementations.
+func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncMap {
+	nonce := fmt.Sprintf("nonce=\"%s\"", contexthelpers.CSPNonce(ctx))
+	return template.FuncMap{
+		"nonce": func() template.HTMLAttr {
+			return template.HTMLAttr(nonce) //nolint:gosec // we trust the nonce since it's not provided by user.
+		},
+		"mdToHTML": func(markdown string) template.HTML {
+			return app.renderMarkdownToHTML(ctx, markdown)
+		},
+		"formatFloat": formatFloat,
+	}
+}
+
 // pageTemplate returns a template for the given page name.
 //
 // pageName corresponds to directory inside ui/templates/pages folder. It has to include a template named "page".
@@ -18,22 +52,8 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 	var err error
 	// We need to initialize the FuncMap before parsing the files. These will be overridden in the render function.
 	var t *template.Template
-	if t, err = template.New(pageName).Funcs(template.FuncMap{
-		"nonce": func() string {
-			panic("not implemented")
-		},
-		"csrf": func() string {
-			panic("not implemented")
-		},
-		"mdToHTML": func() string {
-			panic("not implemented")
-		},
-		"formatFloat": func(f float64) string {
-			// Format float to remove trailing zeros and unnecessary precision.
-			// This handles the floating point rounding errors like 60.900000000000006.
-			return strconv.FormatFloat(f, 'f', -1, 64)
-		},
-	}).ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
+	t = template.New(pageName).Funcs(app.baseTemplateFuncs())
+	if t, err = t.ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
 		return nil, fmt.Errorf("new template: %w", err)
 	}
 	return t, nil
@@ -50,20 +70,7 @@ func (app *application) renderToBuf(ctx context.Context, file string, data any) 
 	}
 
 	buf := new(bytes.Buffer)
-	nonce := fmt.Sprintf("nonce=\"%s\"", contexthelpers.CSPNonce(ctx))
-	t.Funcs(template.FuncMap{
-		"nonce": func() template.HTMLAttr {
-			return template.HTMLAttr(nonce) //nolint:gosec // we trust the nonce since it's not provided by user.
-		},
-		"mdToHTML": func(markdown string) template.HTML {
-			return app.renderMarkdownToHTML(ctx, markdown)
-		},
-		"formatFloat": func(f float64) string {
-			// Format float to remove trailing zeros and unnecessary precision.
-			// This handles the floating point rounding errors like 60.900000000000006.
-			return strconv.FormatFloat(f, 'f', -1, 64)
-		},
-	})
+	t.Funcs(app.contextTemplateFuncs(ctx))
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {
 		return nil, fmt.Errorf("execute template %s: %w", file, err)
 	}
