@@ -18,13 +18,10 @@ func formatFloat(f float64) string {
 }
 
 // baseTemplateFuncs returns the base template.FuncMap with placeholder implementations.
-// Context-dependent functions (nonce, csrf, mdToHTML) must be overridden with actual implementations.
+// Context-dependent functions (nonce, mdToHTML) must be overridden with actual implementations.
 func (app *application) baseTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"nonce": func() string {
-			panic("not implemented")
-		},
-		"csrf": func() string {
 			panic("not implemented")
 		},
 		"mdToHTML": func() string {
