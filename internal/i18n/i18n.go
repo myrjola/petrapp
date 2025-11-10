@@ -8,6 +8,8 @@ const (
 	English Language = "en"
 	// Finnish is the Finnish language.
 	Finnish Language = "fi"
+	// Swedish is the Swedish language.
+	Swedish Language = "sv"
 )
 
 // DefaultLanguage is the fallback language.
@@ -25,6 +27,7 @@ func getTranslations() map[Language]map[string]string {
 			"language.picker.label": "Language",
 			"language.name.en":      "English",
 			"language.name.fi":      "Suomi",
+			"language.name.sv":      "Svenska",
 		},
 		Finnish: {
 			"home.title":            "Petra",
@@ -35,13 +38,25 @@ func getTranslations() map[Language]map[string]string {
 			"language.picker.label": "Kieli",
 			"language.name.en":      "English",
 			"language.name.fi":      "Suomi",
+			"language.name.sv":      "Svenska",
+		},
+		Swedish: {
+			"home.title":            "Petra",
+			"home.tagline":          "Personlig tränare i fickan.",
+			"home.signin":           "Logga in",
+			"home.register":         "Registrera",
+			"home.footer.privacy":   "Integritet och säkerhet",
+			"language.picker.label": "Språk",
+			"language.name.en":      "English",
+			"language.name.fi":      "Suomi",
+			"language.name.sv":      "Svenska",
 		},
 	}
 }
 
 // SupportedLanguages returns a list of all supported languages.
 func SupportedLanguages() []Language {
-	return []Language{English, Finnish}
+	return []Language{English, Finnish, Swedish}
 }
 
 // IsSupported checks if a language is supported.

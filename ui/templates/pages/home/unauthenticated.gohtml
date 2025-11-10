@@ -72,21 +72,10 @@
                     <form method="post" action="/set-language">
                         <label for="language">{{ t "language.picker.label" }}</label>
                         <select name="language" id="language" onchange="this.form.submit()">
-                            <option value="en">{{ t "language.name.en" }}</option>
-                            <option value="fi">{{ t "language.name.fi" }}</option>
+                            <option value="en"{{if eq .Language "en"}} selected{{end}}>{{ t "language.name.en" }}</option>
+                            <option value="fi"{{if eq .Language "fi"}} selected{{end}}>{{ t "language.name.fi" }}</option>
+                            <option value="sv"{{if eq .Language "sv"}} selected{{end}}>{{ t "language.name.sv" }}</option>
                         </select>
-                        <script {{ nonce }}>
-                          // Set the selected language based on the cookie.
-                          (function() {
-                            const cookieValue = document.cookie
-                              .split('; ')
-                              .find(row => row.startsWith('language='))
-                              ?.split('=')[1];
-                            if (cookieValue) {
-                              document.getElementById('language').value = cookieValue;
-                            }
-                          })();
-                        </script>
                     </form>
                 </div>
                 <div>

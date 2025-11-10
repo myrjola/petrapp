@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/myrjola/petrapp/internal/i18n"
 )
@@ -12,6 +13,16 @@ const (
 	hoursPerDay      = 24
 	daysPerYear      = 365
 )
+
+// isRelativePath checks if a path is a relative path without scheme or host.
+func isRelativePath(path string) bool {
+	// Reject paths that contain a scheme (e.g., http://, https://, //).
+	if strings.Contains(path, "://") || strings.HasPrefix(path, "//") {
+		return false
+	}
+	// Accept paths that start with /.
+	return strings.HasPrefix(path, "/")
+}
 
 // setLanguagePOST handles the POST request to set the user's language preference.
 func (app *application) setLanguagePOST(w http.ResponseWriter, r *http.Request) {
@@ -35,8 +46,9 @@ func (app *application) setLanguagePOST(w http.ResponseWriter, r *http.Request) 
 	})
 
 	// Redirect back to the referrer or home page.
+	// Only allow relative paths to prevent open redirects.
 	referer := r.Header.Get("Referer")
-	if referer == "" {
+	if referer == "" || !isRelativePath(referer) {
 		referer = "/"
 	}
 
