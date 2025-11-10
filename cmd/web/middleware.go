@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/i18n"
 	"github.com/myrjola/petrapp/internal/logging"
 )
 
@@ -199,6 +200,27 @@ func (app *application) mustAdmin(next http.Handler) http.Handler {
 func commonContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = contexthelpers.SetCurrentPath(r, r.URL.Path)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// languageDetection detects the user's language preference from a cookie and sets it in the context.
+func languageDetection(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Default to English.
+		lang := i18n.DefaultLanguage
+
+		// Try to get language from cookie.
+		if cookie, err := r.Cookie("language"); err == nil {
+			cookieLang := i18n.Language(cookie.Value)
+			if i18n.IsSupported(cookieLang) {
+				lang = cookieLang
+			}
+		}
+
+		// Set the language in the context.
+		r = contexthelpers.SetLanguage(r, lang)
+
 		next.ServeHTTP(w, r)
 	})
 }

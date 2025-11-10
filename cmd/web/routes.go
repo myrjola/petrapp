@@ -11,7 +11,7 @@ func (app *application) routes() (*http.ServeMux, error) {
 	var (
 		withoutMaintenanceMode = func(next http.Handler) http.Handler {
 			return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
-				commonContext(app.timeout(next)))))
+				commonContext(languageDetection(app.timeout(next))))))
 		}
 		shared = func(next http.Handler) http.Handler {
 			return withoutMaintenanceMode(app.maintenanceMode(next))
@@ -78,6 +78,9 @@ func (app *application) routes() (*http.ServeMux, error) {
 
 	// Privacy page
 	mux.Handle("GET /privacy", session(http.HandlerFunc(app.privacy)))
+
+	// Language selection
+	mux.Handle("POST /set-language", session(http.HandlerFunc(app.setLanguagePOST)))
 
 	// Home route (most specific)
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))

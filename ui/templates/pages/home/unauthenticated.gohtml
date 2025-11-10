@@ -44,6 +44,52 @@
             </style>
             <div>
                 <div>
+                    <style {{ nonce }}>
+                        @scope {
+                            :scope {
+                                display: flex;
+                                justify-content: flex-end;
+                                margin-bottom: var(--size-4);
+                                padding-right: var(--size-2);
+                            }
+
+                            label {
+                                font-size: var(--font-size-1);
+                                color: var(--gray-6);
+                                margin-right: var(--size-2);
+                            }
+
+                            select {
+                                font-size: var(--font-size-1);
+                                padding: var(--size-2);
+                                border: 1px solid var(--gray-3);
+                                border-radius: var(--radius-2);
+                                background: var(--gray-0);
+                                color: var(--gray-8);
+                            }
+                        }
+                    </style>
+                    <form method="post" action="/set-language">
+                        <label for="language">{{ t "language.picker.label" }}</label>
+                        <select name="language" id="language" onchange="this.form.submit()">
+                            <option value="en">{{ t "language.name.en" }}</option>
+                            <option value="fi">{{ t "language.name.fi" }}</option>
+                        </select>
+                        <script {{ nonce }}>
+                          // Set the selected language based on the cookie.
+                          (function() {
+                            const cookieValue = document.cookie
+                              .split('; ')
+                              .find(row => row.startsWith('language='))
+                              ?.split('=')[1];
+                            if (cookieValue) {
+                              document.getElementById('language').value = cookieValue;
+                            }
+                          })();
+                        </script>
+                    </form>
+                </div>
+                <div>
                     <style {{nonce}}>
                         @scope {
                             :scope {
@@ -75,10 +121,10 @@
                     </style>
                     <img src="/logo.svg" alt="Happy kettlebell"/>
                     <h1>
-                        Petra
+                        {{ t "home.title" }}
                     </h1>
                     <p>
-                        Personal trainer in your pocket.
+                        {{ t "home.tagline" }}
                     </p>
                     <div>
                         <style {{ nonce }}>
@@ -91,7 +137,7 @@
                             }
                         </style>
                         <form method="post" action="/api/login/start">
-                            <button type="submit">Sign in</button>
+                            <button type="submit">{{ t "home.signin" }}</button>
                             <script {{ nonce }}>
                               (async (form = me()) => {
                                 const {loginUser} = await import("webauthn")
@@ -100,7 +146,7 @@
                             </script>
                         </form>
                         <form action="/api/registration/start">
-                            <button type="submit">Register</button>
+                            <button type="submit">{{ t "home.register" }}</button>
                             <script {{ nonce }}>
                               (async (form = me()) => {
                                 const {registerUser} = await import("webauthn")
@@ -136,7 +182,7 @@
                 }
             }
         </style>
-        <a href="/privacy">Privacy & Security</a>
+        <a href="/privacy">{{ t "home.footer.privacy" }}</a>
     </footer>
 {{ end }}
 
