@@ -42,10 +42,8 @@ const (
 
 func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -66,15 +64,13 @@ func (app *application) workoutCompletionGET(w http.ResponseWriter, r *http.Requ
 
 func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// First mark the workout as completed
-	if err = app.workoutService.CompleteSession(r.Context(), date); err != nil {
+	if err := app.workoutService.CompleteSession(r.Context(), date); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -85,15 +81,13 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 
 func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Start the workout session
-	if err = app.workoutService.StartSession(r.Context(), date); err != nil {
+	if err := app.workoutService.StartSession(r.Context(), date); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -104,10 +98,8 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 
 func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -138,10 +130,8 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -154,7 +144,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Save the feedback
-	if err = app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
+	if err := app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -166,18 +156,14 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 // workoutSwapExerciseGET handles GET requests to show available exercises for swapping.
 func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse exercise ID from URL path
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
+	exerciseID, ok := app.parseExerciseIDParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -230,23 +216,19 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 // workoutSwapExercisePOST handles POST requests to swap an exercise.
 func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse current exercise ID from URL path
-	exerciseIDStr := r.PathValue("exerciseID")
-	currentExerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
+	currentExerciseID, ok := app.parseExerciseIDParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse form
-	if err = r.ParseForm(); err != nil {
+	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
 	}
@@ -292,10 +274,8 @@ type exerciseAddTemplateData struct {
 // workoutAddExerciseGET handles GET requests to show available exercises for adding.
 func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -340,15 +320,13 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 // workoutAddExercisePOST handles POST requests to add an exercise to a workout.
 func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse form
-	if err = r.ParseForm(); err != nil {
+	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
 	}

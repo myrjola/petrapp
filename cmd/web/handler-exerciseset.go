@@ -69,18 +69,14 @@ func getLastCompletedAt(sets []workout.Set) *time.Time {
 
 func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse exercise ID from URL path
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
+	exerciseID, ok := app.parseExerciseIDParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -264,23 +260,19 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse exercise ID from URL path
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
+	exerciseID, ok := app.parseExerciseIDParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Mark warmup as complete
-	if err = app.workoutService.MarkWarmupComplete(r.Context(), date, exerciseID); err != nil {
+	if err := app.workoutService.MarkWarmupComplete(r.Context(), date, exerciseID); err != nil {
 		app.serverError(w, r, fmt.Errorf("mark warmup complete: %w", err))
 		return
 	}
