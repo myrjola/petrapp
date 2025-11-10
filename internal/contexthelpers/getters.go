@@ -2,6 +2,8 @@ package contexthelpers
 
 import (
 	"context"
+
+	"github.com/myrjola/petrapp/internal/i18n"
 )
 
 func IsAuthenticated(ctx context.Context) bool {
@@ -46,4 +48,12 @@ func IsAdmin(ctx context.Context) bool {
 		return false
 	}
 	return isAdmin
+}
+
+func Language(ctx context.Context) i18n.Language {
+	language, ok := ctx.Value(LanguageContextKey).(i18n.Language)
+	if !ok {
+		return i18n.DefaultLanguage
+	}
+	return language
 }
