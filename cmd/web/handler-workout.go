@@ -76,7 +76,7 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Redirect to the completion form
-	redirect(w, r, fmt.Sprintf("/workouts/%s/complete", dateStr))
+	redirect(w, r, fmt.Sprintf("/workouts/%s/complete", date.Format("2006-01-02")))
 }
 
 func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +93,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Redirect to the workout page
-	redirect(w, r, fmt.Sprintf("/workouts/%s", dateStr))
+	redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
 }
 
 func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +144,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Save the feedback
-	if err := app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
+	if err = app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

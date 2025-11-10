@@ -86,6 +86,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	editIndexStr := r.URL.Query().Get("edit")
 	if editIndexStr != "" {
 		var idx int
+		var err error
 		if idx, err = strconv.Atoi(editIndexStr); err == nil {
 			editingIndex = idx
 			isEditing = true
@@ -278,7 +279,7 @@ func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *
 	}
 
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "warmup completed",
-		slog.String("date", dateStr),
+		slog.String("date", date.Format("2006-01-02")),
 		slog.Int("exercise_id", exerciseID))
 
 	// Redirect back to the exercise set page
