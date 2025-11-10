@@ -14,14 +14,19 @@ const (
 	daysPerYear      = 365
 )
 
-// isRelativePath checks if a path is a relative path without scheme or host.
+// isRelativePath checks if a path is a relative path without scheme or host and doesn't allow ambiguous slashes.
 func isRelativePath(path string) bool {
 	// Reject paths that contain a scheme (e.g., http://, https://, //).
 	if strings.Contains(path, "://") || strings.HasPrefix(path, "//") {
 		return false
 	}
-	// Accept paths that start with /.
-	return strings.HasPrefix(path, "/")
+	// Accept paths that start with /, but not if the second character is / or \.
+	if strings.HasPrefix(path, "/") {
+		if len(path) == 1 || (path[1] != '/' && path[1] != '\\') {
+			return true
+		}
+	}
+	return false
 }
 
 // setLanguagePOST handles the POST request to set the user's language preference.
