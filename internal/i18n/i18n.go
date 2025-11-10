@@ -11,30 +11,32 @@ const (
 )
 
 // DefaultLanguage is the fallback language.
-const DefaultLanguage = Language(English)
+const DefaultLanguage = English
 
-// translations maps language codes to translation keys and their values.
-var translations = map[Language]map[string]string{
-	English: {
-		"home.title":             "Petra",
-		"home.tagline":           "Personal trainer in your pocket.",
-		"home.signin":            "Sign in",
-		"home.register":          "Register",
-		"home.footer.privacy":    "Privacy & Security",
-		"language.picker.label":  "Language",
-		"language.name.en":       "English",
-		"language.name.fi":       "Suomi",
-	},
-	Finnish: {
-		"home.title":             "Petra",
-		"home.tagline":           "Henkilökohtainen valmentaja taskussasi.",
-		"home.signin":            "Kirjaudu",
-		"home.register":          "Rekisteröidy",
-		"home.footer.privacy":    "Tietosuoja ja turvallisuus",
-		"language.picker.label":  "Kieli",
-		"language.name.en":       "English",
-		"language.name.fi":       "Suomi",
-	},
+// getTranslations returns the map of translations.
+func getTranslations() map[Language]map[string]string {
+	return map[Language]map[string]string{
+		English: {
+			"home.title":            "Petra",
+			"home.tagline":          "Personal trainer in your pocket.",
+			"home.signin":           "Sign in",
+			"home.register":         "Register",
+			"home.footer.privacy":   "Privacy & Security",
+			"language.picker.label": "Language",
+			"language.name.en":      "English",
+			"language.name.fi":      "Suomi",
+		},
+		Finnish: {
+			"home.title":            "Petra",
+			"home.tagline":          "Henkilökohtainen valmentaja taskussasi.",
+			"home.signin":           "Kirjaudu",
+			"home.register":         "Rekisteröidy",
+			"home.footer.privacy":   "Tietosuoja ja turvallisuus",
+			"language.picker.label": "Kieli",
+			"language.name.en":      "English",
+			"language.name.fi":      "Suomi",
+		},
+	}
 }
 
 // SupportedLanguages returns a list of all supported languages.
@@ -44,7 +46,7 @@ func SupportedLanguages() []Language {
 
 // IsSupported checks if a language is supported.
 func IsSupported(lang Language) bool {
-	_, ok := translations[lang]
+	_, ok := getTranslations()[lang]
 	return ok
 }
 
@@ -52,17 +54,23 @@ func IsSupported(lang Language) bool {
 // If the key is not found, it falls back to the default language.
 // If still not found, it returns the key itself.
 func Translate(lang Language, key string) string {
+	translations := getTranslations()
+
 	// Try the requested language.
-	if langTranslations, ok := translations[lang]; ok {
-		if translation, ok := langTranslations[key]; ok {
+	var ok bool
+	var langTranslations map[string]string
+	var translation string
+
+	if langTranslations, ok = translations[lang]; ok {
+		if translation, ok = langTranslations[key]; ok {
 			return translation
 		}
 	}
 
 	// Fallback to default language.
 	if lang != DefaultLanguage {
-		if langTranslations, ok := translations[DefaultLanguage]; ok {
-			if translation, ok := langTranslations[key]; ok {
+		if langTranslations, ok = translations[DefaultLanguage]; ok {
+			if translation, ok = langTranslations[key]; ok {
 				return translation
 			}
 		}

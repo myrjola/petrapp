@@ -2,9 +2,15 @@ package main
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/myrjola/petrapp/internal/i18n"
+)
+
+const (
+	secondsPerMinute = 60
+	minutesPerHour   = 60
+	hoursPerDay      = 24
+	daysPerYear      = 365
 )
 
 // setLanguagePOST handles the POST request to set the user's language preference.
@@ -22,7 +28,7 @@ func (app *application) setLanguagePOST(w http.ResponseWriter, r *http.Request) 
 		Name:     "language",
 		Value:    lang,
 		Path:     "/",
-		MaxAge:   365 * 24 * 60 * 60, // 1 year.
+		MaxAge:   daysPerYear * hoursPerDay * minutesPerHour * secondsPerMinute, // 1 year.
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
