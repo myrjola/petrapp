@@ -39,7 +39,7 @@ type exerciseJSONSchema struct {
 }
 
 func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
-	schema := map[string]interface{}{
+	schema := map[string]any{
 		"type": "object",
 		"required": []string{
 			"id",
@@ -50,41 +50,41 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 			"primary_muscle_groups",
 			"secondary_muscle_groups",
 		},
-		"properties": map[string]interface{}{
-			"id": map[string]interface{}{
+		"properties": map[string]any{
+			"id": map[string]any{
 				"type":        "integer",
 				"description": "Unique identifier for the exercise, leave as -1 for new exercises",
 			},
-			"name": map[string]interface{}{
+			"name": map[string]any{
 				"type":        "string",
 				"description": "Name of the exercise",
 			},
-			"category": map[string]interface{}{
+			"category": map[string]any{
 				"type":        "string",
 				"description": "Category of the exercise",
 				"enum":        []string{"full_body", "upper", "lower"},
 			},
-			"exercise_type": map[string]interface{}{
+			"exercise_type": map[string]any{
 				"type":        "string",
 				"description": "StartWorkout of exercise (weighted or bodyweight)",
 				"enum":        []string{"weighted", "bodyweight"},
 			},
-			"description_markdown": map[string]interface{}{
+			"description_markdown": map[string]any{
 				"type":        "string",
 				"description": "Markdown description of the exercise",
 			},
-			"primary_muscle_groups": map[string]interface{}{
+			"primary_muscle_groups": map[string]any{
 				"type":        "array",
 				"description": "Primary muscle groups targeted by the exercise",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "string",
 					"enum": ejs.muscleGroups,
 				},
 			},
-			"secondary_muscle_groups": map[string]interface{}{
+			"secondary_muscle_groups": map[string]any{
 				"type":        "array",
 				"description": "Secondary muscle groups targeted by the exercise",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "string",
 					"enum": ejs.muscleGroups,
 				},

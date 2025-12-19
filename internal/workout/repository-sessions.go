@@ -377,7 +377,7 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 	for _, exerciseSet := range exerciseSets {
 		for i, set := range exerciseSet.Sets {
 			// Format CompletedAt timestamp if it's not nil
-			var completedAtStr interface{}
+			var completedAtStr any
 			if set.CompletedAt != nil {
 				completedAtStr = formatTimestamp(*set.CompletedAt)
 			}

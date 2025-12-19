@@ -397,7 +397,7 @@ func (db *Database) copyTableSchema(ctx context.Context, tx *sql.Tx, tableName s
 // copyUserTableData copies data for a specific user from a table to the export database.
 func (db *Database) copyUserTableData(ctx context.Context, tx *sql.Tx, table userTable, userID int) error {
 	var whereClause string
-	var args []interface{}
+	var args []any
 
 	switch {
 	case table.userColumnPath == nil:

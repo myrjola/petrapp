@@ -727,12 +727,9 @@ func simulateWorkoutCompletion(session sessionAggregate, week int) sessionAggreg
 			// Calculate completed reps between min and max
 			repRange := set.MaxReps - set.MinReps
 			improvement := int(float64(repRange) * completionLevel)
-			completedReps := set.MinReps + improvement
-
-			// Ensure we don't exceed max reps
-			if completedReps > set.MaxReps {
-				completedReps = set.MaxReps
-			}
+			completedReps := min(
+				// Ensure we don't exceed max reps
+				set.MinReps+improvement, set.MaxReps)
 
 			set.CompletedReps = &completedReps
 		}

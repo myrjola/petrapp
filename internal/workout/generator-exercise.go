@@ -78,7 +78,7 @@ Return only the valid JSON object with no additional text or explanation.`,
 	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
 		Name:        "exercise",
 		Description: openai.Opt("Detailed information about a fitness exercise"),
-		Schema:      openai.Opt(interface{}(exerciseJSONSchema{muscleGroups: eg.muscleGroups})),
+		Schema:      openai.Opt(any(exerciseJSONSchema{muscleGroups: eg.muscleGroups})),
 		Strict:      openai.Bool(true),
 	}
 

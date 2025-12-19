@@ -12,10 +12,6 @@ func TestRef(t *testing.T) {
 		s := "test"
 		p := ptr.Ref(s)
 
-		if p == nil {
-			t.Fatal("Expected pointer to be non-nil")
-		}
-
 		if *p != s {
 			t.Errorf("Expected %q, got %q", s, *p)
 		}
@@ -32,10 +28,6 @@ func TestRef(t *testing.T) {
 		i := 42
 		p := ptr.Ref(i)
 
-		if p == nil {
-			t.Fatal("Expected pointer to be non-nil")
-		}
-
 		if *p != i {
 			t.Errorf("Expected %d, got %d", i, *p)
 		}
@@ -50,10 +42,6 @@ func TestRef(t *testing.T) {
 
 		ts := testStruct{Name: "Test", Age: 30}
 		p := ptr.Ref(ts)
-
-		if p == nil {
-			t.Fatal("Expected pointer to be non-nil")
-		}
 
 		if p.Name != ts.Name || p.Age != ts.Age {
 			t.Errorf("Expected %+v, got %+v", ts, *p)

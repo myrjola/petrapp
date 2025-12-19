@@ -20,9 +20,9 @@ type SecureQueryTool struct {
 
 // QueryResult represents the result of a query execution.
 type QueryResult struct {
-	Columns  []string        `json:"columns"`
-	Rows     [][]interface{} `json:"rows"`
-	RowCount int             `json:"row_count"`
+	Columns  []string `json:"columns"`
+	Rows     [][]any  `json:"rows"`
+	RowCount int      `json:"row_count"`
 }
 
 // NewSecureQueryTool creates a new SecureQueryTool instance.
@@ -129,7 +129,7 @@ func (sqt *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Row
 		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
 
-	var resultRows [][]interface{}
+	var resultRows [][]any
 	rowCount := 0
 
 	for rows.Next() {
@@ -159,9 +159,9 @@ func (sqt *SecureQueryTool) collectQueryResults(_ context.Context, rows *sql.Row
 }
 
 // scanRow scans a single row and converts values for JSON compatibility.
-func (sqt *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]interface{}, error) {
-	values := make([]interface{}, columnCount)
-	valuePtrs := make([]interface{}, columnCount)
+func (sqt *SecureQueryTool) scanRow(rows *sql.Rows, columnCount int) ([]any, error) {
+	values := make([]any, columnCount)
+	valuePtrs := make([]any, columnCount)
 	for i := range values {
 		valuePtrs[i] = &values[i]
 	}

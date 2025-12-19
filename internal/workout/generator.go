@@ -362,10 +362,7 @@ func (g *generator) calculateContinuitySets(lastWorkout *sessionAggregate, total
 
 // calculateContinuityCount calculates how many exercises to continue.
 func (g *generator) calculateContinuityCount(totalCount int) int {
-	continuityCount := int(math.Ceil(float64(totalCount) * ContinuityPercentage))
-	if continuityCount > totalCount {
-		continuityCount = totalCount
-	}
+	continuityCount := min(int(math.Ceil(float64(totalCount)*ContinuityPercentage)), totalCount)
 	return continuityCount
 }
 

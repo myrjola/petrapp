@@ -120,7 +120,7 @@ func TestSecureQueryTool_ExecuteQuery_ValidSelect(t *testing.T) {
 		t.Fatalf("expected 1 row in result, got %d", len(result.Rows))
 	}
 
-	expectedRow := []interface{}{int64(1), "John Doe", "john@example.com"}
+	expectedRow := []any{int64(1), "John Doe", "john@example.com"}
 	if diff := cmp.Diff(expectedRow, result.Rows[0]); diff != "" {
 		t.Errorf("row data mismatch (-want +got):\n%s", diff)
 	}

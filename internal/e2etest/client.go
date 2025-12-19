@@ -518,8 +518,8 @@ func (c *Client) processMultipleSelect(
 	value string,
 	formData neturl.Values,
 ) error {
-	options := strings.Split(value, ",")
-	for _, option := range options {
+	options := strings.SplitSeq(value, ",")
+	for option := range options {
 		trimmedOption := strings.TrimSpace(option)
 		if trimmedOption != "" {
 			formData.Add(name, trimmedOption)
