@@ -14,6 +14,8 @@ import (
 )
 
 // setupTestDB creates an in-memory SQLite database with test data.
+//
+//goland:noinspection SqlInsertValues,SqlResolve
 func setupTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -94,6 +96,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
+//goland:noinspection ALL
 func TestSecureQueryTool_ExecuteQuery_ValidSelect(t *testing.T) {
 	db := setupTestDB(t)
 
@@ -126,6 +129,7 @@ func TestSecureQueryTool_ExecuteQuery_ValidSelect(t *testing.T) {
 	}
 }
 
+//goland:noinspection SqlResolve
 func TestSecureQueryTool_ExecuteQuery_ComplexQuery(t *testing.T) {
 	db := setupTestDB(t)
 	tool := tools.NewSecureQueryTool(db)
@@ -157,6 +161,7 @@ func TestSecureQueryTool_ExecuteQuery_ComplexQuery(t *testing.T) {
 	}
 }
 
+//goland:noinspection SqlResolve
 func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
 	allowedQueries := []string{
 		"SELECT * FROM users",
@@ -185,12 +190,17 @@ func TestSecureQueryTool_ValidateSQL_AllowedQueries(t *testing.T) {
 	}
 }
 
+//goland:noinspection SqlResolve
 func TestSecureQueryTool_ValidateSQL_ForbiddenQueries(t *testing.T) {
 	forbiddenQueries := []struct {
 		query string
 		desc  string
 	}{
-		{"INSERT INTO users (name, email) VALUES ('test', 'test@example.com')", "INSERT statement"},
+		{
+			`INSERT INTO users (name, email, display_name, webauthn_user_id)
+VALUES ('test', 'test@example.com', 'Test', x'123')`,
+			"INSERT statement",
+		},
 		{"UPDATE users SET name = 'test' WHERE id = 1", "UPDATE statement"},
 		{"DELETE FROM users WHERE id = 1", "DELETE statement"},
 		{"DROP TABLE users", "DROP statement"},
@@ -252,7 +262,7 @@ func TestSecureQueryTool_TimeoutEnforcement(t *testing.T) {
 	tool := tools.NewSecureQueryTool(db).WithTimeout(1 * time.Millisecond)
 	ctx := context.Background()
 
-	// This query might timeout depending on timing, but we mainly want to test that timeout is respected
+	// This query might time out depending on timing, but we mainly want to test that timeout is respected
 	query := "SELECT * FROM users"
 	_, err := tool.ExecuteQuery(ctx, query)
 
