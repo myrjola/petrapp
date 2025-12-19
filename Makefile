@@ -4,7 +4,7 @@
         migratetest repomix repomix-clipboard setup-git-hooks lint-fix
 
 export GOTOOLCHAIN := auto
-GOLANGCI_LINT_VERSION := v2.4.0
+GOLANGCI_LINT_VERSION := v2.7.2
 
 # Suppress linker warnings on macOS
 ifeq ($(shell uname -s),Darwin)
@@ -40,7 +40,7 @@ test:
 	@echo "Running tests..."
 	go test --race --shuffle=on ./...
 
-lint:
+lint: bin/golangci-lint
 	@echo "Running linter..."
 	./bin/golangci-lint run
 
