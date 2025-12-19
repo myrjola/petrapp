@@ -13,10 +13,10 @@ func IsAuthenticated(ctx context.Context) bool {
 	return isAuthenticated
 }
 
-func AuthenticatedUserID(ctx context.Context) []byte {
-	userID, ok := ctx.Value(AuthenticatedUserIDContextKey).([]byte)
+func AuthenticatedUserID(ctx context.Context) int {
+	userID, ok := ctx.Value(AuthenticatedUserIDContextKey).(int)
 	if !ok {
-		return nil
+		return 0
 	}
 
 	return userID
@@ -29,15 +29,6 @@ func CurrentPath(ctx context.Context) string {
 	}
 
 	return currentPath
-}
-
-func CSRFToken(ctx context.Context) string {
-	csrfToken, ok := ctx.Value(CsrfTokenContextKey).(string)
-	if !ok {
-		return ""
-	}
-
-	return csrfToken
 }
 
 func CSPNonce(ctx context.Context) string {

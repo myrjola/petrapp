@@ -195,9 +195,9 @@
         --color-text-primary: var(--gray-9);
         --color-text-secondary: var(--gray-6);
         --color-text-muted: var(--gray-5);
-        --color-success: var(--lime-6);
+        --color-success: var(--lime-7);
         --color-success-bg: var(--lime-0);
-        --color-info: var(--sky-6);
+        --color-info: var(--sky-7);
         --color-info-bg: var(--sky-0);
     }
 }
@@ -210,7 +210,7 @@
 }
 
 @layer components {
-    button {
+    button, .btn {
         position: relative;
         display: inline-flex;
         border-radius: var(--radius-2);
@@ -224,6 +224,7 @@
         padding: var(--size-2) var(--vertical-padding);
         border: none;
         white-space: nowrap;
+        text-decoration: none;
 
         &:hover {
             cursor: pointer;
@@ -235,6 +236,7 @@
         }
 
         /* Add a spinner to a button when submitting */
+
         form.submitting &[type=submit] {
             cursor: wait;
 

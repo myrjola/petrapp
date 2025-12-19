@@ -1,15 +1,22 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
 
 {{ define "unauthenticated" }}
+    <style {{ nonce }}>
+        @scope {
+            :scope {
+                min-height: 100%;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+        }
+    </style>
     <main>
         <style {{ nonce }}>
             @scope {
                 :scope {
                     position: relative;
-                    overflow: hidden;
-                    min-height: 100%;
-                    padding-top: var(--size-8);
-                    align-content: center;
+                    flex: 1;
                 }
             }
         </style>
@@ -18,6 +25,10 @@
             <style {{ nonce }}>
                 @scope {
                     :scope {
+                        height: 100%;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
                         padding-top: var(--size-8);
                         padding-bottom: var(--size-8);
 
@@ -62,9 +73,9 @@
                             }
                         }
                     </style>
-                    <img src="/logo.svg" alt="Happy kettlebell" />
+                    <img src="/logo.svg" alt="Happy kettlebell"/>
                     <h1>
-                        Petrapp
+                        Petra
                     </h1>
                     <p>
                         Personal trainer in your pocket.
@@ -79,31 +90,53 @@
                                 }
                             }
                         </style>
-                            <form method="post" action="/api/login/start">
-                                {{ csrf }}
-                                <button type="submit">Sign in</button>
-                                <script {{ nonce }}>
-                                  (async (form = me()) => {
-                                    const { loginUser } = await import("webauthn")
-                                    form.addEventListener("submit", loginUser)
-                                  })()
-                                </script>
-                            </form>
-                            <form action="/api/registration/start">
-                                {{ csrf }}
-                                <button type="submit">Register</button>
-                                <script {{ nonce }}>
-                                  (async (form = me()) => {
-                                    const { registerUser } = await import("webauthn")
-                                    form.addEventListener("submit", registerUser)
-                                  })()
-                                </script>
-                            </form>
+                        <form method="post" action="/api/login/start">
+                            <button type="submit">Sign in</button>
+                            <script {{ nonce }}>
+                              (async (form = me()) => {
+                                const {loginUser} = await import("webauthn")
+                                form.addEventListener("submit", loginUser)
+                              })()
+                            </script>
+                        </form>
+                        <form action="/api/registration/start">
+                            <button type="submit">Register</button>
+                            <script {{ nonce }}>
+                              (async (form = me()) => {
+                                const {registerUser} = await import("webauthn")
+                                form.addEventListener("submit", registerUser)
+                              })()
+                            </script>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
         {{ template "backdrop-blur-bottom" }}
     </main>
+    <footer>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    margin-top: var(--size-8);
+                    padding-block: var(--size-4);
+                    text-align: center;
+                    border-top: 1px solid var(--gray-3);
+                }
+
+                a {
+                    color: var(--gray-6);
+                    text-decoration: none;
+                    font-size: var(--font-size-1);
+                }
+
+                a:hover {
+                    color: var(--gray-8);
+                    text-decoration: underline;
+                }
+            }
+        </style>
+        <a href="/privacy">Privacy & Security</a>
+    </footer>
 {{ end }}
 

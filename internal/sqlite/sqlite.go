@@ -6,11 +6,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/mattn/go-sqlite3"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mattn/go-sqlite3"
 
 	_ "embed"
 )
@@ -39,7 +40,7 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 		db  *Database
 	)
 
-	if db, err = connect(url, logger); err != nil {
+	if db, err = connect(ctx, url, logger); err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
@@ -83,7 +84,7 @@ func registerOptimizedDriver() {
 		})
 }
 
-func connect(url string, logger *slog.Logger) (*Database, error) {
+func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, error) {
 	var (
 		err         error
 		readWriteDB *sql.DB
@@ -97,7 +98,7 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	isInMemory := strings.Contains(url, ":memory:")
 	inMemoryConfig := ""
 	if isInMemory {
-		url = fmt.Sprintf("file:%s", rand.Text())
+		url = rand.Text()
 		inMemoryConfig = "mode=memory&cache=shared"
 	}
 	commonConfig := strings.Join([]string{
@@ -126,12 +127,18 @@ func connect(url string, logger *slog.Logger) (*Database, error) {
 	if readWriteDB, err = sql.Open(optimizedDriver, readWriteConfig); err != nil {
 		return nil, fmt.Errorf("open read-write database: %w", err)
 	}
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "opened database", slog.String("sqlDsn", readWriteConfig))
+	logger.LogAttrs(ctx, slog.LevelInfo, "opened database", slog.String("sqlDsn", readWriteConfig))
 
 	readWriteDB.SetMaxOpenConns(1)
 	readWriteDB.SetMaxIdleConns(1)
 	readWriteDB.SetConnMaxLifetime(time.Hour)
 	readWriteDB.SetConnMaxIdleTime(time.Hour)
+
+	// Since sql.DB is lazy, we need to ping it to ensure the connection is established and the database is configured.
+	err = readWriteDB.PingContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ping read-write database: %w", err)
+	}
 
 	if readDB, err = sql.Open(optimizedDriver, readConfig); err != nil {
 		return nil, fmt.Errorf("open read database: %w", err)

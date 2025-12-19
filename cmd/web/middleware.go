@@ -1,37 +1,80 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/justinas/nosurf"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/logging"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"runtime/trace"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/logging"
 )
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode    int
+	headerWritten bool
+}
+
+func newStatusResponseWriter(w http.ResponseWriter) *statusResponseWriter {
+	return &statusResponseWriter{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+		headerWritten:  false,
+	}
+}
+
+func (mw *statusResponseWriter) WriteHeader(statusCode int) {
+	mw.ResponseWriter.WriteHeader(statusCode)
+
+	if !mw.headerWritten {
+		mw.statusCode = statusCode
+		mw.headerWritten = true
+	}
+}
+
+func (mw *statusResponseWriter) Write(b []byte) (int, error) {
+	mw.headerWritten = true
+	written, err := mw.ResponseWriter.Write(b)
+	if err != nil {
+		return written, fmt.Errorf("write response: %w", err)
+	}
+	return written, nil
+}
+
+func (mw *statusResponseWriter) Unwrap() http.ResponseWriter {
+	return mw.ResponseWriter
+}
 
 func secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate a random nonce for use in CSP and set it in the context so that it can be added to the script tags.
 		cspNonce := rand.Text()
 		csp := fmt.Sprintf(`default-src 'none';
-script-src 'nonce-%s' 'strict-dynamic' https: http:;
+script-src 'nonce-%s' 'strict-dynamic' 'unsafe-inline' https: http:;
 connect-src 'self';
 img-src 'self';
-style-src 'nonce-%s' 'self';
+style-src 'nonce-%s' 'self' 'unsafe-inline';
 frame-ancestors 'self';
 form-action 'self';
+font-src 'none';
 object-src 'none';
 manifest-src 'self';
-base-uri 'none';`, cspNonce, cspNonce)
+base-uri 'none';
+report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 
 		w.Header().Set("Content-Security-Policy", csp)
+		w.Header().Set("Reporting-Endpoints", `reports="/api/reports"`)
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")
 		w.Header().Set("X-XSS-Protection", "0")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
 
 		r = contexthelpers.SetCSPNonce(r, cspNonce)
 
@@ -39,7 +82,7 @@ base-uri 'none';`, cspNonce, cspNonce)
 	})
 }
 
-func cacheForeverHeaders(next http.Handler) http.Handler {
+func cacheForever(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 
@@ -47,7 +90,7 @@ func cacheForeverHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func noCacheHeaders(next http.Handler) http.Handler {
+func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
@@ -55,28 +98,64 @@ func noCacheHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func (app *application) logRequest(next http.Handler) http.Handler {
+func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var (
 			proto  = r.Proto
 			method = r.Method
 			uri    = r.URL.RequestURI()
+			path   = r.URL.Path
 		)
 
 		ctx := r.Context()
-		requestID := rand.Text()
+		traceID := rand.Text()
 		ctx = logging.WithAttrs(
 			ctx,
-			slog.Any("request_id", requestID),
+			slog.Any("trace_id", traceID),
 			slog.String("proto", proto),
 			slog.String("method", method),
 			slog.String("uri", uri),
 		)
 		r = r.WithContext(ctx)
 
+		start := time.Now()
 		app.logger.LogAttrs(ctx, slog.LevelDebug, "received request")
 
-		next.ServeHTTP(w, r)
+		// Wrap the response writer to capture status code
+		sw := newStatusResponseWriter(w)
+
+		if !trace.IsEnabled() {
+			next.ServeHTTP(sw, r)
+		} else {
+			taskName := fmt.Sprintf("HTTP %s %s", r.Method, path)
+			traceCtx, task := trace.NewTask(ctx, taskName)
+
+			// Add trace attributes for better context
+			trace.Log(traceCtx, "request", fmt.Sprintf("method=%s path=%s proto=%s", method, path, proto))
+			trace.Log(traceCtx, "trace_id", traceID)
+
+			defer func() {
+				trace.Log(traceCtx, "response", fmt.Sprintf("status=%d duration=%v", sw.statusCode, time.Since(start)))
+				task.End()
+			}()
+
+			r = r.WithContext(traceCtx)
+			next.ServeHTTP(sw, r)
+		}
+
+		// Log request completion
+		level := slog.LevelInfo
+		if sw.statusCode >= http.StatusInternalServerError {
+			level = slog.LevelError
+		}
+		app.logger.LogAttrs(r.Context(), level, "request completed",
+			slog.Int("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
+
+		// If we have a flight recorder, capture a trace if the request timed out.
+		flightRecorderCtx := context.WithoutCancel(ctx)
+		if sw.statusCode == http.StatusServiceUnavailable && app.flightRecorder != nil {
+			go app.flightRecorder.CaptureTimeoutTrace(flightRecorderCtx)
+		}
 	})
 }
 
@@ -120,25 +199,14 @@ func (app *application) mustAdmin(next http.Handler) http.Handler {
 func commonContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = contexthelpers.SetCurrentPath(r, r.URL.Path)
-		r = contexthelpers.SetCSRFToken(r, nosurf.Token(r))
 		next.ServeHTTP(w, r)
 	})
 }
 
-// noSurf implements CSRF protection using https://github.com/justinas/nosurf
-func (app *application) noSurf(next http.Handler) http.Handler {
-	csrfHandler := nosurf.New(next)
-	csrfHandler.SetFailureHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "csrf token validation failed")
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-	}))
-	csrfHandler.SetBaseCookie(http.Cookie{
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-	return csrfHandler
+// crossOriginProtection implements CSRF protection using Go 1.25's CrossOriginProtection.
+func (app *application) crossOriginProtection(next http.Handler) http.Handler {
+	protection := http.NewCrossOriginProtection()
+	return protection.Handler(next)
 }
 
 // timeout times out the request and cancels the context using http.TimeoutHandler.
@@ -156,5 +224,42 @@ func (app *application) timeout(next http.Handler) http.Handler {
 			}
 		}
 		http.TimeoutHandler(next, timeout, "timed out").ServeHTTP(w, r)
+	})
+}
+
+// maintenanceMode checks if maintenance mode is enabled and serves a maintenance page if so.
+func (app *application) maintenanceMode(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Exclude health endpoints, admin authentication paths, and static files from maintenance checks.
+		path := r.URL.Path
+		if path == "/api/healthy" ||
+			path == "/admin/feature-flags" ||
+			path == "/api/login/start" ||
+			path == "/api/login/finish" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if maintenance mode is enabled (skip if workoutService is nil for tests)
+		if app.workoutService != nil && app.workoutService.IsMaintenanceModeEnabled(ctx) {
+			// Allow admin access during maintenance.
+			isAdmin := contexthelpers.IsAdmin(r.Context())
+			if isAdmin {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Add Retry-After header for better HTTP compliance.
+			w.Header().Set("Retry-After", "300")
+
+			// Render the maintenance page
+			data := newBaseTemplateData(r)
+			app.render(w, r, http.StatusServiceUnavailable, "maintenance", data)
+			return
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }

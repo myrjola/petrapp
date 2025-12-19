@@ -2,19 +2,22 @@ package main
 
 import (
 	"fmt"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
 
 type BaseTemplateData struct {
 	Authenticated bool
+	IsAdmin       bool
 }
 
 func newBaseTemplateData(r *http.Request) BaseTemplateData {
 	return BaseTemplateData{
 		Authenticated: contexthelpers.IsAuthenticated(r.Context()),
+		IsAdmin:       contexthelpers.IsAdmin(r.Context()),
 	}
 }
 

@@ -20,6 +20,23 @@
                     }
                 }
 
+                .timer {
+                    position: fixed;
+                    top: var(--size-2);
+                    right: var(--size-2);
+                    isolation: isolate;
+                    background: var(--color-surface);
+                    color: var(--color-text-primary);
+                    padding: var(--size-2) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                    font-weight: var(--font-weight-6);
+                    font-family: var(--font-mono);
+                    border: 1px solid var(--color-border);
+                    min-width: 4rem;
+                    text-align: center;
+                }
+
                 .exercise-header {
                     display: flex;
                     flex-direction: column;
@@ -39,10 +56,6 @@
                     .actions-row {
                         justify-content: flex-start;
                         align-items: center;
-
-                        .timer {
-                            margin-right: auto;
-                        }
 
                         > div:last-child {
                             display: flex;
@@ -69,19 +82,7 @@
                         font-size: var(--font-size-4);
                         font-weight: var(--font-weight-6);
                         color: var(--color-text-primary);
-                    }
-
-                    .timer {
-                        background: var(--color-surface);
-                        color: var(--color-text-primary);
-                        padding: var(--size-2) var(--size-3);
-                        border-radius: var(--radius-2);
-                        font-size: var(--font-size-1);
-                        font-weight: var(--font-weight-6);
-                        font-family: var(--font-mono);
-                        border: 1px solid var(--color-border);
-                        min-width: 4rem;
-                        text-align: center;
+                        view-transition-name: exercise-title-{{ .ExerciseSet.Exercise.ID }};
                     }
 
                     .action-button {
@@ -109,6 +110,71 @@
                                 background: var(--lime-1);
                             }
                         }
+
+                    }
+                }
+
+                .warmup-banner {
+                    padding: var(--size-4);
+                    border-radius: var(--radius-3);
+                    margin-bottom: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                    align-items: center;
+                    text-align: center;
+                    border: 2px solid var(--color-info);
+                    background: var(--color-info-bg);
+
+                    &.completed {
+                        border-color: var(--color-success);
+                        background: var(--color-success-bg);
+                    }
+
+                    .warmup-message {
+                        font-size: var(--font-size-2);
+                        font-weight: var(--font-weight-6);
+                        color: var(--color-text-primary);
+                    }
+
+                    .warmup-description {
+                        font-size: var(--font-size-1);
+                        color: var(--color-text-secondary);
+                        max-width: 500px;
+                    }
+
+                    .warmup-complete-button {
+                        padding: var(--size-3) var(--size-6);
+                        background: var(--color-info);
+                        color: var(--white);
+                        border: none;
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-2);
+                        font-weight: var(--font-weight-6);
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        min-width: 200px;
+
+                        &:hover {
+                            background: var(--sky-7);
+                            transform: translateY(-1px);
+                        }
+
+                        &:active {
+                            transform: translateY(0);
+                        }
+                    }
+
+                    .warmup-completed-status {
+                        padding: var(--size-2) var(--size-4);
+                        background: var(--color-success);
+                        color: var(--white);
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-1);
+                        font-weight: var(--font-weight-6);
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-2);
                     }
                 }
 
@@ -117,6 +183,12 @@
                     flex-direction: column;
                     gap: var(--size-4);
                     margin-bottom: var(--size-6);
+
+                    &.disabled {
+                        opacity: 0.5;
+                        pointer-events: none;
+                        filter: grayscale(50%);
+                    }
                 }
 
                 .exercise-set {
@@ -224,7 +296,7 @@
                                     box-shadow: 0 0 0 3px var(--sky-1);
                                 }
 
-                                &:invalid {
+                                &:user-invalid {
                                     border-color: var(--red-5);
                                 }
                             }
@@ -248,6 +320,7 @@
                             &:active {
                                 transform: translateY(0);
                             }
+
                         }
                     }
                 }
@@ -272,19 +345,33 @@
               }
             }
 
-            // Initialize timer
             initializeTimer();
           });
 
           function initializeTimer() {
             const timerDisplay = document.getElementById('workout-timer');
+              {{ if .LastCompletedAt }}
+            // Use the most recent set completion time
+            const startTime = new Date('{{ .LastCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
+              {{ else if .ExerciseSet.WarmupCompletedAt }}
+            // Use warmup completion time as fallback
+            const startTime = new Date('{{ .ExerciseSet.WarmupCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
+              {{ else }}
+            // Use current time if no previous timestamps
             const startTime = Date.now();
+              {{ end }}
 
             function updateTimer() {
               const elapsed = Date.now() - startTime;
               const seconds = Math.floor(elapsed / 1000);
               const minutes = Math.floor(seconds / 60);
               const hours = Math.floor(minutes / 60);
+
+              // Hide timer after 30 minutes
+              if (minutes >= 30) {
+                timerDisplay.style.display = 'none';
+                return;
+              }
 
               const displaySeconds = seconds % 60;
               const displayMinutes = minutes % 60;
@@ -309,15 +396,16 @@
 
         <header class="exercise-header">
             <div class="header-row">
-                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link" aria-label="Back to workout">
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link"
+                   aria-label="Back to workout">
                     ← Back
                 </a>
             </div>
             <div class="header-row title-row">
-                <h1 class="exercise-title">{{ .ExerciseSet.Exercise.Name }}</h1>
+                <h1 class="exercise-title"
+                    data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
             </div>
             <div class="header-row actions-row">
-                <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
                 <div>
                     <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
                        class="action-button info-button" aria-label="View exercise information">Info</a>
@@ -327,31 +415,57 @@
             </div>
         </header>
 
-        <div class="sets-container" aria-label="Exercise sets">
+        {{ if not .ExerciseSet.WarmupCompletedAt }}
+            <div class="warmup-banner">
+                <div class="warmup-message">Complete your warmup first</div>
+                <div class="warmup-description">
+                    Warming up properly prepares your muscles and joints for exercise, reducing injury risk and
+                    improving performance.
+                </div>
+                <form method="post"
+                      action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete">
+                    <button type="submit" class="warmup-complete-button">
+                        ✓ Mark Warmup Complete
+                    </button>
+                </form>
+            </div>
+        {{ else }}
+            <div class="warmup-banner completed">
+                <div class="warmup-completed-status">
+                    <span>✓</span>
+                    <span>Warmup completed - Ready to exercise!</span>
+                </div>
+            </div>
+        {{ end }}
 
-            {{ range $index, $set := .ExerciseSet.Sets }}
-                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }} active{{ end }}" 
-                     role="group" 
+        <div class="sets-container{{ if not .ExerciseSet.WarmupCompletedAt }} disabled{{ end }}"
+             aria-label="Exercise sets"{{ if not .ExerciseSet.WarmupCompletedAt }} aria-disabled="true"{{ end }}>
+
+            {{ range $index, $setDisplay := .SetsDisplay }}
+                {{ $set := $setDisplay.Set }}
+                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }} active{{ end }}"
+                     role="group"
                      aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
                     <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                            <span class="weight" aria-label="Weight">{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }} kg</span>
+                            <span class="weight"
+                                  aria-label="Weight">{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }} kg</span>
                         {{ end }}
                         {{ if $set.CompletedReps }}
                             <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
                         {{ else }}
-                            <span class="reps" aria-label="Target reps">{{ $set.MinReps }}-{{ $set.MaxReps }} reps</span>
+                            <span class="reps"
+                                  aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
                         {{ end }}
                     </div>
 
-                    {{ if or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex)) }}
+                    {{ if and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
                               class="set-form"
                               aria-label="Complete set {{ $index }}">
-                            {{ csrf }}
                             <div class="form-inputs">
                                 {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
                                     <div class="input-field">
@@ -361,12 +475,13 @@
                                                 inputmode="decimal"
                                                 pattern="[0-9,\.]*"
                                                 name="weight"
-                                                value="{{ if $set.WeightKg }}{{ $set.WeightKg }}{{ else }}0{{ end }}"
+                                                value="{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }}"
                                                 step="0.5"
                                                 required
                                                 aria-describedby="weight-help-{{ $index }}"
                                         >
-                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
+                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms
+                                        </div>
                                     </div>
                                 {{ end }}
                                 <div class="input-field">
@@ -376,7 +491,7 @@
                                             inputmode="numeric"
                                             pattern="[0-9]*"
                                             name="reps"
-                                            placeholder="{{ $set.MinReps }}-{{ $set.MaxReps }}"
+                                            placeholder="{{ $setDisplay.RepStr }}"
                                             {{ if $set.CompletedReps }}
                                                 value="{{ $set.CompletedReps }}"
                                             {{ end }}
@@ -385,7 +500,9 @@
                                             class="reps-input"
                                             aria-describedby="reps-help-{{ $index }}"
                                     >
-                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter number of repetitions completed</div>
+                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter number of repetitions
+                                        completed
+                                    </div>
                                 </div>
                             </div>
                             <button type="submit" class="submit-button"
@@ -397,5 +514,6 @@
             {{ end }}
         </div>
 
+        <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
     </main>
 {{ end }}

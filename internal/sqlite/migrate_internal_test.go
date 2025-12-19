@@ -1,10 +1,10 @@
 package sqlite
 
 import (
-	"github.com/myrjola/petrapp/internal/testhelpers"
-	"io"
 	"log/slog"
 	"testing"
+
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func TestDatabase_migrate(t *testing.T) {
@@ -120,8 +120,8 @@ func TestDatabase_migrate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
-			logger := testhelpers.NewLogger(io.Discard)
-			db, err := connect(":memory:", logger)
+			logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+			db, err := connect(ctx, ":memory:", logger)
 			if err != nil {
 				t.Fatalf("Failed to connect to database: %v", err)
 			}

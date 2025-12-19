@@ -3,21 +3,47 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/workout"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/workout"
 )
+
+type setDisplay struct {
+	Set    workout.Set
+	RepStr string // Formatted rep string (e.g. "8" or "6-8")
+}
 
 type exerciseSetTemplateData struct {
 	BaseTemplateData
 	Date                 time.Time
 	ExerciseSet          workout.ExerciseSet
+	SetsDisplay          []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex int
-	EditingIndex         int  // Index of the set being edited
-	IsEditing            bool // Whether we're in edit mode
+	EditingIndex         int        // Index of the set being edited
+	IsEditing            bool       // Whether we're in edit mode
+	LastCompletedAt      *time.Time // Timestamp of most recently completed set
+}
+
+func formatRepRange(minReps, maxReps int) string {
+	if minReps == maxReps {
+		return strconv.Itoa(minReps)
+	}
+	return fmt.Sprintf("%d-%d", minReps, maxReps)
+}
+
+func prepareSetsDisplay(sets []workout.Set) []setDisplay {
+	displays := make([]setDisplay, len(sets))
+	for i, set := range sets {
+		displays[i] = setDisplay{
+			Set:    set,
+			RepStr: formatRepRange(set.MinReps, set.MaxReps),
+		}
+	}
+	return displays
 }
 
 func getFirstIncompleteIndex(sets []workout.Set) int {
@@ -29,20 +55,28 @@ func getFirstIncompleteIndex(sets []workout.Set) int {
 	return len(sets)
 }
 
+func getLastCompletedAt(sets []workout.Set) *time.Time {
+	var latest *time.Time
+	for _, set := range sets {
+		if set.CompletedAt != nil {
+			if latest == nil || set.CompletedAt.After(*latest) {
+				latest = set.CompletedAt
+			}
+		}
+	}
+	return latest
+}
+
 func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	// Parse date from URL path
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		http.NotFound(w, r)
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
 		return
 	}
 
 	// Parse exercise ID from URL path
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
-	if err != nil {
-		http.NotFound(w, r)
+	exerciseID, ok := app.parseExerciseIDParam(w, r)
+	if !ok {
 		return
 	}
 
@@ -52,6 +86,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	editIndexStr := r.URL.Query().Get("edit")
 	if editIndexStr != "" {
 		var idx int
+		var err error
 		if idx, err = strconv.Atoi(editIndexStr); err == nil {
 			editingIndex = idx
 			isEditing = true
@@ -82,9 +117,11 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData:     newBaseTemplateData(r),
 		Date:                 date,
 		ExerciseSet:          exerciseSet,
+		SetsDisplay:          prepareSetsDisplay(exerciseSet.Sets),
 		FirstIncompleteIndex: getFirstIncompleteIndex(exerciseSet.Sets),
 		EditingIndex:         editingIndex,
 		IsEditing:            isEditing,
+		LastCompletedAt:      getLastCompletedAt(exerciseSet.Sets),
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)
@@ -218,6 +255,34 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		slog.Int("reps", reps))
 
 	// Redirect to the clean URL (without the edit query parameter)
+	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
+	redirect(w, r, redirectURL)
+}
+
+func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
+	// Parse date from URL path
+	date, ok := app.parseDateParam(w, r)
+	if !ok {
+		return
+	}
+
+	// Parse exercise ID from URL path
+	exerciseID, ok := app.parseExerciseIDParam(w, r)
+	if !ok {
+		return
+	}
+
+	// Mark warmup as complete
+	if err := app.workoutService.MarkWarmupComplete(r.Context(), date, exerciseID); err != nil {
+		app.serverError(w, r, fmt.Errorf("mark warmup complete: %w", err))
+		return
+	}
+
+	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "warmup completed",
+		slog.String("date", date.Format("2006-01-02")),
+		slog.Int("exercise_id", exerciseID))
+
+	// Redirect back to the exercise set page
 	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
 	redirect(w, r, redirectURL)
 }

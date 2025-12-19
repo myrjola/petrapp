@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func AuthenticateContext(r *http.Request, userID []byte, isAdmin bool) *http.Request {
+func AuthenticateContext(r *http.Request, userID int, isAdmin bool) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, IsAuthenticatedContextKey, true)
 	ctx = context.WithValue(ctx, AuthenticatedUserIDContextKey, userID)
@@ -16,12 +16,6 @@ func AuthenticateContext(r *http.Request, userID []byte, isAdmin bool) *http.Req
 func SetCurrentPath(r *http.Request, currentPath string) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, CurrentPathContextKey, currentPath)
-	return r.WithContext(ctx)
-}
-
-func SetCSRFToken(r *http.Request, csrfToken string) *http.Request {
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, CsrfTokenContextKey, csrfToken)
 	return r.WithContext(ctx)
 }
 

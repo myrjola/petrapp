@@ -40,7 +40,7 @@ jobs:
 
       - name: Deploy review app
         id: deploy
-        uses: superfly/fly-pr-review-apps@f7152c133b1fe7767b6e549ca09598655c1f8ca4
+        uses: superfly/fly-pr-review-apps@1.3.0
         with:
           image: ${{ needs.build_and_push.outputs.docker_image_uri }}
           secrets: "LITESTREAM_REPLICA_TYPE=file LITESTREAM_REPLICA_PATH=/data/backup"

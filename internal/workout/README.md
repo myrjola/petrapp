@@ -2,7 +2,9 @@
 
 ## Overview
 
-The workout generator uses a combination of user input, historical data, and progression models to create personalized workout plans. The goal is to provide a balanced and challenging workout experience that adapts to the user's fitness level and feedback. A rough outline of the algorithm is as follows
+The workout generator uses a combination of user input, historical data, and progression models to create personalized
+workout plans. The goal is to provide a balanced and challenging workout experience that adapts to the user's fitness
+level and feedback. A rough outline of the algorithm is as follows
 
 1. Determine type of workout, e.g., upper body, lower body, full body. This filters the available exercises.
 2. Exercise selection based on user history and balanced muscle group targeting.
@@ -21,7 +23,8 @@ Else:
 
 ## Exercise Selection
 
-Exercises target primary and secondary muscle groups. Compound movement is defined as targeting two or more primary muscle groups.
+Exercises target primary and secondary muscle groups. Compound movement is defined as targeting two or more primary
+muscle groups.
 
 Exercise Continuity: Repeat some exercises from the previous week's same weekday workout
 Benefits: Helps track progress, builds movement proficiency, creates familiarity
@@ -34,7 +37,8 @@ Rotate isolation exercises more frequently for variety.
 
 ### If exercise does not have previous history.
 
-* Start with 3 sets of 8 reps at empty weight value so that the user can select a weight that is challenging but doable for 8 reps.
+* Start with 3 sets of 8 reps at empty weight value so that the user can select a weight that is challenging but doable
+  for 8 reps.
 
 ### For beginners (1-3 months): Linear progression
 
@@ -49,6 +53,7 @@ Alternate between strength (3-6 reps), hypertrophy (8-12 reps), and endurance (1
 Progress to next workout type when user completes all sets at maximum of rep range for 2 consecutive workouts.
 
 ### User Feedback Integration
+
 Processing the 1-5 Scale Feedback:
 
 * 1 (Too Easy): Increase intensity more aggressively next workout

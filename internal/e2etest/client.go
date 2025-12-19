@@ -4,14 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/descope/virtualwebauthn"
-	"github.com/justinas/nosurf"
 	"io"
 	"net/http"
 	neturl "net/url"
 	"strings"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/descope/virtualwebauthn"
 )
 
 // secFetchSiteTransport wraps an http.RoundTripper and adds the Sec-Fetch-Site header to all requests.
@@ -170,7 +170,7 @@ func (c *Client) newRequestWithContext(
 		req *http.Request
 		err error
 	)
-	if req, err = http.NewRequest(method, c.url+urlPath, body); err != nil {
+	if req, err = http.NewRequestWithContext(ctx, method, c.url+urlPath, body); err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	return req.WithContext(ctx), nil
@@ -178,26 +178,14 @@ func (c *Client) newRequestWithContext(
 
 // Register registers a new WebAuthn credential with the server and returns the front page document.
 func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
-	doc, err := c.GetDoc(ctx, "/")
-	if err != nil {
-		return nil, fmt.Errorf("get document: %w", err)
-	}
-
-	var (
-		registrationStartURLPath = "/api/registration/start"
-		hiddenFields             map[string]string
-	)
-	if hiddenFields, err = c.extractHiddenFormFields(doc, registrationStartURLPath); err != nil {
-		return nil, fmt.Errorf("extract hidden form fields: %w", err)
-	}
-	csrfToken := hiddenFields["csrf_token"]
 	var attOpts *virtualwebauthn.AttestationOptions
-	if attOpts, err = c.startRegistration(ctx, registrationStartURLPath, csrfToken); err != nil {
+	var err error
+	if attOpts, err = c.startRegistration(ctx, "/api/registration/start"); err != nil {
 		return nil, fmt.Errorf("start registration: %w", err)
 	}
 
 	var credential *virtualwebauthn.Credential
-	if credential, err = c.finishRegistration(ctx, attOpts, csrfToken); err != nil {
+	if credential, err = c.finishRegistration(ctx, attOpts); err != nil {
 		return nil, fmt.Errorf("finish registration: %w", err)
 	}
 
@@ -206,7 +194,8 @@ func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 	// This option is needed for making Passkey login work.
 	c.authenticator.Options.UserHandle = []byte(attOpts.UserID)
 
-	if doc, err = c.GetDoc(ctx, "/"); err != nil {
+	doc, err := c.GetDoc(ctx, "/")
+	if err != nil {
 		return nil, fmt.Errorf("get document after registration: %w", err)
 	}
 	return doc, nil
@@ -216,7 +205,6 @@ func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 func (c *Client) finishRegistration(
 	ctx context.Context,
 	attOpts *virtualwebauthn.AttestationOptions,
-	csrfToken string,
 ) (*virtualwebauthn.Credential, error) {
 	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	attestationResponse := virtualwebauthn.CreateAttestationResponse(c.rp, c.authenticator, credential, *attOpts)
@@ -233,7 +221,6 @@ func (c *Client) finishRegistration(
 		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
@@ -251,7 +238,6 @@ func (c *Client) finishRegistration(
 func (c *Client) startRegistration(
 	ctx context.Context,
 	registrationStartURLPath string,
-	csrfToken string,
 ) (*virtualwebauthn.AttestationOptions, error) {
 	var (
 		err error
@@ -261,7 +247,6 @@ func (c *Client) startRegistration(
 		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
@@ -285,33 +270,18 @@ func (c *Client) startRegistration(
 
 // Login logs in to the server given there is a registered WebAuthn credential and returns the front page document.
 func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
-	var (
-		doc *goquery.Document
-		err error
-	)
-	if doc, err = c.GetDoc(ctx, "/"); err != nil {
-		return nil, fmt.Errorf("get document: %w", err)
-	}
-
-	var (
-		loginStartURLPath = "/api/login/start"
-		hiddenFields      map[string]string
-	)
-	if hiddenFields, err = c.extractHiddenFormFields(doc, loginStartURLPath); err != nil {
-		return nil, fmt.Errorf("extract hidden form fields: %w", err)
-	}
-	csrfToken := hiddenFields["csrf_token"]
-
 	var asOpts *virtualwebauthn.AssertionOptions
-	if asOpts, err = c.startLogin(ctx, loginStartURLPath, csrfToken); err != nil {
+	var err error
+	if asOpts, err = c.startLogin(ctx, "/api/login/start"); err != nil {
 		return nil, fmt.Errorf("start login: %w", err)
 	}
 
-	if err = c.finishLogin(ctx, asOpts, csrfToken); err != nil {
+	if err = c.finishLogin(ctx, asOpts); err != nil {
 		return nil, fmt.Errorf("finish login: %w", err)
 	}
 
-	if doc, err = c.GetDoc(ctx, "/"); err != nil {
+	doc, err := c.GetDoc(ctx, "/")
+	if err != nil {
 		return nil, fmt.Errorf("get document after login: %w", err)
 	}
 	return doc, nil
@@ -321,7 +291,6 @@ func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
 func (c *Client) startLogin(
 	ctx context.Context,
 	loginStartURLPath string,
-	csrfToken string,
 ) (*virtualwebauthn.AssertionOptions, error) {
 	var (
 		req *http.Request
@@ -331,7 +300,6 @@ func (c *Client) startLogin(
 		return nil, fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
@@ -353,7 +321,7 @@ func (c *Client) startLogin(
 	return asOpts, nil
 }
 
-func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.AssertionOptions, csrfToken string) error {
+func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.AssertionOptions) error {
 	credential := c.authenticator.Credentials[0]
 	asResp := virtualwebauthn.CreateAssertionResponse(c.rp, c.authenticator, credential, *asOpts)
 	var (
@@ -369,7 +337,6 @@ func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.Assert
 		return fmt.Errorf("new request with context: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set(nosurf.HeaderName, csrfToken)
 	var resp *http.Response
 	if resp, err = c.client.Do(req); err != nil {
 		return fmt.Errorf("do request: %w", err)
@@ -401,6 +368,11 @@ func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPat
 	formSelector := fmt.Sprintf("form[action='%s']", formActionURLPath)
 	form := doc.Find(formSelector)
 
+	// Assert that the form exists
+	if form.Length() == 0 {
+		return nil, fmt.Errorf("form with action '%s' not found in document", formActionURLPath)
+	}
+
 	// Initialize the map to store hidden field values
 	hiddenFields := make(map[string]string)
 
@@ -412,11 +384,6 @@ func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPat
 			hiddenFields[name] = value
 		}
 	})
-
-	// Check if CSRF token is present
-	if _, ok := hiddenFields["csrf_token"]; !ok {
-		return nil, errors.New("csrf_token not found in form")
-	}
 
 	return hiddenFields, nil
 }

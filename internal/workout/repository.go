@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // repository contains the repositories for the domain-driven design aggregates.
 type repository struct {
-	prefs     preferencesRepository
-	sessions  sessionRepository
-	exercises exerciseRepository
+	prefs        preferencesRepository
+	sessions     sessionRepository
+	exercises    exerciseRepository
+	featureFlags featureFlagRepository
 }
 
 // preferencesRepository handles workout preferences.
@@ -24,8 +26,9 @@ type preferencesRepository interface {
 
 // exerciseSetAggregate groups all sets for a specific exercise in a workout.
 type exerciseSetAggregate struct {
-	ExerciseID int
-	Sets       []Set
+	ExerciseID        int
+	Sets              []Set
+	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
 }
 
 // sessionAggregate represents a complete workout session including all exercises and their sets.
@@ -59,6 +62,13 @@ type exerciseRepository interface {
 	Update(ctx context.Context, exerciseID int, updateFn func(ex *Exercise) (bool, error)) error
 	// ListMuscleGroups retrieves all available muscle groups.
 	ListMuscleGroups(ctx context.Context) ([]string, error)
+}
+
+// featureFlagRepository handles feature flags.
+type featureFlagRepository interface {
+	Get(ctx context.Context, name string) (FeatureFlag, error)
+	Set(ctx context.Context, flag FeatureFlag) error
+	List(ctx context.Context) ([]FeatureFlag, error)
 }
 
 // baseRepository contains common functionality for all repositories.
@@ -122,12 +132,14 @@ func (f *repositoryFactory) newRepository() *repository {
 	exerciseRepo := newSQLiteExerciseRepository(f.db)
 	preferencesRepo := newSQLitePreferenceRepository(f.db)
 	sessionRepo := newSQLiteSessionRepository(f.db)
+	featureFlagRepo := newSQLiteFeatureFlagRepository(f.db)
 
 	// Return a composite repository
 	return &repository{
-		prefs:     preferencesRepo,
-		sessions:  sessionRepo,
-		exercises: exerciseRepo,
+		prefs:        preferencesRepo,
+		sessions:     sessionRepo,
+		exercises:    exerciseRepo,
+		featureFlags: featureFlagRepo,
 	}
 }
 

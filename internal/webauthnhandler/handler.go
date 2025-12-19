@@ -4,16 +4,18 @@ import (
 	"context"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/myrjola/petrapp/internal/ptr"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"log/slog"
-	"net/http"
-	"sync"
-	"time"
 )
 
 type WebAuthnHandler struct {
@@ -236,5 +238,23 @@ func (h *WebAuthnHandler) Logout(ctx context.Context) error {
 		return fmt.Errorf("renew session token: %w", err)
 	}
 	h.sessionManager.Remove(ctx, string(userIDSessionKey))
+	return nil
+}
+
+func (h *WebAuthnHandler) DeleteUser(ctx context.Context) error {
+	userID := h.sessionManager.Get(ctx, string(userIDSessionKey))
+	if userID == nil {
+		return errors.New("no authenticated user in session")
+	}
+
+	userIDBytes, ok := userID.([]byte)
+	if !ok {
+		return errors.New("invalid user ID type in session")
+	}
+
+	if err := h.deleteUser(ctx, userIDBytes); err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+
 	return nil
 }

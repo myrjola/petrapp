@@ -28,24 +28,13 @@ function bufferEncode(value) {
 }
 
 /**
- * Extracts CSRF token from a form in the HTTP headers format accepted by fetch.
- * @param form {HTMLFormElement}
- * @returns {Record<string, string>}
- */
-function extractCsrfTokenHeaders(form) {
-  const data = new FormData(form)
-  return {'X-CSRF-Token': data.get('csrf_token').toString()}
-}
-
-/**
- * Submits given form handling CSRF tokens and decoding JSON.
+ * Submits given form and decodes JSON response.
  * @param form {HTMLFormElement}
  * @returns {Promise<any>}
  */
 async function submitForm(form) {
-  const headers = extractCsrfTokenHeaders(form)
   const url = form.action
-  const resp = await fetch(url, {method: "post", headers})
+  const resp = await fetch(url, {method: "post"})
 
   if (!resp.ok) {
     throw new Error(`Failed to submit form!`);
@@ -66,7 +55,7 @@ async function createAttestationResponse(publicKey) {
     ...excludedCredential,
     id: bufferDecode(excludedCredential.id),
   }))
-  const credential = await navigator.credentials.create({ publicKey });
+  const credential = await navigator.credentials.create({publicKey});
   const {id, rawId, type, response: {attestationObject, clientDataJSON}} = credential;
   return JSON.stringify({
     id,
@@ -82,11 +71,10 @@ async function createAttestationResponse(publicKey) {
 /**
  * Finishes registration with the server and reloads the page.
  * @param attestationResponse is the payload sent to the finish registration endpoint.
- * @param headers is the CSRF token headers to be sent with the request.
  * @returns {Promise<void>}
  */
-async function finishRegistration(attestationResponse, headers) {
-  const finishResp = await fetch("/api/registration/finish", { method: "post", headers, body: attestationResponse })
+async function finishRegistration(attestationResponse) {
+  const finishResp = await fetch("/api/registration/finish", {method: "post", body: attestationResponse})
   if (!finishResp.ok) {
     throw new Error("Finishing registration failed!");
   }
@@ -95,17 +83,30 @@ async function finishRegistration(attestationResponse, headers) {
 }
 
 /**
+ * Resets form state after a failed submission.
+ * @param form {HTMLFormElement}
+ */
+function resetFormState(form) {
+  form.classList.remove('submitting')
+  const submitButton = form.querySelector("button[type=submit]")
+  if (submitButton) {
+    submitButton.disabled = false
+  }
+}
+
+/**
  * Registers a user using Webauthn.
  * @param e {SubmitEvent}
  */
 export async function registerUser(e) {
+  e.preventDefault()
   try {
-    e.preventDefault()
     const credentialCreationOptions = await submitForm(e.target)
     const attestationResponse = await createAttestationResponse(credentialCreationOptions.publicKey)
-    await finishRegistration(attestationResponse, extractCsrfTokenHeaders(e.target))
+    await finishRegistration(attestationResponse)
   } catch (err) {
     console.error(err)
+    resetFormState(e.target)
     throw new Error("Registration failed!");
   }
 }
@@ -117,7 +118,7 @@ export async function registerUser(e) {
  */
 async function createAssertionResponse(publicKey) {
   publicKey.challenge = bufferDecode(/** @type {string} */ publicKey.challenge);
-  const assertion = await navigator.credentials.get({ publicKey });
+  const assertion = await navigator.credentials.get({publicKey});
   const {id, rawId, type, response: {authenticatorData, clientDataJSON, signature, userHandle}} = assertion;
   return JSON.stringify({
     id,
@@ -135,11 +136,10 @@ async function createAssertionResponse(publicKey) {
 /**
  * Finishes login with the server and reloads the page.
  * @param assertionResponse is the payload sent to the finish login endpoint.
- * @param headers {Record<string, string>} is the HTTP headers for the request.
  * @returns {Promise<void>}
  */
-async function finishLogin(assertionResponse, headers) {
-  const finishResp = await fetch("/api/login/finish", { method: "post", headers, body: assertionResponse })
+async function finishLogin(assertionResponse) {
+  const finishResp = await fetch("/api/login/finish", {method: "post", body: assertionResponse})
   if (!finishResp.ok) {
     throw new Error("Finishing login failed!");
   }
@@ -156,9 +156,10 @@ export async function loginUser(e) {
   try {
     const credentialRequestOptions = await submitForm(e.target)
     const assertionResponse = await createAssertionResponse(credentialRequestOptions.publicKey)
-    await finishLogin(assertionResponse, extractCsrfTokenHeaders(e.target))
+    await finishLogin(assertionResponse)
   } catch (err) {
     console.error(err)
+    resetFormState(e.target)
     throw new Error("Login failed!");
   }
 }

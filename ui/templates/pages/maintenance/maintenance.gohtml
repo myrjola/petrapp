@@ -1,0 +1,82 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.BaseTemplateData*/ -}}
+
+{{ define "page" }}
+    <style {{ nonce }}>
+        @scope {
+            .maintenance-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                padding: var(--size-4);
+                text-align: center;
+                background: var(--gray-0);
+            }
+
+            .maintenance-content {
+                max-width: var(--size-15);
+                padding: var(--size-8) var(--size-6);
+                background: var(--white);
+                border-radius: var(--radius-3);
+                border: var(--border-size-1) solid var(--yellow-5);
+                box-shadow: 0 var(--size-2) var(--size-4) rgba(0, 0, 0, 0.1);
+            }
+
+            .maintenance-icon {
+                font-size: var(--font-size-8);
+                color: var(--yellow-7);
+                margin-bottom: var(--size-4);
+                line-height: 1;
+            }
+
+            .maintenance-title {
+                font-size: var(--font-size-6);
+                font-weight: var(--font-weight-7);
+                color: var(--gray-9);
+                margin-bottom: var(--size-2);
+                line-height: var(--font-lineheight-1);
+            }
+
+            .maintenance-subtitle {
+                font-size: var(--font-size-4);
+                font-weight: var(--font-weight-5);
+                color: var(--yellow-9);
+                margin-bottom: var(--size-4);
+                line-height: var(--font-lineheight-1);
+            }
+
+            .maintenance-message {
+                font-size: var(--font-size-2);
+                color: var(--gray-6);
+                margin-bottom: var(--size-6);
+                line-height: var(--font-lineheight-3);
+            }
+
+            .maintenance-notice {
+                padding: var(--size-3);
+                background: var(--yellow-1);
+                border: var(--border-size-1) solid var(--yellow-3);
+                border-radius: var(--radius-2);
+                font-size: var(--font-size-1);
+                color: var(--yellow-11);
+                margin-top: var(--size-4);
+            }
+        }
+    </style>
+
+    <div class="maintenance-container">
+        <div class="maintenance-content">
+            <div class="maintenance-icon">🔧</div>
+            <h1 class="maintenance-title">Maintenance Mode</h1>
+            <h2 class="maintenance-subtitle">System Under Maintenance</h2>
+            <p class="maintenance-message">
+                We're currently performing scheduled maintenance to improve your workout experience.
+                Please check back in a few minutes.
+            </p>
+            <div class="maintenance-notice">
+                <strong>Note:</strong> All your workout data is safe and will be available once maintenance is complete.
+            </div>
+        </div>
+    </div>
+{{ end }}

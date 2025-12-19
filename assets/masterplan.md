@@ -2,7 +2,9 @@
 
 ## Overview
 
-Petrapp is a minimalist, privacy-focused mobile web application that automatically generates and tracks gym workouts. The app emphasizes simplicity in both user experience and technical implementation, using standard libraries and minimal dependencies.
+Petrapp is a minimalist, privacy-focused mobile web application that automatically generates and tracks gym workouts.
+The app emphasizes simplicity in both user experience and technical implementation, using standard libraries and minimal
+dependencies.
 
 ## Core Principles
 
@@ -51,9 +53,9 @@ Petrapp is a minimalist, privacy-focused mobile web application that automatical
 ### Backend
 
 - Go with standard library focus and minimal dependencies
-  - Notable golangci-lint rules :
-    - govet shadow: declaration of "err" shadows declaration at line 392
-    - godot: check if comments end in a period.
+    - Notable golangci-lint rules :
+        - govet shadow: declaration of "err" shadows declaration at line 392
+        - godot: check if comments end in a period.
 - SQLite database for simple, self-contained data storage
     - Since the data is local, n+1 query problem is not a concern. Keep the SQL queries simple.
 
@@ -66,7 +68,7 @@ Petrapp is a minimalist, privacy-focused mobile web application that automatical
 - Scoped CSS for style isolation
 - Mobile-only interface
 - Progressive enhancement for JavaScript features, i.e., app will work even when JavaScript is disabled.
-  - Vanilla HTML forms and anchor links for core functionality
+    - Vanilla HTML forms and anchor links for core functionality
 
 ## Task Execution
 

@@ -14,6 +14,7 @@ func createTestSet(weight float64, minReps, maxReps int, completedReps *int) Set
 		MinReps:       minReps,
 		MaxReps:       maxReps,
 		CompletedReps: completedReps,
+		CompletedAt:   nil,
 	}
 }
 
@@ -31,13 +32,13 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "New user with no history",
 			preferences: Preferences{
-				Monday:    true,
-				Wednesday: true,
-				Friday:    true,
-				Tuesday:   false,
-				Thursday:  false,
-				Saturday:  false,
-				Sunday:    false,
+				MondayMinutes:    60,
+				TuesdayMinutes:   0,
+				WednesdayMinutes: 60,
+				ThursdayMinutes:  0,
+				FridayMinutes:    60,
+				SaturdayMinutes:  0,
+				SundayMinutes:    0,
 			},
 			history: nil,
 			pool:    createExercisePool(),
@@ -46,13 +47,13 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "User with workout history",
 			preferences: Preferences{
-				Monday:    true,
-				Tuesday:   true,
-				Thursday:  true,
-				Saturday:  true,
-				Wednesday: false,
-				Friday:    false,
-				Sunday:    false,
+				MondayMinutes:    60,
+				TuesdayMinutes:   60,
+				WednesdayMinutes: 0,
+				ThursdayMinutes:  60,
+				FridayMinutes:    0,
+				SaturdayMinutes:  60,
+				SundayMinutes:    0,
 			},
 			history: createWorkoutHistory(),
 			pool:    createExercisePool(),
@@ -61,13 +62,13 @@ func TestGenerate(t *testing.T) {
 		{
 			name: "Weekend workout",
 			preferences: Preferences{
-				Saturday:  true,
-				Sunday:    true,
-				Monday:    false,
-				Tuesday:   false,
-				Wednesday: false,
-				Thursday:  false,
-				Friday:    false,
+				MondayMinutes:    0,
+				TuesdayMinutes:   0,
+				WednesdayMinutes: 0,
+				ThursdayMinutes:  0,
+				FridayMinutes:    0,
+				SaturdayMinutes:  60,
+				SundayMinutes:    60,
 			},
 			history: createWorkoutHistory(),
 			pool:    createExercisePool(),
@@ -100,13 +101,13 @@ func TestGenerate(t *testing.T) {
 func TestGenerateErrorHandling(t *testing.T) {
 	// Create a generator with no exercises in the pool
 	emptyPreferences := Preferences{
-		Monday:    false,
-		Tuesday:   false,
-		Wednesday: false,
-		Thursday:  false,
-		Friday:    false,
-		Saturday:  false,
-		Sunday:    false,
+		MondayMinutes:    0,
+		TuesdayMinutes:   0,
+		WednesdayMinutes: 0,
+		ThursdayMinutes:  0,
+		FridayMinutes:    0,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
 	}
 	emptyHistory := []sessionAggregate{}
 	emptyPool := []Exercise{}
@@ -422,6 +423,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(80, 8, 12, &rep8),
 						createTestSet(80, 8, 12, &rep8),
 					},
+					WarmupCompletedAt: nil,
 				},
 				{
 					ExerciseID: exercises[2].ID, // Shoulder Press
@@ -430,6 +432,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(50, 8, 12, &rep10),
 						createTestSet(50, 8, 12, &rep8),
 					},
+					WarmupCompletedAt: nil,
 				},
 			},
 		},
@@ -447,6 +450,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(82., 8, 12, &rep8),
 						createTestSet(82., 8, 12, &rep6),
 					},
+					WarmupCompletedAt: nil,
 				},
 				{
 					ExerciseID: exercises[2].ID, // Shoulder Press
@@ -455,6 +459,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(52.5, 8, 12, &rep8),
 						createTestSet(52.5, 8, 12, &rep8),
 					},
+					WarmupCompletedAt: nil,
 				},
 			},
 		},
@@ -472,6 +477,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(100, 8, 12, &rep12),
 						createTestSet(100, 8, 12, &rep10),
 					},
+					WarmupCompletedAt: nil,
 				},
 				{
 					ExerciseID: exercises[7].ID, // Deadlift
@@ -480,6 +486,7 @@ func createWorkoutHistory() []sessionAggregate {
 						createTestSet(120, 3, 6, &rep6),
 						createTestSet(120, 3, 6, &rep6),
 					},
+					WarmupCompletedAt: nil,
 				},
 			},
 		},
@@ -491,13 +498,13 @@ func createWorkoutHistory() []sessionAggregate {
 func TestProgressionOverTime(t *testing.T) {
 	// Create initial generator with test data.
 	preferences := Preferences{
-		Monday:    true,
-		Wednesday: true,
-		Friday:    true,
-		Tuesday:   false,
-		Thursday:  false,
-		Saturday:  false,
-		Sunday:    false,
+		MondayMinutes:    60,
+		TuesdayMinutes:   0,
+		WednesdayMinutes: 60,
+		ThursdayMinutes:  0,
+		FridayMinutes:    60,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
 	}
 	exercises := createExercisePool()
 	initialHistory := []sessionAggregate{}
@@ -550,13 +557,13 @@ func TestProgressionOverTime(t *testing.T) {
 func TestContinuityBetweenWeeks(t *testing.T) {
 	// Create test data
 	preferences := Preferences{
-		Monday:    true,
-		Friday:    true,
-		Tuesday:   false,
-		Wednesday: false,
-		Thursday:  false,
-		Saturday:  false,
-		Sunday:    false,
+		MondayMinutes:    60,
+		TuesdayMinutes:   0,
+		WednesdayMinutes: 0,
+		ThursdayMinutes:  0,
+		FridayMinutes:    60,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
 	}
 	exercises := createExercisePool()
 
@@ -599,13 +606,13 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 func TestUserFeedbackIntegration(t *testing.T) {
 	// Setup test data
 	preferences := Preferences{
-		Tuesday:   true,
-		Thursday:  true,
-		Monday:    false,
-		Wednesday: false,
-		Friday:    false,
-		Saturday:  false,
-		Sunday:    false,
+		MondayMinutes:    0,
+		TuesdayMinutes:   60,
+		WednesdayMinutes: 0,
+		ThursdayMinutes:  60,
+		FridayMinutes:    0,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
 	}
 	exercises := createExercisePool()
 

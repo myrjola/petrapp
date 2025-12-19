@@ -5,7 +5,7 @@
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    margin: var(--size-4);
+                    padding: var(--size-4);
                     display: flex;
                     flex-direction: column;
                     gap: var(--size-4);
@@ -13,52 +13,51 @@
                     header {
                         margin-left: auto;
                     }
+
+                    .menu-button a {
+                        display: inline-flex;
+                        align-items: center;
+                        padding: var(--size-2) var(--size-3);
+                        background: var(--white);
+                        color: var(--gray-9);
+                        text-decoration: none;
+                        border-radius: var(--radius-2);
+                        border: 1px solid var(--gray-3);
+                        font-weight: var(--font-weight-5);
+                        font-size: var(--font-size-1);
+                        transition: all 0.2s ease;
+                        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                    }
+
+                    .menu-button a:hover {
+                        background: var(--gray-0);
+                        border-color: var(--gray-4);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                        transform: translateY(-1px);
+                    }
+
+                    .menu-button a:active {
+                        transform: translateY(0);
+                        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+                    }
+
+                    .weekly-schedule {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+                    }
                 }
             }
         </style>
 
         <header class="menu-button">
-            <a href="/preferences">Menu</a>
+            <a href="/preferences">
+                Menu
+            </a>
         </header>
 
-        {{ range .Days }}
-            {{ if .IsToday }}
-                <div>
-                    <style {{nonce}}>
-                        @scope {
-                            :scope {
-                                display: flex;
-                                flex-direction: column;
-                                gap: var(--size-2);
-
-                                div {
-                                    display: flex;
-                                    justify-content: space-between;
-                                    gap: var(--size-3);
-                                }
-                            }
-                        }
-                    </style>
-                    <div>
-                        <span>
-                            Today {{ .Name }}
-                        </span>
-                        <span>
-                        {{ .Date.Format "2006-01-02" }}
-                        </span>
-                    </div>
-                    <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                        {{ csrf }}
-                        <button type="submit">
-                            Start workout
-                        </button>
-                    </form>
-                </div>
-            {{ else }}
-                <div>
-                    <span>{{ .Name }}</span>
-                </div>
-            {{ end }}
-        {{ end }}
+        <div class="weekly-schedule">
+            {{ template "day-cards" . }}
+        </div>
     </main>
 {{ end }}

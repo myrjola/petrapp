@@ -1,0 +1,44 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.dayData*/ -}}
+
+{{ define "progress-bar" }}
+    {{ if .ShouldShowProgress }}
+        <div data-component="progress-bar">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                    }
+
+                    .progress-bar {
+                        flex: 1;
+                        height: 8px;
+                        background: var(--gray-3);
+                        border-radius: var(--radius-round);
+                        overflow: hidden;
+                    }
+
+                    .progress-fill {
+                        width: {{ .ProgressPercent }}%;
+                        height: 100%;
+                        background: {{ if eq .Status "completed" }}var(--lime-6){{ else }}var(--yellow-6){{ end }};
+                    }
+
+                    .progress-text {
+                        font-size: var(--font-size-0);
+                        color: var(--gray-6);
+                        min-width: fit-content;
+                    }
+                }
+            </style>
+            <div class="progress-bar">
+                <div class="progress-fill">
+                </div>
+            </div>
+            <div class="progress-text">
+                {{ .CompletedSets }}/{{ .TotalSets }} sets
+            </div>
+        </div>
+    {{ end }}
+{{ end }}

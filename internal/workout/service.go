@@ -4,14 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/sqlite"
 	"log/slog"
+	"os"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // Service handles the business logic for workout management.
 type Service struct {
 	repo         *repository
+	db           *sqlite.Database
 	logger       *slog.Logger
 	openaiAPIKey string
 }
@@ -21,6 +25,7 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 	factory := newRepositoryFactory(db, logger)
 	return &Service{
 		repo:         factory.newRepository(),
+		db:           db,
 		logger:       logger,
 		openaiAPIKey: openaiAPIKey,
 	}
@@ -96,12 +101,22 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 	// Generate dates from Monday to Sunday
 	for i := range 7 {
 		day := monday.AddDate(0, 0, i)
-		workout, err := s.generateWorkout(ctx, day)
-		if err != nil {
-			return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
+
+		// Try to get existing session first
+		sessionAggr, err := s.repo.sessions.Get(ctx, day)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return nil, fmt.Errorf("get session %s: %w", formatDate(day), err)
 		}
 
-		workouts[i], err = s.enrichSessionAggregate(ctx, workout)
+		// If no existing session, generate a new one
+		if errors.Is(err, ErrNotFound) {
+			sessionAggr, err = s.generateWorkout(ctx, day)
+			if err != nil {
+				return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
+			}
+		}
+
+		workouts[i], err = s.enrichSessionAggregate(ctx, sessionAggr)
 		if err != nil {
 			return nil, fmt.Errorf("enrich workout %s: %w", formatDate(day), err)
 		}
@@ -142,6 +157,7 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 		}
 		session.ExerciseSets[i].Exercise = exercise
 		session.ExerciseSets[i].Sets = ex.Sets
+		session.ExerciseSets[i].WarmupCompletedAt = ex.WarmupCompletedAt
 	}
 	return session, nil
 }
@@ -240,7 +256,31 @@ func (s *Service) UpdateCompletedReps(
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
+				now := time.Now().UTC()
 				ex.Sets[setIndex].CompletedReps = &completedReps
+				ex.Sets[setIndex].CompletedAt = &now
+				return true, nil
+			}
+		}
+		return false, errors.New("exercise not found")
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+	}
+
+	return nil
+}
+
+// MarkWarmupComplete marks the warmup as complete for a specific exercise.
+func (s *Service) MarkWarmupComplete(
+	ctx context.Context,
+	date time.Time,
+	exerciseID int,
+) error {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
+		for i := range sess.ExerciseSets {
+			if sess.ExerciseSets[i].ExerciseID == exerciseID {
+				now := time.Now().UTC()
+				sess.ExerciseSets[i].WarmupCompletedAt = &now
 				return true, nil
 			}
 		}
@@ -268,6 +308,57 @@ func (s *Service) GetExercise(ctx context.Context, id int) (Exercise, error) {
 		return Exercise{}, fmt.Errorf("get exercise: %w", err)
 	}
 	return exercise, nil
+}
+
+// GetSessionsWithExerciseSince retrieves all sessions since a given date that contain the specified exercise.
+func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID int, since time.Time) (
+	[]Session, error) {
+	sessions, err := s.repo.sessions.List(ctx, since)
+	if err != nil {
+		return nil, fmt.Errorf("get sessions: %w", err)
+	}
+
+	// Filter sessions that contain the specified exercise
+	var result []Session
+	for _, session := range sessions {
+		// Check if this session contains the exercise
+		hasExercise := false
+		for _, es := range session.ExerciseSets {
+			if es.ExerciseID == exerciseID {
+				hasExercise = true
+				break
+			}
+		}
+
+		if hasExercise {
+			// Convert sessionAggregate to Session by enriching with exercise data
+			enrichedSession := Session{
+				Date:             session.Date,
+				DifficultyRating: session.DifficultyRating,
+				StartedAt:        session.StartedAt,
+				CompletedAt:      session.CompletedAt,
+				ExerciseSets:     make([]ExerciseSet, len(session.ExerciseSets)),
+			}
+
+			// Enrich exercise sets with exercise data
+			for i, es := range session.ExerciseSets {
+				ex, getErr := s.repo.exercises.Get(ctx, es.ExerciseID)
+				if getErr != nil {
+					return nil, fmt.Errorf("get exercise %d: %w", es.ExerciseID, getErr)
+				}
+
+				enrichedSession.ExerciseSets[i] = ExerciseSet{
+					Exercise:          ex,
+					Sets:              es.Sets,
+					WarmupCompletedAt: es.WarmupCompletedAt,
+				}
+			}
+
+			result = append(result, enrichedSession)
+		}
+	}
+
+	return result, nil
 }
 
 // UpdateExercise updates an existing exercise.
@@ -427,6 +518,7 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil, // Reset completion status
+			CompletedAt:   nil,
 		}
 	}
 	return result
@@ -445,6 +537,7 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 	}
 	return result
@@ -556,26 +649,30 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
+					CompletedAt:   nil,
 				},
 				{
 					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
+					CompletedAt:   nil,
 				},
 				{
 					WeightKg:      &[]float64{0}[0],
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
+					CompletedAt:   nil,
 				},
 			}
 		}
 
 		// Add the new exercise to the session
 		newExerciseSet := exerciseSetAggregate{
-			ExerciseID: exerciseID,
-			Sets:       newSets,
+			ExerciseID:        exerciseID,
+			Sets:              newSets,
+			WarmupCompletedAt: nil,
 		}
 
 		sess.ExerciseSets = append(sess.ExerciseSets, newExerciseSet)
@@ -587,4 +684,60 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	}
 
 	return nil
+}
+
+// GetFeatureFlag retrieves a feature flag by name.
+func (s *Service) GetFeatureFlag(ctx context.Context, name string) (FeatureFlag, error) {
+	flag, err := s.repo.featureFlags.Get(ctx, name)
+	if err != nil {
+		return FeatureFlag{}, fmt.Errorf("get feature flag %s: %w", name, err)
+	}
+	return flag, nil
+}
+
+// IsMaintenanceModeEnabled checks if maintenance mode is enabled.
+func (s *Service) IsMaintenanceModeEnabled(ctx context.Context) bool {
+	flag, err := s.repo.featureFlags.Get(ctx, "maintenance_mode")
+	if err != nil {
+		// If we can't check the flag, assume maintenance is disabled for safety
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to check maintenance mode flag", slog.Any("error", err))
+		return false
+	}
+	return flag.Enabled
+}
+
+// ListFeatureFlags retrieves all feature flags.
+func (s *Service) ListFeatureFlags(ctx context.Context) ([]FeatureFlag, error) {
+	flags, err := s.repo.featureFlags.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list feature flags: %w", err)
+	}
+	return flags, nil
+}
+
+// SetFeatureFlag updates or creates a feature flag.
+func (s *Service) SetFeatureFlag(ctx context.Context, flag FeatureFlag) error {
+	if err := s.repo.featureFlags.Set(ctx, flag); err != nil {
+		return fmt.Errorf("set feature flag %s: %w", flag.Name, err)
+	}
+	return nil
+}
+
+// ExportUserData creates a SQLite database export containing all data for the authenticated user.
+// This method is intended for GDPR compliance and allows users to download their complete data.
+func (s *Service) ExportUserData(ctx context.Context) (string, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	if userID == 0 {
+		return "", errors.New("no authenticated user found in context")
+	}
+
+	tempDir := os.TempDir()
+
+	// Call the database's createUserDB method
+	exportPath, err := s.db.CreateUserDB(ctx, userID, tempDir)
+	if err != nil {
+		return "", fmt.Errorf("create user database: %w", err)
+	}
+
+	return exportPath, nil
 }

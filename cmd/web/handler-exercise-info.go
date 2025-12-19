@@ -3,14 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/workout"
-	"github.com/yuin/goldmark"
+	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/yuin/goldmark"
 )
 
 // exerciseInfoTemplateData contains data for the exercise info template.
@@ -27,7 +29,7 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	dateStr := r.PathValue("date")
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
@@ -35,13 +37,17 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	exerciseIDStr := r.PathValue("exerciseID")
 	exerciseID, err := strconv.Atoi(exerciseIDStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
 	// Get the exercise
 	exercise, err := app.workoutService.GetExercise(r.Context(), exerciseID)
 	if err != nil {
+		if errors.Is(err, workout.ErrNotFound) {
+			app.notFound(w, r)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}

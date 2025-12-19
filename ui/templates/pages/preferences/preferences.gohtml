@@ -5,74 +5,266 @@
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    margin: var(--size-4);
+                    max-width: 32rem;
+                    margin: 0 auto;
+                    padding: var(--size-6) var(--size-4);
+                }
+
+                h1 {
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-6);
+                    margin-bottom: var(--size-3);
+                    color: var(--color-text-primary);
+                    text-align: center;
+                }
+
+                .subtitle {
+                    color: var(--color-text-secondary);
+                    text-align: center;
+                    margin-bottom: var(--size-7);
+                    font-size: var(--font-size-2);
+                }
+
+                .schedule-form {
+                    background: var(--color-surface-elevated);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    padding: var(--size-6);
+                    margin-bottom: var(--size-6);
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                }
+
+                .weekdays-grid {
+                    display: grid;
+                    gap: var(--size-2);
+                    margin-bottom: var(--size-6);
+                }
+
+                .weekday-item {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-3);
+                    padding: var(--size-4);
+                    border-radius: var(--radius-2);
+                    transition: all 0.2s ease;
+
+                    .workout-duration {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                        width: 100%;
+
+                        .weekday-label {
+                            font-weight: var(--font-weight-5);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-2);
+                            flex: 1;
+                        }
+
+                        select {
+                            padding: var(--size-2) var(--size-3);
+                            border: var(--border-size-1) solid var(--color-border);
+                            border-radius: var(--radius-2);
+                            background: var(--color-surface);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-1);
+                            cursor: pointer;
+                            min-width: 8rem;
+
+                            &:focus {
+                                outline: 2px solid var(--color-success);
+                                outline-offset: 2px;
+                            }
+
+                            &:hover {
+                                border-color: var(--color-border-hover);
+                            }
+                        }
+                    }
+                }
+
+                .save-button {
+                    width: 100%;
+                    padding: var(--size-4) var(--size-6);
+                    background: var(--sky-6);
+                    color: var(--white);
+                    border: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-2);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--sky-7);
+                    }
+
+                    &:active {
+                        background: var(--sky-8);
+                    }
+                }
+
+                .footer-section {
+                    margin-top: var(--size-8);
+                    padding-top: var(--size-6);
+                    border-top: var(--border-size-1) solid var(--color-border);
+                    display: flex;
+                    justify-content: center;
+                }
+
+                .logout-button {
+                    padding: var(--size-3) var(--size-5);
+                    background: transparent;
+                    color: var(--color-text-secondary);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+
+                    &:hover {
+                        background: var(--gray-1);
+                        color: var(--color-text-primary);
+                        border-color: var(--gray-4);
+                    }
+                }
+
+                .data-export-section {
+                    margin-top: var(--size-8);
+                    padding: var(--size-6);
+                    background: var(--color-surface-elevated);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                }
+
+                .data-export-section h2 {
+                    font-size: var(--font-size-3);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin: 0 0 var(--size-3) 0;
+                }
+
+                .data-export-section p {
+                    color: var(--color-text-secondary);
+                    margin-bottom: var(--size-4);
+                    font-size: var(--font-size-1);
+                    line-height: 1.5;
+                }
+
+                .export-button {
+                    display: inline-block;
+                    padding: var(--size-3) var(--size-5);
+                    background: var(--sky-6);
+                    color: var(--white);
+                    text-decoration: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-5);
+                    font-size: var(--font-size-1);
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--sky-7);
+                    }
+
+                    &:active {
+                        background: var(--sky-8);
+                    }
+                }
+
+                .danger-zone {
+                    margin-top: var(--size-8);
+                    padding: var(--size-6);
+                    background: var(--red-1);
+                    border: var(--border-size-1) solid var(--red-4);
+                    border-radius: var(--radius-3);
+                }
+
+                .danger-zone h2 {
+                    font-size: var(--font-size-3);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin: 0 0 var(--size-3) 0;
+                }
+
+                .danger-zone p {
+                    color: var(--color-text-primary);
+                    margin-bottom: var(--size-4);
+                    font-size: var(--font-size-1);
+                    line-height: 1.5;
+                }
+
+                .delete-button {
+                    padding: var(--size-3) var(--size-5);
+                    background: var(--red-11);
+                    color: var(--white);
+                    border: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-5);
+                    font-size: var(--font-size-1);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--red-12);
+                    }
+
+                    &:active {
+                        background: var(--red-12);
+                    }
                 }
             }
         </style>
 
         <h1>Weekly Schedule</h1>
-        <p>On which days are you planning to go to gym?</p>
+        <p class="subtitle">Select the days you're planning to go to the gym</p>
 
-        <form method="post" action="/preferences">
-            {{ csrf }}
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        label {
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-3);
-                            padding-block: var(--size-3);
-
-                            &:hover {
-                                background-color: var(--gray-0);
-                            }
-
-                            input[type="checkbox"] {
-                                width: var(--size-5);
-                                height: var(--size-5);
-                                margin: 0;
-                            }
-                        }
-
-                        button[type="submit"] {
-                            margin-top: var(--size-4);
-                            width: 100%;
-                        }
-                    }
-                }
-            </style>
-            {{ range .Weekdays }}
-                <label>
-                    <input
-                            type="checkbox"
-                            name="{{ .ID }}"
-                            value="true"
-                            {{ if .Checked }}checked{{ end }}
-                    >
-                    <span>
-                        {{ .Name }}
-                    </span>
-                </label>
-                </div>
-            {{ end }}
-            <button type="submit">Save</button>
+        <form method="post" action="/preferences" class="schedule-form">
+            <div class="weekdays-grid">
+                {{ range .Weekdays }}
+                    <div class="weekday-item">
+                        <div class="workout-duration">
+                            <label for="{{ .ID }}_minutes_select" class="weekday-label">{{ .Name }}</label>
+                            <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select">
+                                {{ $weekdayMinutes := .Minutes }}
+                                {{ range $.DurationOptions }}
+                                    <option value="{{ .Value }}"
+                                            {{ if eq .Value $weekdayMinutes }}selected{{ end }}>
+                                        {{ .Label }}
+                                    </option>
+                                {{ end }}
+                            </select>
+                        </div>
+                    </div>
+                {{ end }}
+            </div>
+            <button type="submit" class="save-button">Save Schedule</button>
         </form>
-        <footer>
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        margin-top: var(--size-4);
-                        display: flex;
-                        justify-content: center;
-                        gap: var(--size-4);
-                    }
-                }
-            </style>
+
+        <div class="data-export-section">
+            <h2>Export Your Data</h2>
+            <p>Download all your workout data as a SQLite database file for your personal records or data
+                portability.</p>
+            <a href="/preferences/export-data" class="export-button" download>
+                Download My Data
+            </a>
+        </div>
+
+        <div class="danger-zone">
+            <h2>Danger Zone</h2>
+            <p>Permanently delete your account and all your workout data. This action cannot be undone.</p>
+            <form action="/preferences/delete-user" method="post"
+                  onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your workout data.')">
+                <button type="submit" class="delete-button">
+                    Delete my data
+                </button>
+            </form>
+        </div>
+
+        <footer class="footer-section">
             <form action="/api/logout" method="post">
-                {{ csrf }}
-                <button type="submit">
-                    <span>Log out</span>
+                <button type="submit" class="logout-button">
+                    Log out
                 </button>
             </form>
         </footer>

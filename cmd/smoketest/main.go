@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"log/slog"
-	"os"
-	"time"
 )
 
 func TestAuth(client *e2etest.Client) error {
@@ -40,12 +42,16 @@ func main() {
 
 	var (
 		hostname = os.Args[1]
-		url      = "https://" + hostname
 		client   *e2etest.Client
 		err      error
 		start    = time.Now()
 	)
-	ctx = logging.WithAttrs(ctx, slog.String("hostname", url))
+	ctx = logging.WithAttrs(ctx, slog.String("hostname", hostname))
+	url := "https://" + hostname
+	if strings.Contains(hostname, "localhost") {
+		url = "http://" + hostname
+		hostname = "localhost"
+	}
 
 	if client, err = e2etest.NewClient(url, hostname, url); err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "error creating client", slog.Any("error", err))

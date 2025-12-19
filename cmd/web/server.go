@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/myrjola/petrapp/internal/e2etest"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/e2etest"
 )
 
 const defaultTimeout = 2 * time.Second
@@ -20,7 +21,7 @@ const defaultTimeout = 2 * time.Second
 func (app *application) configureAndStartServer(ctx context.Context, addr string, handler http.Handler) error {
 	var err error
 	shutdownComplete := make(chan struct{})
-	idleTimeout := time.Minute
+	idleTimeout := 2 * time.Minute //nolint:mnd // reverse proxy may keep connections open for a long time.
 	srv := &http.Server{
 		ErrorLog:          slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
 		Handler:           handler,
@@ -28,36 +29,68 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		ReadTimeout:       defaultTimeout,
 		WriteTimeout:      defaultTimeout,
 		ReadHeaderTimeout: time.Second,
+		MaxHeaderBytes:    1 << 20, //nolint:mnd // 1 MB
 	}
-	go func() {
-		sigint := make(chan os.Signal, 1)
 
+	// Create a shutdown goroutine that handles graceful shutdown
+	go func() {
+		defer close(shutdownComplete)
+
+		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt)
 		signal.Notify(sigint, syscall.SIGTERM)
 
-		<-sigint
-		app.logger.LogAttrs(ctx, slog.LevelInfo, "shutting down server")
+		var shutdownReason string
+		select {
+		case <-sigint:
+			shutdownReason = "signal"
+		case <-ctx.Done():
+			shutdownReason = "context"
+		}
 
-		// We received an interrupt signal, shut down.
+		// Create a new context for logging since the original might be cancelled
+		logCtx := context.Background()
+		now := time.Now()
+		app.logger.LogAttrs(logCtx, slog.LevelInfo, "shutting down server", slog.String("reason", shutdownReason))
+
+		// We received an interrupt signal or context cancellation, shut down.
 		var shutdownContext context.Context
 		var cancel context.CancelFunc
 		shutdownContext, cancel = context.WithTimeout(context.Background(), defaultTimeout)
 		defer cancel()
-		if err = srv.Shutdown(shutdownContext); err != nil {
-			err = fmt.Errorf("shutdown server: %w", err)
-			app.logger.LogAttrs(ctx, slog.LevelError, "error shutting down server", slog.Any("error", err))
+		if shutdownErr := srv.Shutdown(shutdownContext); shutdownErr != nil {
+			shutdownErr = fmt.Errorf("shutdown server: %w", shutdownErr)
+			app.logger.LogAttrs(logCtx, slog.LevelError, "error shutting down server", slog.Any("error", shutdownErr))
 		}
-		close(shutdownComplete)
+
+		// Stop flight recorder after server shutdown
+		if app.flightRecorder != nil {
+			app.flightRecorder.Stop(logCtx)
+		}
+
+		app.logger.LogAttrs(logCtx, slog.LevelInfo, "server shut down", slog.Duration("duration", time.Since(now)))
 	}()
 
 	var listener net.Listener
-	if listener, err = net.Listen("tcp", addr); err != nil {
+	listenCfg := net.ListenConfig{
+		Control:   nil,
+		KeepAlive: idleTimeout,
+		KeepAliveConfig: net.KeepAliveConfig{
+			Enable:   true,
+			Idle:     idleTimeout,
+			Interval: 0,
+			Count:    0,
+		},
+	}
+	if listener, err = listenCfg.Listen(ctx, "tcp", addr); err != nil {
 		return fmt.Errorf("TCP listen: %w", err)
 	}
 	app.logger.LogAttrs(ctx, slog.LevelInfo, "starting server", slog.Any(e2etest.LogAddrKey, listener.Addr().String()))
 	if err = srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server serve: %w", err)
 	}
+
+	// Wait for the shutdown goroutine to complete all cleanup work
 	<-shutdownComplete
 
 	return nil

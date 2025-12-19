@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
@@ -22,31 +23,28 @@ func newSQLitePreferenceRepository(db *sqlite.Database) *sqlitePreferencesReposi
 
 // GetUserPreferences retrieves the workout preferences for a user.
 func (r *sqlitePreferencesRepository) Get(ctx context.Context) (Preferences, error) {
-	var prefs Preferences
 	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	var prefs Preferences
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday 
+		SELECT monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes, 
+		       friday_minutes, saturday_minutes, sunday_minutes
 		FROM workout_preferences 
 		WHERE user_id = ?`, userID).Scan(
-		&prefs.Monday,
-		&prefs.Tuesday,
-		&prefs.Wednesday,
-		&prefs.Thursday,
-		&prefs.Friday,
-		&prefs.Saturday,
-		&prefs.Sunday,
+		&prefs.MondayMinutes, &prefs.TuesdayMinutes, &prefs.WednesdayMinutes, &prefs.ThursdayMinutes,
+		&prefs.FridayMinutes, &prefs.SaturdayMinutes, &prefs.SundayMinutes,
 	)
 
 	if errors.Is(err, ErrNotFound) {
-		// If no preferences are found, return default preferences
+		// If no preferences are found, return default preferences (all rest days)
 		return Preferences{
-			Monday:    false,
-			Tuesday:   false,
-			Wednesday: false,
-			Thursday:  false,
-			Friday:    false,
-			Saturday:  false,
-			Sunday:    false,
+			MondayMinutes:    0,
+			TuesdayMinutes:   0,
+			WednesdayMinutes: 0,
+			ThursdayMinutes:  0,
+			FridayMinutes:    0,
+			SaturdayMinutes:  0,
+			SundayMinutes:    0,
 		}, nil
 	}
 
@@ -57,29 +55,26 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (Preferences, err
 	return prefs, nil
 }
 
-// SaveUserPreferences saves the workout preferences for a user.
+// Set saves the workout preferences for a user.
 func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs Preferences) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
+
 	_, err := r.db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO workout_preferences (
-			user_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday
+			user_id, monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
+			friday_minutes, saturday_minutes, sunday_minutes
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (user_id) DO UPDATE SET
-			monday = excluded.monday,
-			tuesday = excluded.tuesday,
-			wednesday = excluded.wednesday,
-			thursday = excluded.thursday,
-			friday = excluded.friday,
-			saturday = excluded.saturday,
-			sunday = excluded.sunday`,
+			monday_minutes = excluded.monday_minutes,
+			tuesday_minutes = excluded.tuesday_minutes,
+			wednesday_minutes = excluded.wednesday_minutes,
+			thursday_minutes = excluded.thursday_minutes,
+			friday_minutes = excluded.friday_minutes,
+			saturday_minutes = excluded.saturday_minutes,
+			sunday_minutes = excluded.sunday_minutes`,
 		userID,
-		prefs.Monday,
-		prefs.Tuesday,
-		prefs.Wednesday,
-		prefs.Thursday,
-		prefs.Friday,
-		prefs.Saturday,
-		prefs.Sunday,
+		prefs.MondayMinutes, prefs.TuesdayMinutes, prefs.WednesdayMinutes, prefs.ThursdayMinutes,
+		prefs.FridayMinutes, prefs.SaturdayMinutes, prefs.SundayMinutes,
 	)
 
 	if err != nil {

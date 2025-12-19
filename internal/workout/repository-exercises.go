@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 

@@ -203,19 +203,19 @@ func (g *generator) determineWorkoutCategory(t time.Time) Category {
 func (g *generator) isWorkoutDay(t time.Time) bool {
 	switch t.Weekday() {
 	case time.Monday:
-		return g.preferences.Monday
+		return g.preferences.Monday()
 	case time.Tuesday:
-		return g.preferences.Tuesday
+		return g.preferences.Tuesday()
 	case time.Wednesday:
-		return g.preferences.Wednesday
+		return g.preferences.Wednesday()
 	case time.Thursday:
-		return g.preferences.Thursday
+		return g.preferences.Thursday()
 	case time.Friday:
-		return g.preferences.Friday
+		return g.preferences.Friday()
 	case time.Saturday:
-		return g.preferences.Saturday
+		return g.preferences.Saturday()
 	case time.Sunday:
-		return g.preferences.Sunday
+		return g.preferences.Sunday()
 	default:
 		return false
 	}
@@ -261,8 +261,9 @@ func (g *generator) createExerciseSets(exercises []Exercise) []exerciseSetAggreg
 	for _, exercise := range exercises {
 		sets := g.determineSetsRepsWeight(exercise)
 		exerciseSets = append(exerciseSets, exerciseSetAggregate{
-			ExerciseID: exercise.ID,
-			Sets:       sets,
+			ExerciseID:        exercise.ID,
+			Sets:              sets,
+			WarmupCompletedAt: nil,
 		})
 	}
 	return exerciseSets
@@ -507,9 +508,9 @@ func createDefaultSets(exerciseType ExerciseType) []Set {
 	// For bodyweight exercises, weight remains nil
 
 	return []Set{
-		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
-		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
-		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil},
+		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil, CompletedAt: nil},
+		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil, CompletedAt: nil},
+		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil, CompletedAt: nil},
 	}
 }
 
@@ -808,6 +809,7 @@ func createStandardSets(weight float64, minReps, maxReps int) []Set {
 		MinReps:       minReps,
 		MaxReps:       maxReps,
 		CompletedReps: nil,
+		CompletedAt:   nil,
 	}
 	return []Set{set, set, set}
 }
@@ -819,6 +821,7 @@ func createStandardBodyweightSets(minReps, maxReps int) []Set {
 		MinReps:       minReps,
 		MaxReps:       maxReps,
 		CompletedReps: nil,
+		CompletedAt:   nil,
 	}
 	return []Set{set, set, set}
 }
@@ -904,6 +907,7 @@ func copySetWithoutCompletion(sets []Set) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 	})
 }
@@ -922,6 +926,7 @@ func reduceWeight(sets []Set, percentage float64) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 	})
 }
@@ -938,6 +943,7 @@ func increaseWeight(sets []Set, increment float64) []Set {
 			MinReps:       set.MinReps,
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 	})
 }
@@ -950,6 +956,7 @@ func increaseReps(sets []Set, increment int) []Set {
 			MinReps:       set.MinReps + increment,
 			MaxReps:       set.MaxReps + increment,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 	})
 }
@@ -967,6 +974,7 @@ func (g *generator) increaseBodyweightDifficulty(sets []Set) []Set {
 			MinReps:       BodyweightBaseReps, // Reset to base reps for new set
 			MaxReps:       BodyweightBaseReps,
 			CompletedReps: nil,
+			CompletedAt:   nil,
 		}
 		return append(sets, newSet)
 	}
@@ -984,6 +992,7 @@ func (g *generator) reduceBodyweightDifficulty(sets []Set) []Set {
 				MinReps:       set.MinReps - BodyweightRepDecrease,
 				MaxReps:       set.MaxReps - BodyweightRepDecrease,
 				CompletedReps: nil,
+				CompletedAt:   nil,
 			}
 		})
 	}

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/PuerkitoBio/goquery"
-	"github.com/myrjola/petrapp/internal/e2etest"
-	"io"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_application_exerciseSet(t *testing.T) {
@@ -16,7 +17,7 @@ func Test_application_exerciseSet(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(ctx, io.Discard, testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -30,7 +31,7 @@ func Test_application_exerciseSet(t *testing.T) {
 
 	// Set workout preferences
 	formData := map[string]string{
-		"monday": "true",
+		"Monday": "60",
 	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
@@ -113,8 +114,29 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to get exercise set page: %v", err)
 	}
 
-	// Find the first form (which should be for the first incomplete set)
-	form := doc.Find("form").First()
+	// Complete the warmup first
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+	}).First()
+
+	if warmupForm.Length() > 0 {
+		warmupAction, exists := warmupForm.Attr("action")
+		if !exists {
+			t.Fatalf("Warmup form has no action attribute")
+		}
+		if doc, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+			t.Fatalf("Failed to submit warmup completion form: %v", err)
+		}
+	}
+
+	// Find the set completion form (which contains a button with type="submit" and text "Done!")
+	form := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[type=submit]:contains('Done!')").Length() > 0
+	}).First()
+
+	if form.Length() == 0 {
+		t.Fatalf("Set completion form not found")
+	}
 
 	// Get the form action
 	action, exists := form.Attr("action")
@@ -184,8 +206,15 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to load edit page: %v", err)
 	}
 
-	// Find the edit form
-	form = doc.Find("form").First()
+	// Find the edit form (which contains a button with type="submit" and text "Done!")
+	form = doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[type=submit]:contains('Done!')").Length() > 0
+	}).First()
+
+	if form.Length() == 0 {
+		t.Fatalf("Edit form not found")
+	}
+
 	action, exists = form.Attr("action")
 	if !exists {
 		t.Fatalf("Edit form has no action attribute")

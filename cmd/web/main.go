@@ -3,20 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/alexedwards/scs/sqlite3store"
-	"github.com/alexedwards/scs/v2"
-	"github.com/myrjola/petrapp/internal/envstruct"
-	"github.com/myrjola/petrapp/internal/logging"
-	"github.com/myrjola/petrapp/internal/pprofserver"
-	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/webauthnhandler"
-	"github.com/myrjola/petrapp/internal/workout"
 	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/alexedwards/scs/sqlite3store"
+	"github.com/alexedwards/scs/v2"
+	"github.com/myrjola/petrapp/internal/envstruct"
+	"github.com/myrjola/petrapp/internal/flightrecorder"
+	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/pprofserver"
+	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/webauthnhandler"
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 type application struct {
@@ -25,6 +27,7 @@ type application struct {
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
 	workoutService  *workout.Service
+	flightRecorder  *flightrecorder.Service
 }
 
 type config struct {
@@ -40,6 +43,8 @@ type config struct {
 	PProfAddr string `env:"PETRAPP_PPROF_ADDR" envDefault:""`
 	// TemplatePath is the path to the directory containing the HTML templates.
 	TemplatePath string `env:"PETRAPP_TEMPLATE_PATH" envDefault:""`
+	// TracesDirectory is the path to the directory where trace files are written.
+	TracesDirectory string `env:"PETRAPP_TRACES_DIRECTORY" envDefault:""`
 	// OpenAIAPIKey is optional. It's used to authenticate with the OpenAI API.
 	OpenAIAPIKey string `env:"OPENAI_API_KEY" envDefault:""`
 }
@@ -84,20 +89,37 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
+	var flightRecorderService *flightrecorder.Service
+	if cfg.TracesDirectory != "" {
+		if flightRecorderService, err = flightrecorder.New(flightrecorder.Config{
+			Logger:          logger,
+			MinAge:          0, // Use default
+			MaxBytes:        0, // Use default
+			TracesDirectory: cfg.TracesDirectory,
+		}); err != nil {
+			return fmt.Errorf("new flight recorder: %w", err)
+		}
+		// Start flight recording.
+		if err = flightRecorderService.Start(ctx); err != nil {
+			return fmt.Errorf("start flight recorder: %w", err)
+		}
+	}
+
 	app := application{
 		logger:          logger,
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
 		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
+		flightRecorder:  flightRecorderService,
 	}
 
-	routes := app.routes()
-
-	if err = app.configureAndStartServer(ctx, cfg.Addr, routes); err != nil {
-		return fmt.Errorf("start server: %w", err)
+	routes, err := app.routes()
+	if err != nil {
+		return fmt.Errorf("initialize routes: %w", err)
 	}
-	return nil
+
+	return app.configureAndStartServer(ctx, cfg.Addr, routes)
 }
 
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
@@ -113,12 +135,22 @@ func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 
 func main() {
 	ctx := context.Background()
-	loggerHandler := logging.NewContextHandler(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handlerOptions := &slog.HandlerOptions{
 		AddSource:   false,
 		Level:       slog.LevelDebug,
 		ReplaceAttr: nil,
-	}))
-	logger := slog.New(loggerHandler)
+	}
+	var loggerHandler slog.Handler
+	loggerHandler = slog.NewTextHandler(os.Stdout, handlerOptions)
+	if os.Getenv("FLY_MACHINE_ID") != "" {
+		loggerHandler = slog.NewJSONHandler(os.Stdout, handlerOptions)
+	}
+	loggerHandler = logging.NewContextHandler(loggerHandler)
+	appName := os.Getenv("FLY_APP_NAME")
+	if appName == "" {
+		appName = "petra-local"
+	}
+	logger := slog.New(loggerHandler).With(slog.String("service_name", appName))
 	if err := run(ctx, logger, os.LookupEnv); err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", slog.Any("error", err))
 		os.Exit(1)

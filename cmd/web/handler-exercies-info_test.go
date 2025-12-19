@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/PuerkitoBio/goquery"
-	"github.com/myrjola/petrapp/internal/e2etest"
-	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_application_exerciseInfo(t *testing.T) {
@@ -16,7 +17,7 @@ func Test_application_exerciseInfo(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(ctx, io.Discard, testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -31,7 +32,7 @@ func Test_application_exerciseInfo(t *testing.T) {
 
 		// Set workout preferences
 		formData := map[string]string{
-			"monday": "true",
+			"Monday": "60",
 		}
 		if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 			t.Fatalf("Failed to get preferences: %v", err)
