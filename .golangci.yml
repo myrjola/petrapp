@@ -45,6 +45,7 @@ linters:
     - lll
     - loggercheck
     - makezero
+    - modernize
     - mirror
     - mnd
     - musttag
