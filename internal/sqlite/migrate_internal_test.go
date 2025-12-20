@@ -18,7 +18,7 @@ func TestDatabase_migrate(t *testing.T) {
 		{
 			name:              "empty schema",
 			schemaDefinitions: []string{""},
-			testQueries:       []string{"SELECT * FROM sqlite_schema"},
+			testQueries:       []string{"SELECT * FROM sqlite_master"},
 			wantErr:           false,
 		},
 		{

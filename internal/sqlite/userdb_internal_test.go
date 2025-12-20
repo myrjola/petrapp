@@ -190,7 +190,7 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 			defer exportedDB.Close()
 
 			// Verify that only expected tables exist
-			query := "SELECT name FROM sqlite_schema WHERE type = 'table' AND name != 'sqlite_stat1'"
+			query := "SELECT name FROM sqlite_master WHERE type = 'table' AND name != 'sqlite_stat1'"
 			rows, err := exportedDB.QueryContext(ctx, query)
 			if err != nil {
 				t.Fatalf("Failed to query tables: %v", err)

@@ -163,8 +163,8 @@ func (db *Database) migrateTables(ctx context.Context, tx *sql.Tx) error {
 	if changedTables, err = db.queryChangedSchemas(ctx, tx, `SELECT live.name AS changed_table,
        live.sql  AS live_sql,
        target.sql   AS new_sql
-FROM sqlite_schema AS live
-         JOIN schemaTarget.sqlite_schema AS target ON live.name = target.name AND live.type = target.type
+FROM sqlite_master AS live
+         JOIN schemaTarget.sqlite_master AS target ON live.name = target.name AND live.type = target.type
 WHERE live.type = 'table'
   AND live.name NOT LIKE 'sqlite_%'
   AND live.name NOT LIKE '_litestream_%'
@@ -226,8 +226,8 @@ func (db *Database) queryDeletedTables(ctx context.Context, tx *sql.Tx) ([]strin
 		err           error
 	)
 	if deletedTables, err = db.queryStringSlice(ctx, tx, `SELECT live.name AS deleted_table
-FROM sqlite_schema AS live
-         LEFT JOIN schemaTarget.sqlite_schema AS target ON live.name = target.name AND live.type = target.type
+FROM sqlite_master AS live
+         LEFT JOIN schemaTarget.sqlite_master AS target ON live.name = target.name AND live.type = target.type
 WHERE live.type = 'table'
   AND target.type IS NULL
   AND live.name NOT LIKE 'sqlite_%'
@@ -245,7 +245,7 @@ func (db *Database) queryNewTableSQLs(ctx context.Context, tx *sql.Tx) ([]string
 		err          error
 	)
 	if newTableSQLs, err = db.queryStringSlice(ctx, tx, `SELECT target.sql AS sql
-FROM sqlite_schema AS live RIGHT JOIN schemaTarget.sqlite_schema AS target
+FROM sqlite_master AS live RIGHT JOIN schemaTarget.sqlite_master AS target
 ON live.name=target.name AND live.type=target.type
 WHERE target.type = 'table'
   AND live.type IS NULL
@@ -358,8 +358,8 @@ func (db *Database) migrateSchema(ctx context.Context, tx *sql.Tx, typ schemaTyp
 	)
 
 	if deleted, err = db.queryStringSlice(ctx, tx, `SELECT live.name AS deleted
-FROM sqlite_schema AS live
-         LEFT JOIN schemaTarget.sqlite_schema AS target ON live.name = target.name AND live.type = target.type
+FROM sqlite_master AS live
+         LEFT JOIN schemaTarget.sqlite_master AS target ON live.name = target.name AND live.type = target.type
 WHERE live.type = ?
   AND target.type IS NULL
   AND live.name NOT LIKE 'sqlite_%'`, typ); err != nil {
@@ -375,8 +375,8 @@ WHERE live.type = ?
 
 	var created []string
 	if created, err = db.queryStringSlice(ctx, tx, `SELECT target.sql AS new_index_sql
-FROM sqlite_schema AS live
-         RIGHT JOIN schemaTarget.sqlite_schema AS target ON live.name = target.name AND live.type = target.type
+FROM sqlite_master AS live
+         RIGHT JOIN schemaTarget.sqlite_master AS target ON live.name = target.name AND live.type = target.type
 WHERE target.type = ?
   AND live.type IS NULL
   AND target.name NOT LIKE 'sqlite_%'`, typ); err != nil {
@@ -393,8 +393,8 @@ WHERE target.type = ?
 	if changedList, err = db.queryChangedSchemas(ctx, tx, `SELECT live.name  AS changed_trigger,
        live.sql   AS live_sql,
        target.sql AS new_sql
-FROM sqlite_schema AS live
-         JOIN schemaTarget.sqlite_schema AS target ON live.name = target.name AND live.type = target.type
+FROM sqlite_master AS live
+         JOIN schemaTarget.sqlite_master AS target ON live.name = target.name AND live.type = target.type
 WHERE live.type = ?
   AND live.name NOT LIKE 'sqlite_%'
   AND live.sql <> target.sql`, typ); err != nil {

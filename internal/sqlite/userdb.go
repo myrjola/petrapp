@@ -127,7 +127,7 @@ func (db *Database) executeExport(
 // validateUsersTable checks if the users table exists.
 func (db *Database) validateUsersTable(ctx context.Context, tx *sql.Tx) error {
 	var count int
-	query := `SELECT COUNT(*) FROM sqlite_schema WHERE type = 'table' AND name = ?`
+	query := `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`
 	if err := tx.QueryRowContext(ctx, query, usersTableName).Scan(&count); err != nil {
 		return fmt.Errorf("check users table existence: %w", err)
 	}
@@ -216,7 +216,7 @@ func (db *Database) findUserRelatedTables(ctx context.Context, tx *sql.Tx) ([]us
 
 // getAllTableNames retrieves all table names except 'users'.
 func (db *Database) getAllTableNames(ctx context.Context, tx *sql.Tx) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT name FROM sqlite_schema WHERE type = 'table' AND name != ?`, usersTableName)
+	rows, err := tx.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table' AND name != ?`, usersTableName)
 	if err != nil {
 		return nil, fmt.Errorf("query tables: %w", err)
 	}
@@ -377,7 +377,7 @@ func (db *Database) getTableReferences(ctx context.Context, tx *sql.Tx, tableNam
 func (db *Database) copyTableSchema(ctx context.Context, tx *sql.Tx, tableName string) error {
 	// Get the CREATE TABLE statement
 	var createSQL string
-	schemaQuery := `SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?`
+	schemaQuery := `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`
 	err := tx.QueryRowContext(ctx, schemaQuery, tableName).Scan(&createSQL)
 	if err != nil {
 		return fmt.Errorf("get schema for table %s: %w", tableName, err)
