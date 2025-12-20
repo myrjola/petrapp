@@ -417,9 +417,11 @@ func (db *Database) copyUserTableData(ctx context.Context, tx *sql.Tx, table use
 	// Copy the data
 	var query string
 	if whereClause == "" {
-		query = "INSERT INTO export." + table.name + " SELECT * FROM main." + table.name
+		// language=text
+		query = fmt.Sprintf("INSERT INTO export.%s SELECT * FROM main.%s", table.name, table.name)
 	} else {
-		query = "INSERT INTO export." + table.name + " SELECT * FROM main." + table.name + " " + whereClause
+		// language=text
+		query = fmt.Sprintf("INSERT INTO export.%s SELECT * FROM main.%s %s", table.name, table.name, whereClause)
 	}
 	_, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {

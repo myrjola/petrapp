@@ -27,9 +27,9 @@ Example:
 
 ```go
 type workoutTemplateData struct {
-BaseTemplateData
-Date    time.Time
-Session workout.Session
+  BaseTemplateData
+  Date    time.Time
+  Session workout.Session
 }
 ```
 
@@ -47,8 +47,8 @@ Example:
 ```go
 // Transform enum to options with labels in handler
 Difficulties: []difficultyOption{
-{Value: difficultyTooEasy, Label: "Too easy"},
-{Value: difficultyICouldDoMore, Label: "I could do more"},
+  {Value: difficultyTooEasy, Label: "Too easy"},
+  {Value: difficultyICouldDoMore, Label: "I could do more"},
 // ...
 }
 ```
@@ -69,15 +69,15 @@ Difficulties: []difficultyOption{
 ```go
 // Parse form data
 if err = r.ParseForm(); err != nil {
-app.serverError(w, r, fmt.Errorf("parse form: %w", err))
-return
+  app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+  return
 }
 
 // Extract form fields
 fieldValue := r.PostForm.Get("field_name")
 if fieldValue == "" {
-app.serverError(w, r, errors.New("field not provided"))
-return
+  app.serverError(w, r, errors.New("field not provided"))
+  return
 }
 ```
 
@@ -117,7 +117,7 @@ return
 ```go
 server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
 if err != nil {
-t.Fatalf("Failed to start server: %v", err)
+  t.Fatalf("Failed to start server: %v", err)
 }
 client := server.Client()
 ```
@@ -134,12 +134,12 @@ Example:
 ```go
 // Good: specific, resilient selector
 form := doc.Find("form").FilterFunction(func (_ int, s *goquery.Selection) bool {
-return s.Find("button:contains('Create Workout')").Length() > 0
+  return s.Find("button:contains('Create Workout')").Length() > 0
 }).First()
 
 // Good: checking for specific content
 if doc.Find("h1:contains('Add Exercise')").Length() == 0 {
-t.Error("Expected to find 'Add Exercise' heading")
+  t.Error("Expected to find 'Add Exercise' heading")
 }
 ```
 
