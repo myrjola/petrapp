@@ -187,7 +187,12 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to open exported database: %v", err)
 			}
-			defer exportedDB.Close()
+			defer func(exportedDB *sql.DB) {
+				err := exportedDB.Close()
+				if err != nil {
+					t.Errorf("Failed to close exported database: %v", err)
+				}
+			}(exportedDB)
 
 			// Verify that only expected tables exist
 			query := "SELECT name FROM sqlite_master WHERE type = 'table' AND name != 'sqlite_stat1'"
@@ -195,7 +200,12 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to query tables: %v", err)
 			}
-			defer rows.Close()
+			defer func(rows *sql.Rows) {
+				err := rows.Close()
+				if err != nil {
+					t.Errorf("Failed to close rows: %v", err)
+				}
+			}(rows)
 
 			var actualTables []string
 			for rows.Next() {

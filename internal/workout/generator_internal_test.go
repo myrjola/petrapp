@@ -109,8 +109,8 @@ func TestGenerateErrorHandling(t *testing.T) {
 		SaturdayMinutes:  0,
 		SundayMinutes:    0,
 	}
-	emptyHistory := []sessionAggregate{}
-	emptyPool := []Exercise{}
+	var emptyHistory []sessionAggregate
+	var emptyPool []Exercise
 
 	gen, err := newGenerator(emptyPreferences, emptyHistory, emptyPool)
 	if err == nil {
@@ -507,7 +507,7 @@ func TestProgressionOverTime(t *testing.T) {
 		SundayMinutes:    0,
 	}
 	exercises := createExercisePool()
-	initialHistory := []sessionAggregate{}
+	var initialHistory []sessionAggregate
 
 	// Create initial generator
 	gen, err := newGenerator(preferences, initialHistory, exercises)
@@ -568,7 +568,7 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 	exercises := createExercisePool()
 
 	// Generate several workouts across different weeks on the same weekday
-	history := []sessionAggregate{}
+	var history []sessionAggregate
 	numWeeks := 3
 	gen, err := newGenerator(preferences, history, exercises)
 	if err != nil {
@@ -634,10 +634,10 @@ func TestUserFeedbackIntegration(t *testing.T) {
 	initialHistory := []sessionAggregate{initialCompletedSession}
 
 	// For each feedback level, create a new test session
-	testSessions := []struct {
+	var testSessions []struct {
 		rating  int
 		session sessionAggregate
-	}{}
+	}
 
 	// For each feedback level
 	for _, rating := range []int{1, 3, 5} { // Too easy, Optimal, Too difficult

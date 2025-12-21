@@ -66,9 +66,9 @@ When making UI changes:
 
 When making changes to files, first understand the file's code conventions:
 
-- NEVER assume that a given library is available - check neighboring files or go.mod first
+- NEVER assume that a given library is available - check neighboring files or `go.mod` first
 - When creating new components, examine existing ones for patterns and conventions
-- Always look at surrounding context (especially imports) to understand framework choices
+- Always look at the surrounding context (especially imports) to understand framework choices
 - Make changes in the most idiomatic way for the existing codebase
 
 ## Fixing linter complaints

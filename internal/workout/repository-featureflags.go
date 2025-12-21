@@ -2,6 +2,7 @@ package workout
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -72,7 +73,9 @@ func (r *sqliteFeatureFlagRepository) List(ctx context.Context) ([]FeatureFlag, 
 	if err != nil {
 		return nil, fmt.Errorf("query feature flags: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 
 	var flags []FeatureFlag
 	for rows.Next() {

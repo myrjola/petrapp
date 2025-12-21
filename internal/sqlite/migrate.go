@@ -141,8 +141,10 @@ func (db *Database) migrateTables(ctx context.Context, tx *sql.Tx) error {
 	}
 	for _, table := range deletedTables {
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "dropping table", slog.String("table", table))
-		if _, err = tx.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s", table)); err != nil {
-			return fmt.Errorf("DROP TABLE %s: %w", table, err)
+		// language=text
+		dropStmt := "DROP TABLE " + table
+		if _, err = tx.ExecContext(ctx, dropStmt); err != nil {
+			return fmt.Errorf("%s: %w", dropStmt, err)
 		}
 	}
 
@@ -195,6 +197,7 @@ WHERE live.type = 'table'
 			return fmt.Errorf("query common columns: %w", err)
 		}
 		common := strings.Join(commonColumns, ", ")
+		// language=text
 		copySQL := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s;", //nolint: gosec // we trust the query.
 			tempName, common, common, table.name)
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "copying data", slog.String("query", copySQL))
@@ -203,6 +206,7 @@ WHERE live.type = 'table'
 		}
 
 		// Step 6: Drop the old table.
+		// language=text
 		dropSQL := fmt.Sprintf("DROP TABLE %s;", table.name)
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "dropping old table", slog.String("query", dropSQL))
 		if _, err = tx.ExecContext(ctx, dropSQL); err != nil {
@@ -210,6 +214,7 @@ WHERE live.type = 'table'
 		}
 
 		// Step 7: Rename new table to old table's name.
+		// language=text
 		renameSQL := fmt.Sprintf("ALTER TABLE %s RENAME TO %s;", tempName, table.name)
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "renaming new table", slog.String("query", renameSQL))
 		if _, err = tx.ExecContext(ctx, renameSQL); err != nil {

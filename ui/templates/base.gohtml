@@ -72,7 +72,7 @@
 
           /**
            * Extract exercise ID from a URL.
-           * @param {string} url - The URL to extract from
+           * @param {string|URL} url - The URL to extract from
            * @returns {string|null} The exercise ID or null if not found
            */
           function extractExerciseId(url) {
@@ -208,7 +208,7 @@
 
         const fromUrl = navigation.activation.from.url
         const entryUrl = navigation.activation.entry.url
-        depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
+        const depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
         if (depthDifference === 0) {
           e.viewTransition.skipTransition()
         }
@@ -251,7 +251,7 @@
                   return
                 }
               }
-              navigation.navigate(location, {history: "replace"})
+              await navigation.navigate(location, {history: "replace"})
             }
           })
         }

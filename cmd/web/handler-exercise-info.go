@@ -73,7 +73,7 @@ func (app *application) renderMarkdownToHTML(ctx context.Context, markdown strin
 	if err := md.Convert([]byte(markdown), &buf); err != nil {
 		app.logger.LogAttrs(ctx, slog.LevelError, "failed to render markdown",
 			slog.Any("error", err))
-		return template.HTML("<p>Error rendering markdown content.</p>")
+		return "<p>Error rendering markdown content.</p>"
 	}
 
 	// Returning as template.HTML tells Go this is safe HTML that doesn't need escaping

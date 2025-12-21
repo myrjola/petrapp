@@ -33,14 +33,11 @@ const (
 	FeedbackTooDifficult FeedbackLevel = 5
 )
 
-// Bodyweight exercise progression constants.
 const (
 	// Rep adjustments.
 	BodyweightRepIncrease = 2
 	BodyweightRepDecrease = 2
-	BodyweightMaxReps     = 15
 	BodyweightBaseReps    = 8
-	BodyweightMinReps     = 5
 
 	// Set limits.
 	BodyweightMaxSets = 5

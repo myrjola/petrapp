@@ -105,7 +105,7 @@ func SetupUsers(
 		usersMu sync.Mutex
 		wg      sync.WaitGroup
 		errCh   = make(chan error, numUsers)
-		errors  = make([]error, 0, numUsers) // Pre-allocate with capacity
+		errs    = make([]error, 0, numUsers) // Pre-allocate with capacity
 	)
 
 	// Limit concurrency to avoid overwhelming the server
@@ -142,16 +142,16 @@ func SetupUsers(
 
 	// Check for errors
 	for err := range errCh {
-		errors = append(errors, err)
+		errs = append(errs, err)
 	}
 
-	if len(errors) > 0 {
+	if len(errs) > 0 {
 		logger.LogAttrs(ctx, slog.LevelError, "Some user registrations failed",
-			slog.Int("failed_count", len(errors)),
+			slog.Int("failed_count", len(errs)),
 			slog.Int("successful_count", len(users)))
 
 		// Return first error for now, but you might want to handle this differently
-		return users, fmt.Errorf("registration failures: %w", errors[0])
+		return users, fmt.Errorf("registration failures: %w", errs[0])
 	}
 
 	logger.LogAttrs(ctx, slog.LevelInfo, "All users registered successfully",
@@ -366,9 +366,9 @@ func completeExerciseSets(ctx context.Context, client *e2etest.Client, dateStr, 
 // GenerateWorkoutHistoryForUsers generates workout history for all users concurrently.
 func GenerateWorkoutHistoryForUsers(ctx context.Context, users []*AuthenticatedUser, logger *slog.Logger) error {
 	var (
-		wg     sync.WaitGroup
-		errCh  = make(chan error, len(users))
-		errors = make([]error, 0, len(users))
+		wg    sync.WaitGroup
+		errCh = make(chan error, len(users))
+		errs  = make([]error, 0, len(users))
 	)
 
 	// Limit concurrency to avoid overwhelming the server
@@ -403,16 +403,16 @@ func GenerateWorkoutHistoryForUsers(ctx context.Context, users []*AuthenticatedU
 
 	// Check for errors
 	for err := range errCh {
-		errors = append(errors, err)
+		errs = append(errs, err)
 	}
 
-	if len(errors) > 0 {
+	if len(errs) > 0 {
 		logger.LogAttrs(ctx, slog.LevelError, "Some workout history generations failed",
-			slog.Int("failed_count", len(errors)),
-			slog.Int("successful_count", len(users)-len(errors)))
+			slog.Int("failed_count", len(errs)),
+			slog.Int("successful_count", len(users)-len(errs)))
 
 		// Return first error, but continue with load test as some users have history
-		return fmt.Errorf("workout history generation failures: %w", errors[0])
+		return fmt.Errorf("workout history generation failures: %w", errs[0])
 	}
 
 	return nil
