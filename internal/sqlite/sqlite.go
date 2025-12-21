@@ -26,12 +26,13 @@ type Database struct {
 	ReadWrite *sql.DB
 	ReadOnly  *sql.DB
 	logger    *slog.Logger
+	once      sync.Once
 }
 
 // NewDatabase connects to a database, migrates the schema, and applies fixtures.
 //
 // It establishes two database connections, one for read/write operations and one for read-only operations.
-// This is a best practice mentioned in https://github.com/mattn/go-sqlite3/issues/1179#issuecomment-1638083995
+// This is the best practice mentioned in https://github.com/mattn/go-sqlite3/issues/1179#issuecomment-1638083995
 //
 // The url parameter is the path to the SQLite database file or ":memory:" for an in-memory database.
 func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Database, error) {
@@ -154,10 +155,15 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 		ReadWrite: readWriteDB,
 		ReadOnly:  readDB,
 		logger:    logger,
+		once:      sync.Once{},
 	}, nil
 }
 
 // Close closes the database connections.
 func (db *Database) Close() error {
-	return errors.Join(db.ReadOnly.Close(), db.ReadWrite.Close())
+	var err error
+	db.once.Do(func() {
+		err = errors.Join(db.ReadOnly.Close(), db.ReadWrite.Close())
+	})
+	return err
 }

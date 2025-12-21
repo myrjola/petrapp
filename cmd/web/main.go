@@ -76,6 +76,11 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	if err != nil {
 		return fmt.Errorf("open db (url: %s): %w", cfg.SqliteURL, err)
 	}
+	defer func() {
+		if err = db.Close(); err != nil {
+			logger.LogAttrs(ctx, slog.LevelError, "failed to close database", slog.Any("error", err))
+		}
+	}()
 	logger.LogAttrs(ctx, slog.LevelInfo, "connected to db")
 
 	sessionManager := initializeSessionManager(db)
