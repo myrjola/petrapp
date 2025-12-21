@@ -251,15 +251,13 @@ func (c *Client) startRegistration(
 	if resp, err = c.client.Do(req); err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
+	defer resp.Body.Close()
 	if http.StatusOK != resp.StatusCode {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	var bodyBytes []byte
 	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
 		return nil, fmt.Errorf("read body bytes: %w", err)
-	}
-	if err = resp.Body.Close(); err != nil {
-		return nil, fmt.Errorf("close response body: %w", err)
 	}
 	var attOpts *virtualwebauthn.AttestationOptions
 	if attOpts, err = virtualwebauthn.ParseAttestationOptions(string(bodyBytes)); err != nil {
@@ -304,15 +302,13 @@ func (c *Client) startLogin(
 	if resp, err = c.client.Do(req); err != nil {
 		return nil, fmt.Errorf("do request: %w", err)
 	}
+	defer resp.Body.Close()
 	if http.StatusOK != resp.StatusCode {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	var bodyBytes []byte
 	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
 		return nil, fmt.Errorf("read body bytes: %w", err)
-	}
-	if err = resp.Body.Close(); err != nil {
-		return nil, fmt.Errorf("close response body: %w", err)
 	}
 	var asOpts *virtualwebauthn.AssertionOptions
 	if asOpts, err = virtualwebauthn.ParseAssertionOptions(string(bodyBytes)); err != nil {
