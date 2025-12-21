@@ -188,7 +188,7 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 				t.Fatalf("Failed to open exported database: %v", err)
 			}
 			defer func(exportedDB *sql.DB) {
-				err := exportedDB.Close()
+				err = exportedDB.Close()
 				if err != nil {
 					t.Errorf("Failed to close exported database: %v", err)
 				}
@@ -200,12 +200,11 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to query tables: %v", err)
 			}
-			defer func(rows *sql.Rows) {
-				err := rows.Close()
-				if err != nil {
-					t.Errorf("Failed to close rows: %v", err)
+			defer func() {
+				if closeErr := rows.Close(); closeErr != nil {
+					t.Errorf("Failed to close rows: %v", closeErr)
 				}
-			}(rows)
+			}()
 
 			var actualTables []string
 			for rows.Next() {

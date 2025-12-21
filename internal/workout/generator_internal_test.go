@@ -407,7 +407,7 @@ func createWorkoutHistory() []sessionAggregate {
 	oneWeekAgo := time.Now().AddDate(0, 0, -7)
 	twoDaysAgo := time.Now().AddDate(0, 0, -2)
 
-	// Create workout history - 3 previous workouts
+	// Create a workout history - 3 previous workouts
 	return []sessionAggregate{
 		{
 			// 2 weeks ago - Monday workout
@@ -568,8 +568,8 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 	exercises := createExercisePool()
 
 	// Generate several workouts across different weeks on the same weekday
-	var history []sessionAggregate
 	numWeeks := 3
+	history := make([]sessionAggregate, 3)
 	gen, err := newGenerator(preferences, history, exercises)
 	if err != nil {
 		t.Fatalf("Failed to create generator: %v", err)
@@ -588,7 +588,7 @@ func TestContinuityBetweenWeeks(t *testing.T) {
 
 		// Complete the workout and add to history
 		completedSession := simulateWorkoutCompletion(session, weekIndex)
-		history = append(history, completedSession)
+		history[weekIndex] = completedSession
 		mondaySessions[weekIndex] = completedSession
 
 		// Update generator with new history
@@ -616,7 +616,7 @@ func TestUserFeedbackIntegration(t *testing.T) {
 	}
 	exercises := createExercisePool()
 
-	// Create initial workout and add to history
+	// Create an initial workout and add to history
 	initialDate := time.Date(2023, 1, 3, 0, 0, 0, 0, time.UTC) // Tuesday
 	gen, err := newGenerator(preferences, nil, exercises)
 	if err != nil {
@@ -634,10 +634,10 @@ func TestUserFeedbackIntegration(t *testing.T) {
 	initialHistory := []sessionAggregate{initialCompletedSession}
 
 	// For each feedback level, create a new test session
-	var testSessions []struct {
+	testSessions := make([]struct {
 		rating  int
 		session sessionAggregate
-	}
+	}, 0, 3)
 
 	// For each feedback level
 	for _, rating := range []int{1, 3, 5} { // Too easy, Optimal, Too difficult
@@ -779,7 +779,7 @@ func verifyWorkoutProgression(t *testing.T, history []sessionAggregate) {
 			continue // Skip exercises that only appear once
 		}
 
-		// First check if weights are non-zero, which indicates the user has set weights
+		// First, check if weights are non-zero, which indicates the user has set weights
 		for _, weight := range weights {
 			if weight > 0 {
 				nonZeroWeightsFound = true
@@ -836,7 +836,7 @@ func verifyContinuityBetweenWeeks(t *testing.T, sessions []sessionAggregate) {
 	}
 }
 
-// Verify appropriate response to user feedback.
+// Verify the appropriate response to user feedback.
 func verifyFeedbackResponse(t *testing.T, previousSession, nextSession sessionAggregate) {
 	t.Helper()
 

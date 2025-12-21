@@ -2,7 +2,6 @@ package workout
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
@@ -64,18 +63,19 @@ func (r *sqliteFeatureFlagRepository) Set(ctx context.Context, flag FeatureFlag)
 }
 
 // List retrieves all feature flags.
-func (r *sqliteFeatureFlagRepository) List(ctx context.Context) ([]FeatureFlag, error) {
+func (r *sqliteFeatureFlagRepository) List(ctx context.Context) (_ []FeatureFlag, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
 		SELECT name, enabled
 		FROM feature_flags
 		ORDER BY name`)
-
 	if err != nil {
 		return nil, fmt.Errorf("query feature flags: %w", err)
 	}
-	defer func(rows *sql.Rows) {
-		_ = rows.Close()
-	}(rows)
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
 	var flags []FeatureFlag
 	for rows.Next() {
