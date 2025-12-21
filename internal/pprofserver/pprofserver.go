@@ -32,8 +32,15 @@ func newServer(addr string) *http.Server {
 	}
 }
 
-func listenAndServe(addr string) error {
-	err := newServer(addr).ListenAndServe()
+func listenAndServe(addr string) (err error) {
+	srv := newServer(addr)
+	defer func(srv *http.Server) {
+		shutdownErr := srv.Shutdown(context.Background())
+		if shutdownErr != nil {
+			err = fmt.Errorf("pprof server shutdown: %w", errors.Join(shutdownErr, err))
+		}
+	}(srv)
+	err = srv.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
