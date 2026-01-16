@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/i18n"
 )
 
 // formatFloat formats a float to remove trailing zeros and unnecessary precision.
@@ -18,7 +19,7 @@ func formatFloat(f float64) string {
 }
 
 // baseTemplateFuncs returns the base template.FuncMap with placeholder implementations.
-// Context-dependent functions (nonce, mdToHTML) must be overridden with actual implementations.
+// Context-dependent functions (nonce, mdToHTML, t) must be overridden with actual implementations.
 func (app *application) baseTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"nonce": func() string {
@@ -28,12 +29,16 @@ func (app *application) baseTemplateFuncs() template.FuncMap {
 			panic("not implemented")
 		},
 		"formatFloat": formatFloat,
+		"t": func() string {
+			panic("not implemented")
+		},
 	}
 }
 
 // contextTemplateFuncs returns template.FuncMap with context-dependent function implementations.
 func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncMap {
 	nonce := fmt.Sprintf("nonce=\"%s\"", contexthelpers.CSPNonce(ctx))
+	lang := contexthelpers.Language(ctx)
 	return template.FuncMap{
 		"nonce": func() template.HTMLAttr {
 			return template.HTMLAttr(nonce) //nolint:gosec // we trust the nonce since it's not provided by user.
@@ -42,6 +47,9 @@ func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncM
 			return app.renderMarkdownToHTML(ctx, markdown)
 		},
 		"formatFloat": formatFloat,
+		"t": func(key string) string {
+			return i18n.Translate(lang, key)
+		},
 	}
 }
 

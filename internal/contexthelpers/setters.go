@@ -3,6 +3,8 @@ package contexthelpers
 import (
 	"context"
 	"net/http"
+
+	"github.com/myrjola/petrapp/internal/i18n"
 )
 
 func AuthenticateContext(r *http.Request, userID int, isAdmin bool) *http.Request {
@@ -22,5 +24,11 @@ func SetCurrentPath(r *http.Request, currentPath string) *http.Request {
 func SetCSPNonce(r *http.Request, cspNonce string) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, CspNonceContextKey, cspNonce)
+	return r.WithContext(ctx)
+}
+
+func SetLanguage(r *http.Request, language i18n.Language) *http.Request {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, LanguageContextKey, language)
 	return r.WithContext(ctx)
 }
