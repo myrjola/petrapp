@@ -2,6 +2,7 @@ package webauthnhandler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,21 @@ import (
 	"github.com/myrjola/petrapp/internal/ptr"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
+
+// UnknownCredentialError is returned when a credential ID is not found in the database.
+// This allows the client to signal the authenticator to remove the credential.
+type UnknownCredentialError struct {
+	CredentialID []byte
+	Err          error
+}
+
+func (e *UnknownCredentialError) Error() string {
+	return fmt.Sprintf("unknown credential: %x: %v", e.CredentialID, e.Err)
+}
+
+func (e *UnknownCredentialError) Unwrap() error {
+	return e.Err
+}
 
 type WebAuthnHandler struct {
 	logger         *slog.Logger
@@ -215,8 +231,19 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("parse credential request response: %w", err)
 	}
+
+	// Extract credential ID before validation for error reporting.
+	credentialID := parsedResponse.RawID
+
 	user, credential, err := h.webAuthn.ValidatePasskeyLogin(h.findUserHandler(ctx), session, parsedResponse)
 	if err != nil {
+		// Check if the error is due to an unknown credential (user not found in database).
+		if errors.Is(err, sql.ErrNoRows) {
+			return &UnknownCredentialError{
+				CredentialID: credentialID,
+				Err:          err,
+			}
+		}
 		return fmt.Errorf("validate Passkey login: %w", err)
 	}
 
