@@ -91,7 +91,7 @@ func (app *application) generateExerciseProgressData(
 	}
 
 	// Process data for chart
-	var dataPoints []ExerciseProgressDataPoint
+	var dataPoints = []ExerciseProgressDataPoint{}
 
 	for _, session := range sessions {
 		if dataPoint, hasData := processSessionData(session, exercise.ID); hasData {
