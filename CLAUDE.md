@@ -75,15 +75,6 @@ When making changes to files, first understand the file's code conventions:
 
 - govet shadow is often fixed by reusing the earlier `err` variable instead of using different variable name.
 
-## Specialized Guidelines
-
-For detailed guidance on specific areas:
-
-- **[Database Schema](internal/sqlite/CLAUDE.md)** - SQLite schema evolution and migration patterns
-- **[Domain Models](internal/workout/CLAUDE.md)** - Business logic, models, and service layer patterns
-- **[Web Handlers](cmd/web/CLAUDE.md)** - HTTP handlers, routing, and middleware patterns
-- **[Templates & UI](ui/templates/CLAUDE.md)** - Go templates, CSS architecture, and design system
-
 ## Debugging Test Failures
 
 - For template-related errors, check for missing functions, syntax errors, or data structure mismatches
