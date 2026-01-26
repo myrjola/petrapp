@@ -35,7 +35,7 @@ func (app *application) parseDateParam(w http.ResponseWriter, r *http.Request) (
 	dateStr := r.PathValue("date")
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return time.Time{}, false
 	}
 	return date, true
@@ -48,7 +48,7 @@ func (app *application) parseExerciseIDParam(w http.ResponseWriter, r *http.Requ
 	exerciseIDStr := r.PathValue("exerciseID")
 	exerciseID, err := strconv.Atoi(exerciseIDStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return 0, false
 	}
 	return exerciseID, true

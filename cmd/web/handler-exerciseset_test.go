@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -262,5 +263,88 @@ func Test_application_exerciseSet(t *testing.T) {
 	// Check if the reps have been updated (should contain "12")
 	if setReps != "12 reps" {
 		t.Errorf("Expected reps to be updated to 12, got %s", setReps)
+	}
+}
+
+func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *testing.T) {
+	var (
+		ctx = t.Context()
+		err error
+		doc *goquery.Document
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	client := server.Client()
+
+	// Register and set up a workout
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Set workout preferences
+	formData := map[string]string{
+		"Monday": "60",
+	}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("Failed to submit form: %v", err)
+	}
+
+	// Start a workout for today
+	today := time.Now().Format("2006-01-02")
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("Failed to submit start workout form: %v", err)
+	}
+
+	// Try to access a nonexistent exercise ID
+	resp, err := client.Get(ctx, "/workouts/"+today+"/exercises/99999")
+	if err != nil {
+		t.Fatalf("Failed to get nonexistent exercise: %v", err)
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			t.Errorf("Failed to close response body: %v", err)
+		}
+	}()
+
+	// Verify we get a 404 status code
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status code %d for nonexistent exercise, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+
+	// Parse the response to check for custom 404 page
+	doc, err = goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to parse 404 document: %v", err)
+	}
+
+	// Check for custom 404 page title
+	title := doc.Find("h1").Text()
+	if title != "404" {
+		t.Errorf("Expected custom 404 page title '404', got: %q", title)
+	}
+
+	// Check for "Page Not Found" subtitle
+	subtitle := doc.Find("h2").Text()
+	if subtitle != "Page Not Found" {
+		t.Errorf("Expected 'Page Not Found' subtitle, got: %q", subtitle)
+	}
+
+	// Check for Go Home link
+	homeLinks := doc.Find("a[href='/']")
+	if homeLinks.Length() == 0 {
+		t.Error("Expected custom 404 page to contain home link")
+	}
+
+	// Check for Go Back button
+	backButtons := doc.Find("button:contains('Go Back')")
+	if backButtons.Length() == 0 {
+		t.Error("Expected custom 404 page to contain 'Go Back' button")
 	}
 }

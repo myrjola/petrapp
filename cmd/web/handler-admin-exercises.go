@@ -63,7 +63,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
@@ -115,7 +115,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 

@@ -109,7 +109,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if exerciseSet.Exercise.ID == 0 {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
@@ -203,7 +203,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	// Parse URL parameters
 	date, exerciseID, setIndex, dateStr, err := app.parseExerciseSetURLParams(r)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	exercise, found := app.findExerciseInSession(&session, exerciseID)
 	if !found {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
