@@ -35,7 +35,7 @@ func (app *application) beginLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(out)
+	_, err = w.Write(out) //#nosec G705 -- out is a structured WebAuthn challenge, not a reflection of raw user input.
 	if err != nil {
 		app.serverError(w, r, err)
 		return
