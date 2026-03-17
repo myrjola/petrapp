@@ -45,7 +45,7 @@ func (app *application) finishLogin(w http.ResponseWriter, r *http.Request) {
 		// Check if the error is due to an unknown credential.
 		var unknownCredErr *webauthnhandler.UnknownCredentialError
 		if errors.As(err, &unknownCredErr) {
-			// Return JSON error response with credential ID for client to signal removal.
+			// Return JSON error response with credential ID for the client to signal removal.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			response := map[string]string{
