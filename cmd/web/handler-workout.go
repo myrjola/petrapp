@@ -228,6 +228,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 	}
 
 	// Parse form
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
@@ -326,6 +327,7 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 	}
 
 	// Parse form
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return

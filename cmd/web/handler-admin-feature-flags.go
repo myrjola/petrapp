@@ -35,7 +35,7 @@ func (app *application) adminFeatureFlagTogglePOST(w http.ResponseWriter, r *htt
 	// Get feature flag name from URL
 	name := r.PathValue("name")
 	if name == "" {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 

@@ -101,6 +101,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return

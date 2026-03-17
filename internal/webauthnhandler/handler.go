@@ -15,7 +15,6 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/petrapp/internal/ptr"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
@@ -70,14 +69,14 @@ func New(
 		RPDisplayName: "Petrapp",
 		RPOrigins:     rpOrigins,
 
-		// Top origins are to my understanding used for cross-origin Passkeys. We don't need it here.
+		// Top origins are, to my understanding, used for cross-origin Passkeys. We don't need it here.
 		RPTopOrigins:                nil,
 		RPTopOriginVerificationMode: protocol.TopOriginIgnoreVerificationMode,
 
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			AuthenticatorAttachment: "platform",
-			RequireResidentKey:      ptr.Ref(true),
+			RequireResidentKey:      new(true),
 			ResidentKey:             protocol.ResidentKeyRequirementRequired,
 			UserVerification:        protocol.VerificationDiscouraged,
 		},
@@ -194,7 +193,7 @@ func (h *WebAuthnHandler) FinishRegistration(r *http.Request) error {
 	return nil
 }
 
-func (h *WebAuthnHandler) BeginLogin(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+func (h *WebAuthnHandler) BeginLogin(r *http.Request) ([]byte, error) {
 	options, session, err := h.webAuthn.BeginDiscoverableLogin()
 	if err != nil {
 		return nil, fmt.Errorf("begin discoverable webauthn login: %w", err)
@@ -202,7 +201,6 @@ func (h *WebAuthnHandler) BeginLogin(w http.ResponseWriter, r *http.Request) ([]
 
 	h.sessionManager.Put(r.Context(), string(webAuthnSessionKey), *session)
 
-	w.Header().Set("Content-Type", "application/json")
 	var out []byte
 	if out, err = json.Marshal(options); err != nil {
 		return nil, fmt.Errorf("json marshal webauthn options: %w", err)

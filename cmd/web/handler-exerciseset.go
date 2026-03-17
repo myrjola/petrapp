@@ -109,7 +109,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if exerciseSet.Exercise.ID == 0 {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
@@ -203,11 +203,12 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	// Parse URL parameters
 	date, exerciseID, setIndex, dateStr, err := app.parseExerciseSetURLParams(r)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
 	// Parse form for weight and reps
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err = r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
@@ -222,7 +223,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	exercise, found := app.findExerciseInSession(&session, exerciseID)
 	if !found {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 

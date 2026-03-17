@@ -16,6 +16,14 @@ func (app *application) notFound(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusNotFound, "not-found", newBaseTemplateData(r))
 }
 
+// defaultMaxFormSize is a reasonable maximum size for form data in bytes.
+//
+// You can use it as follows before calling r.ParseForm(): r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize).
+const defaultMaxFormSize = 1024
+
+// largeMaxFormSize is a larger maximum size for form data when there's more content to be expected.
+const largeMaxFormSize = 1024 * 10
+
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {
@@ -35,7 +43,7 @@ func (app *application) parseDateParam(w http.ResponseWriter, r *http.Request) (
 	dateStr := r.PathValue("date")
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return time.Time{}, false
 	}
 	return date, true
@@ -48,7 +56,7 @@ func (app *application) parseExerciseIDParam(w http.ResponseWriter, r *http.Requ
 	exerciseIDStr := r.PathValue("exerciseID")
 	exerciseID, err := strconv.Atoi(exerciseIDStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return 0, false
 	}
 	return exerciseID, true

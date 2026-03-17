@@ -49,14 +49,14 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		}
 
 		// Create a new context for logging since the original might be cancelled
-		logCtx := context.Background()
+		logCtx := context.WithoutCancel(ctx)
 		now := time.Now()
 		app.logger.LogAttrs(logCtx, slog.LevelInfo, "shutting down server", slog.String("reason", shutdownReason))
 
 		// We received an interrupt signal or context cancellation, shut down.
 		var shutdownContext context.Context
 		var cancel context.CancelFunc
-		shutdownContext, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+		shutdownContext, cancel = context.WithTimeout(context.WithoutCancel(ctx), defaultTimeout)
 		defer cancel()
 		if shutdownErr := srv.Shutdown(shutdownContext); shutdownErr != nil {
 			shutdownErr = fmt.Errorf("shutdown server: %w", shutdownErr)

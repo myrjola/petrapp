@@ -63,7 +63,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
@@ -115,11 +115,12 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.NotFound(w, r)
+		app.notFound(w, r)
 		return
 	}
 
 	// Parse form
+	r.Body = http.MaxBytesReader(w, r.Body, largeMaxFormSize)
 	if err = r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
@@ -182,6 +183,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 // adminExerciseGeneratePOST handles POST requests to generate a new exercise.
 func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http.Request) {
 	// Parse form.
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, err)
 		return

@@ -4,7 +4,7 @@
         migratetest repomix repomix-clipboard setup-git-hooks lint-fix
 
 export GOTOOLCHAIN := auto
-GOLANGCI_LINT_VERSION := v2.7.2
+GOLANGCI_LINT_VERSION := v2.11.3
 
 # Suppress linker warnings on macOS
 ifeq ($(shell uname -s),Darwin)
