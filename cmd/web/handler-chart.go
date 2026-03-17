@@ -107,8 +107,6 @@ func (app *application) generateExerciseProgressData(
 
 // exerciseProgressChart handles requests for exercise progress chart data.
 func (app *application) exerciseProgressChart(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	// Parse date and exercise ID from URL
 	dateStr := r.PathValue("date")
 	date, err := time.Parse("2006-01-02", dateStr)
@@ -146,9 +144,6 @@ func (app *application) exerciseProgressChart(w http.ResponseWriter, r *http.Req
 	}
 
 	// Write the JSON response
-	_, err = w.Write(jsonData)
-	if err != nil {
-		http.Error(w, "Failed to write response", http.StatusInternalServerError)
-		return
-	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(jsonData)
 }

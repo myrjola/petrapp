@@ -17,6 +17,21 @@ import (
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
+// UnknownCredentialError is returned when a credential ID is not found in the database.
+// This allows the client to signal the authenticator to remove the credential.
+type UnknownCredentialError struct {
+	CredentialID []byte
+	Err          error
+}
+
+func (e *UnknownCredentialError) Error() string {
+	return fmt.Sprintf("unknown credential: %x: %v", e.CredentialID, e.Err)
+}
+
+func (e *UnknownCredentialError) Unwrap() error {
+	return e.Err
+}
+
 type WebAuthnHandler struct {
 	logger         *slog.Logger
 	webAuthn       *webauthn.WebAuthn
@@ -50,7 +65,7 @@ func New(
 
 	var webauthnConfig = &webauthn.Config{
 		RPID:          fqdn,
-		RPDisplayName: "Petrapp",
+		RPDisplayName: "Petra",
 		RPOrigins:     rpOrigins,
 
 		// Top origins are, to my understanding, used for cross-origin Passkeys. We don't need it here.
@@ -202,7 +217,6 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 	var (
 		session webauthn.SessionData
 		err     error
-		user    webauthn.User
 		ctx     = r.Context()
 	)
 	if session, err = h.parseWebAuthnSession(ctx); err != nil {
@@ -213,12 +227,24 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("parse credential request response: %w", err)
 	}
-	user, credential, err := h.webAuthn.ValidatePasskeyLogin(h.findUserHandler(ctx), session, parsedResponse)
+
+	// Extract credential ID before validation for error reporting.
+	credentialID := parsedResponse.RawID
+
+	usr, credential, err := h.webAuthn.ValidatePasskeyLogin(h.findUserHandler(ctx), session, parsedResponse)
 	if err != nil {
+		// Check if the error is due to an unknown credential or the user not existing.
+		_, isUnknownCredentialErr := errors.AsType[*protocol.ErrorUnknownCredential](err)
+		if isUnknownCredentialErr || errors.Is(err, ErrUserNotFound) {
+			return &UnknownCredentialError{
+				CredentialID: credentialID,
+				Err:          err,
+			}
+		}
 		return fmt.Errorf("validate Passkey login: %w", err)
 	}
 
-	if err = h.upsertCredential(ctx, user.WebAuthnID(), credential); err != nil {
+	if err = h.upsertCredential(ctx, usr.WebAuthnID(), credential); err != nil {
 		return fmt.Errorf("upsert webauthn credential: %w", err)
 	}
 
@@ -226,7 +252,7 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 	if err = h.sessionManager.RenewToken(r.Context()); err != nil {
 		return fmt.Errorf("renew session token: %w", err)
 	}
-	h.sessionManager.Put(r.Context(), string(userIDSessionKey), user.WebAuthnID())
+	h.sessionManager.Put(r.Context(), string(userIDSessionKey), usr.WebAuthnID())
 
 	return nil
 }

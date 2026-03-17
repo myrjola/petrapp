@@ -2,6 +2,7 @@ package e2etest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,9 @@ type secFetchSiteTransport struct {
 	base      http.RoundTripper
 	siteValue string
 }
+
+// ErrUnknownCredential means that the login failed because the server did not recognize the credential.
+var ErrUnknownCredential = errors.New("unknown credential")
 
 // RoundTrip implements the http.RoundTripper interface.
 func (t *secFetchSiteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -337,10 +341,20 @@ func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.Assert
 	if resp, err = c.client.Do(req); err != nil {
 		return fmt.Errorf("do request: %w", err)
 	}
-	if err = resp.Body.Close(); err != nil {
-		return fmt.Errorf("close response body: %w", err)
-	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if http.StatusOK != resp.StatusCode {
+		// Parse error response body to detect unknown credential error.
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		var bodyBytes []byte
+		bodyBytes, _ = io.ReadAll(resp.Body)
+		_ = json.Unmarshal(bodyBytes, &errResp)
+		if errResp.Error == "unknown_credential" {
+			return ErrUnknownCredential
+		}
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 	return nil

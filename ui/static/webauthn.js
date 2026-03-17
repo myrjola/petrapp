@@ -141,10 +141,42 @@ async function createAssertionResponse(publicKey) {
 async function finishLogin(assertionResponse) {
   const finishResp = await fetch("/api/login/finish", {method: "post", body: assertionResponse})
   if (!finishResp.ok) {
+    // Check if this is an unknown credential error.
+    if (finishResp.status === 401) {
+      try {
+        const errorData = await finishResp.json()
+        if (errorData.error === "unknown_credential" && errorData.credentialId) {
+          // Signal to the authenticator that this credential should be removed.
+          await signalUnknownCredential(errorData.credentialId)
+        }
+      } catch (e) {
+        console.error("Failed to parse error response or signal unknown credential:", e)
+      }
+    }
     throw new Error("Finishing login failed!");
   }
   // At this point, we assume the cookies are in place so that we can reload the page with the proper access.
   window.location.reload();
+}
+
+/**
+ * Signals to the authenticator that a credential is unknown and should be removed.
+ * @param credentialIdBase64 is the base64url-encoded credential ID.
+ * @returns {Promise<void>}
+ */
+async function signalUnknownCredential(credentialIdBase64) {
+  // Check if the Signal API is supported.
+  if (!window.PublicKeyCredential || !window.PublicKeyCredential.signalUnknownCredential) {
+    console.warn("PublicKeyCredential.signalUnknownCredential is not supported in this browser")
+    return
+  }
+
+  try {
+    const rpId = window.location.hostname
+    await window.PublicKeyCredential.signalUnknownCredential({ rpId, credentialId: credentialIdBase64 })
+  } catch (err) {
+    console.error("Failed to signal unknown credential:", err)
+  }
 }
 
 /**

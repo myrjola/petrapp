@@ -127,7 +127,7 @@ func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log the user out by clearing the session and redirect to home
+	// Log the user out by clearing the session and redirect home.
 	if err := app.webAuthnHandler.Logout(ctx); err != nil {
 		app.serverError(w, r, fmt.Errorf("logout after user deletion: %w", err))
 		return

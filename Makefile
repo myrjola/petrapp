@@ -1,6 +1,6 @@
 
-.DEFAULT_GOAL := ci
-.PHONY: ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
+.DEFAULT_GOAL := info
+.PHONY: info ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
         migratetest repomix repomix-clipboard setup-git-hooks lint-fix
 
 export GOTOOLCHAIN := auto
@@ -10,6 +10,9 @@ GOLANGCI_LINT_VERSION := v2.11.3
 ifeq ($(shell uname -s),Darwin)
 	export CGO_LDFLAGS := -w
 endif
+
+info:
+	@echo "Run 'make clean && make ci' for a fresh build"
 
 init: gomod bin/golangci-lint
 	@echo "Dependencies installed"

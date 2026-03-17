@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -278,7 +279,7 @@ func Test_application_deleteUser(t *testing.T) {
 
 	client := server.Client()
 
-	// First register to get authenticated
+	// First, register to get authenticated
 	if _, err = client.Register(ctx); err != nil {
 		t.Fatalf("Failed to register: %v", err)
 	}
@@ -293,7 +294,7 @@ func Test_application_deleteUser(t *testing.T) {
 		t.Fatalf("Failed to login: %v", err)
 	}
 
-	// Navigate to preferences page
+	// Navigate to the preferences page
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
@@ -343,10 +344,10 @@ func Test_application_deleteUser(t *testing.T) {
 		t.Errorf("Expected redirect to %q after user deletion, got %q", want, got)
 	}
 
-	// Verify the user can't login with old credentials (user was deleted)
+	// Verify the user can't log in with old credentials (user was deleted).
 	_, err = client.Login(ctx)
-	if err == nil {
-		t.Fatal("Expected error when trying to login with deleted user credentials, got none")
+	if !errors.Is(err, e2etest.ErrUnknownCredential) {
+		t.Fatal("Expected unknown credential error when trying to login with deleted user credentials, got none")
 	}
 }
 
