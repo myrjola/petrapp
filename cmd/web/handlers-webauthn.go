@@ -53,7 +53,7 @@ func (app *application) finishLogin(w http.ResponseWriter, r *http.Request) {
 				"credentialId": base64.RawURLEncoding.EncodeToString(unknownCredErr.CredentialID),
 			}
 			if err = json.NewEncoder(w).Encode(response); err != nil {
-				app.serverError(w, r, err)
+				app.logger.Error("failed to encode unknown credential response", "error", err)
 			}
 			return
 		}
