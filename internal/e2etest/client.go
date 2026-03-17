@@ -352,7 +352,7 @@ func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.Assert
 		var bodyBytes []byte
 		bodyBytes, _ = io.ReadAll(resp.Body)
 		_ = json.Unmarshal(bodyBytes, &errResp)
-		if errResp.Error == "unknown credential" {
+		if errResp.Error == "unknown_credential" {
 			return ErrUnknownCredential
 		}
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)

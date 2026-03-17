@@ -346,7 +346,7 @@ func Test_application_deleteUser(t *testing.T) {
 
 	// Verify the user can't log in with old credentials (user was deleted).
 	_, err = client.Login(ctx)
-	if errors.Is(err, e2etest.ErrUnknownCredential) {
+	if !errors.Is(err, e2etest.ErrUnknownCredential) {
 		t.Fatal("Expected unknown credential error when trying to login with deleted user credentials, got none")
 	}
 }
