@@ -19,10 +19,7 @@ func (app *application) beginRegistration(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if _, err = w.Write(out); err != nil {
-		app.serverError(w, r, err)
-		return
-	}
+	_, _ = w.Write(out)
 }
 
 func (app *application) finishRegistration(w http.ResponseWriter, r *http.Request) {
@@ -40,11 +37,7 @@ func (app *application) beginLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_, err = w.Write(out) //#nosec G705 -- out is a structured WebAuthn challenge, not a reflection of raw user input.
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
+	_, _ = w.Write(out) //#nosec G705 -- out is a structured WebAuthn challenge, not a reflection of raw user input.
 }
 
 func (app *application) finishLogin(w http.ResponseWriter, r *http.Request) {
