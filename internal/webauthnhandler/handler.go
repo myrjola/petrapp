@@ -66,7 +66,7 @@ func New(
 
 	var webauthnConfig = &webauthn.Config{
 		RPID:          fqdn,
-		RPDisplayName: "Petrapp",
+		RPDisplayName: "Petra",
 		RPOrigins:     rpOrigins,
 
 		// Top origins are, to my understanding, used for cross-origin Passkeys. We don't need it here.
