@@ -29,6 +29,6 @@ jobs:
   build_and_push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: superfly/flyctl-actions/setup-flyctl@v1
       - run: flyctl deploy --app ${{ inputs.fly_app }} --remote-only --build-only --push --image-label ${{ inputs.docker_tag }}

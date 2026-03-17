@@ -30,7 +30,7 @@ jobs:
       url: https://${{ env.APP_HOSTNAME }}
     steps:
       - name: Get code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - uses: superfly/flyctl-actions/setup-flyctl@v1
       - run: flyctl deploy --app ${{ inputs.fly_app }} --remote-only --image ${{ inputs.docker_image_uri }}
 
