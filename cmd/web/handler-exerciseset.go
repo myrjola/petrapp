@@ -208,6 +208,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	}
 
 	// Parse form for weight and reps
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err = r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return

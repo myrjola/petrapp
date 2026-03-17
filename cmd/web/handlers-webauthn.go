@@ -28,7 +28,7 @@ func (app *application) finishRegistration(w http.ResponseWriter, r *http.Reques
 }
 
 func (app *application) beginLogin(w http.ResponseWriter, r *http.Request) {
-	out, err := app.webAuthnHandler.BeginLogin(w, r)
+	out, err := app.webAuthnHandler.BeginLogin(r)
 	if err != nil {
 		app.serverError(w, r, err)
 		return

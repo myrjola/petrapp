@@ -303,7 +303,7 @@ func (db *Database) checkTableForeignKeys(
 				return true, []string{fromColumn}, nil
 			}
 			if len(userPath) > 0 && userPath[len(userPath)-1] == toColumn {
-				var newPath []string
+				newPath := make([]string, 0, len(userPath))
 				newPath = append(newPath, fromColumn)
 				newPath = append(newPath, userPath[:len(userPath)-1]...)
 				return true, newPath, nil

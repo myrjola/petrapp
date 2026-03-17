@@ -16,6 +16,14 @@ func (app *application) notFound(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusNotFound, "not-found", newBaseTemplateData(r))
 }
 
+// defaultMaxFormSize is a reasonable maximum size for form data in bytes.
+//
+// You can use it as follows before calling r.ParseForm(): r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize).
+const defaultMaxFormSize = 1024
+
+// largeMaxFormSize is a larger maximum size for form data when there's more content to be expected.
+const largeMaxFormSize = 1024 * 10
+
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {

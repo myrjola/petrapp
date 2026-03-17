@@ -129,9 +129,9 @@ func (db *Database) rollback(ctx context.Context, tx *sql.Tx) func() {
 	}
 }
 
-// migrateTables ensures table schema is synchronized between databases.
+// migrateTables ensures the table schema is synchronized between databases.
 func (db *Database) migrateTables(ctx context.Context, tx *sql.Tx) error {
-	// Step 3: Remember schema (also includes trivial creation and deletion of tables).
+	// Step 3: Remember the schema (also includes trivial creation and deletion of tables).
 	var err error
 
 	// Drop deleted tables.
@@ -142,7 +142,7 @@ func (db *Database) migrateTables(ctx context.Context, tx *sql.Tx) error {
 	for _, table := range deletedTables {
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "dropping table", slog.String("table", table))
 		// language=text
-		dropStmt := "DROP TABLE " + table
+		dropStmt := "DROP TABLE " + table //#nosec G202 -- we trust the query since it's based on the sqlite schema.
 		if _, err = tx.ExecContext(ctx, dropStmt); err != nil {
 			return fmt.Errorf("%s: %w", dropStmt, err)
 		}
@@ -182,7 +182,7 @@ WHERE live.type = 'table'
 			slog.String("live_sql", table.liveSQL),
 			slog.String("new_sql", table.newSQL))
 
-		// Step 4: Create tables according to new schema on temporary names.
+		// Step 4: Create tables according to the new schema on temporary names.
 		tempName := table.name + "_migration_temp"
 		tempNameSQL := strings.Replace(table.newSQL, table.name, tempName, 1)
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "creating new table to temporary name",
@@ -213,7 +213,7 @@ WHERE live.type = 'table'
 			return fmt.Errorf("drop old table: %w", err)
 		}
 
-		// Step 7: Rename new table to old table's name.
+		// Step 7: Rename a new table to the old table's name.
 		// language=text
 		renameSQL := fmt.Sprintf("ALTER TABLE %s RENAME TO %s;", tempName, table.name)
 		db.logger.LogAttrs(ctx, slog.LevelInfo, "renaming new table", slog.String("query", renameSQL))

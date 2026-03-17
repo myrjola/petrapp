@@ -3,8 +3,6 @@ package workout
 import (
 	"testing"
 	"time"
-
-	"github.com/myrjola/petrapp/internal/ptr"
 )
 
 // Helper function for creating test sets with weights.
@@ -412,7 +410,7 @@ func createWorkoutHistory() []sessionAggregate {
 		{
 			// 2 weeks ago - Monday workout
 			Date:             twoWeeksAgo,
-			DifficultyRating: ptr.Ref(3), // Medium difficulty
+			DifficultyRating: new(3), // Medium difficulty
 			StartedAt:        twoWeeksAgo.Add(17 * time.Hour),
 			CompletedAt:      twoWeeksAgo.Add(18 * time.Hour),
 			ExerciseSets: []exerciseSetAggregate{
@@ -439,7 +437,7 @@ func createWorkoutHistory() []sessionAggregate {
 		{
 			// 1 week ago - Monday workout
 			Date:             oneWeekAgo,
-			DifficultyRating: ptr.Ref(4), // Somewhat challenging
+			DifficultyRating: new(4), // Somewhat challenging
 			StartedAt:        oneWeekAgo.Add(17 * time.Hour),
 			CompletedAt:      oneWeekAgo.Add(18 * time.Hour),
 			ExerciseSets: []exerciseSetAggregate{
@@ -466,7 +464,7 @@ func createWorkoutHistory() []sessionAggregate {
 		{
 			// 2 days ago - Saturday workout
 			Date:             twoDaysAgo,
-			DifficultyRating: ptr.Ref(2), // Somewhat easy
+			DifficultyRating: new(2), // Somewhat easy
 			StartedAt:        twoDaysAgo.Add(10 * time.Hour),
 			CompletedAt:      twoDaysAgo.Add(11 * time.Hour),
 			ExerciseSets: []exerciseSetAggregate{
@@ -628,16 +626,17 @@ func TestUserFeedbackIntegration(t *testing.T) {
 		t.Fatalf("Failed to generate initial workout: %v", err)
 	}
 
-	// First complete the initial workout with a moderate rating
+	// First, complete the initial workout with a moderate rating
 	// This establishes starting weights for exercises
 	initialCompletedSession := simulateWorkoutCompletion(initialSession, 0)
-	initialHistory := []sessionAggregate{initialCompletedSession}
 
 	// For each feedback level, create a new test session
 	testSessions := make([]struct {
 		rating  int
 		session sessionAggregate
 	}, 0, 3)
+	initialHistory := make([]sessionAggregate, 1+len(testSessions)*2)
+	initialHistory[0] = initialCompletedSession
 
 	// For each feedback level
 	for _, rating := range []int{1, 3, 5} { // Too easy, Optimal, Too difficult
@@ -667,8 +666,9 @@ func TestUserFeedbackIntegration(t *testing.T) {
 		rating := testCase.rating
 		completedSession := testCase.session
 
-		// Create a new history with initial session and current completed session
-		var updatedHistory = append(initialHistory, completedSession)
+		// Create a new history with the initial session and current completed session
+		var updatedHistory = initialHistory
+		updatedHistory = append(updatedHistory, completedSession)
 		var updatedGen *generator
 		updatedGen, err = newGenerator(preferences, updatedHistory, exercises)
 		if err != nil {
