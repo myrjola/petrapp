@@ -172,12 +172,8 @@ async function signalUnknownCredential(credentialIdBase64) {
   }
 
   try {
-    const credentialId = bufferDecode(credentialIdBase64)
     const rpId = window.location.hostname
-    await window.PublicKeyCredential.signalUnknownCredential({
-      rpId: rpId,
-      credentialId: credentialId,
-    })
+    await window.PublicKeyCredential.signalUnknownCredential({ rpId, credentialId: credentialIdBase64 })
     console.log("Successfully signaled unknown credential to authenticator")
   } catch (err) {
     console.error("Failed to signal unknown credential:", err)
