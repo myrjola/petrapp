@@ -234,7 +234,7 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 
 	usr, credential, err := h.webAuthn.ValidatePasskeyLogin(h.findUserHandler(ctx), session, parsedResponse)
 	if err != nil {
-		// Check if the error is due to an unknown credential (usr not found in database).
+		// Check if the error is due to an unknown credential (user not found in the database).
 		if errors.Is(err, sql.ErrNoRows) {
 			return &UnknownCredentialError{
 				CredentialID: credentialID,

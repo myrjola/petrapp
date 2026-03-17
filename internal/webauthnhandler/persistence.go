@@ -32,16 +32,11 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user
 		rows *sql.Rows
 	)
 
-	stmt := `SELECT webauthn_user_id, display_name FROM users WHERE webauthn_user_id = ?`
+	stmt := `SELECT id, webauthn_user_id, display_name FROM users WHERE webauthn_user_id = ?`
 	var user user
-	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(&user.id, &user.displayName); err != nil {
+	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(
+		&user.id, &user.webauthnUserID, &user.displayName); err != nil {
 		return nil, fmt.Errorf("read user: %w", err)
-	}
-
-	// Get the integer user ID for credential lookups
-	var intUserID int
-	if err = h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnID).Scan(&intUserID); err != nil {
-		return nil, fmt.Errorf("read user integer ID: %w", err)
 	}
 
 	// scan credentials
@@ -59,7 +54,7 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user
        authenticator_attachment
 FROM credentials
 WHERE user_id = ?`
-	if rows, err = h.database.ReadOnly.QueryContext(ctx, stmt, intUserID); err != nil {
+	if rows, err = h.database.ReadOnly.QueryContext(ctx, stmt, user.id); err != nil {
 		return nil, fmt.Errorf("query credentials: %w", err)
 	}
 	defer func() {
