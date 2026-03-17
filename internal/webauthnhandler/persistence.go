@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 const selectUserStmt = `SELECT id FROM users WHERE webauthn_user_id = ?`
+
+var ErrUserNotFound = errors.New("user not found")
 
 func (h *WebAuthnHandler) upsertUser(ctx context.Context, user webauthn.User) error {
 	var err error
@@ -36,6 +39,9 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user
 	var user user
 	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(
 		&user.id, &user.webauthnUserID, &user.displayName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
 		return nil, fmt.Errorf("read user: %w", err)
 	}
 

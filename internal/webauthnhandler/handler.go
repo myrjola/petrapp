@@ -2,7 +2,6 @@ package webauthnhandler
 
 import (
 	"context"
-	"database/sql"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
@@ -234,8 +233,9 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 
 	usr, credential, err := h.webAuthn.ValidatePasskeyLogin(h.findUserHandler(ctx), session, parsedResponse)
 	if err != nil {
-		// Check if the error is due to an unknown credential (user not found in the database).
-		if errors.Is(err, sql.ErrNoRows) {
+		// Check if the error is due to an unknown credential or the user not existing.
+		_, isUnknownCredentialErr := errors.AsType[*protocol.ErrorUnknownCredential](err)
+		if isUnknownCredentialErr || errors.Is(err, ErrUserNotFound) {
 			return &UnknownCredentialError{
 				CredentialID: credentialID,
 				Err:          err,

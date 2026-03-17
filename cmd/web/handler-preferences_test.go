@@ -279,7 +279,7 @@ func Test_application_deleteUser(t *testing.T) {
 
 	client := server.Client()
 
-	// First register to get authenticated
+	// First, register to get authenticated
 	if _, err = client.Register(ctx); err != nil {
 		t.Fatalf("Failed to register: %v", err)
 	}
@@ -294,7 +294,7 @@ func Test_application_deleteUser(t *testing.T) {
 		t.Fatalf("Failed to login: %v", err)
 	}
 
-	// Navigate to preferences page
+	// Navigate to the preferences page
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
