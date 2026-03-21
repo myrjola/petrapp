@@ -194,15 +194,29 @@
                 <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
                    class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ else if $isStarted }} started{{ end }}"
                    data-exercise-id="{{ .Exercise.ID }}">
-                    {{ .Exercise.Name }}
+                   {{ .Exercise.Name }}
                 </a>
             {{ end }}
+
+            <script {{ nonce }}>
+              // Animate the exercise name between pages.
+              const exercises = document.querySelectorAll('a.exercise')
+              exercises.forEach(exercise => {
+                exercise.addEventListener('click', (e) => {
+                  // Clear the view transition names that might be left from previous transitions in bfcache.
+                  exercises.forEach(e => e.style.viewTransitionName = '')
+                  // Set the view transition name for the clicked exercise. This will match the name on the next page.
+                  e.target.style.viewTransitionName = `exercise-title-${exercise.getAttribute('data-exercise-id')}`
+                })
+              })
+            </script>
 
             <div class="add-exercise">
                 <a href="/workouts/{{ .Date.Format "2006-01-02" }}/add-exercise" class="add-exercise-button">
                     Add Exercise
                 </a>
             </div>
+
         </div>
 
         <div class="complete-workout">
