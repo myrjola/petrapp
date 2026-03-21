@@ -113,13 +113,13 @@
             });
           }
 
-          // OLD PAGE LOGIC - Set view-transition-name when navigating away
+          // OLD PAGE LOGIC - Set view-transition-name when navigating away.
           window.addEventListener('pageswap', async (e) => {
             if (!e.viewTransition || !hasNavigationAPI) return;
 
             const targetUrl = new URL(e.activation.entry.url);
 
-            // Navigating from workout list to exercise detail/info page
+            // Navigating from the workout list to the exercise detail / info page
             if (isWorkoutListPage(window.location.href) &&
               (isExerciseDetailPage(targetUrl.href) || isExerciseInfoPage(targetUrl.href))) {
 
@@ -140,7 +140,7 @@
             }
           });
 
-          // NEW PAGE LOGIC - Set view-transition-name when arriving at page
+          // NEW PAGE LOGIC - Set view-transition-name when arriving at a page.
           window.addEventListener('pagereveal', async (e) => {
             if (!e.viewTransition || !hasNavigationAPI) return;
 
@@ -226,8 +226,14 @@
           window.sessionStorage.setItem("hasUAVisualTransition", "true")
         }
 
-        // Very experimental navigation API testing to see if we can make browser history work like a stack navigator.
-        // Check how backend is setting Content-Location header to understand better how they plumb together.
+        // Stack Navigation implementation using Navigation API.
+        //
+        // When a form is submitted, we want the browser's back button to behave sensibly. An example of what we want to
+        // avoid is when we submit a form and return to the same URL as the form, we don't want the back button to be a
+        // no-op.
+        //
+        // Check how the backend is setting Content-Location HTTP header to understand better how this plumbs together
+        // with the backend.
         if (e.formData) {
           e.intercept({
             async handler() {
@@ -257,6 +263,51 @@
         }
       })
 
+      function findMatchingHistoryEntry(targetUrl) {
+        const entries = navigation.entries();
+        const currentIndex = navigation.currentEntry.index;
+        const targetURL = new URL(targetUrl);
+
+        // Search backwards through history
+        for (let i = currentIndex - 1; i >= 0; i--) {
+          const entry = entries[i];
+          const entryURL = new URL(entry.url);
+
+          if (urlsMatch(entryURL, targetURL)) {
+            return entry;
+          }
+        }
+
+        return null;
+      }
+
+      function urlsMatch(url1, url2) {
+        return url1.href === url2.href ||
+          (url1.pathname === url2.pathname && url1.origin === url2.origin);
+      }
+
+      // Create a smart back button using the Navigation API to make it pop the navigation stack.
+      document.addEventListener("DOMContentLoaded", function () {
+        // Find all anchors marked for back button enhancement.
+        const backLinks = document.querySelectorAll('a[data-back-button]');
+
+        backLinks.forEach(link => {
+          const destinationUrl = link.href;
+
+          // Only enhance it if Navigation API is supported
+          if (typeof navigation !== 'undefined') {
+            link.addEventListener('click', async (e) => {
+              const matchingEntry = findMatchingHistoryEntry(destinationUrl);
+
+              if (matchingEntry) {
+                e.preventDefault();
+                await navigation.traverseTo(matchingEntry.key);
+              }
+            });
+          }
+        })
+      })
+
       // Form submission detector
       document.addEventListener('submit', function (e) {
         const form = e.target;
@@ -282,51 +333,6 @@
           });
         }
       });
-
-      function findMatchingHistoryEntry(targetUrl) {
-        const entries = navigation.entries();
-        const currentIndex = navigation.currentEntry.index;
-        const targetURL = new URL(targetUrl);
-
-        // Search backwards through history
-        for (let i = currentIndex - 1; i >= 0; i--) {
-          const entry = entries[i];
-          const entryURL = new URL(entry.url);
-
-          if (urlsMatch(entryURL, targetURL)) {
-            return entry;
-          }
-        }
-
-        return null;
-      }
-
-      function urlsMatch(url1, url2) {
-        return url1.href === url2.href ||
-          (url1.pathname === url2.pathname && url1.origin === url2.origin);
-      }
-
-      // Create a smart back button using the Navigation API.
-      document.addEventListener("DOMContentLoaded", function () {
-        // Find all anchors marked for back button enhancement.
-        const backLinks = document.querySelectorAll('a[data-back-button]');
-
-        backLinks.forEach(link => {
-          const destinationUrl = link.href;
-
-          // Only enhance if Navigation API is supported
-          if (typeof navigation !== 'undefined') {
-            link.addEventListener('click', async (e) => {
-              const matchingEntry = findMatchingHistoryEntry(destinationUrl);
-
-              if (matchingEntry) {
-                e.preventDefault();
-                await navigation.traverseTo(matchingEntry.key);
-              }
-            });
-          }
-        })
-      })
     </script>
     {{ template "page" . }}
     </body>
