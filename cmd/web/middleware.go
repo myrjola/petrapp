@@ -65,6 +65,7 @@ font-src 'none';
 object-src 'none';
 manifest-src 'self';
 base-uri 'none';
+require-trusted-types-for 'script';
 report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 
 		w.Header().Set("Content-Security-Policy", csp)

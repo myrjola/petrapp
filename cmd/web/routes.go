@@ -42,8 +42,6 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/warmup/complete",
 		mustSession(http.HandlerFunc(app.exerciseSetWarmupCompletePOST)))
 	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/info", mustSession(http.HandlerFunc(app.exerciseInfoGET)))
-	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/progress-chart",
-		mustSession(http.HandlerFunc(app.exerciseProgressChart)))
 	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/swap",
 		mustSession(http.HandlerFunc(app.workoutSwapExerciseGET)))
 	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/swap",

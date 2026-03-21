@@ -1,0 +1,25 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseInfoTemplateData*/ -}}
+
+{{ define "progress-chart" }}
+    <div class="table-container" tabindex="0" role="group" aria-labelledby="caption">
+        <table>
+            <caption id="caption">Progress of {{ .Exercise.Name }}</caption>
+            <tbody>
+            <tr>
+                {{ range $p := .ProgressPoints }}
+                    <th role="columnheader" scope="col">{{ $p.Date.Format "2006-01-02" }}</th>
+                {{ end}}
+            </tr>
+            <tr>
+                {{ range $p := .ProgressPoints }}
+                    <td>
+                        {{ range $d := $p.SetDescriptions }}
+                            {{ $d }}<br>
+                        {{ end }}
+                    </td>
+                {{ end }}
+            </tr>
+            </tbody>
+        </table>
+    </div>
+{{ end }}
