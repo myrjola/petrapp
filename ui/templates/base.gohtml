@@ -65,9 +65,7 @@
         if (depthDifference === 0) {
           e.viewTransition.skipTransition()
         }
-        document.documentElement.dataset.direction = depthDifference > 0 ? 'backward' : 'forward'
-        await e.viewTransition.finished
-        delete document.documentElement.dataset.direction
+        e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward');
       })
 
       navigation.addEventListener('navigate', (e) => {

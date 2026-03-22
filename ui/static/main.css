@@ -280,20 +280,29 @@
     }
 }
 
-[data-direction="forward"]::view-transition-old(root) {
-    animation: slide-out-left .3s ease-in-out;
+html:active-view-transition-type(forward, backward) {
+    :root {
+        view-transition-name: none;
+    }
 }
 
-[data-direction="forward"]::view-transition-new(root) {
-    animation: slide-in-right .3s ease-in-out;
+html:active-view-transition-type(forward) {
+    &::view-transition-old(root) {
+        animation: slide-out-left .3s ease-in-out;
+    }
+
+    &::view-transition-new(root) {
+        animation: slide-in-right .3s ease-in-out;
+    }
 }
 
-[data-direction="backward"]::view-transition-old(root) {
-    animation: slide-out-right .3s ease-in-out;
-}
-
-[data-direction="backward"]::view-transition-new(root) {
-    animation: slide-in-left .3s ease-in-out;
+html:active-view-transition-type(backward) {
+    &::view-transition-old(root) {
+        animation: slide-out-right .3s ease-in-out;
+    }
+    &::view-transition-new(root) {
+        animation: slide-in-left .3s ease-in-out;
+    }
 }
 
 @keyframes scale-in {
