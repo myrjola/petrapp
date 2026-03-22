@@ -75,7 +75,7 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	app.render(w, r, http.StatusOK, "exercise-info", data)
 }
 
-// renderMarkdownToHTML converts markdown string to HTML.
+// renderMarkdownToHTML converts Markdown string to HTML.
 func (app *application) renderMarkdownToHTML(ctx context.Context, markdown string) template.HTML {
 	md := goldmark.New()
 
