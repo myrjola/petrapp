@@ -102,14 +102,14 @@ type ExerciseProgressDataPoint struct {
 
 // processEntryData extracts chart metrics from a single exercise progress entry.
 // For weighted exercises Progress is the max weight lifted; for bodyweight it is the max reps completed.
-func processEntryData(entry workout.ExerciseProgressEntry, exerciseType workout.ExerciseType) ExerciseProgressDataPoint {
+func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseType) ExerciseProgressDataPoint {
 	var progress float64
 	var setDescriptions []string
 
 	for _, set := range entry.Sets {
 		reps := *set.CompletedReps // service guarantees CompletedReps != nil
 
-		switch exerciseType {
+		switch typ {
 		case workout.ExerciseTypeWeighted:
 			if set.WeightKg != nil {
 				weight := *set.WeightKg
