@@ -374,11 +374,23 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 		return ExerciseProgress{}, fmt.Errorf("get exercise %d: %w", exerciseID, err)
 	}
 
-	entries := make([]ExerciseProgressEntry, len(aggs))
-	for i, agg := range aggs {
-		entries[i] = ExerciseProgressEntry{
-			Date: agg.Date,
-			Sets: agg.Sets,
+	entries := make([]ExerciseProgressEntry, 0, len(aggs))
+	for _, agg := range aggs {
+		// Only include entries where at least one set was completed and only the completed sets.
+		var completedSets []Set
+		hasData := false
+		for _, set := range agg.Sets {
+			if set.CompletedReps != nil {
+				completedSets = append(completedSets, set)
+				hasData = true
+				break
+			}
+		}
+		if hasData {
+			entries = append(entries, ExerciseProgressEntry{
+				Date: agg.Date,
+				Sets: completedSets,
+			})
 		}
 	}
 
@@ -750,7 +762,7 @@ func (s *Service) SetFeatureFlag(ctx context.Context, flag FeatureFlag) error {
 	return nil
 }
 
-// ExportUserData creates a SQLite database export containing all data for the authenticated user.
+// ExportUserData creates an SQLite database export containing all data for the authenticated user.
 // This method is intended for GDPR compliance and allows users to download their complete data.
 func (s *Service) ExportUserData(ctx context.Context) (string, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)

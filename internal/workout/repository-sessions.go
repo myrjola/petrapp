@@ -423,9 +423,9 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 				result = append(result, current)
 			}
 
-			warmupCompletedAt, parseErr := r.parseWarmupCompletedAtTimestamp(warmupCompletedAtStr)
-			if parseErr != nil {
-				return nil, parseErr
+			warmupCompletedAt, parseWarmupErr := r.parseWarmupCompletedAtTimestamp(warmupCompletedAtStr)
+			if parseWarmupErr != nil {
+				return nil, parseWarmupErr
 			}
 
 			current = datedExerciseSetAggregate{
