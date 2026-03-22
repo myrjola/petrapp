@@ -376,17 +376,14 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 
 	entries := make([]ExerciseProgressEntry, 0, len(aggs))
 	for _, agg := range aggs {
-		// Only include entries where at least one set was completed and only the completed sets.
+		// Collect only completed sets; skip entries with none.
 		var completedSets []Set
-		hasData := false
 		for _, set := range agg.Sets {
 			if set.CompletedReps != nil {
 				completedSets = append(completedSets, set)
-				hasData = true
-				break
 			}
 		}
-		if hasData {
+		if len(completedSets) > 0 {
 			entries = append(entries, ExerciseProgressEntry{
 				Date: agg.Date,
 				Sets: completedSets,

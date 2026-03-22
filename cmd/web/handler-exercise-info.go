@@ -101,26 +101,33 @@ type ExerciseProgressDataPoint struct {
 }
 
 // processEntryData extracts chart metrics from a single exercise progress entry.
-func processEntryData(entry workout.ExerciseProgressEntry) ExerciseProgressDataPoint {
-	var maxWeight float64
+// For weighted exercises Progress is the max weight lifted; for bodyweight it is the max reps completed.
+func processEntryData(entry workout.ExerciseProgressEntry, exerciseType workout.ExerciseType) ExerciseProgressDataPoint {
+	var progress float64
 	var setDescriptions []string
 
 	for _, set := range entry.Sets {
-		if set.WeightKg != nil && set.CompletedReps != nil {
-			weight := *set.WeightKg
-			reps := *set.CompletedReps
+		reps := *set.CompletedReps // service guarantees CompletedReps != nil
 
-			if weight > maxWeight {
-				maxWeight = weight
+		switch exerciseType {
+		case workout.ExerciseTypeWeighted:
+			if set.WeightKg != nil {
+				weight := *set.WeightKg
+				if weight > progress {
+					progress = weight
+				}
+				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))
 			}
-
-			// Format as "8x10kg"
-			setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))
+		case workout.ExerciseTypeBodyweight:
+			if float64(reps) > progress {
+				progress = float64(reps)
+			}
+			setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", reps))
 		}
 	}
 
 	return ExerciseProgressDataPoint{
-		Progress:        maxWeight, // TODO: Handle other types of progress than max weight.
+		Progress:        progress,
 		Date:            entry.Date,
 		SetDescriptions: setDescriptions,
 	}
@@ -138,7 +145,7 @@ func (app *application) generateExerciseProgressData(
 
 	dataPoints := make([]ExerciseProgressDataPoint, len(progress.Entries))
 	for i, entry := range progress.Entries {
-		dataPoints[i] = processEntryData(entry)
+		dataPoints[i] = processEntryData(entry, progress.Exercise.ExerciseType)
 	}
 
 	return dataPoints, nil
