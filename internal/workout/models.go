@@ -115,6 +115,18 @@ type ExerciseSet struct {
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
 }
 
+// ExerciseProgressEntry represents the sets performed for an exercise on a specific date.
+type ExerciseProgressEntry struct {
+	Date time.Time
+	Sets []Set
+}
+
+// ExerciseProgress represents an exercise with its historical performance data across sessions.
+type ExerciseProgress struct {
+	Exercise Exercise
+	Entries  []ExerciseProgressEntry
+}
+
 // Session represents a complete workout session including all exercises and their sets.
 type Session struct {
 	Date             time.Time

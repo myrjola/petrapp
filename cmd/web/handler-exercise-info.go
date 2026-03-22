@@ -100,24 +100,12 @@ type ExerciseProgressDataPoint struct {
 	SetDescriptions []string
 }
 
-// processSessionData extracts exercise data from a session and calculates metrics.
-func processSessionData(session workout.Session, exerciseID int) (ExerciseProgressDataPoint, bool) {
-	// Find the exercise in this session
-	var exerciseData *workout.ExerciseSet
-	for _, es := range session.ExerciseSets {
-		if es.Exercise.ID == exerciseID {
-			exerciseData = &es
-			break
-		}
-	}
-	if exerciseData == nil {
-		return ExerciseProgressDataPoint{}, false
-	}
-
+// processEntryData extracts chart metrics from a single exercise progress entry.
+func processEntryData(entry workout.ExerciseProgressEntry) (ExerciseProgressDataPoint, bool) {
 	var sessionMaxWeight float64
 	var setDescriptions []string
 
-	for _, set := range exerciseData.Sets {
+	for _, set := range entry.Sets {
 		if set.WeightKg != nil && set.CompletedReps != nil {
 			weight := *set.WeightKg
 			reps := *set.CompletedReps
@@ -131,18 +119,14 @@ func processSessionData(session workout.Session, exerciseID int) (ExerciseProgre
 		}
 	}
 
-	// Only include sessions with actual data
+	// Only include entries with actual data.
 	if len(setDescriptions) == 0 {
-		return ExerciseProgressDataPoint{
-			Progress:        0,
-			Date:            time.Time{},
-			SetDescriptions: nil,
-		}, false
+		return ExerciseProgressDataPoint{}, false
 	}
 
 	return ExerciseProgressDataPoint{
 		Progress:        sessionMaxWeight, // TODO: Handle other types of progress than max weight.
-		Date:            session.Date,
+		Date:            entry.Date,
 		SetDescriptions: setDescriptions,
 	}, true
 }
@@ -150,18 +134,16 @@ func processSessionData(session workout.Session, exerciseID int) (ExerciseProgre
 // generateExerciseProgressData creates a chart dataset for exercise progress tracking.
 func (app *application) generateExerciseProgressData(
 	ctx context.Context, currentDate time.Time, exercise workout.Exercise) ([]ExerciseProgressDataPoint, error) {
-	// Get historical data for the past 5 years
+	// Get historical data for the past 5 years.
 	fiveYearsAgo := currentDate.AddDate(-5, 0, 0)
-	sessions, err := app.workoutService.GetSessionsWithExerciseSince(ctx, exercise.ID, fiveYearsAgo)
+	progress, err := app.workoutService.GetExerciseSetsForExerciseSince(ctx, exercise.ID, fiveYearsAgo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sessions: %w", err)
+		return nil, fmt.Errorf("failed to get exercise sets: %w", err)
 	}
 
-	// Process data for the chart.
 	var dataPoints []ExerciseProgressDataPoint
-
-	for _, session := range sessions {
-		if dataPoint, hasData := processSessionData(session, exercise.ID); hasData {
+	for _, entry := range progress.Entries {
+		if dataPoint, hasData := processEntryData(entry); hasData {
 			dataPoints = append(dataPoints, dataPoint)
 		}
 	}

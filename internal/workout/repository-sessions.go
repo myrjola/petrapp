@@ -364,6 +364,94 @@ func (r *sqliteSessionRepository) parseWarmupCompletedAtTimestamp(
 	return &warmupTime, nil
 }
 
+// ListSetsForExerciseSince retrieves all sets for a specific exercise since a given date.
+func (r *sqliteSessionRepository) ListSetsForExerciseSince(
+	ctx context.Context,
+	exerciseID int,
+	sinceDate time.Time,
+) (_ []datedExerciseSetAggregate, err error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	sinceDateStr := formatDate(sinceDate)
+
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+		SELECT es.workout_date, es.weight_kg, es.min_reps, es.max_reps,
+		       es.completed_reps, es.completed_at, we.warmup_completed_at
+		FROM exercise_sets es
+		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id
+		                              AND we.workout_date = es.workout_date
+		                              AND we.exercise_id = es.exercise_id
+		WHERE es.workout_user_id = ? AND es.exercise_id = ? AND es.workout_date >= ?
+		ORDER BY es.workout_date DESC, es.set_number`,
+		userID, exerciseID, sinceDateStr)
+	if err != nil {
+		return nil, fmt.Errorf("query exercise sets for exercise: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
+
+	var result []datedExerciseSetAggregate
+	var current datedExerciseSetAggregate
+	current.ExerciseID = -1
+
+	for rows.Next() {
+		var (
+			workoutDateStr       string
+			set                  Set
+			completedAtStr       sql.NullString
+			warmupCompletedAtStr sql.NullString
+		)
+		if err = rows.Scan(&workoutDateStr, &set.WeightKg, &set.MinReps, &set.MaxReps,
+			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr); err != nil {
+			return nil, fmt.Errorf("scan exercise set row: %w", err)
+		}
+
+		if err = r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
+			return nil, err
+		}
+
+		date, parseErr := time.Parse(dateFormat, workoutDateStr)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parse workout date: %w", parseErr)
+		}
+
+		// Start a new aggregate when the date changes.
+		if !date.Equal(current.Date) {
+			if current.ExerciseID != -1 {
+				result = append(result, current)
+			}
+
+			warmupCompletedAt, parseErr := r.parseWarmupCompletedAtTimestamp(warmupCompletedAtStr)
+			if parseErr != nil {
+				return nil, parseErr
+			}
+
+			current = datedExerciseSetAggregate{
+				Date: date,
+				exerciseSetAggregate: exerciseSetAggregate{
+					ExerciseID:        exerciseID,
+					Sets:              []Set{},
+					WarmupCompletedAt: warmupCompletedAt,
+				},
+			}
+		}
+
+		current.Sets = append(current.Sets, set)
+	}
+
+	if current.ExerciseID != -1 {
+		result = append(result, current)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	return result, nil
+}
+
 // saveExerciseSets inserts or updates exercise sets for a session.
 func (r *sqliteSessionRepository) saveExerciseSets(
 	ctx context.Context,

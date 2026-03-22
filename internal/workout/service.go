@@ -361,6 +361,33 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 	return result, nil
 }
 
+// GetExerciseSetsForExerciseSince retrieves all sets for a specific exercise since a given date.
+func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseID int, since time.Time) (
+	ExerciseProgress, error) {
+	aggs, err := s.repo.sessions.ListSetsForExerciseSince(ctx, exerciseID, since)
+	if err != nil {
+		return ExerciseProgress{}, fmt.Errorf("list sets for exercise: %w", err)
+	}
+
+	ex, err := s.repo.exercises.Get(ctx, exerciseID)
+	if err != nil {
+		return ExerciseProgress{}, fmt.Errorf("get exercise %d: %w", exerciseID, err)
+	}
+
+	entries := make([]ExerciseProgressEntry, len(aggs))
+	for i, agg := range aggs {
+		entries[i] = ExerciseProgressEntry{
+			Date: agg.Date,
+			Sets: agg.Sets,
+		}
+	}
+
+	return ExerciseProgress{
+		Exercise: ex,
+		Entries:  entries,
+	}, nil
+}
+
 // UpdateExercise updates an existing exercise.
 func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
 	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {

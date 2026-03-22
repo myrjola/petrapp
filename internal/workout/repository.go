@@ -40,6 +40,12 @@ type sessionAggregate struct {
 	ExerciseSets     []exerciseSetAggregate
 }
 
+// datedExerciseSetAggregate pairs an exercise set with the session date it belongs to.
+type datedExerciseSetAggregate struct {
+	Date time.Time
+	exerciseSetAggregate
+}
+
 // sessionRepository handles workout sessions.
 type sessionRepository interface {
 	List(ctx context.Context, sinceDate time.Time) ([]sessionAggregate, error)
@@ -47,8 +53,10 @@ type sessionRepository interface {
 	Create(ctx context.Context, sess sessionAggregate) error
 	// Update updates an existing session.
 	//
-	// The updateFn is called with the existing session and if it returns true, the modified sess is persisted.
+	// The updateFn is called with the existing session, and if it returns true, the modified sess is persisted.
 	Update(ctx context.Context, date time.Time, updateFn func(sess *sessionAggregate) (bool, error)) error
+	// ListSetsForExerciseSince retrieves all sets for a given exercise since a date, one aggregate per session.
+	ListSetsForExerciseSince(ctx context.Context, exerciseID int, sinceDate time.Time) ([]datedExerciseSetAggregate, error)
 }
 
 // exerciseRepository handles exercises and sets.
