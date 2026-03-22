@@ -131,6 +131,9 @@ linters:
           paramsOnly: false
         underef:
           skipRecvDeref: false
+    gomoddirectives:
+      replace-allow-list:
+        - github.com/descope/virtualwebauthn
     gomodguard:
       blocked:
         modules:
