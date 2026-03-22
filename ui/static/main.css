@@ -274,27 +274,24 @@
     }
 }
 
-/*noinspection CssInvalidAtRule*/
-@view-transition {
-    navigation: auto;
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+        navigation: auto;
+    }
 }
 
-/*noinspection CssInvalidPseudoSelector*/
 [data-direction="forward"]::view-transition-old(root) {
     animation: slide-out-left .3s ease-in-out;
 }
 
-/*noinspection CssInvalidPseudoSelector*/
 [data-direction="forward"]::view-transition-new(root) {
     animation: slide-in-right .3s ease-in-out;
 }
 
-/*noinspection CssInvalidPseudoSelector*/
 [data-direction="backward"]::view-transition-old(root) {
     animation: slide-out-right .3s ease-in-out;
 }
 
-/*noinspection CssInvalidPseudoSelector*/
 [data-direction="backward"]::view-transition-new(root) {
     animation: slide-in-left .3s ease-in-out;
 }
