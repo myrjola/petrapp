@@ -22,6 +22,16 @@
               }
             }
         </script>
+        <script type="speculationrules" {{ nonce }}>
+            {
+              "prerender": [{
+                "where": {
+                  "href_matches": "/*"
+                },
+                "eagerness": "immediate"
+              }]
+            }
+        </script>
     </head>
     <body>
     <script {{ nonce }}>
