@@ -31,7 +31,7 @@ COPY /ui ./ui
 RUN csshash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
     sed -i "s/\/main.css/\/main.${csshash}.css/g" ui/templates/base.gohtml && \
     mv ./ui/static/main.css ui/static/main.${csshash}.css && \
-    jshash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
+    jshash=`md5sum ./ui/static/main.js | awk '{ print $1 }'` && \
     sed -i "s/\/main.js/\/main.${jshash}.js/g" ui/templates/base.gohtml && \
     mv ./ui/static/main.js ui/static/main.${jshash}.js
 
