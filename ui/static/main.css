@@ -11,11 +11,16 @@
         margin: 0;
     }
 
+    html, body {
+        height: 100%;
+        color: var(--gray-9);
+        background: var(--white)
+    }
+
     body {
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
         font-family: var(--font-serif);
-        height: 100%;
     }
 
     img, picture, video, canvas, svg {
@@ -203,13 +208,6 @@
     }
 }
 
-@layer layout {
-    html {
-        height: 100%;
-        color: var(--gray-9);
-    }
-}
-
 @layer components {
     button, .btn {
         position: relative;
@@ -274,77 +272,92 @@
     }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    @view-transition {
-        navigation: auto;
+@keyframes shrink {
+    to {
+        scale: 0.8;
+        opacity: 0.5;
     }
 }
 
+@keyframes grow {
+    from {
+        scale: 0.8;
+        opacity: 0.5;
+    }
+}
+
+@keyframes slide-in {
+    from {
+        translate: 100vw 0;
+    }
+}
+
+@keyframes slide-out {
+    to {
+        translate: 100vw 0;
+    }
+}
+
+@keyframes scale-up {
+    from {
+        scale: 0;
+    }
+}
+
+@keyframes scale-down {
+    to {
+        scale: 0;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes fade-out {
+    to {
+        opacity: 0;
+    }
+}
+
+@view-transition {
+    navigation: auto;
+}
+
+:root {
+    view-transition-name: none;
+}
+
+body {
+    view-transition-name: page;
+}
+
+::view-transition-group(page) {
+    animation-duration: 0.3s;
+}
+
 html:active-view-transition-type(forward) {
-    &::view-transition-old(root) {
-        animation: slide-out-left .3s ease-in-out;
+    &::view-transition-old(page) {
+        animation-name: shrink;
+        transform-origin: 100% 50%;
     }
 
-    &::view-transition-new(root) {
-        animation: slide-in-right .3s ease-in-out;
+    &::view-transition-new(page) {
+        animation-name: slide-in;
     }
 }
 
 html:active-view-transition-type(backward) {
-    &::view-transition-old(root) {
-        animation: slide-out-right .3s ease-in-out;
+    &::view-transition-old(page) {
+        animation-name: slide-out;
+        z-index: 1;
     }
 
-    &::view-transition-new(root) {
-        animation: slide-in-left .3s ease-in-out;
-    }
-}
-
-@keyframes scale-in {
-    from {
-        transform: scale(0);
-    }
-}
-
-@keyframes scale-out {
-    to {
-        transform: scale(0);
-    }
-}
-
-@keyframes slide-out-left {
-    from {
-        transform: translateX(0);
-    }
-    to {
-        transform: translateX(-100%);
-    }
-}
-
-@keyframes slide-in-right {
-    from {
-        transform: translateX(100%);
-    }
-    to {
-        transform: translateX(0);
-    }
-}
-
-@keyframes slide-out-right {
-    from {
-        transform: translateX(0);
-    }
-    to {
-        transform: translateX(100%);
-    }
-}
-
-@keyframes slide-in-left {
-    from {
-        transform: translateX(-100%);
-    }
-    to {
-        transform: translateX(0);
+    &::view-transition-new(page) {
+        animation-name: grow;
+        transform-origin: 100% 50%;
     }
 }
 
