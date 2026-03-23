@@ -292,6 +292,11 @@ html:active-view-transition-type(forward) {
     }
 
     &::view-transition-new(root) {
+        /* Sometimes, Safari flashes the new page on the first frame causing a flicker. Maybe this fixes it. */
+        @starting-style {
+            transform: translateX(-100%);
+        }
+
         animation: slide-in-right .3s ease-in-out;
     }
 }
@@ -301,6 +306,11 @@ html:active-view-transition-type(backward) {
         animation: slide-out-right .3s ease-in-out;
     }
     &::view-transition-new(root) {
+        /* Sometimes, Safari flashes the new page on the first frame causing a flicker. Maybe this fixes it. */
+        @starting-style {
+            transform: translateX(100%);
+        }
+
         animation: slide-in-left .3s ease-in-out;
     }
 }
