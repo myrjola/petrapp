@@ -176,24 +176,24 @@ err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, err
 ```go
 // Convert repository aggregate to domain model
 func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercise) (Session, error) {
-    session := Session{
-        Date:             agg.Date,
-        DifficultyRating: agg.DifficultyRating,
-        StartedAt:        agg.StartedAt,
-        CompletedAt:      agg.CompletedAt,
-    }
-    
-    // Build exercise sets with domain exercises
-    for _, setAgg := range agg.ExerciseSets {
-        exercise := findExerciseByID(exercises, setAgg.ExerciseID)
-        session.ExerciseSets = append(session.ExerciseSets, ExerciseSet{
-            Exercise:          exercise,
-            Sets:              setAgg.Sets,
-            WarmupCompletedAt: setAgg.WarmupCompletedAt,
-        })
-    }
-    
-    return session, nil
+session := Session{
+Date:             agg.Date,
+DifficultyRating: agg.DifficultyRating,
+StartedAt:        agg.StartedAt,
+CompletedAt:      agg.CompletedAt,
+}
+
+// Build exercise sets with domain exercises
+for _, setAgg := range agg.ExerciseSets {
+exercise := findExerciseByID(exercises, setAgg.ExerciseID)
+session.ExerciseSets = append(session.ExerciseSets, ExerciseSet{
+Exercise:          exercise,
+Sets:              setAgg.Sets,
+WarmupCompletedAt: setAgg.WarmupCompletedAt,
+})
+}
+
+return session, nil
 }
 ```
 

@@ -302,6 +302,7 @@ html:active-view-transition-type(backward) {
     &::view-transition-old(page) {
         animation: slide-out-right .3s ease-in-out;
     }
+
     &::view-transition-new(page) {
         animation: slide-in-left .3s ease-in-out;
     }

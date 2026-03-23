@@ -19,8 +19,8 @@ VALUES
 ('Glutes'),
 ('Calves'),
 ('Hip Flexors'),
-('Adductors')
-ON CONFLICT(name) DO UPDATE SET name = excluded.name;
+('Adductors') ON CONFLICT(name) DO
+UPDATE SET name = excluded.name;
 
 INSERT INTO exercises (id, name, category, exercise_type, description_markdown)
 VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
@@ -340,11 +340,11 @@ VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
 ## Resources
 - [Video tutorial](https://www.youtube.com/watch?v=ASdvN_XEl_c)
 - [Form guide](https://www.verywellfit.com/how-to-do-a-plank-3120068)
-')
-ON CONFLICT(id) DO UPDATE SET name                 = excluded.name,
-                              category             = excluded.category,
-                              exercise_type        = excluded.exercise_type,
-                              description_markdown = excluded.description_markdown;
+') ON CONFLICT(id) DO
+UPDATE SET name = excluded.name,
+    category = excluded.category,
+    exercise_type = excluded.exercise_type,
+    description_markdown = excluded.description_markdown;
 
 INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
 VALUES (1, 'Forearms', 0),
@@ -420,9 +420,9 @@ VALUES (1, 'Forearms', 0),
        (21, 'Abs', 1),
        (21, 'Obliques', 0),
        (21, 'Shoulders', 0),
-       (21, 'Glutes', 0)
-ON CONFLICT(exercise_id, muscle_group_name) DO UPDATE SET is_primary = excluded.is_primary;
+       (21, 'Glutes', 0) ON CONFLICT(exercise_id, muscle_group_name) DO
+UPDATE SET is_primary = excluded.is_primary;
 
 INSERT INTO feature_flags (name, enabled)
-VALUES ('maintenance_mode', 0)
-ON CONFLICT(name) DO UPDATE SET enabled = excluded.enabled;
+VALUES ('maintenance_mode', 0) ON CONFLICT(name) DO
+UPDATE SET enabled = excluded.enabled;

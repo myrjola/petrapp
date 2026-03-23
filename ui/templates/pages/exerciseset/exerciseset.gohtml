@@ -330,67 +330,67 @@
 
         <script {{ nonce }}>
           document.addEventListener("DOMContentLoaded", function () {
-            const form = document.getElementById(`form-{{ $.EditingIndex }}`);
+            const form = document.getElementById(`form-{{ $.EditingIndex }}`)
             if (form) {
-              const repsInput = form.querySelector('.reps-input');
+              const repsInput = form.querySelector('.reps-input')
               if (repsInput) {
                 // Enable the reps input
-                repsInput.disabled = false;
+                repsInput.disabled = false
 
                 // Focus and select the text
                 setTimeout(() => {
-                  repsInput.focus();
-                  repsInput.select();
-                }, 100);
+                  repsInput.focus()
+                  repsInput.select()
+                }, 100)
               }
             }
 
-            initializeTimer();
-          });
+            initializeTimer()
+          })
 
           function initializeTimer() {
-            const timerDisplay = document.getElementById('workout-timer');
-            {{ if .LastCompletedAt }}
-                // Use the most recent set completion time
-                const startTime = new Date('{{ .LastCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
-            {{ else if .ExerciseSet.WarmupCompletedAt }}
-                // Use warmup completion time as fallback
-                const startTime = new Date('{{ .ExerciseSet.WarmupCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime();
-            {{ else }}
-                // Use current time if no previous timestamps
-                const startTime = Date.now();
-            {{ end }}
+            const timerDisplay = document.getElementById('workout-timer')
+              {{ if .LastCompletedAt }}
+            // Use the most recent set completion time
+            const startTime = new Date('{{ .LastCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime()
+              {{ else if .ExerciseSet.WarmupCompletedAt }}
+            // Use warmup completion time as fallback
+            const startTime = new Date('{{ .ExerciseSet.WarmupCompletedAt.Format "2006-01-02T15:04:05.000Z" }}').getTime()
+              {{ else }}
+            // Use current time if no previous timestamps
+            const startTime = Date.now()
+              {{ end }}
 
             function updateTimer() {
-              const elapsed = Date.now() - startTime;
-              const seconds = Math.floor(elapsed / 1000);
-              const minutes = Math.floor(seconds / 60);
-              const hours = Math.floor(minutes / 60);
+              const elapsed = Date.now() - startTime
+              const seconds = Math.floor(elapsed / 1000)
+              const minutes = Math.floor(seconds / 60)
+              const hours = Math.floor(minutes / 60)
 
               // Hide timer after 30 minutes
               if (minutes >= 30) {
-                timerDisplay.style.display = 'none';
-                return;
+                timerDisplay.style.display = 'none'
+                return
               }
 
-              const displaySeconds = seconds % 60;
-              const displayMinutes = minutes % 60;
+              const displaySeconds = seconds % 60
+              const displayMinutes = minutes % 60
 
-              let timeString = '';
+              let timeString = ''
               if (hours > 0) {
-                timeString = `${hours}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
+                timeString = `${hours}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`
               } else {
-                timeString = `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`;
+                timeString = `${displayMinutes}:${displaySeconds.toString().padStart(2, '0')}`
               }
 
-              timerDisplay.textContent = timeString;
+              timerDisplay.textContent = timeString
             }
 
             // Update timer immediately
-            updateTimer();
+            updateTimer()
 
             // Update timer every second
-            setInterval(updateTimer, 1000);
+            setInterval(updateTimer, 1000)
           }
         </script>
 

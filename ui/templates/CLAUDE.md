@@ -22,11 +22,13 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 - Inline scripts update immediately when templates are reloaded
 
 **When to use inline scripts:**
+
 - Page-specific JavaScript logic
 - Scripts that benefit from template context or dynamic values
 - Any JavaScript that may need frequent updates during development
 
 **When to use static files:**
+
 - Large third-party libraries (e.g., echarts, webauthn)
 - Scripts that rarely change and benefit from long-term caching
 
@@ -167,16 +169,16 @@ The project uses CSS layers defined in main.css:
 ```go
 // Handler: Transform enum to display options
 Difficulties: []difficultyOption{
-    {Value: difficultyTooEasy, Label: "Too easy"},
-    {Value: difficultyICouldDoMore, Label: "I could do more"},
+{Value: difficultyTooEasy, Label: "Too easy"},
+{Value: difficultyICouldDoMore, Label: "I could do more"},
 }
 
 // Handler: Filter and prepare collections
 var availableExercises []workout.Exercise
 for _, exercise := range allExercises {
-    if !existingExerciseIDs[exercise.ID] {
-        availableExercises = append(availableExercises, exercise)
-    }
+if !existingExerciseIDs[exercise.ID] {
+availableExercises = append(availableExercises, exercise)
+}
 }
 ```
 

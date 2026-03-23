@@ -98,7 +98,8 @@ go tool pprof -top "http://localhost:6060/debug/pprof/goroutine"
 
 #### Flight Controller for automatic trace capture
 
-When a request times out, the app writes a [trace](https://pkg.go.dev/runtime/trace) to a file and logs something like the following line: 
+When a request times out, the app writes a [trace](https://pkg.go.dev/runtime/trace) to a file and logs something like
+the following line:
 
 ```json
 {
@@ -115,7 +116,8 @@ When a request times out, the app writes a [trace](https://pkg.go.dev/runtime/tr
 }
 ```
 
-This file can be downloaded with the following replacing FLY_APP and file name with service_name and file from the log line:
+This file can be downloaded with the following replacing FLY_APP and file name with service_name and file from the log
+line:
 
 ```
 FLY_APP=pr-29-myrjola-petrapp fly sftp get /data/traces/timeout-20250913-070211.trace

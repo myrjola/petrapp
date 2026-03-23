@@ -3,17 +3,17 @@
  * @returns {Uint8Array}
  */
 function bufferDecode(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
 
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
 
   for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
+    outputArray[i] = rawData.charCodeAt(i)
   }
 
-  return outputArray;
+  return outputArray
 }
 
 /**
@@ -24,7 +24,7 @@ function bufferEncode(value) {
   return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
-    .replace(/=/g, "");
+    .replace(/=/g, "")
 }
 
 /**
@@ -37,7 +37,7 @@ async function submitForm(form) {
   const resp = await fetch(url, {method: "post"})
 
   if (!resp.ok) {
-    throw new Error(`Failed to submit form!`);
+    throw new Error(`Failed to submit form!`)
   }
 
   return resp.json()
@@ -49,14 +49,14 @@ async function submitForm(form) {
  * @returns {Promise<string>}
  */
 async function createAttestationResponse(publicKey) {
-  publicKey.challenge = bufferDecode(/** @type {string} */ publicKey.challenge);
-  publicKey.user.id = bufferDecode(/** @type {string} */ publicKey.user.id);
+  publicKey.challenge = bufferDecode(/** @type {string} */ publicKey.challenge)
+  publicKey.user.id = bufferDecode(/** @type {string} */ publicKey.user.id)
   publicKey.excludeCredentials = publicKey.excludeCredentials?.map((excludedCredential) => ({
     ...excludedCredential,
     id: bufferDecode(excludedCredential.id),
   }))
-  const credential = await navigator.credentials.create({publicKey});
-  const {id, rawId, type, response: {attestationObject, clientDataJSON}} = credential;
+  const credential = await navigator.credentials.create({publicKey})
+  const {id, rawId, type, response: {attestationObject, clientDataJSON}} = credential
   return JSON.stringify({
     id,
     rawId: bufferEncode(rawId),
@@ -76,10 +76,10 @@ async function createAttestationResponse(publicKey) {
 async function finishRegistration(attestationResponse) {
   const finishResp = await fetch("/api/registration/finish", {method: "post", body: attestationResponse})
   if (!finishResp.ok) {
-    throw new Error("Finishing registration failed!");
+    throw new Error("Finishing registration failed!")
   }
   // At this point, we assume the cookies are in place so that we can reload the page with the proper access.
-  window.location.reload();
+  window.location.reload()
 }
 
 /**
@@ -107,7 +107,7 @@ export async function registerUser(e) {
   } catch (err) {
     console.error(err)
     resetFormState(e.target)
-    throw new Error("Registration failed!");
+    throw new Error("Registration failed!")
   }
 }
 
@@ -117,9 +117,9 @@ export async function registerUser(e) {
  * @returns {Promise<string>}
  */
 async function createAssertionResponse(publicKey) {
-  publicKey.challenge = bufferDecode(/** @type {string} */ publicKey.challenge);
-  const assertion = await navigator.credentials.get({publicKey});
-  const {id, rawId, type, response: {authenticatorData, clientDataJSON, signature, userHandle}} = assertion;
+  publicKey.challenge = bufferDecode(/** @type {string} */ publicKey.challenge)
+  const assertion = await navigator.credentials.get({publicKey})
+  const {id, rawId, type, response: {authenticatorData, clientDataJSON, signature, userHandle}} = assertion
   return JSON.stringify({
     id,
     rawId: bufferEncode(rawId),
@@ -153,10 +153,10 @@ async function finishLogin(assertionResponse) {
         console.error("Failed to parse error response or signal unknown credential:", e)
       }
     }
-    throw new Error("Finishing login failed!");
+    throw new Error("Finishing login failed!")
   }
   // At this point, we assume the cookies are in place so that we can reload the page with the proper access.
-  window.location.reload();
+  window.location.reload()
 }
 
 /**
@@ -173,7 +173,7 @@ async function signalUnknownCredential(credentialIdBase64) {
 
   try {
     const rpId = window.location.hostname
-    await window.PublicKeyCredential.signalUnknownCredential({ rpId, credentialId: credentialIdBase64 })
+    await window.PublicKeyCredential.signalUnknownCredential({rpId, credentialId: credentialIdBase64})
   } catch (err) {
     console.error("Failed to signal unknown credential:", err)
   }
@@ -192,6 +192,6 @@ export async function loginUser(e) {
   } catch (err) {
     console.error(err)
     resetFormState(e.target)
-    throw new Error("Login failed!");
+    throw new Error("Login failed!")
   }
 }
