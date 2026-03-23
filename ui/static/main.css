@@ -300,6 +300,12 @@ html:active-view-transition-type(backward) {
     }
 }
 
+@starting-style {
+    ::view-transition-new(root) {
+        transform: translateX(-100%);
+    }
+}
+
 @keyframes scale-in {
     from {
         transform: scale(0);

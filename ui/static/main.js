@@ -15,21 +15,14 @@ window.addEventListener('pagereveal', async (e) => {
   if (!e.viewTransition) {
     return
   }
-
-  // Let Safari finish compositing the old snapshot to prevent flickering.
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      e.viewTransition.ready.then(() => {
-        // Determine direction of transition based on the depth difference between the from and entry URLs.
-        const fromUrl = navigation.activation.from.url
-        const entryUrl = navigation.activation.entry.url
-        const depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
-        if (depthDifference === 0) {
-          e.viewTransition.skipTransition()
-        }
-        e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward')      });
-    });
-  });
+  // Determine the direction of transition based on the depth difference between the from and entry URLs.
+  const fromUrl = navigation.activation.from.url
+  const entryUrl = navigation.activation.entry.url
+  const depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
+  if (depthDifference === 0) {
+    e.viewTransition.skipTransition()
+  }
+  e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward')
 })
 
 navigation.addEventListener('navigate', (e) => {
