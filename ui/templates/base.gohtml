@@ -152,6 +152,32 @@
           }
         })
       })
+
+      // Form submission detector
+      document.addEventListener('submit', function (e) {
+        const form = e.target
+        form.classList.add('submitting')
+        const submitButton = form.querySelector("button[type=submit]")
+        if (submitButton) {
+          submitButton.disabled = true
+        }
+      })
+
+      // Reset form states when the page is loaded from the browser cache (back button).
+      window.addEventListener('pageshow', function (event) {
+        // pageshow event fires when the page is loaded, including from cache.
+        // event.persisted is true when the page is loaded from the back/forward cache.
+        if (event.persisted) {
+          // This was a back/forward navigation from the cache.
+          document.querySelectorAll('form.submitting').forEach(form => {
+            form.classList.remove('submitting')
+            const submitButton = form.querySelector("button[type=submit]")
+            if (submitButton) {
+              submitButton.disabled = false
+            }
+          })
+        }
+      })
     </script>
     {{ template "page" . }}
     </body>
