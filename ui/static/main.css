@@ -280,23 +280,21 @@
     }
 }
 
-html:active-view-transition-type(forward, backward) {
-    :root {
-        view-transition-name: none;
-    }
+::view-transition {
+    background: white;
+}
+
+:root {
+    view-transition-name: none;
 }
 
 html:active-view-transition-type(forward) {
     &::view-transition-old(root) {
         animation: slide-out-left .3s ease-in-out;
+        z-index: 1; /* To prevent Safari from flashing the new page on the first frame */
     }
 
     &::view-transition-new(root) {
-        /* Sometimes, Safari flashes the new page on the first frame causing a flicker. Maybe this fixes it. */
-        @starting-style {
-            transform: translateX(-100%);
-        }
-
         animation: slide-in-right .3s ease-in-out;
     }
 }
@@ -304,13 +302,9 @@ html:active-view-transition-type(forward) {
 html:active-view-transition-type(backward) {
     &::view-transition-old(root) {
         animation: slide-out-right .3s ease-in-out;
+        z-index: 1; /* To prevent Safari from flashing the new page on the first frame */
     }
     &::view-transition-new(root) {
-        /* Sometimes, Safari flashes the new page on the first frame causing a flicker. Maybe this fixes it. */
-        @starting-style {
-            transform: translateX(100%);
-        }
-
         animation: slide-in-left .3s ease-in-out;
     }
 }
