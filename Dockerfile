@@ -26,11 +26,14 @@ FROM --platform=linux/amd64 alpine:3.21.0 AS ui-builder
 
 WORKDIR /workspace/
 
-# Hash CSS for cache busting and copy UI files to dist
+# Hash main CSS and JS for cache busting and copy UI files to dist
 COPY /ui ./ui
-RUN filehash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
-    sed -i "s/\/main.css/\/main.${filehash}.css/g" ui/templates/base.gohtml && \
-    mv ./ui/static/main.css ui/static/main.${filehash}.css
+RUN csshash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
+    sed -i "s/\/main.css/\/main.${csshash}.css/g" ui/templates/base.gohtml && \
+    mv ./ui/static/main.css ui/static/main.${csshash}.css && \
+    jshash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
+    sed -i "s/\/main.js/\/main.${jshash}.js/g" ui/templates/base.gohtml && \
+    mv ./ui/static/main.js ui/static/main.${jshash}.js
 
 # -----------------------------------------------------------------------------
 #  Dependency image for litestream
