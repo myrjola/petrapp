@@ -65,7 +65,7 @@
         if (depthDifference === 0) {
           e.viewTransition.skipTransition()
         }
-        e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward');
+        e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward')
       })
 
       navigation.addEventListener('navigate', (e) => {
@@ -88,73 +88,81 @@
         if (e.formData) {
           e.intercept({
             async handler() {
-              const body = new URLSearchParams(e.formData).toString()
-              const result = await fetch(e.destination.url, {
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded"
-                },
-                method: "POST",
-                body,
-              })
-              const baseUrl = window.location.origin;
-              const location = result.headers.get("Content-Location")
-              const locationUrl = new URL(location, baseUrl)
+              try {
+                // Submit the form using fetch so that we can process the Content-Location header.
+                const body = new URLSearchParams(e.formData).toString()
+                const result = await fetch(e.destination.url, {
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                  },
+                  method: "POST",
+                  body,
+                })
+                const baseUrl = window.location.origin
+                const location = result.headers.get("Content-Location")
+                const locationUrl = new URL(location, baseUrl)
 
-              for (entry of navigation.entries()) {
-                const entryUrl = new URL(entry.url)
-                if (entryUrl.pathname === locationUrl.pathname) {
-                  await navigation.traverseTo(entry.key).committed
-                  navigation.reload()
-                  return
+                // If there's an entry in the navigation history that matches the location, we want to replace it.
+                for (entry of navigation.entries()) {
+                  const entryUrl = new URL(entry.url)
+                  if (entryUrl.pathname === locationUrl.pathname) {
+                    await navigation.traverseTo(entry.key).committed
+                    // This is a bit hacky to reload the page, but it's because the bfcache might show a stale page.
+                    navigation.reload()
+                    return
+                  }
                 }
+                await navigation.navigate(location, {history: "replace"})
+              } catch (err) {
+                // TODO: Introduce a toast for giving feedback to the user.
+                console.error("Failed to submit form:", err)
               }
-              await navigation.navigate(location, {history: "replace"})
             }
           })
         }
       })
 
       function findMatchingHistoryEntry(targetUrl) {
-        const entries = navigation.entries();
-        const currentIndex = navigation.currentEntry.index;
-        const targetURL = new URL(targetUrl);
+        const entries = navigation.entries()
+        const currentIndex = navigation.currentEntry.index
+        const targetURL = new URL(targetUrl)
 
         // Search backwards through history
         for (let i = currentIndex - 1; i >= 0; i--) {
-          const entry = entries[i];
-          const entryURL = new URL(entry.url);
+          const entry = entries[i]
+          const entryURL = new URL(entry.url)
 
           if (urlsMatch(entryURL, targetURL)) {
-            return entry;
+            return entry
           }
         }
 
-        return null;
+        return null
       }
 
       function urlsMatch(url1, url2) {
         return url1.href === url2.href ||
-          (url1.pathname === url2.pathname && url1.origin === url2.origin);
+          (url1.pathname === url2.pathname && url1.origin === url2.origin)
       }
 
       // Create a smart back button using the Navigation API to make it pop the navigation stack.
       document.addEventListener("DOMContentLoaded", function () {
         // Find all anchors marked for back button enhancement.
-        const backLinks = document.querySelectorAll('a[data-back-button]');
+        const backLinks = document.querySelectorAll('a[data-back-button]')
 
         backLinks.forEach(link => {
-          const destinationUrl = link.href;
+          const destinationUrl = link.href
 
           // Only enhance it if Navigation API is supported
           if (typeof navigation !== 'undefined') {
             link.addEventListener('click', async (e) => {
-              const matchingEntry = findMatchingHistoryEntry(destinationUrl);
+              const matchingEntry = findMatchingHistoryEntry(destinationUrl)
 
               if (matchingEntry) {
-                e.preventDefault();
-                await navigation.traverseTo(matchingEntry.key);
+                e.preventDefault()
+                await navigation.traverseTo(matchingEntry.key)
               }
-            });
+            })
           }
         })
       })
