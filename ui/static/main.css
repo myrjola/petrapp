@@ -280,31 +280,29 @@
     }
 }
 
-::view-transition {
-    background: white;
-}
-
 :root {
     view-transition-name: none;
 }
 
+body {
+    view-transition-name: page;
+}
+
 html:active-view-transition-type(forward) {
-    &::view-transition-old(root) {
+    &::view-transition-old(page) {
         animation: slide-out-left .3s ease-in-out;
-        z-index: 1; /* To prevent Safari from flashing the new page on the first frame */
     }
 
-    &::view-transition-new(root) {
+    &::view-transition-new(page) {
         animation: slide-in-right .3s ease-in-out;
     }
 }
 
 html:active-view-transition-type(backward) {
-    &::view-transition-old(root) {
+    &::view-transition-old(page) {
         animation: slide-out-right .3s ease-in-out;
-        z-index: 1; /* To prevent Safari from flashing the new page on the first frame */
     }
-    &::view-transition-new(root) {
+    &::view-transition-new(page) {
         animation: slide-in-left .3s ease-in-out;
     }
 }
