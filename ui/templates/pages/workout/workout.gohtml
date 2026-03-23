@@ -194,7 +194,7 @@
                 <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
                    class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ else if $isStarted }} started{{ end }}"
                    data-exercise-id="{{ .Exercise.ID }}">
-                    {{ .Exercise.Name }}
+                    <span>{{ .Exercise.Name }}</span>
                 </a>
             {{ end }}
 
@@ -212,7 +212,7 @@
                   const targetUrl = new URL(e.activation.entry.url)
                   const exercise = extractExerciseIdFromUrl(targetUrl)
                   if (exercise) {
-                    const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"]`)
+                    const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
                     element.style.viewTransitionName = `exercise-title-${exercise}`
                     await e.viewTransition.finished
                     element.style.viewTransitionName = ''
@@ -227,7 +227,7 @@
                   const fromUrl = new URL(navigation.activation.from.url)
                   const exercise = extractExerciseIdFromUrl(fromUrl)
                   if (exercise) {
-                    const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"]`)
+                    const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
                     element.style.viewTransitionName = `exercise-title-${exercise}`
                     await e.viewTransition.finished
                     element.style.viewTransitionName = ''
