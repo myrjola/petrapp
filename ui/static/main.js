@@ -53,7 +53,7 @@ navigation.addEventListener('navigate', (e) => {
           const locationUrl = new URL(location, baseUrl)
 
           // If there's an entry in the navigation history that matches the location, we want to replace it.
-          for (entry of navigation.entries()) {
+          for (const entry of navigation.entries()) {
             const entryUrl = new URL(entry.url)
             if (entryUrl.pathname === locationUrl.pathname) {
               await navigation.traverseTo(entry.key).committed
