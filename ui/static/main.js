@@ -23,7 +23,6 @@ window.addEventListener('pagereveal', async (e) => {
     e.viewTransition.skipTransition()
   }
   e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward')
-  await e.viewTransition.finished
 })
 
 navigation.addEventListener('navigate', (e) => {
