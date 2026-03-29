@@ -447,7 +447,7 @@
                      role="group"
                      aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
                     <div class="set-info">
-                        {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                        {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
                             <span class="weight"
                                   aria-label="Weight">{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }} kg</span>
                         {{ end }}
@@ -467,13 +467,13 @@
                               class="set-form"
                               aria-label="Complete set {{ $index }}">
                             <div class="form-inputs">
-                                {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                                {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
                                     <div class="input-field">
                                         <label for="weight-{{ $index }}">Weight (kg)</label>
                                         <input
                                                 id="weight-{{ $index }}"
                                                 inputmode="decimal"
-                                                pattern="[0-9,\.]*"
+                                                pattern="-?[0-9]*[,\.]?[0-9]*"
                                                 name="weight"
                                                 value="{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }}"
                                                 step="0.5"

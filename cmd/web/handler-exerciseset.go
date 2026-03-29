@@ -171,7 +171,8 @@ func (app *application) findExerciseInSession(session *workout.Session, exercise
 // parseWeightAndReps extracts weight and reps from form data based on exercise type.
 func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exercise) (float64, int, error) {
 	var weight float64
-	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
+	if exercise.ExerciseType == workout.ExerciseTypeWeighted ||
+		exercise.ExerciseType == workout.ExerciseTypeAssisted {
 		weightStr := r.PostForm.Get("weight")
 		if weightStr == "" {
 			return 0, 0, errors.New("weight not provided for weighted exercise")
@@ -234,8 +235,9 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Update weight only for weighted exercises
-	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
+	// Update weight for weighted and assisted exercises.
+	if exercise.ExerciseType == workout.ExerciseTypeWeighted ||
+		exercise.ExerciseType == workout.ExerciseTypeAssisted {
 		if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
 			app.serverError(w, r, fmt.Errorf("update weight: %w", err))
 			return

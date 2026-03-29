@@ -340,6 +340,24 @@ VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
 ## Resources
 - [Video tutorial](https://www.youtube.com/watch?v=ASdvN_XEl_c)
 - [Form guide](https://www.verywellfit.com/how-to-do-a-plank-3120068)
+'),
+       (22, 'Assisted Pull-Up', 'upper', 'assisted',
+        'Use a band or machine for assistance. Enter a **negative** weight to indicate the amount of assistance (e.g. `-20` for 20 kg of assistance). Aim to reduce assistance over time.
+
+## Instructions
+1. Set up the assisted pull-up machine or attach a resistance band to the pull-up bar.
+2. Grip the bar with hands slightly wider than shoulder-width, palms facing away.
+3. Pull yourself up until your chin clears the bar, keeping your core engaged.
+4. Lower yourself slowly under control back to the starting position.
+
+## Common Mistakes
+- Using too much assistance: Gradually reduce the assistance weight as you get stronger.
+- Not going through full range of motion: Ensure full arm extension at the bottom.
+- Swinging: Keep the movement controlled to isolate the back muscles.
+
+## Resources
+- [Video tutorial](https://www.youtube.com/watch?v=H4bE8POkGCg)
+- [Form guide](https://www.verywellfit.com/how-to-do-an-assisted-pull-up-4589052)
 ') ON CONFLICT(id) DO
 UPDATE SET name = excluded.name,
     category = excluded.category,
@@ -420,7 +438,12 @@ VALUES (1, 'Forearms', 0),
        (21, 'Abs', 1),
        (21, 'Obliques', 0),
        (21, 'Shoulders', 0),
-       (21, 'Glutes', 0) ON CONFLICT(exercise_id, muscle_group_name) DO
+       (21, 'Glutes', 0),
+-- Assisted exercises
+       (22, 'Lats', 1),
+       (22, 'Biceps', 1),
+       (22, 'Upper Back', 0),
+       (22, 'Forearms', 0) ON CONFLICT(exercise_id, muscle_group_name) DO
 UPDATE SET is_primary = excluded.is_primary;
 
 INSERT INTO feature_flags (name, enabled)

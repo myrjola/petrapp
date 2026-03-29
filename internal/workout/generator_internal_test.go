@@ -1,6 +1,7 @@
 package workout
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -144,12 +145,6 @@ func verifyGeneratedWorkout(t *testing.T, session sessionAggregate, date time.Ti
 
 		// Verify set parameters
 		for j, set := range exerciseSet.Sets {
-			// Verify all weights are reasonable (skip for bodyweight exercises where weight is nil)
-			if set.WeightKg != nil && *set.WeightKg < 0 {
-				t.Errorf("Exercise %d, set #%d has negative weight: %f",
-					exerciseSet.ExerciseID, j+1, *set.WeightKg)
-			}
-
 			// Verify rep ranges (3-16)
 			if set.MinReps < 3 || set.MaxReps > 16 {
 				t.Errorf("Exercise %d, set #%d has unusual rep range: %d-%d",
@@ -979,4 +974,212 @@ func getAverageWeight(t *testing.T, exerciseSet exerciseSetAggregate) float64 {
 	}
 
 	return total / float64(len(exerciseSet.Sets))
+}
+
+// TestAssistedExerciseDefaultSets verifies that assisted exercises start at 0 kg.
+func TestAssistedExerciseDefaultSets(t *testing.T) {
+	sets := createDefaultSets(ExerciseTypeAssisted)
+
+	if len(sets) != 3 {
+		t.Fatalf("Expected 3 default sets, got %d", len(sets))
+	}
+
+	for i, set := range sets {
+		if set.WeightKg == nil {
+			t.Errorf("Set %d: expected non-nil WeightKg for assisted exercise", i)
+			continue
+		}
+		if *set.WeightKg != 0.0 {
+			t.Errorf("Set %d: expected WeightKg=0.0, got %f", i, *set.WeightKg)
+		}
+		if set.MinReps != DefaultReps || set.MaxReps != DefaultReps {
+			t.Errorf("Set %d: expected %d reps, got %d-%d", i, DefaultReps, set.MinReps, set.MaxReps)
+		}
+	}
+}
+
+// TestReduceWeightForNegativeWeights verifies that reduceWeight moves assisted exercises further
+// negative on failure, including the zero-boundary case.
+func TestReduceWeightForNegativeWeights(t *testing.T) {
+	tests := []struct {
+		name         string
+		inputWeight  float64
+		exerciseType ExerciseType
+		wantWeight   float64
+	}{
+		{
+			name:         "assisted at -20 kg goes more negative",
+			inputWeight:  -20.0,
+			exerciseType: ExerciseTypeAssisted,
+			wantWeight:   -20.0 - math.Max(StandardWeightIncrementKg, 20.0*WeightReductionFactor),
+		},
+		{
+			name:         "assisted at 0 kg zero-boundary uses minimum increment",
+			inputWeight:  0.0,
+			exerciseType: ExerciseTypeAssisted,
+			wantWeight:   -StandardWeightIncrementKg,
+		},
+		{
+			name:         "weighted at 100 kg reduces toward zero",
+			inputWeight:  100.0,
+			exerciseType: ExerciseTypeWeighted,
+			wantWeight:   math.Max(0, 100.0-100.0*WeightReductionFactor),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			weight := tt.inputWeight
+			sets := []Set{
+				{WeightKg: &weight, MinReps: 8, MaxReps: 12, CompletedReps: nil, CompletedAt: nil},
+			}
+
+			result := reduceWeight(sets, WeightReductionFactor, tt.exerciseType)
+
+			if len(result) != 1 {
+				t.Fatalf("Expected 1 set, got %d", len(result))
+			}
+			if result[0].WeightKg == nil {
+				t.Fatal("Expected non-nil WeightKg")
+			}
+			if *result[0].WeightKg != tt.wantWeight {
+				t.Errorf("Expected weight %f, got %f", tt.wantWeight, *result[0].WeightKg)
+			}
+		})
+	}
+}
+
+// TestAssistedExerciseProgression verifies full progression for assisted exercises:
+// starting at 0 kg increases to positive weight, and starting at -20 kg progresses
+// toward 0 and eventually positive weight.
+func TestAssistedExerciseProgression(t *testing.T) {
+	preferences := Preferences{
+		MondayMinutes:    60,
+		TuesdayMinutes:   0,
+		WednesdayMinutes: 60,
+		ThursdayMinutes:  0,
+		FridayMinutes:    60,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
+	}
+
+	assistedExercise := Exercise{
+		ID:                    100,
+		Name:                  "Assisted Pull-Up",
+		Category:              CategoryUpper,
+		ExerciseType:          ExerciseTypeAssisted,
+		PrimaryMuscleGroups:   []string{"Lats", "Biceps"},
+		SecondaryMuscleGroups: []string{"Upper Back"},
+		DescriptionMarkdown:   "",
+	}
+
+	// Also need enough exercises for the generator to work.
+	pool := append(createExercisePool(), assistedExercise)
+
+	// Use recent dates so the generator uses linear progression (beginner path), which
+	// directly calls increaseWeight and is the expected behavior for assisted exercises.
+	recentBase := time.Now().AddDate(0, 0, -7)
+	nextWorkoutDate := time.Now().AddDate(0, 0, -5)
+
+	// Scenario 1: starting at 0 kg should increase to positive weight after successful sets.
+	t.Run("progression from 0 kg", func(t *testing.T) {
+		startWeight := 0.0
+		completedReps := 8
+		history := []sessionAggregate{
+			{
+				Date:             recentBase,
+				DifficultyRating: nil,
+				StartedAt:        recentBase.Add(17 * time.Hour),
+				CompletedAt:      recentBase.Add(18 * time.Hour),
+				ExerciseSets: []exerciseSetAggregate{
+					{
+						ExerciseID:        assistedExercise.ID,
+						WarmupCompletedAt: nil,
+						Sets: []Set{
+							{WeightKg: &startWeight, MinReps: 8, MaxReps: 8, CompletedReps: &completedReps, CompletedAt: nil},
+							{WeightKg: &startWeight, MinReps: 8, MaxReps: 8, CompletedReps: &completedReps, CompletedAt: nil},
+							{WeightKg: &startWeight, MinReps: 8, MaxReps: 8, CompletedReps: &completedReps, CompletedAt: nil},
+						},
+					},
+				},
+			},
+		}
+
+		gen, err := newGenerator(preferences, history, pool)
+		if err != nil {
+			t.Fatalf("Failed to create generator: %v", err)
+		}
+
+		nextSession, err := gen.Generate(nextWorkoutDate)
+		if err != nil {
+			t.Fatalf("Failed to generate session: %v", err)
+		}
+
+		for _, es := range nextSession.ExerciseSets {
+			if es.ExerciseID != assistedExercise.ID {
+				continue
+			}
+			for i, set := range es.Sets {
+				if set.WeightKg == nil {
+					t.Errorf("Set %d: expected non-nil WeightKg", i)
+					continue
+				}
+				if *set.WeightKg <= startWeight {
+					t.Errorf("Set %d: expected weight > %f after successful completion, got %f",
+						i, startWeight, *set.WeightKg)
+				}
+			}
+		}
+	})
+
+	// Scenario 2: starting at -20 kg progresses toward 0 after successful completion.
+	t.Run("progression from -20 kg toward 0", func(t *testing.T) {
+		negWeight := -20.0
+		completedReps := 8
+		history := []sessionAggregate{
+			{
+				Date:             recentBase,
+				DifficultyRating: nil,
+				StartedAt:        recentBase.Add(17 * time.Hour),
+				CompletedAt:      recentBase.Add(18 * time.Hour),
+				ExerciseSets: []exerciseSetAggregate{
+					{
+						ExerciseID:        assistedExercise.ID,
+						WarmupCompletedAt: nil,
+						Sets: []Set{
+							{WeightKg: &negWeight, MinReps: 8, MaxReps: 8, CompletedReps: &completedReps, CompletedAt: nil},
+							{WeightKg: &negWeight, MinReps: 8, MaxReps: 8, CompletedReps: &completedReps, CompletedAt: nil},
+							{WeightKg: &negWeight, MinReps: 8, MaxReps: 8, CompletedReps: &completedReps, CompletedAt: nil},
+						},
+					},
+				},
+			},
+		}
+
+		gen, err := newGenerator(preferences, history, pool)
+		if err != nil {
+			t.Fatalf("Failed to create generator: %v", err)
+		}
+
+		nextSession, err := gen.Generate(nextWorkoutDate)
+		if err != nil {
+			t.Fatalf("Failed to generate session: %v", err)
+		}
+
+		for _, es := range nextSession.ExerciseSets {
+			if es.ExerciseID != assistedExercise.ID {
+				continue
+			}
+			for i, set := range es.Sets {
+				if set.WeightKg == nil {
+					t.Errorf("Set %d: expected non-nil WeightKg", i)
+					continue
+				}
+				if *set.WeightKg <= negWeight {
+					t.Errorf("Set %d: expected weight > %f (less assistance) after success, got %f",
+						i, negWeight, *set.WeightKg)
+				}
+			}
+		}
+	})
 }

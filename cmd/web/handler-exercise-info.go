@@ -118,6 +118,15 @@ func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseT
 				}
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))
 			}
+		case workout.ExerciseTypeAssisted:
+			if set.WeightKg != nil {
+				weight := *set.WeightKg
+				// For assisted exercises, less negative (closer to 0) is more progress.
+				if weight > progress {
+					progress = weight
+				}
+				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))
+			}
 		case workout.ExerciseTypeBodyweight:
 			if float64(reps) > progress {
 				progress = float64(reps)

@@ -2,13 +2,17 @@ package main
 
 import (
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 func Test_application_exerciseSet(t *testing.T) {
@@ -346,5 +350,92 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 	backButtons := doc.Find("button:contains('Go Back')")
 	if backButtons.Length() == 0 {
 		t.Error("Expected custom 404 page to contain 'Go Back' button")
+	}
+}
+
+func Test_parseWeightAndReps(t *testing.T) {
+	app := &application{} //nolint:exhaustruct // only parseWeightAndReps is under test
+
+	tests := []struct {
+		name       string
+		exercise   workout.Exercise
+		formWeight string
+		formReps   string
+		wantWeight float64
+		wantReps   int
+		wantErr    bool
+	}{
+		{
+			name: "weighted exercise with positive weight",
+			exercise: workout.Exercise{ //nolint:exhaustruct // only ExerciseType matters here
+				ExerciseType: workout.ExerciseTypeWeighted,
+			},
+			formWeight: "20.5",
+			formReps:   "8",
+			wantWeight: 20.5,
+			wantReps:   8,
+			wantErr:    false,
+		},
+		{
+			name: "assisted exercise with negative weight",
+			exercise: workout.Exercise{ //nolint:exhaustruct // only ExerciseType matters here
+				ExerciseType: workout.ExerciseTypeAssisted,
+			},
+			formWeight: "-20",
+			formReps:   "8",
+			wantWeight: -20.0,
+			wantReps:   8,
+			wantErr:    false,
+		},
+		{
+			name: "assisted exercise with comma decimal separator",
+			exercise: workout.Exercise{ //nolint:exhaustruct // only ExerciseType matters here
+				ExerciseType: workout.ExerciseTypeAssisted,
+			},
+			formWeight: "-17,5",
+			formReps:   "10",
+			wantWeight: -17.5,
+			wantReps:   10,
+			wantErr:    false,
+		},
+		{
+			name: "bodyweight exercise ignores weight",
+			exercise: workout.Exercise{ //nolint:exhaustruct // only ExerciseType matters here
+				ExerciseType: workout.ExerciseTypeBodyweight,
+			},
+			formWeight: "",
+			formReps:   "12",
+			wantWeight: 0.0,
+			wantReps:   12,
+			wantErr:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			formValues := url.Values{}
+			if tt.formWeight != "" {
+				formValues.Set("weight", tt.formWeight)
+			}
+			formValues.Set("reps", tt.formReps)
+
+			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(formValues.Encode()))
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			if err := r.ParseForm(); err != nil {
+				t.Fatalf("Failed to parse form: %v", err)
+			}
+
+			gotWeight, gotReps, err := app.parseWeightAndReps(r, tt.exercise)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseWeightAndReps() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotWeight != tt.wantWeight {
+				t.Errorf("parseWeightAndReps() weight = %v, want %v", gotWeight, tt.wantWeight)
+			}
+			if gotReps != tt.wantReps {
+				t.Errorf("parseWeightAndReps() reps = %v, want %v", gotReps, tt.wantReps)
+			}
+		})
 	}
 }

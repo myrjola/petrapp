@@ -21,6 +21,7 @@ type ExerciseType string
 const (
 	ExerciseTypeWeighted   ExerciseType = "weighted"
 	ExerciseTypeBodyweight ExerciseType = "bodyweight"
+	ExerciseTypeAssisted   ExerciseType = "assisted"
 )
 
 // Exercise represents a single exercise type, e.g. Squat, Bench Press, etc.
@@ -66,8 +67,8 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 			},
 			"exercise_type": map[string]any{
 				"type":        "string",
-				"description": "StartWorkout of exercise (weighted or bodyweight)",
-				"enum":        []string{"weighted", "bodyweight"},
+				"description": "Type of exercise (weighted, bodyweight, or assisted)",
+				"enum":        []string{"weighted", "bodyweight", "assisted"},
 			},
 			"description_markdown": map[string]any{
 				"type":        "string",

@@ -493,19 +493,29 @@ func (g *generator) createProgressiveSets(
 	return sets
 }
 
-// createDefaultSets creates a default set of exercises for beginners with 8 reps.
-func createDefaultSets(exerciseType ExerciseType) []Set {
-	var weight *float64
-	if exerciseType == ExerciseTypeWeighted {
-		weight = &[]float64{0}[0] // Starting weight of 0 for weighted exercises
-	}
-	// For bodyweight exercises, weight remains nil
-
+// defaultSetsWithWeight creates 3 default sets with the given weight pointer.
+func defaultSetsWithWeight(weight *float64) []Set {
 	return []Set{
 		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil, CompletedAt: nil},
 		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil, CompletedAt: nil},
 		{WeightKg: weight, MinReps: DefaultReps, MaxReps: DefaultReps, CompletedReps: nil, CompletedAt: nil},
 	}
+}
+
+// createDefaultSets creates a default set of exercises for beginners with 8 reps.
+func createDefaultSets(exerciseType ExerciseType) []Set {
+	switch exerciseType {
+	case ExerciseTypeWeighted:
+		weight := 0.0
+		return defaultSetsWithWeight(&weight)
+	case ExerciseTypeAssisted:
+		weight := 0.0 // Start at 0 kg; user adjusts assistance as needed.
+		return defaultSetsWithWeight(&weight)
+	case ExerciseTypeBodyweight:
+		// Bodyweight exercises: weight remains nil.
+		return defaultSetsWithWeight(nil)
+	}
+	return defaultSetsWithWeight(nil)
 }
 
 // findMostRecentExerciseSet finds the most recent performance of a specific exercise.
@@ -579,7 +589,7 @@ func (g *generator) progressSetsLinear(lastExerciseSet exerciseSetAggregate, exe
 		if exerciseType == ExerciseTypeBodyweight {
 			return g.reduceBodyweightDifficulty(lastExerciseSet.Sets)
 		}
-		return reduceWeight(lastExerciseSet.Sets, WeightReductionFactor)
+		return reduceWeight(lastExerciseSet.Sets, WeightReductionFactor, exerciseType)
 	case "completed_max":
 		// If all sets completed at max, increase difficulty
 		if exerciseType == ExerciseTypeBodyweight {
@@ -856,7 +866,7 @@ func (g *generator) reduceDifficulty(sets []Set, exerciseType ExerciseType) []Se
 	if len(sets) > MaxStandardSets {
 		return sets[:len(sets)-1] // Reduce volume
 	}
-	return reduceWeight(sets, WeightReductionFactor) // Reduce intensity
+	return reduceWeight(sets, WeightReductionFactor, exerciseType) // Reduce intensity
 }
 
 // getMostRecentFeedback gets the most recent feedback for a session containing the specified exercise.
@@ -906,13 +916,21 @@ func copySetWithoutCompletion(sets []Set) []Set {
 	})
 }
 
-// reduceWeight reduces the weight by a percentage.
-func reduceWeight(sets []Set, percentage float64) []Set {
+// reduceWeight reduces the weight by a percentage. For assisted exercises, it goes further
+// negative (more assistance) on failure, using StandardWeightIncrementKg as the minimum
+// reduction so a 0 kg start can go negative.
+func reduceWeight(sets []Set, percentage float64, exerciseType ExerciseType) []Set {
 	return transformSets(sets, func(set Set) Set {
 		var newWeight *float64
 		if set.WeightKg != nil {
-			reduction := *set.WeightKg * percentage
-			weightValue := math.Max(0, *set.WeightKg-reduction)
+			var weightValue float64
+			if exerciseType == ExerciseTypeAssisted {
+				reduction := math.Max(StandardWeightIncrementKg, math.Abs(*set.WeightKg)*percentage)
+				weightValue = *set.WeightKg - reduction
+			} else {
+				reduction := *set.WeightKg * percentage
+				weightValue = math.Max(0, *set.WeightKg-reduction)
+			}
 			newWeight = &weightValue
 		}
 		return Set{
