@@ -175,7 +175,7 @@ func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exe
 		exercise.ExerciseType == workout.ExerciseTypeAssisted {
 		weightStr := r.PostForm.Get("weight")
 		if weightStr == "" {
-			return 0, 0, errors.New("weight not provided for weighted exercise")
+			return 0, 0, errors.New("weight not provided for weighted or assisted exercise")
 		}
 		// Replace comma with dot for decimal numbers.
 		weightStr = strings.Replace(weightStr, ",", ".", 1)

@@ -122,7 +122,8 @@ func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseT
 			if set.WeightKg != nil {
 				weight := *set.WeightKg
 				// For assisted exercises, less negative (closer to 0) is more progress.
-				if weight > progress {
+				// Use first set as sentinel to handle all-negative weight sessions.
+				if len(setDescriptions) == 0 || weight > progress {
 					progress = weight
 				}
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))

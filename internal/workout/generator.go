@@ -505,11 +505,8 @@ func defaultSetsWithWeight(weight *float64) []Set {
 // createDefaultSets creates a default set of exercises for beginners with 8 reps.
 func createDefaultSets(exerciseType ExerciseType) []Set {
 	switch exerciseType {
-	case ExerciseTypeWeighted:
+	case ExerciseTypeWeighted, ExerciseTypeAssisted:
 		weight := 0.0
-		return defaultSetsWithWeight(&weight)
-	case ExerciseTypeAssisted:
-		weight := 0.0 // Start at 0 kg; user adjusts assistance as needed.
 		return defaultSetsWithWeight(&weight)
 	case ExerciseTypeBodyweight:
 		// Bodyweight exercises: weight remains nil.
