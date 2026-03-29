@@ -44,6 +44,13 @@ shown in the UI.
    be negative for assisted ones. The declarative migration system in `migrate.go` handles schema
    evolution automatically.
 
+   The enforcement point today is `parseWeightAndReps()` in
+   `cmd/web/handler-exerciseset.go` (currently guards weight parsing behind
+   `exercise.ExerciseType == ExerciseTypeWeighted`) and the corresponding branch in
+   `exerciseSetUpdatePOST` that only calls `UpdateSetWeight` for the weighted type. PR 3 extends
+   both guards to also cover the `assisted` type — that is where the application rule is enforced.
+   No additional validation function is required.
+
 #### `internal/workout/models.go`
 
 Add the new exercise type constant:
@@ -75,21 +82,48 @@ the codebase exhaustive (at minimum `cmd/web/handler-exercise-info.go`).
 #### Fix `reduceWeight()` for negative weights
 
 The current implementation is wrong for negative weights because `math.Max(0, weight - reduction)`
-moves an assisted weight *toward zero* (easier), not further negative (harder).
+moves an assisted weight *toward zero* (easier), not further negative (harder). There is also a
+zero-boundary bug: when an assisted exercise starts at the default **0 kg** and the user fails,
+a percentage-of-zero reduction is `0` — the weight would stay at 0 indefinitely regardless of the
+sign check.
+
+The fix adds an `exerciseType ExerciseType` parameter and uses `StandardWeightIncrementKg` as the
+minimum reduction for the assisted path:
 
 ```go
 // Before (broken for negatives):
 reduction := *set.WeightKg * percentage
 weightValue := math.Max(0, *set.WeightKg-reduction)
 
-// After (correct for all signs):
-reduction := math.Abs(*set.WeightKg) * percentage
-if *set.WeightKg >= 0 {
-    weightValue = math.Max(0, *set.WeightKg-reduction) // clamp to 0 for weighted
-} else {
-    weightValue = *set.WeightKg - reduction // no clamp for assisted (goes further negative)
+// After (correct for all signs, including assisted at 0 kg):
+func reduceWeight(sets []Set, percentage float64, exerciseType ExerciseType) []Set {
+    return transformSets(sets, func(set Set) Set {
+        var newWeight *float64
+        if set.WeightKg != nil {
+            var weightValue float64
+            if exerciseType == ExerciseTypeAssisted {
+                // Go further negative (more assistance) on failure.
+                // Use a minimum of StandardWeightIncrementKg so a 0 kg start can go negative.
+                reduction := math.Max(StandardWeightIncrementKg, math.Abs(*set.WeightKg)*percentage)
+                weightValue = *set.WeightKg - reduction
+            } else {
+                reduction := *set.WeightKg * percentage
+                weightValue = math.Max(0, *set.WeightKg-reduction) // clamp to 0 for weighted
+            }
+            newWeight = &weightValue
+        }
+        return Set{
+            WeightKg:      newWeight,
+            MinReps:       set.MinReps,
+            MaxReps:       set.MaxReps,
+            CompletedReps: nil,
+            CompletedAt:   nil,
+        }
+    })
 }
 ```
+
+All call sites that pass `reduceWeight` must be updated to supply the exercise type.
 
 #### Add `ExerciseTypeAssisted` case to `createDefaultSets()`
 
@@ -101,12 +135,24 @@ case ExerciseTypeAssisted:
     return defaultSetsWithWeight(&weight)
 ```
 
+#### Verify `increaseWeight()` is safe for negative weights
+
+`increaseWeight` in `generator.go` contains no clamping — it simply adds the increment to the
+current weight:
+
+```go
+newWeight = &[]float64{*set.WeightKg + increment}[0]
+```
+
+For an assisted exercise at `-20 kg`, `increaseWeight(..., StandardWeightIncrementKg)` correctly
+produces `-17.5 kg` (less assistance = harder). No change needed; this is confirmed safe.
+
 #### Tests to add
 
 | Test | Description |
 |------|-------------|
 | `TestAssistedExerciseDefaultSets` | Default sets have `WeightKg = 0.0` |
-| `TestReduceWeightForNegativeWeights` | `reduceWeight` moves further negative (e.g. `-20 → -22`) |
+| `TestReduceWeightForNegativeWeights` | `reduceWeight` moves further negative: `-20 → -22` and `0 → -2.5` (zero-boundary case) |
 | `TestAssistedExerciseProgression` | Full progression: `0 → 2.5`, and `-20 → -17.5 → … → 0 → 2.5` |
 
 ---
@@ -137,8 +183,11 @@ Apply the same condition extension in the section that writes `weight_kg` back t
 
 #### Tests to add
 
-Add a test case with an assisted exercise submitting `weight="-20"` in the form and verify it
-parses correctly.
+- Add a `parseWeightAndReps` test case for an assisted exercise submitting `weight="-20"` and
+  verify it parses to `-20.0`.
+- Add an `exerciseSetUpdatePOST` integration test case: POST an assisted exercise set with
+  `weight="-20"` and `reps="8"`, verify the set's `WeightKg` is stored as `-20.0` and
+  `CompletedReps` as `8` (symmetry with the existing weighted handler test).
 
 ---
 
@@ -164,8 +213,12 @@ display section and the form section).
 <!-- Before: -->
 pattern="[0-9,\.]*"
 <!-- After: -->
-pattern="-?[0-9,\.]*"
+pattern="-?[0-9]*[,\.]?[0-9]*"
 ```
+
+The tighter pattern allows an optional leading `-`, an optional decimal separator (`,` or `.`),
+and digits on either side — preventing malformed inputs like `-.` or `-,` that the naive
+`-?[0-9,\.]*` would accept.
 
 No label change needed — raw negative values are shown as-is.
 
@@ -197,5 +250,5 @@ Add corresponding muscle group rows in `exercise_muscle_groups`:
 | UI representation | Raw negative value (e.g. `-20`) | Simpler, no internal sign flip |
 | Weight floor | None | Assistance can go arbitrarily negative if needed |
 | `reduceWeight` direction | Further negative (more assistance) on failure | Consistent with "harder = higher absolute value" for weighted |
-| `increaseWeight` direction | Less negative (less assistance) on success | `strconv.ParseFloat` already handles this correctly, no change needed |
+| `increaseWeight` direction | Less negative (less assistance) on success | Existing `increaseWeight` adds a fixed increment with no clamping — already correct for negatives, no change needed |
 | Schema migration | Remove `weight_kg >= 0` constraint entirely | Declarative migration system handles this; application enforces NULL-only-for-bodyweight |
