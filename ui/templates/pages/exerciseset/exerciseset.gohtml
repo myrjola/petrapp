@@ -302,6 +302,24 @@
                             }
                         }
 
+                        .sign-toggle-button {
+                            width: 5rem;
+                            padding: var(--size-1) var(--size-2);
+                            background: var(--color-info-bg);
+                            color: var(--color-info);
+                            border: 1px solid var(--color-info);
+                            border-radius: var(--radius-2);
+                            font-size: var(--font-size-0);
+                            font-weight: var(--font-weight-6);
+                            cursor: pointer;
+                            transition: background-color 0.2s ease;
+                            text-align: center;
+
+                            &:hover {
+                                background: var(--sky-1);
+                            }
+                        }
+
                         .submit-button {
                             padding: var(--size-3) var(--size-5);
                             background: var(--color-success);
@@ -347,6 +365,14 @@
 
             initializeTimer()
           })
+
+          function toggleWeightSign(inputId) {
+            const input = document.getElementById(inputId)
+            const value = parseFloat(input.value.replace(',', '.'))
+            if (!isNaN(value)) {
+              input.value = (-value).toString()
+            }
+          }
 
           function initializeTimer() {
             const timerDisplay = document.getElementById('workout-timer')
@@ -480,6 +506,12 @@
                                                 required
                                                 aria-describedby="weight-help-{{ $index }}"
                                         >
+                                        {{ if eq $.ExerciseSet.Exercise.ExerciseType "assisted" }}
+                                            <button type="button"
+                                                    class="sign-toggle-button"
+                                                    aria-label="Flip weight sign (for assisted exercises where assistance is negative)"
+                                                    onclick="toggleWeightSign('weight-{{ $index }}')">± Flip sign</button>
+                                        {{ end }}
                                         <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms
                                         </div>
                                     </div>
