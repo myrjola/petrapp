@@ -53,3 +53,4 @@ node_modules
 /dockerdata
 /repomix-output.txt
 .githooks
+.air
