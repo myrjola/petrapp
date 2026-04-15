@@ -116,9 +116,6 @@
         <p class="subtitle">Choose which days you'll be going to the gym</p>
 
         <form method="post" action="/schedule" class="schedule-form">
-            {{ if .ValidationError }}
-                <p class="validation-error">{{ .ValidationError }}</p>
-            {{ end }}
             <div class="weekdays-grid">
                 {{ range .Weekdays }}
                     <div class="weekday-item">
@@ -137,6 +134,9 @@
                     </div>
                 {{ end }}
             </div>
+            {{ if .ValidationError }}
+                <p class="validation-error">{{ .ValidationError }}</p>
+            {{ end }}
             <button type="submit" class="save-button">Start Tracking</button>
         </form>
     </main>

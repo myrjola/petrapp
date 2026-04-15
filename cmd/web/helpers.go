@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -34,6 +35,18 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 	}
 
 	http.Redirect(w, r, path, http.StatusSeeOther)
+}
+
+const flashErrorKey = "flash_error"
+
+// putFlashError stores a flash error message in the session to be displayed on the next page load.
+func (app *application) putFlashError(ctx context.Context, message string) {
+	app.sessionManager.Put(ctx, flashErrorKey, message)
+}
+
+// popFlashError retrieves and removes the flash error message from the session.
+func (app *application) popFlashError(ctx context.Context) string {
+	return app.sessionManager.PopString(ctx, flashErrorKey)
 }
 
 // parseDateParam parses the "date" path parameter from the request URL.

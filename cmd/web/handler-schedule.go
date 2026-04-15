@@ -24,7 +24,7 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData: newBaseTemplateData(r),
 		Weekdays:         preferencesToWeekdays(prefs),
 		DurationOptions:  getWorkoutDurationOptions(),
-		ValidationError:  "",
+		ValidationError:  app.popFlashError(ctx),
 	}
 
 	app.render(w, r, http.StatusOK, "schedule", data)
@@ -40,13 +40,8 @@ func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
 	prefs := weekdaysToPreferences(r)
 
 	if prefs.IsEmpty() {
-		data := scheduleTemplateData{
-			BaseTemplateData: newBaseTemplateData(r),
-			Weekdays:         preferencesToWeekdays(prefs),
-			DurationOptions:  getWorkoutDurationOptions(),
-			ValidationError:  "Please schedule at least one workout day.",
-		}
-		app.render(w, r, http.StatusUnprocessableEntity, "schedule", data)
+		app.putFlashError(r.Context(), "Please schedule at least one workout day.")
+		redirect(w, r, "/schedule")
 		return
 	}
 
