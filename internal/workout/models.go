@@ -157,6 +157,13 @@ func (p Preferences) Friday() bool    { return p.FridayMinutes > 0 }
 func (p Preferences) Saturday() bool  { return p.SaturdayMinutes > 0 }
 func (p Preferences) Sunday() bool    { return p.SundayMinutes > 0 }
 
+// IsEmpty returns true if no workout days are scheduled (all days are rest days).
+func (p Preferences) IsEmpty() bool {
+	return p.MondayMinutes == 0 && p.TuesdayMinutes == 0 && p.WednesdayMinutes == 0 &&
+		p.ThursdayMinutes == 0 && p.FridayMinutes == 0 && p.SaturdayMinutes == 0 &&
+		p.SundayMinutes == 0
+}
+
 // FeatureFlag represents a feature flag that can toggle application features.
 type FeatureFlag struct {
 	Name    string

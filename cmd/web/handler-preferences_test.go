@@ -149,6 +149,14 @@ func Test_application_exportUserData(t *testing.T) {
 		t.Fatalf("Failed to register: %v", err)
 	}
 
+	// Set up a workout schedule (required before accessing the home page)
+	if doc, err = client.GetDoc(ctx, "/schedule"); err != nil {
+		t.Fatalf("Failed to get schedule page: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, doc, "/schedule", map[string]string{"Monday": "60"}); err != nil {
+		t.Fatalf("Failed to submit schedule form: %v", err)
+	}
+
 	// Start a workout to generate some data for the user
 	today := time.Now().Format("2006-01-02")
 	formData := map[string]string{}

@@ -52,6 +52,9 @@ func (app *application) routes() (*http.ServeMux, error) {
 		mustSession(http.HandlerFunc(app.workoutAddExercisePOST)))
 	mux.Handle("POST /workouts/{date}/feedback/{difficulty}", mustSession(http.HandlerFunc(app.workoutFeedbackPOST)))
 
+	mux.Handle("GET /schedule", mustSession(http.HandlerFunc(app.scheduleGET)))
+	mux.Handle("POST /schedule", mustSession(http.HandlerFunc(app.schedulePOST)))
+
 	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
 	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
 	mux.Handle("GET /preferences/export-data", mustSession(http.HandlerFunc(app.exportUserDataGET)))

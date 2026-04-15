@@ -251,13 +251,18 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 
 	// Only fetch workout data for authenticated users
 	if data.Authenticated {
-		sessions, err := app.workoutService.ResolveWeeklySchedule(r.Context())
+		preferences, err := app.workoutService.GetUserPreferences(r.Context())
 		if err != nil {
 			app.serverError(w, r, err)
 			return
 		}
 
-		preferences, err := app.workoutService.GetUserPreferences(r.Context())
+		if preferences.IsEmpty() {
+			redirect(w, r, "/schedule")
+			return
+		}
+
+		sessions, err := app.workoutService.ResolveWeeklySchedule(r.Context())
 		if err != nil {
 			app.serverError(w, r, err)
 			return

@@ -1,0 +1,143 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.scheduleTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    max-width: 32rem;
+                    margin: 0 auto;
+                    padding: var(--size-6) var(--size-4);
+                }
+
+                h1 {
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-6);
+                    margin-bottom: var(--size-3);
+                    color: var(--color-text-primary);
+                    text-align: center;
+                }
+
+                .subtitle {
+                    color: var(--color-text-secondary);
+                    text-align: center;
+                    margin-bottom: var(--size-7);
+                    font-size: var(--font-size-2);
+                }
+
+                .schedule-form {
+                    background: var(--color-surface-elevated);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    padding: var(--size-6);
+                    margin-bottom: var(--size-6);
+                    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+                }
+
+                .weekdays-grid {
+                    display: grid;
+                    gap: var(--size-2);
+                    margin-bottom: var(--size-6);
+                }
+
+                .weekday-item {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-3);
+                    padding: var(--size-4);
+                    border-radius: var(--radius-2);
+                    transition: all 0.2s ease;
+
+                    .workout-duration {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                        width: 100%;
+
+                        .weekday-label {
+                            font-weight: var(--font-weight-5);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-2);
+                            flex: 1;
+                        }
+
+                        select {
+                            padding: var(--size-2) var(--size-3);
+                            border: var(--border-size-1) solid var(--color-border);
+                            border-radius: var(--radius-2);
+                            background: var(--color-surface);
+                            color: var(--color-text-primary);
+                            font-size: var(--font-size-1);
+                            cursor: pointer;
+                            min-width: 8rem;
+
+                            &:focus {
+                                outline: 2px solid var(--color-success);
+                                outline-offset: 2px;
+                            }
+                        }
+                    }
+                }
+
+                .validation-error {
+                    padding: var(--size-3) var(--size-4);
+                    background: var(--red-1);
+                    border: var(--border-size-1) solid var(--red-4);
+                    border-radius: var(--radius-2);
+                    color: var(--red-9);
+                    font-size: var(--font-size-1);
+                    margin-bottom: var(--size-4);
+                }
+
+                .save-button {
+                    width: 100%;
+                    padding: var(--size-4) var(--size-6);
+                    background: var(--sky-6);
+                    color: var(--white);
+                    border: none;
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-2);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--sky-7);
+                    }
+
+                    &:active {
+                        background: var(--sky-8);
+                    }
+                }
+            }
+        </style>
+
+        <h1>Set Up Your Schedule</h1>
+        <p class="subtitle">Choose which days you'll be going to the gym</p>
+
+        <form method="post" action="/schedule" class="schedule-form">
+            {{ if .ValidationError }}
+                <p class="validation-error">{{ .ValidationError }}</p>
+            {{ end }}
+            <div class="weekdays-grid">
+                {{ range .Weekdays }}
+                    <div class="weekday-item">
+                        <div class="workout-duration">
+                            <label for="{{ .ID }}_minutes_select" class="weekday-label">{{ .Name }}</label>
+                            <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select">
+                                {{ $weekdayMinutes := .Minutes }}
+                                {{ range $.DurationOptions }}
+                                    <option value="{{ .Value }}"
+                                            {{ if eq .Value $weekdayMinutes }}selected{{ end }}>
+                                        {{ .Label }}
+                                    </option>
+                                {{ end }}
+                            </select>
+                        </div>
+                    </div>
+                {{ end }}
+            </div>
+            <button type="submit" class="save-button">Start Tracking</button>
+        </form>
+    </main>
+{{ end }}
