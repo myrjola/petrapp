@@ -212,6 +212,34 @@
             }
         </style>
 
+        <header>
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-3);
+                        margin-bottom: var(--size-4);
+
+                        a {
+                            color: var(--gray-7);
+                            text-decoration: none;
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            padding: var(--size-2);
+                            border-radius: var(--radius-2);
+
+                            &:hover {
+                                background: var(--gray-1);
+                            }
+                        }
+                    }
+                }
+            </style>
+            <a href="/" data-back-button>← Back</a>
+        </header>
+
         <h1>Weekly Schedule</h1>
         <p class="subtitle">Select the days you're planning to go to the gym</p>
 
