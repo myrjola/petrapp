@@ -34,6 +34,19 @@
                     box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
                 }
 
+                fieldset {
+                    border: none;
+                    padding: 0;
+                    margin: 0;
+
+                    legend {
+                        font-weight: var(--font-weight-6);
+                        color: var(--color-text-primary);
+                        font-size: var(--font-size-2);
+                        margin-bottom: var(--size-4);
+                    }
+                }
+
                 .weekdays-grid {
                     display: grid;
                     gap: var(--size-2);
@@ -112,17 +125,19 @@
             }
         </style>
 
-        <h1>Set Up Your Schedule</h1>
+        <h1 id="schedule-heading">Set Up Your Schedule</h1>
         <p class="subtitle">Choose which days you'll be going to the gym</p>
 
-        <form method="post" action="/schedule" class="schedule-form"
-              {{ if .ValidationError }}aria-describedby="validation-error"{{ end }}>
-            <div class="weekdays-grid">
+        <form method="post" action="/schedule" class="schedule-form" aria-labelledby="schedule-heading">
+            <fieldset>
+                <legend>Workout duration per day</legend>
+                <div class="weekdays-grid">
                 {{ range .Weekdays }}
                     <div class="weekday-item">
                         <div class="workout-duration">
                             <label for="{{ .ID }}_minutes_select" class="weekday-label">{{ .Name }}</label>
-                            <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select">
+                            <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select"
+                                    aria-label="{{ .Name }} workout duration">
                                 {{ $weekdayMinutes := .Minutes }}
                                 {{ range $.DurationOptions }}
                                     <option value="{{ .Value }}"
@@ -134,7 +149,8 @@
                         </div>
                     </div>
                 {{ end }}
-            </div>
+                </div>
+            </fieldset>
             {{ if .ValidationError }}
                 <p id="validation-error" class="validation-error" role="alert">{{ .ValidationError }}</p>
             {{ end }}
