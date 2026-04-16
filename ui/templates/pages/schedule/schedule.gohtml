@@ -115,7 +115,8 @@
         <h1>Set Up Your Schedule</h1>
         <p class="subtitle">Choose which days you'll be going to the gym</p>
 
-        <form method="post" action="/schedule" class="schedule-form">
+        <form method="post" action="/schedule" class="schedule-form"
+              {{ if .ValidationError }}aria-describedby="validation-error"{{ end }}>
             <div class="weekdays-grid">
                 {{ range .Weekdays }}
                     <div class="weekday-item">
@@ -135,7 +136,7 @@
                 {{ end }}
             </div>
             {{ if .ValidationError }}
-                <p class="validation-error">{{ .ValidationError }}</p>
+                <p id="validation-error" class="validation-error" role="alert">{{ .ValidationError }}</p>
             {{ end }}
             <button type="submit" class="save-button">Start Tracking</button>
         </form>

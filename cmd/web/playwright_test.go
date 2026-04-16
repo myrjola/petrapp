@@ -123,7 +123,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	if err = startTrackingBtn.Click(); err != nil {
 		t.Fatalf("click Start Tracking with empty schedule: %v", err)
 	}
-	validationError := page.Locator(".validation-error")
+	validationError := page.GetByRole("alert")
 	if err = validationError.WaitFor(); err != nil {
 		t.Fatalf("wait for validation error after empty schedule: %v", err)
 	}
