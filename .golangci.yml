@@ -118,6 +118,7 @@ linters:
         - ^google.golang.org/protobuf/.+Options$
         - ^gopkg.in/yaml.v3.Node$
         - ^github.com/playwright-community/playwright-go\..+Options$
+        - ^github.com/playwright-community/playwright-go\..+Values$
     funlen:
       lines: 100
       statements: 50

@@ -7,7 +7,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	playwright "github.com/playwright-community/playwright-go"
+	"github.com/playwright-community/playwright-go"
 )
 
 // smoke test using playwright. To debug, set PWDEBUG=1 environment variable.
@@ -129,8 +129,8 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 2b: Submit a valid schedule — navigator replaces /schedule with / in history.
-	if _, err = page.Locator("#monday_minutes_select").SelectOption(playwright.SelectOptionValues{
-		Values: &[]string{"60"},
+	if _, err = page.GetByLabel("Monday").SelectOption(playwright.SelectOptionValues{
+		Labels: &[]string{"1 hour"},
 	}); err != nil {
 		t.Fatalf("select Monday duration: %v", err)
 	}
