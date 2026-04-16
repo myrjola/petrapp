@@ -118,9 +118,33 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("expect redirect to /schedule after registration: %v", err)
 	}
 
+	// Step 2a: Verify error handling for empty schedule submission.
+	startTrackingBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start Tracking"})
+	if err = startTrackingBtn.Click(); err != nil {
+		t.Fatalf("click Start Tracking with empty schedule: %v", err)
+	}
+	validationError := page.Locator(".validation-error")
+	if err = validationError.WaitFor(); err != nil {
+		t.Fatalf("wait for validation error after empty schedule: %v", err)
+	}
+
+	// Step 2b: Submit a valid schedule — navigator replaces /schedule with / in history.
+	if _, err = page.Locator("#monday_minutes_select").SelectOption(playwright.SelectOptionValues{
+		Values: &[]string{"60"},
+	}); err != nil {
+		t.Fatalf("select Monday duration: %v", err)
+	}
+	if err = startTrackingBtn.Click(); err != nil {
+		t.Fatalf("click Start Tracking with valid schedule: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect redirect to / after valid schedule submission: %v", err)
+	}
+
 	// Step 3: Logout.
-	if _, err = page.Goto(serverURL + "/preferences"); err != nil {
-		t.Fatalf("navigate to preferences: %v", err)
+	menuLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Menu"})
+	if err = menuLink.Click(); err != nil {
+		t.Fatalf("click Menu link: %v", err)
 	}
 	if err = logOutBtn.Click(); err != nil {
 		t.Fatalf("logout click: %v", err)
@@ -138,7 +162,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	if err = signInBtn.Click(); err != nil {
 		t.Fatalf("login click: %v", err)
 	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
-		t.Fatalf("expect redirect to /schedule after login: %v", err)
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect redirect to / after login: %v", err)
 	}
 }
