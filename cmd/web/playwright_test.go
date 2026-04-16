@@ -53,6 +53,10 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = bCtx.Close() })
 
+	if os.Getenv("PWDEBUG") != "" {
+		bCtx.SetDefaultTimeout(0)
+	}
+
 	page, err := bCtx.NewPage()
 	if err != nil {
 		t.Fatalf("new page: %v", err)
