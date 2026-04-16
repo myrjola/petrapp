@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
@@ -9,6 +10,10 @@ import (
 	playwright "github.com/playwright-community/playwright-go"
 )
 
+// smoke test using playwright. To debug, set PWDEBUG=1 environment variable.
+// Place a `page.Pause()` in the place you want to debug.
+//
+// `PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/web/`.
 func Test_playwright_smoketest(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow playwright smoke test")
@@ -33,7 +38,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = pw.Stop() })
 
-	headless := true
+	headless := os.Getenv("PWDEBUG") == ""
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: &headless,
 	})
