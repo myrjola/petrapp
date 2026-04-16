@@ -50,7 +50,7 @@ lint: bin/golangci-lint
 dev:
 	@echo "Running dev server with debug build..."
 	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
-	./bin/petrapp
+	bash scripts/dev.sh
 
 build-docker:
 	@echo "Building Docker image..."

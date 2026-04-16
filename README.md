@@ -17,7 +17,7 @@ make setup-git-hooks # if you want to develop straight to main branch
 make dev
 ```
 
-Navigate to http://localhost:4000 to see the service in action. You
+This will start the server on a free local port and open the browser. You
 can [attach a debugger](https://www.jetbrains.com/help/go/attach-to-running-go-processes-with-debugger.html) to it.
 
 ## Operations
