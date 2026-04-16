@@ -54,3 +54,4 @@ node_modules
 /repomix-output.txt
 .githooks
 .air
+/web
