@@ -45,7 +45,9 @@ func createListener(ctx context.Context, addr string) (net.Listener, string, err
 
 // configureAndStartServer configures and starts the HTTP server using an already-bound listener.
 // logAddr is the human-readable address logged and used by e2etest to build the server URL.
-func (app *application) configureAndStartServer(ctx context.Context, listener net.Listener, logAddr string, handler http.Handler) error {
+func (app *application) configureAndStartServer(
+	ctx context.Context, listener net.Listener, logAddr string, handler http.Handler,
+) error {
 	var err error
 	shutdownComplete := make(chan struct{})
 	idleTimeout := 2 * time.Minute //nolint:mnd // reverse proxy may keep connections open for a long time.

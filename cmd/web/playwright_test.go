@@ -33,8 +33,9 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = pw.Stop() })
 
+	headless := true
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(true),
+		Headless: &headless,
 	})
 	if err != nil {
 		t.Fatalf("launch chromium: %v", err)
@@ -96,10 +97,8 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 2: Register — JS calls window.location.reload() after finishing.
-	if _, err = page.ExpectNavigation(func() error {
-		return page.Locator("button:has-text('Register')").Click()
-	}); err != nil {
-		t.Fatalf("register navigation: %v", err)
+	if err = page.Locator("button:has-text('Register')").Click(); err != nil {
+		t.Fatalf("register click: %v", err)
 	}
 	// Home handler redirects users with empty preferences to /schedule.
 	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
@@ -110,10 +109,8 @@ func Test_playwright_smoketest(t *testing.T) {
 	if _, err = page.Goto(serverURL + "/preferences"); err != nil {
 		t.Fatalf("navigate to preferences: %v", err)
 	}
-	if _, err = page.ExpectNavigation(func() error {
-		return page.Locator("button:has-text('Log out')").Click()
-	}); err != nil {
-		t.Fatalf("logout navigation: %v", err)
+	if err = page.Locator("button:has-text('Log out')").Click(); err != nil {
+		t.Fatalf("logout click: %v", err)
 	}
 	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
 		t.Fatalf("expect redirect to / after logout: %v", err)
@@ -125,10 +122,8 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 5: Login — JS calls window.location.reload() after finishing.
-	if _, err = page.ExpectNavigation(func() error {
-		return page.Locator("button:has-text('Sign in')").Click()
-	}); err != nil {
-		t.Fatalf("login navigation: %v", err)
+	if err = page.Locator("button:has-text('Sign in')").Click(); err != nil {
+		t.Fatalf("login click: %v", err)
 	}
 	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
 		t.Fatalf("expect redirect to /schedule after login: %v", err)
