@@ -52,6 +52,16 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("new page: %v", err)
 	}
 
+	// Surface browser console errors in test output for easier debugging.
+	page.On("console", func(msg playwright.ConsoleMessage) {
+		if msg.Type() == "error" {
+			t.Logf("browser console error: %s", msg.Text())
+		}
+	})
+	page.On("pageerror", func(err error) {
+		t.Logf("browser page error: %v", err)
+	})
+
 	if _, err = page.Goto(serverURL + "/"); err != nil {
 		t.Fatalf("navigate to home: %v", err)
 	}
@@ -69,8 +79,8 @@ func Test_playwright_smoketest(t *testing.T) {
 			"protocol":                    "ctap2",
 			"transport":                   "internal",
 			"hasResidentKey":              true,
-			"hasUserVerification":         false,
-			"isUserVerified":              false,
+			"hasUserVerification":         true,
+			"isUserVerified":              true,
 			"automaticPresenceSimulation": true,
 		},
 	}); err != nil {

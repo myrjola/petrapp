@@ -17,8 +17,35 @@ import (
 
 const defaultTimeout = 2 * time.Second
 
-// configureAndStartServer configures and starts the HTTP server.
-func (app *application) configureAndStartServer(ctx context.Context, addr string, handler http.Handler) error {
+// createListener creates a TCP listener and returns it together with the logical address.
+// The logical address uses the configured host (e.g. "localhost") and the actual bound port,
+// so that WebAuthn RP origins and the e2etest server URL agree even when port 0 is used.
+func createListener(ctx context.Context, addr string) (net.Listener, string, error) {
+	idleTimeout := 2 * time.Minute //nolint:mnd // reverse proxy may keep connections open for a long time.
+	listenCfg := net.ListenConfig{
+		Control:   nil,
+		KeepAlive: idleTimeout,
+		KeepAliveConfig: net.KeepAliveConfig{
+			Enable:   true,
+			Idle:     idleTimeout,
+			Interval: 0,
+			Count:    0,
+		},
+	}
+	listener, err := listenCfg.Listen(ctx, "tcp", addr)
+	if err != nil {
+		return nil, "", fmt.Errorf("TCP listen: %w", err)
+	}
+	// Preserve the configured host so that "localhost:0" → "localhost:PORT", not "127.0.0.1:PORT".
+	configuredHost, _, _ := net.SplitHostPort(addr)
+	_, actualPort, _ := net.SplitHostPort(listener.Addr().String())
+	logicalAddr := net.JoinHostPort(configuredHost, actualPort)
+	return listener, logicalAddr, nil
+}
+
+// configureAndStartServer configures and starts the HTTP server using an already-bound listener.
+// logAddr is the human-readable address logged and used by e2etest to build the server URL.
+func (app *application) configureAndStartServer(ctx context.Context, listener net.Listener, logAddr string, handler http.Handler) error {
 	var err error
 	shutdownComplete := make(chan struct{})
 	idleTimeout := 2 * time.Minute //nolint:mnd // reverse proxy may keep connections open for a long time.
@@ -71,21 +98,7 @@ func (app *application) configureAndStartServer(ctx context.Context, addr string
 		app.logger.LogAttrs(logCtx, slog.LevelInfo, "server shut down", slog.Duration("duration", time.Since(now)))
 	}()
 
-	var listener net.Listener
-	listenCfg := net.ListenConfig{
-		Control:   nil,
-		KeepAlive: idleTimeout,
-		KeepAliveConfig: net.KeepAliveConfig{
-			Enable:   true,
-			Idle:     idleTimeout,
-			Interval: 0,
-			Count:    0,
-		},
-	}
-	if listener, err = listenCfg.Listen(ctx, "tcp", addr); err != nil {
-		return fmt.Errorf("TCP listen: %w", err)
-	}
-	app.logger.LogAttrs(ctx, slog.LevelInfo, "starting server", slog.Any(e2etest.LogAddrKey, listener.Addr().String()))
+	app.logger.LogAttrs(ctx, slog.LevelInfo, "starting server", slog.Any(e2etest.LogAddrKey, logAddr))
 	if err = srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server serve: %w", err)
 	}

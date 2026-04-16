@@ -89,7 +89,7 @@ func StartServer(
 		client *Client
 	)
 	serverURL := fmt.Sprintf("http://%s", addr)
-	if client, err = NewClient(serverURL, "localhost", "http://localhost:0"); err != nil {
+	if client, err = NewClient(serverURL, "localhost", serverURL); err != nil {
 		return nil, fmt.Errorf("new client: %w", err)
 	}
 	if err = client.WaitForReady(ctx, "/api/healthy"); err != nil {

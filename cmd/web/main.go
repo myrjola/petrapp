@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -85,12 +86,21 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 
 	sessionManager := initializeSessionManager(db)
 
+	// Bind the listener first so we know the actual port before configuring WebAuthn.
+	// This matters when port 0 is used (e.g. in tests): the RP origin must match the URL
+	// the browser navigates to, and both are derived from the logical address below.
+	var listener net.Listener
+	var actualAddr string
+	if listener, actualAddr, err = createListener(ctx, cfg.Addr); err != nil {
+		return fmt.Errorf("create listener: %w", err)
+	}
+
 	fqdn := cfg.FQDN
 	if cfg.FlyAppName != "" {
 		fqdn = cfg.FlyAppName + ".fly.dev"
 	}
 	var webAuthnHandler *webauthnhandler.WebAuthnHandler
-	if webAuthnHandler, err = webauthnhandler.New(cfg.Addr, fqdn, logger, sessionManager, db); err != nil {
+	if webAuthnHandler, err = webauthnhandler.New(actualAddr, fqdn, logger, sessionManager, db); err != nil {
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
@@ -124,7 +134,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("initialize routes: %w", err)
 	}
 
-	return app.configureAndStartServer(ctx, cfg.Addr, routes)
+	return app.configureAndStartServer(ctx, listener, actualAddr, routes)
 }
 
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
