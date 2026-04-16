@@ -97,16 +97,20 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("WebAuthn.addVirtualAuthenticator: %v", err)
 	}
 
+	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Register"})
+	signInBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Sign in"})
+	logOutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Log out"})
+
 	// Step 1: Verify unauthenticated state.
-	if err = page.Locator("button:has-text('Register')").WaitFor(); err != nil {
+	if err = registerBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for Register button: %v", err)
 	}
-	if err = page.Locator("button:has-text('Sign in')").WaitFor(); err != nil {
+	if err = signInBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for Sign in button: %v", err)
 	}
 
 	// Step 2: Register — JS calls window.location.reload() after finishing.
-	if err = page.Locator("button:has-text('Register')").Click(); err != nil {
+	if err = registerBtn.Click(); err != nil {
 		t.Fatalf("register click: %v", err)
 	}
 	// Home handler redirects users with empty preferences to /schedule.
@@ -118,7 +122,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	if _, err = page.Goto(serverURL + "/preferences"); err != nil {
 		t.Fatalf("navigate to preferences: %v", err)
 	}
-	if err = page.Locator("button:has-text('Log out')").Click(); err != nil {
+	if err = logOutBtn.Click(); err != nil {
 		t.Fatalf("logout click: %v", err)
 	}
 	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
@@ -126,12 +130,12 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 4: Verify unauthenticated state.
-	if err = page.Locator("button:has-text('Register')").WaitFor(); err != nil {
+	if err = registerBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for Register button after logout: %v", err)
 	}
 
 	// Step 5: Login — JS calls window.location.reload() after finishing.
-	if err = page.Locator("button:has-text('Sign in')").Click(); err != nil {
+	if err = signInBtn.Click(); err != nil {
 		t.Fatalf("login click: %v", err)
 	}
 	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
