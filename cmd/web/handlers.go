@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -12,9 +13,11 @@ import (
 )
 
 // formatFloat formats a float to remove trailing zeros and unnecessary precision.
-// This handles the floating point rounding errors like 60.900000000000006.
+// Rounds to one decimal place to avoid floating-point artifacts from weight calculations
+// (e.g., multiplying by factors like 0.85 can produce 62.54 instead of 62.5).
 func formatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'f', -1, 64)
+	rounded := math.Round(f*10) / 10 //nolint:mnd // 10 = one decimal place precision
+	return strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
 // baseTemplateFuncs returns the base template.FuncMap with placeholder implementations.
