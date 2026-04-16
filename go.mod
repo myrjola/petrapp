@@ -11,6 +11,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/mattn/go-sqlite3 v1.14.37
 	github.com/openai/openai-go v1.12.0
+	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/yuin/goldmark v1.7.16
 	golang.org/x/sync v0.20.0
 )
@@ -20,7 +21,10 @@ replace github.com/descope/virtualwebauthn v1.0.4 => github.com/myrjola/virtualw
 
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/deckarep/golang-set/v2 v2.8.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-webauthn/x v0.2.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
