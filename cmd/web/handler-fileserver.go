@@ -52,7 +52,7 @@ func (app *application) fileServerHandler() (http.Handler, error) {
 				return
 			}
 			staticPath := filepath.Join(fileRoot, cleanPath)
-			if _, err = os.Stat(staticPath); os.IsNotExist(err) {
+			if _, err := os.Stat(staticPath); os.IsNotExist(err) {
 				// File doesn't exist, use our custom 404 handler with session middleware
 				session(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
 				return
