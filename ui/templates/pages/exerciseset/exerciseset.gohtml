@@ -271,7 +271,16 @@
                         flex-wrap: wrap;
                     }
 
+                    .signal-radio {
+                        position: absolute;
+                        opacity: 0;
+                        width: 0;
+                        height: 0;
+                    }
+
                     .signal-btn {
+                        display: inline-flex;
+                        align-items: center;
                         padding: var(--size-3) var(--size-4);
                         border-radius: var(--radius-2);
                         font-weight: var(--font-weight-6);
@@ -285,6 +294,7 @@
                             color: var(--red-8);
                             border-color: var(--red-3);
                             &:hover { background: var(--red-2); }
+                            &:has(input:checked) { background: var(--red-2); outline: 3px solid var(--red-5); }
                         }
 
                         &.on-target-btn {
@@ -292,6 +302,7 @@
                             color: var(--color-success);
                             border-color: var(--lime-4);
                             &:hover { background: var(--lime-2); }
+                            &:has(input:checked) { background: var(--lime-2); outline: 3px solid var(--lime-5); }
                         }
 
                         &.too-light-btn {
@@ -299,14 +310,19 @@
                             color: var(--color-info);
                             border-color: var(--sky-3);
                             &:hover { background: var(--sky-2); }
+                            &:has(input:checked) { background: var(--sky-2); outline: 3px solid var(--sky-5); }
                         }
                     }
 
                     .reps-section {
-                        display: flex;
+                        display: none;
                         gap: var(--size-3);
                         align-items: end;
                         margin-top: var(--size-3);
+                    }
+
+                    .signal-form:has(input[name="signal"][value="too_heavy"]:checked) .reps-section {
+                        display: flex;
                     }
 
                     .signal-badge {
@@ -388,20 +404,21 @@
         </style>
 
         <script {{ nonce }}>
-          function handleSignal(index, value) {
-            document.getElementById('signal-' + index).value = value
-            if (value === 'too_heavy') {
-              var section = document.getElementById('reps-section-' + index)
-              section.removeAttribute('hidden')
-              var repsInput = document.getElementById('reps-' + index)
-              repsInput.required = true
-              setTimeout(function () { repsInput.focus() }, 50)
-              return
-            }
-            document.getElementById('form-' + index).submit()
-          }
-
           document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll('.signal-form').forEach(function (form) {
+              form.querySelectorAll('input[name="signal"]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                  if (this.value !== 'too_heavy') {
+                    form.submit()
+                  } else {
+                    var repsInput = form.querySelector('.reps-input')
+                    if (repsInput) {
+                      setTimeout(function () { repsInput.focus() }, 50)
+                    }
+                  }
+                })
+              })
+            })
             const form = document.getElementById(`form-{{ $.EditingIndex }}`)
             if (form) {
               const repsInput = form.querySelector('.reps-input')
@@ -551,7 +568,6 @@
                                   id="form-{{ $index }}"
                                   class="set-form signal-form"
                                   aria-label="Complete set {{ $index }}">
-                                <input type="hidden" id="signal-{{ $index }}" name="signal" value="">
                                 <input type="hidden" name="target_reps" value="{{ $.CurrentSetTarget.TargetReps }}">
                                 <div class="form-inputs">
                                     <div class="input-field">
@@ -571,23 +587,23 @@
                                 </div>
                                 <p class="signal-question">Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</p>
                                 <div class="signal-buttons">
-                                    <button type="button"
-                                            class="signal-btn too-heavy-btn"
-                                            aria-label="No, I failed to reach target reps"
-                                            onclick="handleSignal({{ $index }}, 'too_heavy')">No
-                                    </button>
-                                    <button type="button"
-                                            class="signal-btn on-target-btn"
-                                            aria-label="Barely reached target reps"
-                                            onclick="handleSignal({{ $index }}, 'on_target')">Barely
-                                    </button>
-                                    <button type="button"
-                                            class="signal-btn too-light-btn"
-                                            aria-label="Could have done more reps"
-                                            onclick="handleSignal({{ $index }}, 'too_light')">Could do more
-                                    </button>
+                                    <label class="signal-btn too-heavy-btn">
+                                        <input type="radio" name="signal" value="too_heavy" class="signal-radio"
+                                               aria-label="No, I failed to reach target reps">
+                                        No
+                                    </label>
+                                    <label class="signal-btn on-target-btn">
+                                        <input type="radio" name="signal" value="on_target" class="signal-radio"
+                                               aria-label="Barely reached target reps">
+                                        Barely
+                                    </label>
+                                    <label class="signal-btn too-light-btn">
+                                        <input type="radio" name="signal" value="too_light" class="signal-radio"
+                                               aria-label="Could have done more reps">
+                                        Could do more
+                                    </label>
                                 </div>
-                                <div id="reps-section-{{ $index }}" hidden class="reps-section">
+                                <div class="reps-section">
                                     <div class="input-field">
                                         <label for="reps-{{ $index }}">Actual reps</label>
                                         <input
@@ -595,6 +611,7 @@
                                                 inputmode="numeric"
                                                 pattern="[0-9]*"
                                                 name="reps"
+                                                required
                                                 class="reps-input"
                                                 aria-describedby="reps-help-{{ $index }}"
                                         >
