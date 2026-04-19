@@ -60,3 +60,64 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		})
 	}
 }
+
+func TestCurrentSet_SignalAdjustment(t *testing.T) {
+	const startWeight = 100.0
+
+	tests := []struct {
+		name       string
+		signal     exerciseprogression.Signal
+		wantWeight float64
+	}{
+		{
+			name:       "TooLight increases by 2.5kg",
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: 102.5,
+		},
+		{
+			name:       "TooHeavy decreases by 10 percent rounded to 0.5kg",
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: 90.0, // 100 * 0.9 = 90.0
+		},
+		{
+			name:       "OnTarget keeps same weight",
+			signal:     exerciseprogression.SignalOnTarget,
+			wantWeight: startWeight,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := exerciseprogression.New(exerciseprogression.Config{
+				Type:           exerciseprogression.Hypertrophy,
+				StartingWeight: startWeight,
+			})
+			p.RecordCompletion(exerciseprogression.SetResult{
+				ActualReps: 8,
+				Signal:     tt.signal,
+				WeightKg:   startWeight,
+			})
+			got := p.CurrentSet()
+			if got.WeightKg != tt.wantWeight {
+				t.Errorf("WeightKg = %v, want %v", got.WeightKg, tt.wantWeight)
+			}
+		})
+	}
+}
+
+func TestCurrentSet_TooHeavyRounding(t *testing.T) {
+	// 23kg * 0.9 = 20.7kg → rounds to 20.5
+	p := exerciseprogression.New(exerciseprogression.Config{
+		Type:           exerciseprogression.Hypertrophy,
+		StartingWeight: 23.0,
+	})
+	p.RecordCompletion(exerciseprogression.SetResult{
+		ActualReps: 5,
+		Signal:     exerciseprogression.SignalTooHeavy,
+		WeightKg:   23.0,
+	})
+	got := p.CurrentSet()
+	if got.WeightKg != 20.5 {
+		t.Errorf("WeightKg = %v, want 20.5", got.WeightKg)
+	}
+}
