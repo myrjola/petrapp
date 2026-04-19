@@ -411,25 +411,9 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	current.ExerciseID = -1
 
 	for rows.Next() {
-		var (
-			workoutDateStr       string
-			set                  Set
-			completedAtStr       sql.NullString
-			warmupCompletedAtStr sql.NullString
-			signalStr            sql.NullString
-		)
-		if err = rows.Scan(&workoutDateStr, &set.WeightKg, &set.MinReps, &set.MaxReps,
-			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr, &signalStr); err != nil {
-			return nil, fmt.Errorf("scan exercise set row: %w", err)
-		}
-
-		if err = r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
-			return nil, err
-		}
-
-		if signalStr.Valid {
-			s := Signal(signalStr.String)
-			set.Signal = &s
+		workoutDateStr, set, warmupCompletedAtStr, scanErr := r.scanExerciseSetWithDate(rows)
+		if scanErr != nil {
+			return nil, scanErr
 		}
 
 		date, parseErr := time.Parse(dateFormat, workoutDateStr)
@@ -470,6 +454,31 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	}
 
 	return result, nil
+}
+
+// scanExerciseSetWithDate scans one row from the ListSetsForExerciseSince query.
+func (r *sqliteSessionRepository) scanExerciseSetWithDate(
+	rows *sql.Rows,
+) (string, Set, sql.NullString, error) {
+	var (
+		workoutDateStr       string
+		set                  Set
+		completedAtStr       sql.NullString
+		warmupCompletedAtStr sql.NullString
+		signalStr            sql.NullString
+	)
+	if err := rows.Scan(&workoutDateStr, &set.WeightKg, &set.MinReps, &set.MaxReps,
+		&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr, &signalStr); err != nil {
+		return "", Set{}, sql.NullString{}, fmt.Errorf("scan exercise set row: %w", err)
+	}
+	if err := r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
+		return "", Set{}, sql.NullString{}, err
+	}
+	if signalStr.Valid {
+		s := Signal(signalStr.String)
+		set.Signal = &s
+	}
+	return workoutDateStr, set, warmupCompletedAtStr, nil
 }
 
 // CountCompleted returns the number of completed sessions for the authenticated user.

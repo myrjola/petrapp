@@ -479,7 +479,7 @@ func (s *Service) BuildProgression(
 	switch sess.PeriodizationType {
 	case PeriodizationHypertrophy:
 		epType = exerciseprogression.Hypertrophy
-	default:
+	case PeriodizationStrength:
 		epType = exerciseprogression.Strength
 	}
 
