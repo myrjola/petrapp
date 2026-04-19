@@ -476,6 +476,74 @@ func Test_GenerateWorkout_PeriodizationTypeCycles(t *testing.T) {
 	}
 }
 
+func Test_GetStartingWeight(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("sw-user"), "SW User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
+		"Squat", "lower", "desc")
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Squat'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+
+	// No history: expect 0.
+	got, err := svc.GetStartingWeight(ctx, exerciseID)
+	if err != nil {
+		t.Fatalf("GetStartingWeight no history: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("no history: want 0, got %v", got)
+	}
+
+	// Insert a completed session with set 1 weight = 60kg.
+	dateStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date, completed_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
+		userID, dateStr)
+	if err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps)
+		 VALUES (?, ?, ?, 1, 60.0, 5, 5, 5)`,
+		userID, dateStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert set: %v", err)
+	}
+
+	got, err = svc.GetStartingWeight(ctx, exerciseID)
+	if err != nil {
+		t.Fatalf("GetStartingWeight with history: %v", err)
+	}
+	if got != 60.0 {
+		t.Errorf("with history: want 60.0, got %v", got)
+	}
+}
+
 func nextMonday(t *testing.T) time.Time {
 	t.Helper()
 	now := time.Now()

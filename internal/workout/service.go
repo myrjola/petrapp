@@ -409,6 +409,23 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 	}, nil
 }
 
+// GetStartingWeight returns the weight from the first set of the most recent completed
+// session for the given exercise. Returns 0 if no completed history exists.
+func (s *Service) GetStartingWeight(ctx context.Context, exerciseID int) (float64, error) {
+	since := time.Now().AddDate(0, -3, 0)
+	aggs, err := s.repo.sessions.ListSetsForExerciseSince(ctx, exerciseID, since)
+	if err != nil {
+		return 0, fmt.Errorf("list sets for exercise: %w", err)
+	}
+	// aggs is ordered DESC by date; first element is most recent session.
+	for _, agg := range aggs {
+		if len(agg.Sets) > 0 && agg.Sets[0].WeightKg != nil && agg.Sets[0].CompletedReps != nil {
+			return *agg.Sets[0].WeightKg, nil
+		}
+	}
+	return 0, nil
+}
+
 // UpdateExercise updates an existing exercise.
 func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
 	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {
