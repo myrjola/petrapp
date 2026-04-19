@@ -53,10 +53,12 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 			difficultyRating  sql.NullInt32
 			startedAtStr      sql.NullString
 			completedAtStr    sql.NullString
-			periodizationType string
+			periodizationType PeriodizationType
 		)
 
-		if err = rows.Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType); err != nil {
+		if err = rows.Scan(
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType,
+		); err != nil {
 			return nil, fmt.Errorf("scan session row: %w", err)
 		}
 
@@ -94,7 +96,7 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sess
 		difficultyRating  sql.NullInt32
 		startedAtStr      sql.NullString
 		completedAtStr    sql.NullString
-		periodizationType string
+		periodizationType PeriodizationType
 	)
 
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
@@ -166,7 +168,7 @@ func (r *sqliteSessionRepository) set(ctx context.Context, sess sessionAggregate
 			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
 		) VALUES (?, ?, ?, ?, ?, ?)`,
 		userID, dateStr, sess.DifficultyRating, formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
-		string(sess.PeriodizationType))
+		sess.PeriodizationType)
 
 	if err != nil {
 		return fmt.Errorf("insert session: %w", err)
@@ -218,7 +220,7 @@ func (r *sqliteSessionRepository) parseSessionRow(
 	difficultyRating sql.NullInt32,
 	startedAtStr sql.NullString,
 	completedAtStr sql.NullString,
-	periodizationType string,
+	periodizationType PeriodizationType,
 ) (sessionAggregate, error) {
 	var session sessionAggregate
 
@@ -247,7 +249,7 @@ func (r *sqliteSessionRepository) parseSessionRow(
 	}
 	session.CompletedAt = completedAt
 
-	session.PeriodizationType = PeriodizationType(periodizationType)
+	session.PeriodizationType = periodizationType
 
 	return session, nil
 }
