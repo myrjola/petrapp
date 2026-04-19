@@ -23,6 +23,23 @@ const (
 	ExerciseTypeBodyweight ExerciseType = "bodyweight"
 )
 
+// PeriodizationType determines the fixed rep target for all exercises in a session.
+type PeriodizationType string
+
+const (
+	PeriodizationStrength    PeriodizationType = "strength"
+	PeriodizationHypertrophy PeriodizationType = "hypertrophy"
+)
+
+// Signal is the user's perceived effort after completing a set.
+type Signal string
+
+const (
+	SignalTooHeavy Signal = "too_heavy"
+	SignalOnTarget Signal = "on_target"
+	SignalTooLight Signal = "too_light"
+)
+
 // Exercise represents a single exercise type, e.g. Squat, Bench Press, etc.
 type Exercise struct {
 	ID                    int          `json:"id"`
@@ -101,11 +118,12 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 
 // Set represents a single set of an exercise with target and actual performance.
 type Set struct {
-	WeightKg      *float64 // Nullable for bodyweight exercises
+	WeightKg      *float64   // Nullable for bodyweight exercises
 	MinReps       int
 	MaxReps       int
 	CompletedReps *int
 	CompletedAt   *time.Time // Nullable timestamp when set was completed
+	Signal        *Signal    // Nullable; nil until the set is completed
 }
 
 // ExerciseSet groups all sets for a specific exercise in a workout.
@@ -129,11 +147,12 @@ type ExerciseProgress struct {
 
 // Session represents a complete workout session including all exercises and their sets.
 type Session struct {
-	Date             time.Time
-	DifficultyRating *int
-	StartedAt        time.Time
-	CompletedAt      time.Time
-	ExerciseSets     []ExerciseSet
+	Date              time.Time
+	DifficultyRating  *int
+	StartedAt         time.Time
+	CompletedAt       time.Time
+	ExerciseSets      []ExerciseSet
+	PeriodizationType PeriodizationType
 }
 
 // Preferences stores how long a user wants to work out each day of the week.
