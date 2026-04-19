@@ -87,12 +87,14 @@ CREATE TABLE exercises
 
 CREATE TABLE workout_sessions
 (
-    user_id           INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    workout_date      TEXT    NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
-                                              DATE(workout_date, '+0 days') IS workout_date),
-    difficulty_rating INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
-    started_at        TEXT CHECK (started_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', started_at) = started_at),
-    completed_at      TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    user_id            INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    workout_date       TEXT    NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
+                                               DATE(workout_date, '+0 days') IS workout_date),
+    difficulty_rating  INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
+    started_at         TEXT CHECK (started_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', started_at) = started_at),
+    completed_at       TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    periodization_type TEXT    NOT NULL DEFAULT 'strength'
+        CHECK (periodization_type IN ('strength', 'hypertrophy')),
 
     PRIMARY KEY (user_id, workout_date)
 ) WITHOUT ROWID, STRICT;
@@ -121,6 +123,7 @@ CREATE TABLE exercise_sets
     max_reps        INTEGER NOT NULL CHECK (max_reps >= min_reps),
     completed_reps  INTEGER,
     completed_at    TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    signal          TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
 
     PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
