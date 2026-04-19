@@ -143,11 +143,12 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, erro
 
 func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessionAggregate) (Session, error) {
 	session := Session{
-		Date:             sessionAggr.Date,
-		StartedAt:        sessionAggr.StartedAt,
-		CompletedAt:      sessionAggr.CompletedAt,
-		DifficultyRating: sessionAggr.DifficultyRating,
-		ExerciseSets:     make([]ExerciseSet, len(sessionAggr.ExerciseSets)),
+		Date:              sessionAggr.Date,
+		StartedAt:         sessionAggr.StartedAt,
+		CompletedAt:       sessionAggr.CompletedAt,
+		DifficultyRating:  sessionAggr.DifficultyRating,
+		ExerciseSets:      make([]ExerciseSet, len(sessionAggr.ExerciseSets)),
+		PeriodizationType: "",
 	}
 
 	for i, ex := range sessionAggr.ExerciseSets {
@@ -333,11 +334,12 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 		if hasExercise {
 			// Convert sessionAggregate to Session by enriching with exercise data
 			enrichedSession := Session{
-				Date:             session.Date,
-				DifficultyRating: session.DifficultyRating,
-				StartedAt:        session.StartedAt,
-				CompletedAt:      session.CompletedAt,
-				ExerciseSets:     make([]ExerciseSet, len(session.ExerciseSets)),
+				Date:              session.Date,
+				DifficultyRating:  session.DifficultyRating,
+				StartedAt:         session.StartedAt,
+				CompletedAt:       session.CompletedAt,
+				ExerciseSets:      make([]ExerciseSet, len(session.ExerciseSets)),
+				PeriodizationType: "",
 			}
 
 			// Enrich exercise sets with exercise data
@@ -555,6 +557,7 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil, // Reset completion status
 			CompletedAt:   nil,
+			Signal:        nil,
 		}
 	}
 	return result
@@ -574,6 +577,7 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 			MaxReps:       set.MaxReps,
 			CompletedReps: nil,
 			CompletedAt:   nil,
+			Signal:        nil,
 		}
 	}
 	return result
@@ -686,6 +690,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
 					CompletedAt:   nil,
+					Signal:        nil,
 				},
 				{
 					WeightKg:      &[]float64{0}[0],
@@ -693,6 +698,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
 					CompletedAt:   nil,
+					Signal:        nil,
 				},
 				{
 					WeightKg:      &[]float64{0}[0],
@@ -700,6 +706,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
 					CompletedAt:   nil,
+					Signal:        nil,
 				},
 			}
 		}

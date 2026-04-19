@@ -118,7 +118,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 
 // Set represents a single set of an exercise with target and actual performance.
 type Set struct {
-	WeightKg      *float64   // Nullable for bodyweight exercises
+	WeightKg      *float64 // Nullable for bodyweight exercises
 	MinReps       int
 	MaxReps       int
 	CompletedReps *int

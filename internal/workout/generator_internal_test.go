@@ -13,6 +13,7 @@ func createTestSet(weight float64, minReps, maxReps int, completedReps *int) Set
 		MaxReps:       maxReps,
 		CompletedReps: completedReps,
 		CompletedAt:   nil,
+		Signal:        nil,
 	}
 }
 
