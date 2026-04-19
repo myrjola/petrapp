@@ -264,11 +264,11 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 
 	// Query for exercise sets with warmup completion timestamp
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps, 
-		       es.completed_at, we.warmup_completed_at
+		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps,
+		       es.completed_at, we.warmup_completed_at, es.signal
 		FROM exercise_sets es
-		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id 
-		                              AND we.workout_date = es.workout_date 
+		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id
+		                              AND we.workout_date = es.workout_date
 		                              AND we.exercise_id = es.exercise_id
 		WHERE es.workout_user_id = ? AND es.workout_date = ?
 		ORDER BY es.exercise_id, es.set_number`,
@@ -292,9 +292,10 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 			set                  Set
 			completedAtStr       sql.NullString
 			warmupCompletedAtStr sql.NullString
+			signalStr            sql.NullString
 		)
 		err = rows.Scan(&exerciseID, &set.WeightKg, &set.MinReps, &set.MaxReps,
-			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr)
+			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr, &signalStr)
 		if err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
@@ -302,6 +303,11 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		// Parse the completed_at timestamp
 		if err = r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
 			return nil, err
+		}
+
+		if signalStr.Valid {
+			s := Signal(signalStr.String)
+			set.Signal = &s
 		}
 
 		if exerciseID != currentExerciseSet.ExerciseID {
@@ -383,7 +389,7 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
 		SELECT es.workout_date, es.weight_kg, es.min_reps, es.max_reps,
-		       es.completed_reps, es.completed_at, we.warmup_completed_at
+		       es.completed_reps, es.completed_at, we.warmup_completed_at, es.signal
 		FROM exercise_sets es
 		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id
 		                              AND we.workout_date = es.workout_date
@@ -410,14 +416,20 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 			set                  Set
 			completedAtStr       sql.NullString
 			warmupCompletedAtStr sql.NullString
+			signalStr            sql.NullString
 		)
 		if err = rows.Scan(&workoutDateStr, &set.WeightKg, &set.MinReps, &set.MaxReps,
-			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr); err != nil {
+			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr, &signalStr); err != nil {
 			return nil, fmt.Errorf("scan exercise set row: %w", err)
 		}
 
 		if err = r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
 			return nil, err
+		}
+
+		if signalStr.Valid {
+			s := Signal(signalStr.String)
+			set.Signal = &s
 		}
 
 		date, parseErr := time.Parse(dateFormat, workoutDateStr)
@@ -478,13 +490,18 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 				completedAtStr = formatTimestamp(*set.CompletedAt)
 			}
 
+			var signalValue any
+			if set.Signal != nil {
+				signalValue = string(*set.Signal)
+			}
+
 			_, err := tx.ExecContext(ctx, `
 				INSERT INTO exercise_sets (
 					workout_user_id, workout_date, exercise_id, set_number,
-					weight_kg, min_reps, max_reps, completed_reps, completed_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					weight_kg, min_reps, max_reps, completed_reps, completed_at, signal
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				userID, dateStr, exerciseSet.ExerciseID, i+1,
-				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps, completedAtStr)
+				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps, completedAtStr, signalValue)
 
 			if err != nil {
 				return fmt.Errorf("insert exercise set: %w", err)
