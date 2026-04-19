@@ -1,13 +1,18 @@
-// internal/exerciseprogression/progression.go
+// Package exerciseprogression manages set-to-set weight progression for a single
+// weighted exercise execution using RIR-based auto-regulation.
 package exerciseprogression
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // Signal is the user's perceived effort after completing a set.
 type Signal int
 
 const (
-	SignalTooHeavy Signal = iota // failed to complete target reps
+	SignalUnknown  Signal = iota // zero value; must not be used
+	SignalTooHeavy               // failed to complete target reps
 	SignalOnTarget               // completed reps with ~1-2 in reserve
 	SignalTooLight               // completed reps with 2+ in reserve
 )
@@ -98,7 +103,7 @@ func targetReps(t PeriodizationType) int {
 	case Endurance:
 		return repsEndurance
 	default:
-		return repsHypertrophy
+		panic(fmt.Sprintf("exerciseprogression: unknown PeriodizationType %d", t))
 	}
 }
 
