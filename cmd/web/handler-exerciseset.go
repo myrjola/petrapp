@@ -24,9 +24,9 @@ type exerciseSetTemplateData struct {
 	ExerciseSet          workout.ExerciseSet
 	SetsDisplay          []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex int
-	EditingIndex         int                          // Index of the set being edited
-	IsEditing            bool                         // Whether we're in edit mode
-	LastCompletedAt      *time.Time                   // Timestamp of most recently completed set
+	EditingIndex         int                           // Index of the set being edited
+	IsEditing            bool                          // Whether we're in edit mode
+	LastCompletedAt      *time.Time                    // Timestamp of most recently completed set
 	CurrentSetTarget     exerciseprogression.SetTarget // Recommended weight and reps from progression
 }
 
@@ -212,22 +212,64 @@ func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exe
 	return weight, reps, nil
 }
 
+// recordWeightedSetCompletion handles parsing and persisting a weighted set completion from form data.
+func (app *application) recordWeightedSetCompletion(
+	w http.ResponseWriter, r *http.Request,
+	date time.Time, exerciseID, setIndex int, dateStr string,
+) bool {
+	weightStr := strings.Replace(r.PostForm.Get("weight"), ",", ".", 1)
+	weight, err := strconv.ParseFloat(weightStr, 64)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
+		return false
+	}
+
+	signal := workout.Signal(r.PostForm.Get("signal"))
+
+	var reps int
+	if signal == workout.SignalTooHeavy {
+		reps, err = strconv.Atoi(r.PostForm.Get("reps"))
+		if err != nil {
+			app.serverError(w, r, fmt.Errorf("parse reps: %w", err))
+			return false
+		}
+	} else {
+		reps, err = strconv.Atoi(r.PostForm.Get("target_reps"))
+		if err != nil {
+			app.serverError(w, r, fmt.Errorf("parse target_reps: %w", err))
+			return false
+		}
+	}
+
+	err = app.workoutService.RecordSetCompletion(r.Context(), date, exerciseID, setIndex, signal, weight, reps)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("record set completion: %w", err))
+		return false
+	}
+
+	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded set completion",
+		slog.String("date", dateStr),
+		slog.Int("exercise_id", exerciseID),
+		slog.Int("set_index", setIndex),
+		slog.String("signal", string(signal)),
+		slog.Float64("weight", weight),
+		slog.Int("reps", reps))
+	return true
+}
+
 func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Request) {
-	// Parse URL parameters
 	date, exerciseID, setIndex, dateStr, err := app.parseExerciseSetURLParams(r)
 	if err != nil {
 		app.notFound(w, r)
 		return
 	}
 
-	// Parse form for weight and reps
 	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err = r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
 	}
 
-	// Get the exercise to check if it's bodyweight or weighted
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
@@ -240,37 +282,23 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Parse weight and reps from form
-	weight, reps, err := app.parseWeightAndReps(r, exercise)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
-	// Update weight only for weighted exercises
 	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
-		if err = app.workoutService.UpdateSetWeight(r.Context(), date, exerciseID, setIndex, weight); err != nil {
-			app.serverError(w, r, fmt.Errorf("update weight: %w", err))
+		if !app.recordWeightedSetCompletion(w, r, date, exerciseID, setIndex, dateStr) {
+			return
+		}
+	} else {
+		_, reps, parseErr := app.parseWeightAndReps(r, exercise)
+		if parseErr != nil {
+			app.serverError(w, r, parseErr)
+			return
+		}
+		if err = app.workoutService.UpdateCompletedReps(r.Context(), date, exerciseID, setIndex, reps); err != nil {
+			app.serverError(w, r, fmt.Errorf("update completed reps: %w", err))
 			return
 		}
 	}
 
-	// Update the completed reps
-	if err = app.workoutService.UpdateCompletedReps(r.Context(), date, exerciseID, setIndex, reps); err != nil {
-		app.serverError(w, r, fmt.Errorf("update completed reps: %w", err))
-		return
-	}
-
-	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "updated set",
-		slog.String("date", dateStr),
-		slog.Int("exercise_id", exerciseID),
-		slog.Int("set_index", setIndex),
-		slog.Float64("weight", weight),
-		slog.Int("reps", reps))
-
-	// Redirect to the clean URL (without the edit query parameter)
-	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
-	redirect(w, r, redirectURL)
+	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID))
 }
 
 func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
