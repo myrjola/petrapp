@@ -52,6 +52,7 @@ const (
 
 	weightIncrementKg     = 2.5
 	weightDecrementFactor = 0.10
+	halfKg                = 0.5
 )
 
 // Progression manages set-to-set weight progression for one exercise execution.
@@ -62,7 +63,7 @@ type Progression struct {
 
 // New creates a Progression for a new exercise execution.
 func New(config Config) *Progression {
-	return &Progression{config: config}
+	return &Progression{config: config, completed: nil}
 }
 
 // NewFromHistory reconstructs a Progression from sets already completed in this session.
@@ -114,11 +115,12 @@ func adjustedWeight(last SetResult) float64 {
 	case SignalTooHeavy:
 		decreased := last.WeightKg * (1 - weightDecrementFactor)
 		return roundToHalf(decreased)
-	default: // SignalOnTarget
+	case SignalOnTarget, SignalUnknown:
 		return last.WeightKg
 	}
+	panic(fmt.Sprintf("exerciseprogression: unhandled Signal %d", last.Signal))
 }
 
 func roundToHalf(kg float64) float64 {
-	return math.Round(kg/0.5) * 0.5
+	return math.Round(kg/halfKg) * halfKg
 }

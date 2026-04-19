@@ -216,12 +216,20 @@ func TestSetsCompleted(t *testing.T) {
 		t.Errorf("SetsCompleted before any sets = %d, want 0", p.SetsCompleted())
 	}
 
-	p.RecordCompletion(exerciseprogression.SetResult{ActualReps: 8, Signal: exerciseprogression.SignalOnTarget, WeightKg: 60.0})
+	p.RecordCompletion(exerciseprogression.SetResult{
+		ActualReps: 8,
+		Signal:     exerciseprogression.SignalOnTarget,
+		WeightKg:   60.0,
+	})
 	if p.SetsCompleted() != 1 {
 		t.Errorf("SetsCompleted after 1 set = %d, want 1", p.SetsCompleted())
 	}
 
-	p.RecordCompletion(exerciseprogression.SetResult{ActualReps: 8, Signal: exerciseprogression.SignalTooLight, WeightKg: 60.0})
+	p.RecordCompletion(exerciseprogression.SetResult{
+		ActualReps: 8,
+		Signal:     exerciseprogression.SignalTooLight,
+		WeightKg:   60.0,
+	})
 	if p.SetsCompleted() != 2 {
 		t.Errorf("SetsCompleted after 2 sets = %d, want 2", p.SetsCompleted())
 	}
