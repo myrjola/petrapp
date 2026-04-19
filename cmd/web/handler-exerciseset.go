@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/exerciseprogression"
 	"github.com/myrjola/petrapp/internal/workout"
 )
 
@@ -23,9 +24,10 @@ type exerciseSetTemplateData struct {
 	ExerciseSet          workout.ExerciseSet
 	SetsDisplay          []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex int
-	EditingIndex         int        // Index of the set being edited
-	IsEditing            bool       // Whether we're in edit mode
-	LastCompletedAt      *time.Time // Timestamp of most recently completed set
+	EditingIndex         int                          // Index of the set being edited
+	IsEditing            bool                         // Whether we're in edit mode
+	LastCompletedAt      *time.Time                   // Timestamp of most recently completed set
+	CurrentSetTarget     exerciseprogression.SetTarget // Recommended weight and reps from progression
 }
 
 func formatRepRange(minReps, maxReps int) string {
@@ -113,6 +115,16 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var currentSetTarget exerciseprogression.SetTarget
+	if exerciseSet.Exercise.ExerciseType == workout.ExerciseTypeWeighted {
+		progression, progressionErr := app.workoutService.BuildProgression(r.Context(), date, exerciseID)
+		if progressionErr != nil {
+			app.serverError(w, r, progressionErr)
+			return
+		}
+		currentSetTarget = progression.CurrentSet()
+	}
+
 	data := exerciseSetTemplateData{
 		BaseTemplateData:     newBaseTemplateData(r),
 		Date:                 date,
@@ -122,6 +134,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		EditingIndex:         editingIndex,
 		IsEditing:            isEditing,
 		LastCompletedAt:      getLastCompletedAt(exerciseSet.Sets),
+		CurrentSetTarget:     currentSetTarget,
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)
