@@ -121,3 +121,108 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 		t.Errorf("WeightKg = %v, want 20.5", got.WeightKg)
 	}
 }
+
+func TestCurrentSet_OverridePropagates(t *testing.T) {
+	// Recommended set 1 = 100kg. User overrides to 95kg and signals OnTarget.
+	// Set 2 recommendation must be 95kg (from actual), not 100kg.
+	p := exerciseprogression.New(exerciseprogression.Config{
+		Type:           exerciseprogression.Hypertrophy,
+		StartingWeight: 100.0,
+	})
+	p.RecordCompletion(exerciseprogression.SetResult{
+		ActualReps: 8,
+		Signal:     exerciseprogression.SignalOnTarget,
+		WeightKg:   95.0, // user lifted less than recommended
+	})
+	got := p.CurrentSet()
+	if got.WeightKg != 95.0 {
+		t.Errorf("WeightKg = %v, want 95.0 (override weight)", got.WeightKg)
+	}
+}
+
+func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
+	// User overrides set 2 to 90kg and signals TooLight.
+	// Set 3 must be 90 + 2.5 = 92.5kg.
+	p := exerciseprogression.New(exerciseprogression.Config{
+		Type:           exerciseprogression.Hypertrophy,
+		StartingWeight: 100.0,
+	})
+	p.RecordCompletion(exerciseprogression.SetResult{
+		ActualReps: 8,
+		Signal:     exerciseprogression.SignalOnTarget,
+		WeightKg:   100.0,
+	})
+	p.RecordCompletion(exerciseprogression.SetResult{
+		ActualReps: 8,
+		Signal:     exerciseprogression.SignalTooLight,
+		WeightKg:   90.0, // user overrode set 2 down to 90kg
+	})
+	got := p.CurrentSet()
+	if got.WeightKg != 92.5 {
+		t.Errorf("WeightKg = %v, want 92.5", got.WeightKg)
+	}
+}
+
+func TestNewFromHistory_MatchesReplay(t *testing.T) {
+	config := exerciseprogression.Config{
+		Type:           exerciseprogression.Hypertrophy,
+		StartingWeight: 80.0,
+	}
+	results := []exerciseprogression.SetResult{
+		{ActualReps: 8, Signal: exerciseprogression.SignalTooLight, WeightKg: 80.0},
+		{ActualReps: 8, Signal: exerciseprogression.SignalOnTarget, WeightKg: 82.5},
+	}
+
+	// Build via replay.
+	replay := exerciseprogression.New(config)
+	for _, r := range results {
+		replay.RecordCompletion(r)
+	}
+
+	// Build via NewFromHistory.
+	history := exerciseprogression.NewFromHistory(config, results)
+
+	replayTarget := replay.CurrentSet()
+	historyTarget := history.CurrentSet()
+
+	if replayTarget != historyTarget {
+		t.Errorf("NewFromHistory CurrentSet = %+v, want %+v", historyTarget, replayTarget)
+	}
+	if history.SetsCompleted() != replay.SetsCompleted() {
+		t.Errorf("SetsCompleted = %d, want %d", history.SetsCompleted(), replay.SetsCompleted())
+	}
+}
+
+func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
+	config := exerciseprogression.Config{
+		Type:           exerciseprogression.Strength,
+		StartingWeight: 60.0,
+	}
+	fresh := exerciseprogression.New(config)
+	fromEmpty := exerciseprogression.NewFromHistory(config, nil)
+
+	if fresh.CurrentSet() != fromEmpty.CurrentSet() {
+		t.Errorf("CurrentSet mismatch: fresh=%+v history=%+v", fresh.CurrentSet(), fromEmpty.CurrentSet())
+	}
+}
+
+func TestSetsCompleted(t *testing.T) {
+	p := exerciseprogression.New(exerciseprogression.Config{
+		Type:           exerciseprogression.Hypertrophy,
+		StartingWeight: 60.0,
+	})
+
+	if p.SetsCompleted() != 0 {
+		t.Errorf("SetsCompleted before any sets = %d, want 0", p.SetsCompleted())
+	}
+
+	p.RecordCompletion(exerciseprogression.SetResult{ActualReps: 8, Signal: exerciseprogression.SignalOnTarget, WeightKg: 60.0})
+	if p.SetsCompleted() != 1 {
+		t.Errorf("SetsCompleted after 1 set = %d, want 1", p.SetsCompleted())
+	}
+
+	p.RecordCompletion(exerciseprogression.SetResult{ActualReps: 8, Signal: exerciseprogression.SignalTooLight, WeightKg: 60.0})
+	if p.SetsCompleted() != 2 {
+		t.Errorf("SetsCompleted after 2 sets = %d, want 2", p.SetsCompleted())
+	}
+}
