@@ -31,7 +31,7 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 	sinceDateStr := formatDate(sinceDate)
 
 	query := `
-		SELECT workout_date, difficulty_rating, started_at, completed_at
+		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date >= ?
 		ORDER BY workout_date DESC`
@@ -49,18 +49,19 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 	var sessions []sessionAggregate
 	for rows.Next() {
 		var (
-			workoutDateStr   string
-			difficultyRating sql.NullInt32
-			startedAtStr     sql.NullString
-			completedAtStr   sql.NullString
+			workoutDateStr    string
+			difficultyRating  sql.NullInt32
+			startedAtStr      sql.NullString
+			completedAtStr    sql.NullString
+			periodizationType string
 		)
 
-		if err = rows.Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr); err != nil {
+		if err = rows.Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType); err != nil {
 			return nil, fmt.Errorf("scan session row: %w", err)
 		}
 
 		var session sessionAggregate
-		session, err = r.parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr)
+		session, err = r.parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType)
 		if err != nil {
 			return nil, err
 		}
@@ -89,17 +90,18 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sess
 	dateStr := formatDate(date)
 
 	var (
-		workoutDateStr   string
-		difficultyRating sql.NullInt32
-		startedAtStr     sql.NullString
-		completedAtStr   sql.NullString
+		workoutDateStr    string
+		difficultyRating  sql.NullInt32
+		startedAtStr      sql.NullString
+		completedAtStr    sql.NullString
+		periodizationType string
 	)
 
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT workout_date, difficulty_rating, started_at, completed_at
+		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date = ?`,
-		userID, dateStr).Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr)
+		userID, dateStr).Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -108,7 +110,7 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sess
 		return sessionAggregate{}, fmt.Errorf("query session: %w", err)
 	}
 
-	session, err := r.parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr)
+	session, err := r.parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType)
 	if err != nil {
 		return sessionAggregate{}, err
 	}
@@ -161,9 +163,10 @@ func (r *sqliteSessionRepository) set(ctx context.Context, sess sessionAggregate
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO workout_sessions (
-			user_id, workout_date, difficulty_rating, started_at, completed_at
-		) VALUES (?, ?, ?, ?, ?)`,
-		userID, dateStr, sess.DifficultyRating, formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt))
+			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
+		) VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, dateStr, sess.DifficultyRating, formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
+		string(sess.PeriodizationType))
 
 	if err != nil {
 		return fmt.Errorf("insert session: %w", err)
@@ -215,6 +218,7 @@ func (r *sqliteSessionRepository) parseSessionRow(
 	difficultyRating sql.NullInt32,
 	startedAtStr sql.NullString,
 	completedAtStr sql.NullString,
+	periodizationType string,
 ) (sessionAggregate, error) {
 	var session sessionAggregate
 
@@ -242,6 +246,8 @@ func (r *sqliteSessionRepository) parseSessionRow(
 		return sessionAggregate{}, fmt.Errorf("parse completed_at: %w", err)
 	}
 	session.CompletedAt = completedAt
+
+	session.PeriodizationType = PeriodizationType(periodizationType)
 
 	return session, nil
 }

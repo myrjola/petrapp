@@ -33,11 +33,12 @@ type exerciseSetAggregate struct {
 
 // sessionAggregate represents a complete workout session including all exercises and their sets.
 type sessionAggregate struct {
-	Date             time.Time
-	DifficultyRating *int
-	StartedAt        time.Time
-	CompletedAt      time.Time
-	ExerciseSets     []exerciseSetAggregate
+	Date              time.Time
+	DifficultyRating  *int
+	StartedAt         time.Time
+	CompletedAt       time.Time
+	ExerciseSets      []exerciseSetAggregate
+	PeriodizationType PeriodizationType
 }
 
 // datedExerciseSetAggregate pairs an exercise set with the session date it belongs to.

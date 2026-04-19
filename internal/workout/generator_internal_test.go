@@ -434,6 +434,7 @@ func createWorkoutHistory() []sessionAggregate {
 					WarmupCompletedAt: nil,
 				},
 			},
+			PeriodizationType: PeriodizationStrength,
 		},
 		{
 			// 1 week ago - Monday workout
@@ -461,6 +462,7 @@ func createWorkoutHistory() []sessionAggregate {
 					WarmupCompletedAt: nil,
 				},
 			},
+			PeriodizationType: PeriodizationStrength,
 		},
 		{
 			// 2 days ago - Saturday workout
@@ -488,6 +490,7 @@ func createWorkoutHistory() []sessionAggregate {
 					WarmupCompletedAt: nil,
 				},
 			},
+			PeriodizationType: PeriodizationStrength,
 		},
 	}
 }

@@ -165,11 +165,12 @@ func validateWorkoutDate(t time.Time) error {
 // createWorkoutSession creates a new workout session.
 func (g *generator) createWorkoutSession(date time.Time, exerciseSets []exerciseSetAggregate) sessionAggregate {
 	return sessionAggregate{
-		Date:             date,
-		ExerciseSets:     exerciseSets,
-		DifficultyRating: nil,
-		StartedAt:        time.Time{},
-		CompletedAt:      time.Time{},
+		Date:              date,
+		ExerciseSets:      exerciseSets,
+		DifficultyRating:  nil,
+		StartedAt:         time.Time{},
+		CompletedAt:       time.Time{},
+		PeriodizationType: PeriodizationStrength,
 	}
 }
 

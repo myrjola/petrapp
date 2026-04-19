@@ -148,7 +148,7 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 		CompletedAt:       sessionAggr.CompletedAt,
 		DifficultyRating:  sessionAggr.DifficultyRating,
 		ExerciseSets:      make([]ExerciseSet, len(sessionAggr.ExerciseSets)),
-		PeriodizationType: "",
+		PeriodizationType: sessionAggr.PeriodizationType,
 	}
 
 	for i, ex := range sessionAggr.ExerciseSets {
@@ -339,7 +339,7 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 				StartedAt:         session.StartedAt,
 				CompletedAt:       session.CompletedAt,
 				ExerciseSets:      make([]ExerciseSet, len(session.ExerciseSets)),
-				PeriodizationType: "",
+				PeriodizationType: session.PeriodizationType,
 			}
 
 			// Enrich exercise sets with exercise data
