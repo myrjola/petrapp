@@ -258,6 +258,65 @@
                         }
                     }
 
+                    .signal-question {
+                        font-size: var(--font-size-1);
+                        font-weight: var(--font-weight-6);
+                        color: var(--color-text-primary);
+                        margin: var(--size-2) 0;
+                    }
+
+                    .signal-buttons {
+                        display: flex;
+                        gap: var(--size-2);
+                        flex-wrap: wrap;
+                    }
+
+                    .signal-btn {
+                        padding: var(--size-3) var(--size-4);
+                        border-radius: var(--radius-2);
+                        font-weight: var(--font-weight-6);
+                        font-size: var(--font-size-1);
+                        cursor: pointer;
+                        border: 2px solid transparent;
+                        transition: all 0.2s ease;
+
+                        &.too-heavy-btn {
+                            background: var(--red-1);
+                            color: var(--red-8);
+                            border-color: var(--red-3);
+                            &:hover { background: var(--red-2); }
+                        }
+
+                        &.on-target-btn {
+                            background: var(--color-success-bg);
+                            color: var(--color-success);
+                            border-color: var(--lime-4);
+                            &:hover { background: var(--lime-2); }
+                        }
+
+                        &.too-light-btn {
+                            background: var(--color-info-bg);
+                            color: var(--color-info);
+                            border-color: var(--sky-3);
+                            &:hover { background: var(--sky-2); }
+                        }
+                    }
+
+                    .reps-section {
+                        display: flex;
+                        gap: var(--size-3);
+                        align-items: end;
+                        margin-top: var(--size-3);
+                    }
+
+                    .signal-badge {
+                        font-size: var(--font-size-0);
+                        color: var(--color-text-secondary);
+                        background: var(--color-surface-elevated);
+                        padding: var(--size-1) var(--size-2);
+                        border-radius: var(--radius-2);
+                    }
+
                     .set-form {
                         display: flex;
                         gap: var(--size-3);
@@ -329,6 +388,19 @@
         </style>
 
         <script {{ nonce }}>
+          function handleSignal(index, value) {
+            document.getElementById('signal-' + index).value = value
+            if (value === 'too_heavy') {
+              var section = document.getElementById('reps-section-' + index)
+              section.removeAttribute('hidden')
+              var repsInput = document.getElementById('reps-' + index)
+              repsInput.required = true
+              setTimeout(function () { repsInput.focus() }, 50)
+              return
+            }
+            document.getElementById('form-' + index).submit()
+          }
+
           document.addEventListener("DOMContentLoaded", function () {
             const form = document.getElementById(`form-{{ $.EditingIndex }}`)
             if (form) {
@@ -448,26 +520,40 @@
                      aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
                     <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
-                            <span class="weight"
-                                  aria-label="Weight">{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }} kg</span>
-                        {{ end }}
-                        {{ if $set.CompletedReps }}
-                            <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
-                            <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
+                            {{ if $set.CompletedReps }}
+                                <span class="weight" aria-label="Weight">{{ formatFloat $set.WeightKg }} kg</span>
+                                <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
+                                {{ if $set.Signal }}
+                                    <span class="signal-badge" aria-label="Signal">{{ $set.Signal }}</span>
+                                {{ end }}
+                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
+                            {{ else if and $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
+                                <span class="weight" aria-label="Recommended weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
+                                <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
+                            {{ else }}
+                                <span class="weight" aria-label="Target weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
+                                <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
+                            {{ end }}
                         {{ else }}
-                            <span class="reps"
-                                  aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
+                            {{ if $set.CompletedReps }}
+                                <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
+                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
+                            {{ else }}
+                                <span class="reps" aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
+                            {{ end }}
                         {{ end }}
                     </div>
 
                     {{ if and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
-                        <form method="post"
-                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
-                              id="form-{{ $index }}"
-                              class="set-form"
-                              aria-label="Complete set {{ $index }}">
-                            <div class="form-inputs">
-                                {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                        {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                            <form method="post"
+                                  action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
+                                  id="form-{{ $index }}"
+                                  class="set-form signal-form"
+                                  aria-label="Complete set {{ $index }}">
+                                <input type="hidden" id="signal-{{ $index }}" name="signal" value="">
+                                <input type="hidden" name="target_reps" value="{{ $.CurrentSetTarget.TargetReps }}">
+                                <div class="form-inputs">
                                     <div class="input-field">
                                         <label for="weight-{{ $index }}">Weight (kg)</label>
                                         <input
@@ -475,40 +561,73 @@
                                                 inputmode="decimal"
                                                 pattern="[0-9,\.]*"
                                                 name="weight"
-                                                value="{{ if $set.WeightKg }}{{ formatFloat $set.WeightKg }}{{ else }}0{{ end }}"
+                                                value="{{ formatFloat $.CurrentSetTarget.WeightKg }}"
                                                 step="0.5"
                                                 required
                                                 aria-describedby="weight-help-{{ $index }}"
                                         >
-                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms
-                                        </div>
-                                    </div>
-                                {{ end }}
-                                <div class="input-field">
-                                    <label for="reps-{{ $index }}">Reps</label>
-                                    <input
-                                            id="reps-{{ $index }}"
-                                            inputmode="numeric"
-                                            pattern="[0-9]*"
-                                            name="reps"
-                                            placeholder="{{ $setDisplay.RepStr }}"
-                                            {{ if $set.CompletedReps }}
-                                                value="{{ $set.CompletedReps }}"
-                                            {{ end }}
-                                            required
-                                            {{ if $set.CompletedReps }}disabled{{ end }}
-                                            class="reps-input"
-                                            aria-describedby="reps-help-{{ $index }}"
-                                    >
-                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter number of repetitions
-                                        completed
+                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
                                     </div>
                                 </div>
-                            </div>
-                            <button type="submit" class="submit-button"
-                                    aria-label="Complete set {{ $index }}">Done!
-                            </button>
-                        </form>
+                                <p class="signal-question">Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</p>
+                                <div class="signal-buttons">
+                                    <button type="button"
+                                            class="signal-btn too-heavy-btn"
+                                            aria-label="No, I failed to reach target reps"
+                                            onclick="handleSignal({{ $index }}, 'too_heavy')">No
+                                    </button>
+                                    <button type="button"
+                                            class="signal-btn on-target-btn"
+                                            aria-label="Barely reached target reps"
+                                            onclick="handleSignal({{ $index }}, 'on_target')">Barely
+                                    </button>
+                                    <button type="button"
+                                            class="signal-btn too-light-btn"
+                                            aria-label="Could have done more reps"
+                                            onclick="handleSignal({{ $index }}, 'too_light')">Could do more
+                                    </button>
+                                </div>
+                                <div id="reps-section-{{ $index }}" hidden class="reps-section">
+                                    <div class="input-field">
+                                        <label for="reps-{{ $index }}">Actual reps</label>
+                                        <input
+                                                id="reps-{{ $index }}"
+                                                inputmode="numeric"
+                                                pattern="[0-9]*"
+                                                name="reps"
+                                                class="reps-input"
+                                                aria-describedby="reps-help-{{ $index }}"
+                                        >
+                                        <div id="reps-help-{{ $index }}" class="sr-only">Enter actual repetitions completed</div>
+                                    </div>
+                                    <button type="submit" class="submit-button" aria-label="Submit set {{ $index }}">Submit</button>
+                                </div>
+                            </form>
+                        {{ else }}
+                            <form method="post"
+                                  action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
+                                  id="form-{{ $index }}"
+                                  class="set-form"
+                                  aria-label="Complete set {{ $index }}">
+                                <div class="form-inputs">
+                                    <div class="input-field">
+                                        <label for="reps-{{ $index }}">Reps</label>
+                                        <input
+                                                id="reps-{{ $index }}"
+                                                inputmode="numeric"
+                                                pattern="[0-9]*"
+                                                name="reps"
+                                                placeholder="{{ $setDisplay.RepStr }}"
+                                                {{ if $set.CompletedReps }}value="{{ $set.CompletedReps }}"{{ end }}
+                                                required
+                                                {{ if $set.CompletedReps }}disabled{{ end }}
+                                                class="reps-input"
+                                        >
+                                    </div>
+                                </div>
+                                <button type="submit" class="submit-button" aria-label="Complete set {{ $index }}">Done!</button>
+                            </form>
+                        {{ end }}
                     {{ end }}
                 </div>
             {{ end }}

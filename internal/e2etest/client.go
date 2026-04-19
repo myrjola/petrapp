@@ -538,6 +538,31 @@ func (c *Client) processMultipleSelect(
 	return nil
 }
 
+// PostForm submits a POST request to the given URL path with the provided field names and values.
+// Unlike SubmitForm, field keys are treated as field names (not label text) and no hidden field extraction is done.
+// The CSRF token is extracted from the page's hidden fields for the given action URL.
+func (c *Client) PostForm(
+	ctx context.Context,
+	doc *goquery.Document,
+	formActionURLPath string,
+	fields map[string]string,
+) (*goquery.Document, error) {
+	hiddenFields, err := c.extractHiddenFormFields(doc, formActionURLPath)
+	if err != nil {
+		return nil, fmt.Errorf("extract hidden form fields: %w", err)
+	}
+
+	formData := neturl.Values{}
+	for name, value := range hiddenFields {
+		formData.Set(name, value)
+	}
+	for name, value := range fields {
+		formData.Set(name, value)
+	}
+
+	return c.submitFormRequest(ctx, formActionURLPath, formData)
+}
+
 // submitFormRequest submits the form data to the specified URL and returns the response document.
 func (c *Client) submitFormRequest(
 	ctx context.Context,

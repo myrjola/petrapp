@@ -130,29 +130,23 @@ func Test_application_exerciseSet(t *testing.T) {
 		}
 	}
 
-	// Find the set completion form (which contains a button with type="submit" and text "Done!")
-	form := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button[type=submit]:contains('Done!')").Length() > 0
-	}).First()
-
-	if form.Length() == 0 {
-		t.Fatalf("Set completion form not found")
+	// Find the signal form for completing a weighted set
+	setForm := doc.Find("form.signal-form").First()
+	if setForm.Length() == 0 {
+		t.Fatalf("Expected to find signal-form for active set")
 	}
 
-	// Get the form action
-	action, exists := form.Attr("action")
+	setAction, exists := setForm.Attr("action")
 	if !exists {
-		t.Fatalf("Form has no action attribute")
+		t.Fatalf("Signal form has no action attribute")
 	}
 
-	// Submit the form with weight and reps
-	formData = map[string]string{
-		"weight": "20,5", // Test comma for decimal point
-		"reps":   "10",   // Using 10 reps as a valid number
-	}
-
-	if doc, err = client.SubmitForm(ctx, doc, action, formData); err != nil {
-		t.Fatalf("Failed to submit set completion form: %v", err)
+	if doc, err = client.PostForm(ctx, doc, setAction, map[string]string{
+		"weight":      "20.5",
+		"signal":      "on_target",
+		"target_reps": "5",
+	}); err != nil {
+		t.Fatalf("Failed to submit signal form: %v", err)
 	}
 
 	// Verify we're back on the exercise set page
@@ -207,23 +201,20 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to load edit page: %v", err)
 	}
 
-	// Find the edit form (which contains a button with type="submit" and text "Done!")
-	form = doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button[type=submit]:contains('Done!')").Length() > 0
-	}).First()
-
-	if form.Length() == 0 {
-		t.Fatalf("Edit form not found")
+	// Find the signal form for the edit page
+	editSignalForm := doc.Find("form.signal-form").First()
+	if editSignalForm.Length() == 0 {
+		t.Fatalf("Edit signal form not found")
 	}
 
-	action, exists = form.Attr("action")
-	if !exists {
-		t.Fatalf("Edit form has no action attribute")
+	editAction, editActionExists := editSignalForm.Attr("action")
+	if !editActionExists {
+		t.Fatalf("Edit signal form has no action attribute")
 	}
 
-	// Get the current weight value
+	// Get the current weight value from the edit form
 	var weight string
-	weight, exists = form.Find("input[name='weight']").Attr("value")
+	weight, exists = editSignalForm.Find("input[name='weight']").Attr("value")
 	if !exists {
 		t.Fatalf("Edit form has no weight input")
 	}
@@ -232,13 +223,12 @@ func Test_application_exerciseSet(t *testing.T) {
 	weightFloat, _ := strconv.ParseFloat(weight, 64)
 	newWeight := weightFloat + 2.5 // Increase by 2.5 kg
 
-	// Update the completed set with new weight and reps
-	formData = map[string]string{
-		"weight": strconv.FormatFloat(newWeight, 'f', 1, 64),
-		"reps":   "12", // Increase reps
-	}
-
-	if doc, err = client.SubmitForm(ctx, doc, action, formData); err != nil {
+	// Update the completed set with new weight and signal
+	if doc, err = client.PostForm(ctx, doc, editAction, map[string]string{
+		"weight":      strconv.FormatFloat(newWeight, 'f', 1, 64),
+		"signal":      "on_target",
+		"target_reps": "12",
+	}); err != nil {
 		t.Fatalf("Failed to submit set update form: %v", err)
 	}
 
