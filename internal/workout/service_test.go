@@ -630,6 +630,92 @@ func Test_RecordSetCompletion(t *testing.T) {
 	}
 }
 
+func Test_BuildProgression(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("bp-user"), "BP User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
+		"OHP", "upper", "desc")
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'OHP'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	// Hypertrophy session (1 completed before this one).
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
+		userID, today)
+	if err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number, weight_kg, min_reps, max_reps)
+		 VALUES (?, ?, ?, 1, 40.0, 8, 8), (?, ?, ?, 2, 40.0, 8, 8), (?, ?, ?, 3, 40.0, 8, 8)`,
+		userID, today, exerciseID, userID, today, exerciseID, userID, today, exerciseID)
+	if err != nil {
+		t.Fatalf("insert sets: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
+		userID, today, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+	date, _ := time.Parse("2006-01-02", today)
+
+	// No history: starting weight 0, target 8 reps (hypertrophy).
+	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression: %v", err)
+	}
+	target := prog.CurrentSet()
+	if target.WeightKg != 0 {
+		t.Errorf("first set weight: want 0, got %v", target.WeightKg)
+	}
+	if target.TargetReps != 8 {
+		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
+	}
+
+	// Record set 0 as TooLight at 0kg.
+	if err = svc.RecordSetCompletion(ctx, date, exerciseID, 0, workout.SignalTooLight, 0, 8); err != nil {
+		t.Fatalf("RecordSetCompletion: %v", err)
+	}
+
+	// Rebuild: next set should be 0 + 2.5 = 2.5 kg.
+	prog, err = svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression after set 1: %v", err)
+	}
+	target = prog.CurrentSet()
+	if target.WeightKg != 2.5 {
+		t.Errorf("second set weight: want 2.5, got %v", target.WeightKg)
+	}
+}
+
 func nextMonday(t *testing.T) time.Time {
 	t.Helper()
 	now := time.Now()

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/exerciseprogression"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
@@ -455,6 +456,70 @@ func (s *Service) GetStartingWeight(ctx context.Context, exerciseID int) (float6
 		}
 	}
 	return 0, nil
+}
+
+// BuildProgression constructs an exerciseprogression.Progression for the given exercise
+// in the given session, ready to call CurrentSet() for the next set recommendation.
+func (s *Service) BuildProgression(
+	ctx context.Context,
+	date time.Time,
+	exerciseID int,
+) (*exerciseprogression.Progression, error) {
+	sess, err := s.repo.sessions.Get(ctx, date)
+	if err != nil {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+
+	startingWeight, err := s.GetStartingWeight(ctx, exerciseID)
+	if err != nil {
+		return nil, fmt.Errorf("get starting weight: %w", err)
+	}
+
+	var epType exerciseprogression.PeriodizationType
+	switch sess.PeriodizationType {
+	case PeriodizationHypertrophy:
+		epType = exerciseprogression.Hypertrophy
+	default:
+		epType = exerciseprogression.Strength
+	}
+
+	config := exerciseprogression.Config{
+		Type:           epType,
+		StartingWeight: startingWeight,
+	}
+
+	var completed []exerciseprogression.SetResult
+	for _, es := range sess.ExerciseSets {
+		if es.ExerciseID != exerciseID {
+			continue
+		}
+		for _, set := range es.Sets {
+			if set.CompletedReps == nil || set.Signal == nil {
+				continue
+			}
+			var sig exerciseprogression.Signal
+			switch *set.Signal {
+			case SignalTooHeavy:
+				sig = exerciseprogression.SignalTooHeavy
+			case SignalOnTarget:
+				sig = exerciseprogression.SignalOnTarget
+			case SignalTooLight:
+				sig = exerciseprogression.SignalTooLight
+			}
+			var kg float64
+			if set.WeightKg != nil {
+				kg = *set.WeightKg
+			}
+			completed = append(completed, exerciseprogression.SetResult{
+				ActualReps: *set.CompletedReps,
+				Signal:     sig,
+				WeightKg:   kg,
+			})
+		}
+		break
+	}
+
+	return exerciseprogression.NewFromHistory(config, completed), nil
 }
 
 // UpdateExercise updates an existing exercise.
