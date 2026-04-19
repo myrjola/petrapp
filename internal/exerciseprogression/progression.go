@@ -115,8 +115,10 @@ func adjustedWeight(last SetResult) float64 {
 	case SignalTooHeavy:
 		decreased := last.WeightKg * (1 - weightDecrementFactor)
 		return roundToHalf(decreased)
-	case SignalOnTarget, SignalUnknown:
+	case SignalOnTarget:
 		return last.WeightKg
+	case SignalUnknown:
+		panic("exerciseprogression: SetResult must not use SignalUnknown")
 	}
 	panic(fmt.Sprintf("exerciseprogression: unhandled Signal %d", last.Signal))
 }
