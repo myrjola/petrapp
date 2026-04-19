@@ -395,3 +395,93 @@ func workoutExistsForDate(ctx context.Context, t *testing.T, svc *workout.Servic
 	}
 	return true, nil
 }
+
+func Test_GenerateWorkout_PeriodizationTypeCycles(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("test-user-id"), "Test User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_preferences (user_id, monday_minutes) VALUES (?, ?)", userID, 60)
+	if err != nil {
+		t.Fatalf("insert preferences: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+
+	// Session 0 completed: expect Strength.
+	monday := nextMonday(t)
+	if err = svc.StartSession(ctx, monday); err != nil {
+		t.Fatalf("StartSession 1: %v", err)
+	}
+	sess, err := svc.GetSession(ctx, monday)
+	if err != nil {
+		t.Fatalf("GetSession 1: %v", err)
+	}
+	if sess.PeriodizationType != workout.PeriodizationStrength {
+		t.Errorf("session 1: want Strength, got %q", sess.PeriodizationType)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"UPDATE workout_sessions SET completed_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE user_id = ? AND workout_date = ?",
+		userID, monday.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("complete session 1: %v", err)
+	}
+
+	// Session 1 completed: expect Hypertrophy.
+	tuesday := monday.AddDate(0, 0, 1)
+	if err = svc.StartSession(ctx, tuesday); err != nil {
+		t.Fatalf("StartSession 2: %v", err)
+	}
+	sess, err = svc.GetSession(ctx, tuesday)
+	if err != nil {
+		t.Fatalf("GetSession 2: %v", err)
+	}
+	if sess.PeriodizationType != workout.PeriodizationHypertrophy {
+		t.Errorf("session 2: want Hypertrophy, got %q", sess.PeriodizationType)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"UPDATE workout_sessions SET completed_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE user_id = ? AND workout_date = ?",
+		userID, tuesday.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("complete session 2: %v", err)
+	}
+
+	// Session 2 completed: wraps back to Strength.
+	wednesday := monday.AddDate(0, 0, 2)
+	if err = svc.StartSession(ctx, wednesday); err != nil {
+		t.Fatalf("StartSession 3: %v", err)
+	}
+	sess, err = svc.GetSession(ctx, wednesday)
+	if err != nil {
+		t.Fatalf("GetSession 3: %v", err)
+	}
+	if sess.PeriodizationType != workout.PeriodizationStrength {
+		t.Errorf("session 3: want Strength, got %q", sess.PeriodizationType)
+	}
+}
+
+func nextMonday(t *testing.T) time.Time {
+	t.Helper()
+	now := time.Now()
+	daysUntilMonday := (int(time.Monday) - int(now.Weekday()) + 7) % 7
+	if daysUntilMonday == 0 {
+		daysUntilMonday = 7
+	}
+	return now.AddDate(0, 0, daysUntilMonday).Truncate(24 * time.Hour)
+}

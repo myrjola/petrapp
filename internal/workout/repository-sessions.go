@@ -472,6 +472,20 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	return result, nil
 }
 
+// CountCompleted returns the number of completed sessions for the authenticated user.
+func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	var count int
+	err := r.db.ReadOnly.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM workout_sessions
+		WHERE user_id = ? AND completed_at IS NOT NULL`,
+		userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count completed sessions: %w", err)
+	}
+	return count, nil
+}
+
 // saveExerciseSets inserts or updates exercise sets for a session.
 func (r *sqliteSessionRepository) saveExerciseSets(
 	ctx context.Context,

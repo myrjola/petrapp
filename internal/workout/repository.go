@@ -58,6 +58,8 @@ type sessionRepository interface {
 	Update(ctx context.Context, date time.Time, updateFn func(sess *sessionAggregate) (bool, error)) error
 	// ListSetsForExerciseSince retrieves all sets for a given exercise since a date, one aggregate per session.
 	ListSetsForExerciseSince(ctx context.Context, exerciseID int, sinceDate time.Time) ([]datedExerciseSetAggregate, error)
+	// CountCompleted returns the count of sessions with completed_at IS NOT NULL.
+	CountCompleted(ctx context.Context) (int, error)
 }
 
 // exerciseRepository handles exercises and sets.

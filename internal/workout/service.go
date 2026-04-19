@@ -81,6 +81,16 @@ func (s *Service) generateWorkout(ctx context.Context, date time.Time) (sessionA
 		return sessionAggregate{}, fmt.Errorf("generate workout: %w", err)
 	}
 
+	count, err := s.repo.sessions.CountCompleted(ctx)
+	if err != nil {
+		return sessionAggregate{}, fmt.Errorf("count completed sessions: %w", err)
+	}
+	if count%2 == 0 {
+		session.PeriodizationType = PeriodizationStrength
+	} else {
+		session.PeriodizationType = PeriodizationHypertrophy
+	}
+
 	return session, nil
 }
 
