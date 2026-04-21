@@ -107,3 +107,85 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 		t.Error("firstSessionPeriodizationType is not deterministic")
 	}
 }
+
+func minimalExercises() []Exercise {
+	return []Exercise{
+		{ID: 1, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Quads", "Glutes"}},
+		{ID: 2, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Hamstrings"}},
+		{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest", "Triceps", "Shoulders"}},
+		{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Lats", "Upper Back"}},
+		{ID: 5, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Biceps"}},
+		{ID: 6, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}},
+	}
+}
+
+func minimalTargets() []MuscleGroupTarget {
+	return []MuscleGroupTarget{
+		{Name: "Chest", WeeklySetTarget: 10},
+		{Name: "Shoulders", WeeklySetTarget: 10},
+		{Name: "Triceps", WeeklySetTarget: 8},
+		{Name: "Biceps", WeeklySetTarget: 8},
+		{Name: "Upper Back", WeeklySetTarget: 10},
+		{Name: "Lats", WeeklySetTarget: 10},
+		{Name: "Quads", WeeklySetTarget: 10},
+		{Name: "Hamstrings", WeeklySetTarget: 8},
+		{Name: "Glutes", WeeklySetTarget: 8},
+	}
+}
+
+func TestAllocateMuscleGroups(t *testing.T) {
+	// Mon(Lower), Tue(Upper), Thu(Full Body) schedule.
+	p := prefs(time.Monday, time.Tuesday, time.Thursday)
+	wp := NewWeeklyPlanner(p, minimalExercises(), minimalTargets())
+
+	mon := monday2026          // Lower
+	tue := date(monday2026, 1) // Upper
+	thu := date(monday2026, 3) // Full Body
+
+	workoutDays := []time.Time{mon, tue, thu}
+	categories := map[time.Time]Category{
+		mon: CategoryLower,
+		tue: CategoryUpper,
+		thu: CategoryFullBody,
+	}
+
+	alloc := wp.allocateMuscleGroups(workoutDays, categories)
+
+	// Lower muscle groups (Quads, Hamstrings, Glutes) must appear on Mon (Lower
+	// compatible) and/or Thu (Full Body compatible), never on Tue (Upper only).
+	for _, mg := range []string{"Quads", "Hamstrings", "Glutes"} {
+		for _, assignedMG := range alloc[tue] {
+			if assignedMG == mg {
+				t.Errorf("lower muscle group %q must not be assigned to Upper day", mg)
+			}
+		}
+	}
+
+	// Upper muscle groups must not appear on Mon (Lower only).
+	for _, mg := range []string{"Chest", "Shoulders", "Triceps", "Biceps", "Upper Back", "Lats"} {
+		for _, assignedMG := range alloc[mon] {
+			if assignedMG == mg {
+				t.Errorf("upper muscle group %q must not be assigned to Lower day", mg)
+			}
+		}
+	}
+
+	// Every tracked muscle group must appear in at least 1 day's allocation.
+	allGroups := make(map[string]bool)
+	for _, groups := range alloc {
+		for _, g := range groups {
+			allGroups[g] = true
+		}
+	}
+	for _, target := range minimalTargets() {
+		if !allGroups[target.Name] {
+			t.Errorf("muscle group %q not assigned to any day", target.Name)
+		}
+	}
+}

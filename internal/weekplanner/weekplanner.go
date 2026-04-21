@@ -2,6 +2,7 @@ package weekplanner
 
 import (
 	"math/rand/v2"
+	"slices"
 	"time"
 )
 
@@ -186,4 +187,95 @@ func (wp *WeeklyPlanner) firstSessionPeriodizationType(startingDate time.Time) P
 		return PeriodizationStrength
 	}
 	return PeriodizationHypertrophy
+}
+
+// isCategoryCompatible reports whether an exercise of exerciseCategory can be
+// used on a day with dayCategory.
+//   - Full Body days accept all exercise categories.
+//   - Upper/Lower days only accept their matching exercise category.
+func isCategoryCompatible(exerciseCategory, dayCategory Category) bool {
+	if dayCategory == CategoryFullBody {
+		return true
+	}
+	return exerciseCategory == dayCategory
+}
+
+// hasCategoryExerciseForMuscleGroup reports whether the pool contains at least
+// one exercise compatible with dayCategory whose primary muscles include muscleGroup.
+func (wp *WeeklyPlanner) hasCategoryExerciseForMuscleGroup(dayCategory Category, muscleGroup string) bool {
+	for _, ex := range wp.Exercises {
+		if !isCategoryCompatible(ex.Category, dayCategory) {
+			continue
+		}
+		for _, mg := range ex.PrimaryMuscleGroups {
+			if mg == muscleGroup {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// allocateMuscleGroups assigns each tracked muscle group to up to 2 workout days
+// using a most-constrained-first greedy algorithm. A muscle group is valid for a
+// day if at least one compatible exercise targets it as a primary muscle.
+func (wp *WeeklyPlanner) allocateMuscleGroups(
+	workoutDays []time.Time,
+	categories map[time.Time]Category,
+) map[time.Time][]string {
+	// Build valid-day lists for each muscle group.
+	type mgEntry struct {
+		name      string
+		validDays []time.Time
+	}
+	entries := make([]mgEntry, len(wp.Targets))
+	for i, target := range wp.Targets {
+		var valid []time.Time
+		for _, day := range workoutDays {
+			if wp.hasCategoryExerciseForMuscleGroup(categories[day], target.Name) {
+				valid = append(valid, day)
+			}
+		}
+		entries[i] = mgEntry{name: target.Name, validDays: valid}
+	}
+
+	// Sort ascending by number of valid days (most constrained first).
+	// Alphabetical name as tiebreaker for determinism.
+	slices.SortFunc(entries, func(a, b mgEntry) int {
+		if len(a.validDays) != len(b.validDays) {
+			return len(a.validDays) - len(b.validDays)
+		}
+		if a.name < b.name {
+			return -1
+		}
+		if a.name > b.name {
+			return 1
+		}
+		return 0
+	})
+
+	assignmentCount := make(map[time.Time]int)
+	result := make(map[time.Time][]string)
+
+	for _, entry := range entries {
+		if len(entry.validDays) == 0 {
+			continue
+		}
+
+		// Sort valid days by current assignment count (least loaded first).
+		sortedDays := slices.Clone(entry.validDays)
+		slices.SortFunc(sortedDays, func(a, b time.Time) int {
+			return assignmentCount[a] - assignmentCount[b]
+		})
+
+		// Assign to up to 2 days.
+		limit := min(2, len(sortedDays))
+		for i := range limit {
+			day := sortedDays[i]
+			result[day] = append(result[day], entry.name)
+			assignmentCount[day]++
+		}
+	}
+
+	return result
 }
