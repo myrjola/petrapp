@@ -153,7 +153,8 @@ func Test_application_exportUserData(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/schedule"); err != nil {
 		t.Fatalf("Failed to get schedule page: %v", err)
 	}
-	if _, err = client.SubmitForm(ctx, doc, "/schedule", map[string]string{"Monday": "60"}); err != nil {
+	scheduleForm := map[string]string{time.Now().Weekday().String(): "60"}
+	if _, err = client.SubmitForm(ctx, doc, "/schedule", scheduleForm); err != nil {
 		t.Fatalf("Failed to submit schedule form: %v", err)
 	}
 
