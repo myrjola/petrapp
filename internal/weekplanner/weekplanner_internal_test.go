@@ -99,28 +99,48 @@ func TestDetermineCategory(t *testing.T) {
 }
 
 func TestFirstSessionPeriodizationType(t *testing.T) {
-	// Mon/Wed/Fri at 60 min = 3 exercises each = 9 exercises/week.
-	p := prefs(time.Monday, time.Wednesday, time.Friday)
-	wp := NewWeeklyPlanner(p, nil, nil)
+	t.Run("consecutive weeks alternate for odd exercise count", func(t *testing.T) {
+		// Mon/Wed/Fri at 60 min = 3 exercises each = 9 exercises/week (odd).
+		p := prefs(time.Monday, time.Wednesday, time.Friday)
+		wp := NewWeeklyPlanner(p, nil, nil)
 
-	monday := monday2026Date()
+		monday1 := monday2026Date()                  // week N
+		monday2 := monday2026Date().AddDate(0, 0, 7) // week N+1
 
-	// Verify formula: (weeksSinceEpoch * exercisesPerWeek) % 2.
-	// For any two Mondays 2 weeks apart the periodization must differ.
-	monday1 := monday                  // week N
-	monday2 := monday.AddDate(0, 0, 7) // week N+1
+		pt1 := wp.firstSessionPeriodizationType(monday1)
+		pt2 := wp.firstSessionPeriodizationType(monday2)
 
-	pt1 := wp.firstSessionPeriodizationType(monday1)
-	pt2 := wp.firstSessionPeriodizationType(monday2)
+		if pt1 == pt2 {
+			t.Errorf("consecutive weeks must alternate: both got %v", pt1)
+		}
+	})
 
-	if pt1 == pt2 {
-		t.Errorf("consecutive weeks with odd exercisesPerWeek must alternate: both got %v", pt1)
-	}
+	t.Run("consecutive weeks alternate for even exercise count", func(t *testing.T) {
+		// Mon/Wed at 60 min = 3 exercises each = 6 exercises/week (even).
+		p := prefs(time.Monday, time.Wednesday)
+		wp := NewWeeklyPlanner(p, nil, nil)
 
-	// Verify determinism: same date always returns the same value.
-	if wp.firstSessionPeriodizationType(monday1) != pt1 {
-		t.Error("firstSessionPeriodizationType is not deterministic")
-	}
+		monday1 := monday2026Date()
+		monday2 := monday2026Date().AddDate(0, 0, 7)
+
+		pt1 := wp.firstSessionPeriodizationType(monday1)
+		pt2 := wp.firstSessionPeriodizationType(monday2)
+
+		if pt1 == pt2 {
+			t.Errorf("consecutive weeks must alternate even for even exercise count: both got %v", pt1)
+		}
+	})
+
+	t.Run("determinism", func(t *testing.T) {
+		p := prefs(time.Monday, time.Wednesday, time.Friday)
+		wp := NewWeeklyPlanner(p, nil, nil)
+
+		monday1 := monday2026Date()
+		pt1 := wp.firstSessionPeriodizationType(monday1)
+		if wp.firstSessionPeriodizationType(monday1) != pt1 {
+			t.Error("firstSessionPeriodizationType is not deterministic")
+		}
+	})
 }
 
 func minimalExercises() []Exercise {

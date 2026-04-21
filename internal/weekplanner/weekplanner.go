@@ -179,6 +179,8 @@ func (wp *WeeklyPlanner) determineCategory(date time.Time) Category {
 }
 
 // exercisesPerWeek sums the exercise count across all scheduled days.
+//
+//nolint:unused // kept for future extensibility.
 func (wp *WeeklyPlanner) exercisesPerWeek() int {
 	total := 0
 	for _, wd := range []time.Weekday{
@@ -195,11 +197,7 @@ func (wp *WeeklyPlanner) exercisesPerWeek() int {
 func (wp *WeeklyPlanner) firstSessionPeriodizationType(startingDate time.Time) PeriodizationType {
 	const secondsPerWeek = 7 * 24 * 3600
 	weeksSinceEpoch := startingDate.Unix() / secondsPerWeek
-	epw := int64(wp.exercisesPerWeek())
-	if epw == 0 {
-		return PeriodizationStrength
-	}
-	if (weeksSinceEpoch*epw)%2 == 0 {
+	if weeksSinceEpoch%2 == 0 {
 		return PeriodizationStrength
 	}
 	return PeriodizationHypertrophy
