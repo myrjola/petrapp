@@ -495,6 +495,42 @@ func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, erro
 	return count, nil
 }
 
+// CreateBatch creates multiple sessions atomically in a single transaction.
+func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []sessionAggregate) (err error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+
+	for _, sess := range sessions {
+		dateStr := formatDate(sess.Date)
+		if _, execErr := tx.ExecContext(ctx, `
+			INSERT INTO workout_sessions (
+				user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
+			) VALUES (?, ?, ?, ?, ?, ?)`,
+			userID, dateStr, sess.DifficultyRating,
+			formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
+			sess.PeriodizationType); execErr != nil {
+			return fmt.Errorf("insert session %s: %w", dateStr, execErr)
+		}
+		if saveErr := r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); saveErr != nil {
+			return fmt.Errorf("save exercise sets %s: %w", dateStr, saveErr)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit batch sessions: %w", err)
+	}
+	return nil
+}
+
 // saveExerciseSets inserts or updates exercise sets for a session.
 func (r *sqliteSessionRepository) saveExerciseSets(
 	ctx context.Context,

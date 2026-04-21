@@ -188,3 +188,9 @@ type FeatureFlag struct {
 	Name    string
 	Enabled bool
 }
+
+// MuscleGroupTarget stores the minimum weekly set target for a tracked muscle group.
+type MuscleGroupTarget struct {
+	MuscleGroupName string
+	WeeklySetTarget int
+}
