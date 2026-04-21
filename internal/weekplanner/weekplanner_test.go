@@ -262,3 +262,90 @@ func findExercise(exercises []Exercise, id int) Exercise {
 	}
 	panic(fmt.Sprintf("exercise %d not found", id))
 }
+
+func TestPlan(t *testing.T) {
+	exercises := minimalExercises()
+	targets := minimalTargets()
+
+	t.Run("returns error for non-Monday start date", func(t *testing.T) {
+		p := prefs(time.Monday, time.Wednesday)
+		wp := NewWeeklyPlanner(p, exercises, targets)
+		_, err := wp.Plan(date(monday2026, 1)) // Tuesday
+		if err == nil {
+			t.Error("want error for non-Monday start date, got nil")
+		}
+	})
+
+	t.Run("returns error when no workout days scheduled", func(t *testing.T) {
+		wp := NewWeeklyPlanner(Preferences{}, exercises, targets)
+		_, err := wp.Plan(monday2026)
+		if err == nil {
+			t.Error("want error when no workout days scheduled, got nil")
+		}
+	})
+
+	t.Run("returns one session per scheduled day", func(t *testing.T) {
+		p := prefs(time.Monday, time.Wednesday, time.Friday)
+		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp.rng = rand.New(rand.NewPCG(1, 0))
+
+		sessions, err := wp.Plan(monday2026)
+		if err != nil {
+			t.Fatalf("Plan returned error: %v", err)
+		}
+		if len(sessions) != 3 {
+			t.Fatalf("want 3 sessions, got %d", len(sessions))
+		}
+	})
+
+	t.Run("session dates match scheduled weekdays", func(t *testing.T) {
+		p := prefs(time.Monday, time.Wednesday, time.Friday)
+		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp.rng = rand.New(rand.NewPCG(1, 0))
+
+		sessions, err := wp.Plan(monday2026)
+		if err != nil {
+			t.Fatalf("Plan returned error: %v", err)
+		}
+		expected := []time.Weekday{time.Monday, time.Wednesday, time.Friday}
+		for i, sess := range sessions {
+			if sess.Date.Weekday() != expected[i] {
+				t.Errorf("session %d: want %s, got %s", i, expected[i], sess.Date.Weekday())
+			}
+		}
+	})
+
+	t.Run("each session has correct exercise count for duration", func(t *testing.T) {
+		// 60 min → 3 exercises
+		p := prefs(time.Monday, time.Wednesday)
+		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp.rng = rand.New(rand.NewPCG(2, 0))
+
+		sessions, err := wp.Plan(monday2026)
+		if err != nil {
+			t.Fatalf("Plan returned error: %v", err)
+		}
+		for _, sess := range sessions {
+			if len(sess.ExerciseSets) != 3 {
+				t.Errorf("60-min session: want 3 exercises, got %d", len(sess.ExerciseSets))
+			}
+		}
+	})
+
+	t.Run("consecutive sessions alternate periodization", func(t *testing.T) {
+		p := prefs(time.Monday, time.Tuesday)
+		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp.rng = rand.New(rand.NewPCG(3, 0))
+
+		sessions, err := wp.Plan(monday2026)
+		if err != nil {
+			t.Fatalf("Plan returned error: %v", err)
+		}
+		if len(sessions) < 2 {
+			t.Fatal("need at least 2 sessions to test alternation")
+		}
+		if sessions[0].PeriodizationType == sessions[1].PeriodizationType {
+			t.Error("consecutive sessions must have different periodization types")
+		}
+	})
+}

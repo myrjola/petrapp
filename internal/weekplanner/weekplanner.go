@@ -1,6 +1,7 @@
 package weekplanner
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"slices"
 	"time"
@@ -375,4 +376,73 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 		}
 	}
 	return result
+}
+
+// hasExercisesForCategory reports whether the exercise pool contains at least one
+// exercise compatible with the given day category.
+func (wp *WeeklyPlanner) hasExercisesForCategory(category Category) bool {
+	for _, ex := range wp.Exercises {
+		if isCategoryCompatible(ex.Category, category) {
+			return true
+		}
+	}
+	return false
+}
+
+// Plan generates one PlannedSession per scheduled workout day for the week beginning on
+// startingDate. Returns an error if startingDate is not a Monday, if no workout days are
+// scheduled, or if a scheduled day has no compatible exercises.
+func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) {
+	if startingDate.Weekday() != time.Monday {
+		return nil, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
+	}
+
+	// Collect scheduled workout days Mon–Sun.
+	var workoutDays []time.Time
+	for i := range 7 {
+		day := startingDate.AddDate(0, 0, i)
+		if wp.Prefs.IsWorkoutDay(day.Weekday()) {
+			workoutDays = append(workoutDays, day)
+		}
+	}
+	if len(workoutDays) == 0 {
+		return nil, fmt.Errorf("no workout days scheduled in preferences")
+	}
+
+	// Phase 1: determine category for each scheduled day.
+	categories := make(map[time.Time]Category, len(workoutDays))
+	for _, day := range workoutDays {
+		cat := wp.determineCategory(day)
+		if !wp.hasExercisesForCategory(cat) {
+			return nil, fmt.Errorf("no exercises available for %s day (%s)", cat, day.Weekday())
+		}
+		categories[day] = cat
+	}
+
+	// Phase 2: allocate muscle group slots across days.
+	dayMuscleGroups := wp.allocateMuscleGroups(workoutDays, categories)
+
+	// Determine periodization type for first session.
+	firstPT := wp.firstSessionPeriodizationType(startingDate)
+
+	// Phase 3: select exercises and build sessions.
+	sessions := make([]PlannedSession, len(workoutDays))
+	for i, day := range workoutDays {
+		pt := PeriodizationType((int(firstPT) + i) % 2)
+		n := wp.Prefs.ExercisesPerSession(day.Weekday())
+		exerciseSets := wp.selectExercisesForDayWithPeriodization(
+			categories[day],
+			dayMuscleGroups[day],
+			n,
+			pt,
+		)
+		sessions[i] = PlannedSession{
+			Date:              day,
+			Category:          categories[day],
+			PeriodizationType: pt,
+			ExerciseSets:      exerciseSets,
+		}
+	}
+
+	return sessions, nil
 }
