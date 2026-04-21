@@ -88,6 +88,14 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 
 	// Start the workout session
 	if err := app.workoutService.StartSession(r.Context(), date); err != nil {
+		if errors.Is(err, workout.ErrNotFound) {
+			data := workoutNotFoundTemplateData{
+				BaseTemplateData: newBaseTemplateData(r),
+				Date:             date,
+			}
+			app.render(w, r, http.StatusNotFound, "workout-not-found", data)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}

@@ -121,14 +121,8 @@ func Test_application_workoutNotFound(t *testing.T) {
 	}
 
 	// Verify we're on the workout not found page
-	if doc.Find("h1:contains('Workout Not Found')").Length() == 0 {
-		t.Error("Expected to find 'Workout Not Found' heading on the page")
-	}
-
-	// Verify there's a create workout button
-	createButton := doc.Find("button:contains('Create Workout')")
-	if createButton.Length() == 0 {
-		t.Error("Expected to find 'Create Workout' button on the page")
+	if doc.Find("h1:contains('Not in This Week\\'s Plan')").Length() == 0 {
+		t.Error("Expected to find 'Not in This Week's Plan' heading on the page")
 	}
 
 	// Verify there's a back to home link
@@ -137,22 +131,9 @@ func Test_application_workoutNotFound(t *testing.T) {
 		t.Error("Expected to find 'Back to Home' link on the page")
 	}
 
-	// Test that the create workout button actually works
-	form := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button:contains('Create Workout')").Length() > 0
-	}).First()
-
-	if form.Length() == 0 {
-		t.Fatal("Could not find create workout form")
-	}
-
-	action, exists := form.Attr("action")
-	if !exists {
-		t.Fatal("Create workout form has no action attribute")
-	}
-
-	expectedAction := "/workouts/" + futureDate + "/start"
-	if action != expectedAction {
-		t.Errorf("Expected form action to be %s, got %s", expectedAction, action)
+	// Verify there's no create workout button
+	createButton := doc.Find("button:contains('Create Workout')")
+	if createButton.Length() > 0 {
+		t.Error("Expected no 'Create Workout' button on the page")
 	}
 }
