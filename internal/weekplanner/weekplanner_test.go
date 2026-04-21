@@ -1,6 +1,8 @@
 package weekplanner
 
 import (
+	"fmt"
+	"math/rand/v2"
 	"testing"
 	"time"
 )
@@ -92,7 +94,7 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 
 	// Verify formula: (weeksSinceEpoch * exercisesPerWeek) % 2.
 	// For any two Mondays 2 weeks apart the periodization must differ.
-	monday1 := monday2026                   // week N
+	monday1 := monday2026                  // week N
 	monday2 := monday2026.AddDate(0, 0, 7) // week N+1
 
 	pt1 := wp.firstSessionPeriodizationType(monday1)
@@ -188,4 +190,75 @@ func TestAllocateMuscleGroups(t *testing.T) {
 			t.Errorf("muscle group %q not assigned to any day", target.Name)
 		}
 	}
+}
+
+func TestSelectExercisesForDay(t *testing.T) {
+	p := prefs(time.Monday, time.Tuesday, time.Thursday)
+	wp := NewWeeklyPlanner(p, minimalExercises(), minimalTargets())
+	wp.rng = rand.New(rand.NewPCG(42, 0)) // fixed seed for determinism
+
+	t.Run("lower day only selects lower exercises", func(t *testing.T) {
+		sets := wp.selectExercisesForDay(CategoryLower, []string{"Quads", "Hamstrings"}, 2)
+		if len(sets) != 2 {
+			t.Fatalf("want 2 exercise sets, got %d", len(sets))
+		}
+		for _, es := range sets {
+			ex := findExercise(wp.Exercises, es.ExerciseID)
+			if ex.Category != CategoryLower {
+				t.Errorf("lower day got exercise with category %s", ex.Category)
+			}
+		}
+	})
+
+	t.Run("upper day only selects upper exercises", func(t *testing.T) {
+		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest", "Lats"}, 2)
+		for _, es := range sets {
+			ex := findExercise(wp.Exercises, es.ExerciseID)
+			if ex.Category != CategoryUpper {
+				t.Errorf("upper day got exercise with category %s", ex.Category)
+			}
+		}
+	})
+
+	t.Run("full body day can select any category", func(t *testing.T) {
+		sets := wp.selectExercisesForDay(CategoryFullBody, []string{"Hamstrings", "Chest"}, 3)
+		categories := make(map[Category]bool)
+		for _, es := range sets {
+			ex := findExercise(wp.Exercises, es.ExerciseID)
+			categories[ex.Category] = true
+		}
+		// With Hamstrings and Chest as priorities, expect both lower and upper exercises selected.
+		if !categories[CategoryLower] || !categories[CategoryUpper] {
+			t.Error("full body day should draw from multiple categories when priorities span both")
+		}
+	})
+
+	t.Run("each exercise set has setsPerExercise sets", func(t *testing.T) {
+		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest"}, 1)
+		if len(sets) != 1 {
+			t.Fatalf("want 1 exercise set, got %d", len(sets))
+		}
+		if len(sets[0].Sets) != setsPerExercise {
+			t.Errorf("want %d sets, got %d", setsPerExercise, len(sets[0].Sets))
+		}
+	})
+
+	t.Run("strength periodization sets correct rep range", func(t *testing.T) {
+		sets := wp.selectExercisesForDay(CategoryUpper, nil, 1)
+		for _, s := range sets[0].Sets {
+			if s.MinReps != minRepsStrength || s.MaxReps != maxRepsStrength {
+				t.Errorf("strength set: want min=%d max=%d, got min=%d max=%d",
+					minRepsStrength, maxRepsStrength, s.MinReps, s.MaxReps)
+			}
+		}
+	})
+}
+
+func findExercise(exercises []Exercise, id int) Exercise {
+	for _, ex := range exercises {
+		if ex.ID == id {
+			return ex
+		}
+	}
+	panic(fmt.Sprintf("exercise %d not found", id))
 }

@@ -279,3 +279,100 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 
 	return result
 }
+
+// setsForPeriodization returns MinReps/MaxReps for a PlannedSet based on periodization type.
+func setsForPeriodization(pt PeriodizationType) (minReps, maxReps int) {
+	if pt == PeriodizationStrength {
+		return minRepsStrength, maxRepsStrength
+	}
+	return minRepsHypertrophy, maxRepsHypertrophy
+}
+
+// scoreExercise returns how many of the priority muscle groups the exercise covers
+// via primary muscle groups and are not yet satisfied.
+func scoreExercise(ex Exercise, priority []string, satisfied map[string]bool) int {
+	score := 0
+	for _, mg := range ex.PrimaryMuscleGroups {
+		for _, p := range priority {
+			if mg == p && !satisfied[mg] {
+				score++
+			}
+		}
+	}
+	return score
+}
+
+// selectExercisesForDay picks n exercises for a day via category-filtered, score-based
+// greedy selection. Uses Strength periodization by default.
+func (wp *WeeklyPlanner) selectExercisesForDay(
+	category Category,
+	priorityMuscleGroups []string,
+	n int,
+) []PlannedExerciseSet {
+	return wp.selectExercisesForDayWithPeriodization(category, priorityMuscleGroups, n, PeriodizationStrength)
+}
+
+func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
+	category Category,
+	priorityMuscleGroups []string,
+	n int,
+	pt PeriodizationType,
+) []PlannedExerciseSet {
+	// Filter exercise pool by category compatibility.
+	pool := make([]Exercise, 0, len(wp.Exercises))
+	for _, ex := range wp.Exercises {
+		if isCategoryCompatible(ex.Category, category) {
+			pool = append(pool, ex)
+		}
+	}
+
+	satisfied := make(map[string]bool)
+	var selected []Exercise
+
+	for len(selected) < n && len(pool) > 0 {
+		// Find best score among remaining pool.
+		bestScore := -1
+		for _, ex := range pool {
+			if s := scoreExercise(ex, priorityMuscleGroups, satisfied); s > bestScore {
+				bestScore = s
+			}
+		}
+
+		// Collect all exercises with best score.
+		var candidates []int
+		for i, ex := range pool {
+			if scoreExercise(ex, priorityMuscleGroups, satisfied) == bestScore {
+				candidates = append(candidates, i)
+			}
+		}
+
+		// Pick one at random from best candidates.
+		chosen := candidates[wp.rng.IntN(len(candidates))]
+		ex := pool[chosen]
+		selected = append(selected, ex)
+
+		// Mark primary muscle groups satisfied.
+		for _, mg := range ex.PrimaryMuscleGroups {
+			satisfied[mg] = true
+		}
+
+		// Remove chosen from pool.
+		pool = append(pool[:chosen], pool[chosen+1:]...)
+	}
+
+	// Build PlannedExerciseSets.
+	minR, maxR := setsForPeriodization(pt)
+	sets := make([]PlannedSet, setsPerExercise)
+	for i := range sets {
+		sets[i] = PlannedSet{MinReps: minR, MaxReps: maxR}
+	}
+
+	result := make([]PlannedExerciseSet, len(selected))
+	for i, ex := range selected {
+		result[i] = PlannedExerciseSet{
+			ExerciseID: ex.ID,
+			Sets:       slices.Clone(sets),
+		}
+	}
+	return result
+}
