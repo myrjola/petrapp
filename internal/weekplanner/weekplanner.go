@@ -1,6 +1,7 @@
 package weekplanner
 
 import (
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"slices"
@@ -38,6 +39,18 @@ const (
 	maxRepsStrength    = 5
 	minRepsHypertrophy = 6
 	maxRepsHypertrophy = 10
+)
+
+const (
+	minutesLong   = 90
+	minutesMedium = 60
+
+	exercisesLong   = 4
+	exercisesMedium = 3
+	exercisesShort  = 2
+
+	maxMuscleGroupDaysPerWeek = 2
+	numPeriodizationTypes     = 2
 )
 
 // Preferences describes which days are workout days and their duration in minutes.
@@ -81,12 +94,12 @@ func (p Preferences) IsWorkoutDay(weekday time.Weekday) bool {
 // ExercisesPerSession returns how many exercises to include based on session duration.
 func (p Preferences) ExercisesPerSession(weekday time.Weekday) int {
 	switch minutes := p.minutesForDay(weekday); {
-	case minutes >= 90:
-		return 4
-	case minutes >= 60:
-		return 3
+	case minutes >= minutesLong:
+		return exercisesLong
+	case minutes >= minutesMedium:
+		return exercisesMedium
 	case minutes > 0:
-		return 2
+		return exercisesShort
 	default:
 		return 0
 	}
@@ -138,11 +151,13 @@ type WeeklyPlanner struct {
 
 // NewWeeklyPlanner creates a WeeklyPlanner with a randomly seeded RNG.
 func NewWeeklyPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTarget) *WeeklyPlanner {
+	// Non-cryptographic randomness is intentional for exercise selection.
+	rng := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)) //nolint:gosec // not security-sensitive
 	return &WeeklyPlanner{
 		Prefs:     prefs,
 		Exercises: exercises,
 		Targets:   targets,
-		rng:       rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
+		rng:       rng,
 	}
 }
 
@@ -208,10 +223,8 @@ func (wp *WeeklyPlanner) hasCategoryExerciseForMuscleGroup(dayCategory Category,
 		if !isCategoryCompatible(ex.Category, dayCategory) {
 			continue
 		}
-		for _, mg := range ex.PrimaryMuscleGroups {
-			if mg == muscleGroup {
-				return true
-			}
+		if slices.Contains(ex.PrimaryMuscleGroups, muscleGroup) {
+			return true
 		}
 	}
 	return false
@@ -269,8 +282,8 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 			return assignmentCount[a] - assignmentCount[b]
 		})
 
-		// Assign to up to 2 days.
-		limit := min(2, len(sortedDays))
+		// Assign to up to maxMuscleGroupDaysPerWeek days.
+		limit := min(maxMuscleGroupDaysPerWeek, len(sortedDays))
 		for i := range limit {
 			day := sortedDays[i]
 			result[day] = append(result[day], entry.name)
@@ -282,7 +295,7 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 }
 
 // setsForPeriodization returns MinReps/MaxReps for a PlannedSet based on periodization type.
-func setsForPeriodization(pt PeriodizationType) (minReps, maxReps int) {
+func setsForPeriodization(pt PeriodizationType) (int, int) {
 	if pt == PeriodizationStrength {
 		return minRepsStrength, maxRepsStrength
 	}
@@ -406,7 +419,7 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 		}
 	}
 	if len(workoutDays) == 0 {
-		return nil, fmt.Errorf("no workout days scheduled in preferences")
+		return nil, errors.New("no workout days scheduled in preferences")
 	}
 
 	// Phase 1: determine category for each scheduled day.
@@ -428,7 +441,7 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 	// Phase 3: select exercises and build sessions.
 	sessions := make([]PlannedSession, len(workoutDays))
 	for i, day := range workoutDays {
-		pt := PeriodizationType((int(firstPT) + i) % 2)
+		pt := PeriodizationType((int(firstPT) + i) % numPeriodizationTypes)
 		n := wp.Prefs.ExercisesPerSession(day.Weekday())
 		exerciseSets := wp.selectExercisesForDayWithPeriodization(
 			categories[day],

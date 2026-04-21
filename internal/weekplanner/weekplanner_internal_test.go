@@ -7,37 +7,48 @@ import (
 	"time"
 )
 
-// monday2026 is 2026-01-05, a known Monday.
-var monday2026 = time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
+// monday2026Date returns 2026-01-05, a known Monday.
+func monday2026Date() time.Time {
+	return time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
+}
 
 func date(base time.Time, offsetDays int) time.Time {
 	return base.AddDate(0, 0, offsetDays)
 }
 
 func prefs(days ...time.Weekday) Preferences {
-	p := Preferences{}
+	p := Preferences{
+		MondayMinutes:    0,
+		TuesdayMinutes:   0,
+		WednesdayMinutes: 0,
+		ThursdayMinutes:  0,
+		FridayMinutes:    0,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
+	}
 	for _, d := range days {
 		switch d {
 		case time.Monday:
-			p.MondayMinutes = 60
+			p.MondayMinutes = minutesMedium
 		case time.Tuesday:
-			p.TuesdayMinutes = 60
+			p.TuesdayMinutes = minutesMedium
 		case time.Wednesday:
-			p.WednesdayMinutes = 60
+			p.WednesdayMinutes = minutesMedium
 		case time.Thursday:
-			p.ThursdayMinutes = 60
+			p.ThursdayMinutes = minutesMedium
 		case time.Friday:
-			p.FridayMinutes = 60
+			p.FridayMinutes = minutesMedium
 		case time.Saturday:
-			p.SaturdayMinutes = 60
+			p.SaturdayMinutes = minutesMedium
 		case time.Sunday:
-			p.SundayMinutes = 60
+			p.SundayMinutes = minutesMedium
 		}
 	}
 	return p
 }
 
 func TestDetermineCategory(t *testing.T) {
+	monday := monday2026Date()
 	tests := []struct {
 		name     string
 		prefs    Preferences
@@ -47,31 +58,31 @@ func TestDetermineCategory(t *testing.T) {
 		{
 			name:     "isolated day is full body",
 			prefs:    prefs(time.Monday, time.Wednesday, time.Friday),
-			date:     monday2026, // Mon: tomorrow=Tue not workout, yesterday=Sun not workout
+			date:     monday, // Mon: tomorrow=Tue not workout, yesterday=Sun not workout
 			expected: CategoryFullBody,
 		},
 		{
 			name:     "first of consecutive days is lower",
 			prefs:    prefs(time.Monday, time.Tuesday),
-			date:     monday2026, // Mon: tomorrow=Tue is workout
+			date:     monday, // Mon: tomorrow=Tue is workout
 			expected: CategoryLower,
 		},
 		{
 			name:     "second of consecutive days is upper",
 			prefs:    prefs(time.Monday, time.Tuesday),
-			date:     date(monday2026, 1), // Tue: yesterday=Mon was workout
+			date:     date(monday, 1), // Tue: yesterday=Mon was workout
 			expected: CategoryUpper,
 		},
 		{
 			name:     "week wrap: Sunday before Monday is lower",
 			prefs:    prefs(time.Sunday, time.Monday, time.Tuesday),
-			date:     date(monday2026, 6), // Sun (next week context doesn't matter — prefs wrap)
-			expected: CategoryLower,       // Sun: today=workout, tomorrow=Mon=workout
+			date:     date(monday, 6), // Sun (next week context doesn't matter — prefs wrap)
+			expected: CategoryLower,   // Sun: today=workout, tomorrow=Mon=workout
 		},
 		{
 			name:     "week wrap: Monday after Sunday is upper",
 			prefs:    prefs(time.Sunday, time.Monday),
-			date:     monday2026, // Mon: yesterday=Sun=workout
+			date:     monday, // Mon: yesterday=Sun=workout
 			expected: CategoryUpper,
 		},
 	}
@@ -92,10 +103,12 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 	p := prefs(time.Monday, time.Wednesday, time.Friday)
 	wp := NewWeeklyPlanner(p, nil, nil)
 
+	monday := monday2026Date()
+
 	// Verify formula: (weeksSinceEpoch * exercisesPerWeek) % 2.
 	// For any two Mondays 2 weeks apart the periodization must differ.
-	monday1 := monday2026                  // week N
-	monday2 := monday2026.AddDate(0, 0, 7) // week N+1
+	monday1 := monday                  // week N
+	monday2 := monday.AddDate(0, 0, 7) // week N+1
 
 	pt1 := wp.firstSessionPeriodizationType(monday1)
 	pt2 := wp.firstSessionPeriodizationType(monday2)
@@ -113,17 +126,17 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 func minimalExercises() []Exercise {
 	return []Exercise{
 		{ID: 1, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Quads", "Glutes"}},
+			PrimaryMuscleGroups: []string{"Quads", "Glutes"}, SecondaryMuscleGroups: nil},
 		{ID: 2, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Hamstrings"}},
+			PrimaryMuscleGroups: []string{"Hamstrings"}, SecondaryMuscleGroups: nil},
 		{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Chest", "Triceps", "Shoulders"}},
+			PrimaryMuscleGroups: []string{"Chest", "Triceps", "Shoulders"}, SecondaryMuscleGroups: nil},
 		{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Lats", "Upper Back"}},
+			PrimaryMuscleGroups: []string{"Lats", "Upper Back"}, SecondaryMuscleGroups: nil},
 		{ID: 5, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Biceps"}},
+			PrimaryMuscleGroups: []string{"Biceps"}, SecondaryMuscleGroups: nil},
 		{ID: 6, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}},
+			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}, SecondaryMuscleGroups: nil},
 	}
 }
 
@@ -143,12 +156,13 @@ func minimalTargets() []MuscleGroupTarget {
 
 func TestAllocateMuscleGroups(t *testing.T) {
 	// Mon(Lower), Tue(Upper), Thu(Full Body) schedule.
+	monday := monday2026Date()
 	p := prefs(time.Monday, time.Tuesday, time.Thursday)
 	wp := NewWeeklyPlanner(p, minimalExercises(), minimalTargets())
 
-	mon := monday2026          // Lower
-	tue := date(monday2026, 1) // Upper
-	thu := date(monday2026, 3) // Full Body
+	mon := monday          // Lower
+	tue := date(monday, 1) // Upper
+	thu := date(monday, 3) // Full Body
 
 	workoutDays := []time.Time{mon, tue, thu}
 	categories := map[time.Time]Category{
@@ -264,21 +278,22 @@ func findExercise(exercises []Exercise, id int) Exercise {
 }
 
 func TestPlan(t *testing.T) {
+	monday := monday2026Date()
 	exercises := minimalExercises()
 	targets := minimalTargets()
 
 	t.Run("returns error for non-Monday start date", func(t *testing.T) {
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewWeeklyPlanner(p, exercises, targets)
-		_, err := wp.Plan(date(monday2026, 1)) // Tuesday
+		_, err := wp.Plan(date(monday, 1)) // Tuesday
 		if err == nil {
 			t.Error("want error for non-Monday start date, got nil")
 		}
 	})
 
 	t.Run("returns error when no workout days scheduled", func(t *testing.T) {
-		wp := NewWeeklyPlanner(Preferences{}, exercises, targets)
-		_, err := wp.Plan(monday2026)
+		wp := NewWeeklyPlanner(prefs(), exercises, targets)
+		_, err := wp.Plan(monday)
 		if err == nil {
 			t.Error("want error when no workout days scheduled, got nil")
 		}
@@ -289,7 +304,7 @@ func TestPlan(t *testing.T) {
 		wp := NewWeeklyPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
 
-		sessions, err := wp.Plan(monday2026)
+		sessions, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
 		}
@@ -303,7 +318,7 @@ func TestPlan(t *testing.T) {
 		wp := NewWeeklyPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
 
-		sessions, err := wp.Plan(monday2026)
+		sessions, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
 		}
@@ -316,18 +331,18 @@ func TestPlan(t *testing.T) {
 	})
 
 	t.Run("each session has correct exercise count for duration", func(t *testing.T) {
-		// 60 min → 3 exercises
+		// 60 min → 3 exercises.
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewWeeklyPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(2, 0))
 
-		sessions, err := wp.Plan(monday2026)
+		sessions, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
 		}
 		for _, sess := range sessions {
-			if len(sess.ExerciseSets) != 3 {
-				t.Errorf("60-min session: want 3 exercises, got %d", len(sess.ExerciseSets))
+			if len(sess.ExerciseSets) != exercisesMedium {
+				t.Errorf("60-min session: want %d exercises, got %d", exercisesMedium, len(sess.ExerciseSets))
 			}
 		}
 	})
@@ -337,7 +352,7 @@ func TestPlan(t *testing.T) {
 		wp := NewWeeklyPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(3, 0))
 
-		sessions, err := wp.Plan(monday2026)
+		sessions, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
 		}

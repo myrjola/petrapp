@@ -82,7 +82,7 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 
 	// Build 7-day schedule: sessions from DB for scheduled days, empty for rest days.
 	workouts := make([]Session, 7) //nolint:mnd // 7 days in a week.
-	for i := range 7 {             //nolint:mnd // 7 days in a week.
+	for i := range 7 {
 		day := monday.AddDate(0, 0, i)
 		sessionAggr, getErr := s.repo.sessions.Get(ctx, day)
 		if getErr != nil && !errors.Is(getErr, ErrNotFound) {
