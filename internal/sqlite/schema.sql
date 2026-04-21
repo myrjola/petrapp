@@ -144,6 +144,12 @@ CREATE TABLE exercise_muscle_groups
     PRIMARY KEY (exercise_id, muscle_group_name)
 ) WITHOUT ROWID, STRICT;
 
+CREATE TABLE muscle_group_weekly_targets
+(
+    muscle_group_name   TEXT    PRIMARY KEY REFERENCES muscle_groups (name),
+    weekly_sets_target  INTEGER NOT NULL CHECK (weekly_sets_target > 0)
+) WITHOUT ROWID, STRICT;
+
 -------------------
 -- Feature flags --
 -------------------
