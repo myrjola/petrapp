@@ -84,3 +84,26 @@ func TestDetermineCategory(t *testing.T) {
 		})
 	}
 }
+
+func TestFirstSessionPeriodizationType(t *testing.T) {
+	// Mon/Wed/Fri at 60 min = 3 exercises each = 9 exercises/week.
+	p := prefs(time.Monday, time.Wednesday, time.Friday)
+	wp := NewWeeklyPlanner(p, nil, nil)
+
+	// Verify formula: (weeksSinceEpoch * exercisesPerWeek) % 2.
+	// For any two Mondays 2 weeks apart the periodization must differ.
+	monday1 := monday2026                   // week N
+	monday2 := monday2026.AddDate(0, 0, 7) // week N+1
+
+	pt1 := wp.firstSessionPeriodizationType(monday1)
+	pt2 := wp.firstSessionPeriodizationType(monday2)
+
+	if pt1 == pt2 {
+		t.Errorf("consecutive weeks with odd exercisesPerWeek must alternate: both got %v", pt1)
+	}
+
+	// Verify determinism: same date always returns the same value.
+	if wp.firstSessionPeriodizationType(monday1) != pt1 {
+		t.Error("firstSessionPeriodizationType is not deterministic")
+	}
+}

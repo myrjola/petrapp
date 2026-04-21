@@ -160,3 +160,30 @@ func (wp *WeeklyPlanner) determineCategory(date time.Time) Category {
 	}
 	return CategoryFullBody
 }
+
+// exercisesPerWeek sums the exercise count across all scheduled days.
+func (wp *WeeklyPlanner) exercisesPerWeek() int {
+	total := 0
+	for _, wd := range []time.Weekday{
+		time.Monday, time.Tuesday, time.Wednesday,
+		time.Thursday, time.Friday, time.Saturday, time.Sunday,
+	} {
+		total += wp.Prefs.ExercisesPerSession(wd)
+	}
+	return total
+}
+
+// firstSessionPeriodizationType derives the periodization type for the first session of the
+// week deterministically from the start date and preferences — no DB query needed.
+func (wp *WeeklyPlanner) firstSessionPeriodizationType(startingDate time.Time) PeriodizationType {
+	const secondsPerWeek = 7 * 24 * 3600
+	weeksSinceEpoch := startingDate.Unix() / secondsPerWeek
+	epw := int64(wp.exercisesPerWeek())
+	if epw == 0 {
+		return PeriodizationStrength
+	}
+	if (weeksSinceEpoch*epw)%2 == 0 {
+		return PeriodizationStrength
+	}
+	return PeriodizationHypertrophy
+}
