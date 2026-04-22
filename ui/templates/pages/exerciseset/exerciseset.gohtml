@@ -580,7 +580,7 @@
                 </form>
             </div>
         {{ else }}
-            <div class="warmup-status" role="status">
+            <div class="warmup-status">
                 <span class="check" aria-hidden="true">✓</span>
                 <span>Warmup complete — ready to exercise</span>
             </div>
@@ -605,7 +605,7 @@
                                 {{ if $set.Signal }}
                                     <span class="signal-badge" aria-label="Signal">{{ $set.Signal }}</span>
                                 {{ end }}
-                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit completed set">Edit</a>
+                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                             {{ else if and $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
                                 <span class="weight" aria-label="Recommended weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
                                 <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
@@ -617,7 +617,7 @@
                             {{ if $set.CompletedReps }}
                                 <span class="status-icon" aria-hidden="true">✓</span>
                                 <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
-                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit completed set">Edit</a>
+                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                             {{ else }}
                                 <span class="reps" aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
                             {{ end }}
