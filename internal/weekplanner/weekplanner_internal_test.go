@@ -383,6 +383,76 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 	})
 }
 
+func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
+	t.Run("exercise used earlier in week is skipped", func(t *testing.T) {
+		exercises := []Exercise{
+			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil},
+			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil},
+		}
+
+		p := Preferences{TuesdayMinutes: 60}
+		wp := NewWeeklyPlanner(p, exercises, nil)
+		wp.rng = rand.New(rand.NewPCG(42, 0))
+
+		// Simulate that exercise 1 was already used earlier in the week.
+		weekUsedExercises := map[int]bool{1: true}
+
+		// Request exercises with Chest priority, but exercise 1 (Chest) is already used.
+		// Expected: select exercise 2 (Shoulders) or 3 (Triceps) instead.
+		sets := wp.selectExercisesForDayWithPeriodization(
+			CategoryUpper,
+			[]string{"Chest"},
+			1,
+			PeriodizationStrength,
+			weekUsedExercises,
+		)
+
+		if len(sets) == 0 {
+			t.Fatalf("want 1 exercise, got 0")
+		}
+
+		selectedID := sets[0].ExerciseID
+		if selectedID == 1 {
+			t.Errorf("exercise 1 was already used this week; expected a different exercise, got %d", selectedID)
+		}
+	})
+
+	t.Run("plan() does not repeat exercises across days", func(t *testing.T) {
+		exercises := minimalExercises() // Use existing test fixture
+		targets := minimalTargets()
+
+		monday := monday2026Date()
+		p := prefs(time.Monday, time.Tuesday, time.Thursday)
+		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp.rng = rand.New(rand.NewPCG(42, 0))
+
+		sessions, err := wp.Plan(monday)
+		if err != nil {
+			t.Fatalf("Plan failed: %v", err)
+		}
+
+		// Collect all exercise IDs across all sessions.
+		usedExercises := make(map[int]bool)
+		for _, session := range sessions {
+			for _, es := range session.ExerciseSets {
+				if usedExercises[es.ExerciseID] {
+					t.Errorf("exercise %d appears in multiple sessions across the week", es.ExerciseID)
+				}
+				usedExercises[es.ExerciseID] = true
+			}
+		}
+
+		// Verify that we have more than one session (to make the test meaningful).
+		if len(sessions) < 2 {
+			t.Logf("note: only %d session(s) planned, test less meaningful", len(sessions))
+		}
+	})
+}
+
 func findExercise(exercises []Exercise, id int) Exercise {
 	for _, ex := range exercises {
 		if ex.ID == id {
