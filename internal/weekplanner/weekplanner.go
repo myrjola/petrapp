@@ -332,7 +332,13 @@ func (wp *WeeklyPlanner) selectExercisesForDay(
 	priorityMuscleGroups []string,
 	n int,
 ) []PlannedExerciseSet {
-	return wp.selectExercisesForDayWithPeriodization(category, priorityMuscleGroups, n, PeriodizationStrength)
+	return wp.selectExercisesForDayWithPeriodization(
+		category,
+		priorityMuscleGroups,
+		n,
+		PeriodizationStrength,
+		make(map[int]bool),
+	)
 }
 
 func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
@@ -340,6 +346,7 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 	priorityMuscleGroups []string,
 	n int,
 	pt PeriodizationType,
+	weekUsedExercises map[int]bool,
 ) []PlannedExerciseSet {
 	// Filter exercise pool by category compatibility.
 	pool := make([]Exercise, 0, len(wp.Exercises))
@@ -457,6 +464,7 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 			dayMuscleGroups[day],
 			n,
 			pt,
+			make(map[int]bool),
 		)
 		sessions[i] = PlannedSession{
 			Date:              day,
