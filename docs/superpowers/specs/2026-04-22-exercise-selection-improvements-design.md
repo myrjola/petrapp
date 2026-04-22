@@ -175,3 +175,30 @@ No schema or type changes. The `weekUsedExercises` map is a temporary runtime st
 4. **Determinism:** For the same inputs (preferences, exercise pool, start date), the plan is always identical
 5. **Performance:** Algorithm completes in < 10ms for typical exercise pools (50–200 exercises, 3–6 workout days)
 
+---
+
+## Implementation Status
+
+**Completed:** 2026-04-22
+
+### Changes Made
+
+1. Added `primaryMuscleGroupsOverlap()` helper function to detect primary muscle group conflicts
+2. Modified `selectExercisesForDayWithPeriodization()` signature to accept `weekUsedExercises` parameter
+3. Implemented two-phase selection algorithm:
+   - Phase A: Satisfy priority muscle groups with non-conflicting exercises
+   - Phase B: Fill remaining slots with any non-conflicting exercise
+4. Updated `Plan()` to initialize and track `weekUsedExercises` across the week
+5. Updated wrapper function `selectExercisesForDay()` to pass empty `weekUsedExercises`
+
+### Test Coverage
+
+- Session-level diversity: 2 test cases (overlap detection, graceful degradation)
+- Week-level deduplication: 2 test cases (skip used exercises, no repeats across week)
+- Graceful degradation: 1 test case (returns fewer exercises if constraints unsatisfiable)
+- Backward compatibility: All existing tests pass unchanged
+
+### Files Modified
+
+- `internal/weekplanner/weekplanner.go`: 4 changes (helper, signatures, implementation, Plan update)
+- `internal/weekplanner/weekplanner_internal_test.go`: 3 new test functions, enhanced test fixtures
