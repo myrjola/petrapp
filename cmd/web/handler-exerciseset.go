@@ -16,6 +16,7 @@ import (
 type setDisplay struct {
 	Set    workout.Set
 	RepStr string // Formatted rep string (e.g. "8" or "6-8")
+	Number int    // 1-based set number for display.
 }
 
 type exerciseSetTemplateData struct {
@@ -43,6 +44,7 @@ func prepareSetsDisplay(sets []workout.Set) []setDisplay {
 		displays[i] = setDisplay{
 			Set:    set,
 			RepStr: formatRepRange(set.MinReps, set.MaxReps),
+			Number: i + 1,
 		}
 	}
 	return displays
