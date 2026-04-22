@@ -5,18 +5,17 @@
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    margin: var(--size-4);
                     display: flex;
                     flex-direction: column;
-                    gap: var(--size-6);
+                    gap: var(--size-5);
                     max-width: 600px;
-                    margin-left: auto;
-                    margin-right: auto;
+                    margin: var(--size-4) auto;
                     padding: var(--size-4);
 
                     @media (max-width: 768px) {
-                        margin: var(--size-2);
-                        padding: var(--size-2);
+                        margin: var(--size-2) auto;
+                        padding: var(--size-3);
+                        gap: var(--size-4);
                     }
                 }
 
@@ -38,51 +37,45 @@
                 }
 
                 .exercise-header {
-                    display: flex;
-                    flex-direction: column;
+                    display: grid;
+                    grid-template-columns: auto 1fr auto;
+                    align-items: center;
                     gap: var(--size-3);
-                    margin-bottom: var(--size-6);
-
-                    .header-row {
-                        display: flex;
-                        align-items: center;
-                        gap: var(--size-3);
-                    }
-
-                    .title-row {
-                        justify-content: center;
-                    }
-
-                    .actions-row {
-                        justify-content: flex-start;
-                        align-items: center;
-
-                        > div:last-child {
-                            display: flex;
-                            gap: var(--size-2);
-                        }
-                    }
 
                     .back-link {
                         color: var(--color-text-secondary);
                         text-decoration: none;
-                        display: flex;
+                        display: inline-flex;
                         align-items: center;
-                        gap: var(--size-2);
-                        padding: var(--size-2);
+                        gap: var(--size-1);
+                        padding: var(--size-2) var(--size-3);
                         border-radius: var(--radius-2);
+                        font-weight: var(--font-weight-5);
                         transition: background-color 0.2s ease;
 
                         &:hover {
                             background: var(--color-surface);
                         }
+
+                        &:focus-visible {
+                            outline: 2px solid var(--color-border-focus);
+                            outline-offset: 2px;
+                        }
                     }
 
                     .exercise-title {
                         font-size: var(--font-size-4);
-                        font-weight: var(--font-weight-6);
+                        font-weight: var(--font-weight-7);
                         color: var(--color-text-primary);
+                        text-align: center;
+                        margin: 0;
                         view-transition-name: exercise-title-{{ .ExerciseSet.Exercise.ID }};
+                    }
+
+                    .header-actions {
+                        display: flex;
+                        gap: var(--size-2);
+                        justify-content: flex-end;
                     }
 
                     .action-button {
@@ -92,6 +85,11 @@
                         font-weight: var(--font-weight-6);
                         text-decoration: none;
                         transition: background-color 0.2s ease;
+
+                        &:focus-visible {
+                            outline: 2px solid var(--color-border-focus);
+                            outline-offset: 2px;
+                        }
 
                         &.info-button {
                             background: var(--color-info-bg);
@@ -110,14 +108,22 @@
                                 background: var(--lime-1);
                             }
                         }
+                    }
 
+                    @media (max-width: 480px) {
+                        grid-template-columns: auto 1fr;
+                        row-gap: var(--size-2);
+
+                        .header-actions {
+                            grid-column: 1 / -1;
+                            justify-content: center;
+                        }
                     }
                 }
 
                 .warmup-banner {
                     padding: var(--size-4);
                     border-radius: var(--radius-3);
-                    margin-bottom: var(--size-4);
                     display: flex;
                     flex-direction: column;
                     gap: var(--size-3);
@@ -125,11 +131,6 @@
                     text-align: center;
                     border: 2px solid var(--color-info);
                     background: var(--color-info-bg);
-
-                    &.completed {
-                        border-color: var(--color-success);
-                        background: var(--color-success-bg);
-                    }
 
                     .warmup-message {
                         font-size: var(--font-size-2);
@@ -141,6 +142,7 @@
                         font-size: var(--font-size-1);
                         color: var(--color-text-secondary);
                         max-width: 500px;
+                        line-height: 1.5;
                     }
 
                     .warmup-complete-button {
@@ -152,7 +154,7 @@
                         font-size: var(--font-size-2);
                         font-weight: var(--font-weight-6);
                         cursor: pointer;
-                        transition: all 0.2s ease;
+                        transition: background-color 0.2s ease, transform 0.1s ease;
                         min-width: 200px;
 
                         &:hover {
@@ -163,26 +165,46 @@
                         &:active {
                             transform: translateY(0);
                         }
-                    }
 
-                    .warmup-completed-status {
-                        padding: var(--size-2) var(--size-4);
+                        &:focus-visible {
+                            outline: 3px solid var(--color-border-focus);
+                            outline-offset: 2px;
+                        }
+                    }
+                }
+
+                .warmup-status {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: var(--size-2);
+                    padding: var(--size-2) var(--size-4);
+                    border-radius: var(--radius-round);
+                    background: var(--color-success-bg);
+                    color: var(--color-success);
+                    border: 1px solid var(--lime-3);
+                    font-size: var(--font-size-1);
+                    font-weight: var(--font-weight-6);
+                    align-self: center;
+
+                    .check {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 1.25rem;
+                        height: 1.25rem;
+                        border-radius: var(--radius-round);
                         background: var(--color-success);
                         color: var(--white);
-                        border-radius: var(--radius-2);
-                        font-size: var(--font-size-1);
-                        font-weight: var(--font-weight-6);
-                        display: flex;
-                        align-items: center;
-                        gap: var(--size-2);
+                        font-size: var(--font-size-0);
+                        font-weight: var(--font-weight-7);
                     }
                 }
 
                 .sets-container {
                     display: flex;
                     flex-direction: column;
-                    gap: var(--size-4);
-                    margin-bottom: var(--size-6);
+                    gap: var(--size-3);
 
                     &.disabled {
                         opacity: 0.5;
@@ -199,21 +221,12 @@
                     background: var(--color-surface);
                     border: 1px solid var(--color-border);
                     border-radius: var(--radius-3);
-                    transition: all 0.2s ease;
+                    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
                     position: relative;
 
                     &.completed {
                         background: var(--color-surface-completed);
                         border-color: var(--color-success);
-
-                        &::before {
-                            content: "✓";
-                            position: absolute;
-                            top: var(--size-2);
-                            right: var(--size-2);
-                            color: var(--color-success);
-                            font-weight: var(--font-weight-7);
-                        }
                     }
 
                     &.active {
@@ -225,11 +238,11 @@
                     .set-info {
                         display: flex;
                         align-items: center;
-                        gap: var(--size-3);
-                        margin-bottom: var(--size-2);
+                        flex-wrap: wrap;
+                        gap: var(--size-2) var(--size-3);
 
                         .weight {
-                            font-weight: var(--font-weight-6);
+                            font-weight: var(--font-weight-7);
                             color: var(--color-text-primary);
                             font-size: var(--font-size-2);
                         }
@@ -239,36 +252,121 @@
                             font-size: var(--font-size-1);
                         }
 
+                        .status-icon {
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            width: 1.5rem;
+                            height: 1.5rem;
+                            border-radius: var(--radius-round);
+                            background: var(--color-success);
+                            color: var(--white);
+                            font-size: var(--font-size-0);
+                            font-weight: var(--font-weight-7);
+                            flex-shrink: 0;
+                        }
+
                         .edit-button {
                             margin-left: auto;
-                            padding: var(--size-1) var(--size-2);
+                            padding: var(--size-1) var(--size-3);
                             background: var(--color-surface-elevated);
                             border: 1px solid var(--color-border);
                             border-radius: var(--radius-2);
                             font-size: var(--font-size-0);
+                            font-weight: var(--font-weight-5);
                             cursor: pointer;
                             text-decoration: none;
                             color: var(--color-text-secondary);
-                            transition: all 0.2s ease;
+                            transition: background-color 0.2s ease, border-color 0.2s ease;
 
                             &:hover {
                                 background: var(--gray-1);
                                 border-color: var(--gray-4);
                             }
+
+                            &:focus-visible {
+                                outline: 2px solid var(--color-border-focus);
+                                outline-offset: 2px;
+                            }
+                        }
+
+                        .signal-badge {
+                            font-size: var(--font-size-0);
+                            color: var(--color-text-secondary);
+                            background: var(--color-surface-elevated);
+                            padding: var(--size-1) var(--size-2);
+                            border-radius: var(--radius-2);
                         }
                     }
 
-                    .signal-question {
-                        font-size: var(--font-size-1);
-                        font-weight: var(--font-weight-6);
-                        color: var(--color-text-primary);
-                        margin: var(--size-2) 0;
+                    .set-form {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-4);
+                        padding-top: var(--size-2);
+                        border-top: 1px solid var(--color-border);
+                    }
+
+                    .input-field {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-1);
+
+                        label {
+                            font-size: var(--font-size-0);
+                            color: var(--color-text-secondary);
+                            font-weight: var(--font-weight-5);
+                        }
+
+                        input {
+                            width: 6rem;
+                            padding: var(--size-2) var(--size-3);
+                            border: 2px solid var(--color-border);
+                            border-radius: var(--radius-2);
+                            text-align: center;
+                            font-size: var(--font-size-2);
+                            font-weight: var(--font-weight-6);
+                            background: var(--color-surface-elevated);
+                            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+                            &:focus {
+                                outline: none;
+                                border-color: var(--color-border-focus);
+                                box-shadow: 0 0 0 3px var(--sky-1);
+                            }
+
+                            &:user-invalid {
+                                border-color: var(--red-5);
+                            }
+                        }
+                    }
+
+                    .signal-group {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-2);
+                        border: none;
+                        padding: 0;
+                        margin: 0;
+                        min-width: 0;
+
+                        > legend {
+                            font-size: var(--font-size-1);
+                            font-weight: var(--font-weight-6);
+                            color: var(--color-text-primary);
+                            padding: 0;
+                            margin-bottom: var(--size-1);
+                        }
                     }
 
                     .signal-buttons {
-                        display: flex;
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
                         gap: var(--size-2);
-                        flex-wrap: wrap;
+
+                        @media (max-width: 380px) {
+                            grid-template-columns: 1fr;
+                        }
                     }
 
                     .signal-radio {
@@ -281,20 +379,28 @@
                     .signal-btn {
                         display: inline-flex;
                         align-items: center;
-                        padding: var(--size-3) var(--size-4);
+                        justify-content: center;
+                        text-align: center;
+                        padding: var(--size-3) var(--size-2);
                         border-radius: var(--radius-2);
                         font-weight: var(--font-weight-6);
                         font-size: var(--font-size-1);
                         cursor: pointer;
                         border: 2px solid transparent;
-                        transition: all 0.2s ease;
+                        min-height: 3rem;
+                        transition: background-color 0.2s ease, box-shadow 0.2s ease;
+
+                        &:focus-within {
+                            outline: 3px solid var(--color-border-focus);
+                            outline-offset: 2px;
+                        }
 
                         &.too-heavy-btn {
                             background: var(--red-1);
                             color: var(--red-8);
                             border-color: var(--red-3);
                             &:hover { background: var(--red-2); }
-                            &:has(input:checked) { background: var(--red-2); outline: 3px solid var(--red-5); }
+                            &:has(input:checked) { background: var(--red-2); box-shadow: 0 0 0 3px var(--red-5); }
                         }
 
                         &.on-target-btn {
@@ -302,7 +408,7 @@
                             color: var(--color-success);
                             border-color: var(--lime-4);
                             &:hover { background: var(--lime-2); }
-                            &:has(input:checked) { background: var(--lime-2); outline: 3px solid var(--lime-5); }
+                            &:has(input:checked) { background: var(--lime-2); box-shadow: 0 0 0 3px var(--lime-5); }
                         }
 
                         &.too-light-btn {
@@ -310,7 +416,7 @@
                             color: var(--color-info);
                             border-color: var(--sky-3);
                             &:hover { background: var(--sky-2); }
-                            &:has(input:checked) { background: var(--sky-2); outline: 3px solid var(--sky-5); }
+                            &:has(input:checked) { background: var(--sky-2); box-shadow: 0 0 0 3px var(--sky-5); }
                         }
                     }
 
@@ -318,88 +424,48 @@
                         display: none;
                         gap: var(--size-3);
                         align-items: end;
-                        margin-top: var(--size-3);
+                        flex-wrap: wrap;
                     }
 
                     .signal-form:has(input[name="signal"][value="too_heavy"]:checked) .reps-section {
                         display: flex;
                     }
 
-                    .signal-badge {
-                        font-size: var(--font-size-0);
-                        color: var(--color-text-secondary);
-                        background: var(--color-surface-elevated);
-                        padding: var(--size-1) var(--size-2);
+                    .submit-button {
+                        padding: var(--size-3) var(--size-5);
+                        background: var(--color-success);
+                        color: var(--white);
+                        border: none;
                         border-radius: var(--radius-2);
+                        font-weight: var(--font-weight-6);
+                        font-size: var(--font-size-1);
+                        cursor: pointer;
+                        transition: background-color 0.2s ease, transform 0.1s ease;
+
+                        &:hover {
+                            background: var(--lime-7);
+                            transform: translateY(-1px);
+                        }
+
+                        &:active {
+                            transform: translateY(0);
+                        }
+
+                        &:focus-visible {
+                            outline: 3px solid var(--color-border-focus);
+                            outline-offset: 2px;
+                        }
                     }
 
-                    .set-form {
+                    .bodyweight-form {
                         display: flex;
                         gap: var(--size-3);
                         align-items: end;
-
-                        .form-inputs {
-                            display: flex;
-                            gap: var(--size-3);
-                            flex: 1;
-                        }
-
-                        .input-field {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--size-1);
-
-                            label {
-                                font-size: var(--font-size-0);
-                                color: var(--color-text-secondary);
-                                font-weight: var(--font-weight-5);
-                            }
-
-                            input {
-                                width: 5rem;
-                                padding: var(--size-2) var(--size-3);
-                                border: 2px solid var(--color-border);
-                                border-radius: var(--radius-2);
-                                text-align: center;
-                                font-size: var(--font-size-1);
-                                font-weight: var(--font-weight-5);
-                                transition: border-color 0.2s ease, box-shadow 0.2s ease;
-
-                                &:focus {
-                                    outline: none;
-                                    border-color: var(--color-border-focus);
-                                    box-shadow: 0 0 0 3px var(--sky-1);
-                                }
-
-                                &:user-invalid {
-                                    border-color: var(--red-5);
-                                }
-                            }
-                        }
-
-                        .submit-button {
-                            padding: var(--size-3) var(--size-5);
-                            background: var(--color-success);
-                            color: var(--white);
-                            border: none;
-                            border-radius: var(--radius-2);
-                            font-weight: var(--font-weight-6);
-                            cursor: pointer;
-                            transition: background-color 0.2s ease, transform 0.1s ease;
-
-                            &:hover {
-                                background: var(--lime-7);
-                                transform: translateY(-1px);
-                            }
-
-                            &:active {
-                                transform: translateY(0);
-                            }
-
-                        }
+                        flex-wrap: wrap;
+                        padding-top: var(--size-2);
+                        border-top: 1px solid var(--color-border);
                     }
                 }
-
             }
         </style>
 
@@ -484,28 +550,23 @@
         </script>
 
         <header class="exercise-header">
-            <div class="header-row">
-                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link"
-                   aria-label="Back to workout">
-                    ← Back
-                </a>
-            </div>
-            <div class="header-row title-row">
-                <h1 class="exercise-title"
-                    data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
-            </div>
-            <div class="header-row actions-row">
-                <div>
-                    <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
-                       class="action-button info-button" aria-label="View exercise information">Info</a>
-                    <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
-                       class="action-button swap-button" aria-label="Swap exercise">Swap</a>
-                </div>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link"
+               aria-label="Back to workout">
+                <span aria-hidden="true">←</span>
+                <span>Back</span>
+            </a>
+            <h1 class="exercise-title"
+                data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+            <div class="header-actions">
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
+                   class="action-button info-button" aria-label="View exercise information">Info</a>
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
+                   class="action-button swap-button" aria-label="Swap exercise">Swap</a>
             </div>
         </header>
 
         {{ if not .ExerciseSet.WarmupCompletedAt }}
-            <div class="warmup-banner">
+            <div class="warmup-banner" role="region" aria-label="Warmup">
                 <div class="warmup-message">Complete your warmup first</div>
                 <div class="warmup-description">
                     Warming up properly prepares your muscles and joints for exercise, reducing injury risk and
@@ -519,11 +580,9 @@
                 </form>
             </div>
         {{ else }}
-            <div class="warmup-banner completed">
-                <div class="warmup-completed-status">
-                    <span>✓</span>
-                    <span>Warmup completed - Ready to exercise!</span>
-                </div>
+            <div class="warmup-status" role="status">
+                <span class="check" aria-hidden="true">✓</span>
+                <span>Warmup complete — ready to exercise</span>
             </div>
         {{ end }}
 
@@ -532,18 +591,21 @@
 
             {{ range $index, $setDisplay := .SetsDisplay }}
                 {{ $set := $setDisplay.Set }}
-                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }} active{{ end }}"
+                {{ $isActive := and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
+                <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if $isActive }} active{{ end }}"
                      role="group"
-                     aria-label="Set {{ $index }}{{ if $set.CompletedReps }} completed{{ end }}">
+                     {{ if $isActive }}aria-current="step"{{ end }}
+                     aria-label="{{ if $set.CompletedReps }}Completed set{{ else if $isActive }}Current set{{ else }}Upcoming set{{ end }}">
                     <div class="set-info">
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
                             {{ if $set.CompletedReps }}
+                                <span class="status-icon" aria-hidden="true">✓</span>
                                 <span class="weight" aria-label="Weight">{{ formatFloat $set.WeightKg }} kg</span>
                                 <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
                                 {{ if $set.Signal }}
                                     <span class="signal-badge" aria-label="Signal">{{ $set.Signal }}</span>
                                 {{ end }}
-                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
+                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit completed set">Edit</a>
                             {{ else if and $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
                                 <span class="weight" aria-label="Recommended weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
                                 <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
@@ -553,56 +615,57 @@
                             {{ end }}
                         {{ else }}
                             {{ if $set.CompletedReps }}
+                                <span class="status-icon" aria-hidden="true">✓</span>
                                 <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
-                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $index }}">Edit</a>
+                                <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit completed set">Edit</a>
                             {{ else }}
                                 <span class="reps" aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
                             {{ end }}
                         {{ end }}
                     </div>
 
-                    {{ if and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
+                    {{ if $isActive }}
                         {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
                             <form method="post"
                                   action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
                                   id="form-{{ $index }}"
                                   class="set-form signal-form"
-                                  aria-label="Complete set {{ $index }}">
+                                  aria-label="Complete current set">
                                 <input type="hidden" name="target_reps" value="{{ $.CurrentSetTarget.TargetReps }}">
-                                <div class="form-inputs">
-                                    <div class="input-field">
-                                        <label for="weight-{{ $index }}">Weight (kg)</label>
-                                        <input
-                                                id="weight-{{ $index }}"
-                                                inputmode="decimal"
-                                                pattern="[0-9,\.]*"
-                                                name="weight"
-                                                value="{{ formatFloat $.CurrentSetTarget.WeightKg }}"
-                                                step="0.5"
-                                                required
-                                                aria-describedby="weight-help-{{ $index }}"
-                                        >
-                                        <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
+                                <div class="input-field">
+                                    <label for="weight-{{ $index }}">Weight (kg)</label>
+                                    <input
+                                            id="weight-{{ $index }}"
+                                            inputmode="decimal"
+                                            pattern="[0-9,\.]*"
+                                            name="weight"
+                                            value="{{ formatFloat $.CurrentSetTarget.WeightKg }}"
+                                            step="0.5"
+                                            required
+                                            aria-describedby="weight-help-{{ $index }}"
+                                    >
+                                    <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
+                                </div>
+                                <fieldset class="signal-group">
+                                    <legend>Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</legend>
+                                    <div class="signal-buttons">
+                                        <label class="signal-btn too-heavy-btn">
+                                            <input type="radio" name="signal" value="too_heavy" class="signal-radio"
+                                                   aria-label="No, I failed to reach target reps">
+                                            No
+                                        </label>
+                                        <label class="signal-btn on-target-btn">
+                                            <input type="radio" name="signal" value="on_target" class="signal-radio"
+                                                   aria-label="Barely reached target reps">
+                                            Barely
+                                        </label>
+                                        <label class="signal-btn too-light-btn">
+                                            <input type="radio" name="signal" value="too_light" class="signal-radio"
+                                                   aria-label="Could have done more reps">
+                                            Could do more
+                                        </label>
                                     </div>
-                                </div>
-                                <p class="signal-question">Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</p>
-                                <div class="signal-buttons">
-                                    <label class="signal-btn too-heavy-btn">
-                                        <input type="radio" name="signal" value="too_heavy" class="signal-radio"
-                                               aria-label="No, I failed to reach target reps">
-                                        No
-                                    </label>
-                                    <label class="signal-btn on-target-btn">
-                                        <input type="radio" name="signal" value="on_target" class="signal-radio"
-                                               aria-label="Barely reached target reps">
-                                        Barely
-                                    </label>
-                                    <label class="signal-btn too-light-btn">
-                                        <input type="radio" name="signal" value="too_light" class="signal-radio"
-                                               aria-label="Could have done more reps">
-                                        Could do more
-                                    </label>
-                                </div>
+                                </fieldset>
                                 <div class="reps-section">
                                     <div class="input-field">
                                         <label for="reps-{{ $index }}">Actual reps</label>
@@ -617,32 +680,30 @@
                                         >
                                         <div id="reps-help-{{ $index }}" class="sr-only">Enter actual repetitions completed</div>
                                     </div>
-                                    <button type="submit" class="submit-button" aria-label="Submit set {{ $index }}">Submit</button>
+                                    <button type="submit" class="submit-button" aria-label="Submit set">Submit</button>
                                 </div>
                             </form>
                         {{ else }}
                             <form method="post"
                                   action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
                                   id="form-{{ $index }}"
-                                  class="set-form"
-                                  aria-label="Complete set {{ $index }}">
-                                <div class="form-inputs">
-                                    <div class="input-field">
-                                        <label for="reps-{{ $index }}">Reps</label>
-                                        <input
-                                                id="reps-{{ $index }}"
-                                                inputmode="numeric"
-                                                pattern="[0-9]*"
-                                                name="reps"
-                                                placeholder="{{ $setDisplay.RepStr }}"
-                                                {{ if $set.CompletedReps }}value="{{ $set.CompletedReps }}"{{ end }}
-                                                required
-                                                {{ if $set.CompletedReps }}disabled{{ end }}
-                                                class="reps-input"
-                                        >
-                                    </div>
+                                  class="set-form bodyweight-form"
+                                  aria-label="Complete current set">
+                                <div class="input-field">
+                                    <label for="reps-{{ $index }}">Reps</label>
+                                    <input
+                                            id="reps-{{ $index }}"
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
+                                            name="reps"
+                                            placeholder="{{ $setDisplay.RepStr }}"
+                                            {{ if $set.CompletedReps }}value="{{ $set.CompletedReps }}"{{ end }}
+                                            required
+                                            {{ if $set.CompletedReps }}disabled{{ end }}
+                                            class="reps-input"
+                                    >
                                 </div>
-                                <button type="submit" class="submit-button" aria-label="Complete set {{ $index }}">Done!</button>
+                                <button type="submit" class="submit-button" aria-label="Complete set">Done!</button>
                             </form>
                         {{ end }}
                     {{ end }}
