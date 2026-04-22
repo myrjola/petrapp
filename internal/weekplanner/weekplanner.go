@@ -538,6 +538,7 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 	firstPT := wp.firstSessionPeriodizationType(startingDate)
 
 	// Phase 3: select exercises and build sessions.
+	weekUsedExercises := make(map[int]bool)
 	sessions := make([]PlannedSession, len(workoutDays))
 	for i, day := range workoutDays {
 		pt := PeriodizationType((int(firstPT) + i) % numPeriodizationTypes)
@@ -547,8 +548,14 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 			dayMuscleGroups[day],
 			n,
 			pt,
-			make(map[int]bool),
+			weekUsedExercises,
 		)
+
+		// Record which exercises were used this week.
+		for _, es := range exerciseSets {
+			weekUsedExercises[es.ExerciseID] = true
+		}
+
 		sessions[i] = PlannedSession{
 			Date:              day,
 			Category:          categories[day],

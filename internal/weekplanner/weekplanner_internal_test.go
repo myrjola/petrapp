@@ -157,6 +157,10 @@ func minimalExercises() []Exercise {
 			PrimaryMuscleGroups: []string{"Biceps"}, SecondaryMuscleGroups: nil},
 		{ID: 6, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}, SecondaryMuscleGroups: nil},
+		{ID: 7, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+		{ID: 8, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Quads"}, SecondaryMuscleGroups: nil},
 	}
 }
 
