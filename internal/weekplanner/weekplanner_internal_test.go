@@ -292,6 +292,97 @@ func TestSelectExercisesForDay(t *testing.T) {
 	})
 }
 
+func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
+	t.Run("no primary muscle group overlap within session", func(t *testing.T) {
+		// Exercise pool: multiple exercises that could target overlapping muscles.
+		exercises := []Exercise{
+			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Triceps"}},
+			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Shoulders"}},
+			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Shoulders", "Triceps"}, SecondaryMuscleGroups: nil},
+			{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil},
+		}
+
+		p := Preferences{TuesdayMinutes: 60} // 3 exercises
+		wp := NewWeeklyPlanner(p, exercises, nil)
+		wp.rng = rand.New(rand.NewPCG(42, 0))
+
+		// Request 3 exercises with priority Chest, Shoulders, Triceps.
+		// Expected: one exercise per primary muscle group, no overlaps.
+		sets := wp.selectExercisesForDayWithPeriodization(
+			CategoryUpper,
+			[]string{"Chest", "Shoulders", "Triceps"},
+			3,
+			PeriodizationStrength,
+			make(map[int]bool), // Empty week-used set
+		)
+
+		if len(sets) < 2 {
+			t.Fatalf("want at least 2 exercises, got %d", len(sets))
+		}
+
+		// Collect all primary muscle groups across selected exercises.
+		seenPrimary := make(map[string]bool)
+		for _, es := range sets {
+			ex := findExercise(exercises, es.ExerciseID)
+			for _, mg := range ex.PrimaryMuscleGroups {
+				if seenPrimary[mg] {
+					t.Errorf("primary muscle group %q appears in multiple exercises in the same session", mg)
+				}
+				seenPrimary[mg] = true
+			}
+		}
+	})
+
+	t.Run("skip priority muscle group when no non-conflicting exercise available", func(t *testing.T) {
+		// Exercise pool: all Chest exercises have overlapping primary muscles.
+		exercises := []Exercise{
+			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Chest", "Triceps"}, SecondaryMuscleGroups: nil},
+			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+				PrimaryMuscleGroups: []string{"Chest", "Shoulders"}, SecondaryMuscleGroups: nil},
+		}
+
+		p := Preferences{TuesdayMinutes: 60} // 3 exercises
+		wp := NewWeeklyPlanner(p, exercises, nil)
+		wp.rng = rand.New(rand.NewPCG(42, 0))
+
+		// Request 3 exercises, but only 1 non-overlapping is available.
+		// Expected: graceful degradation — select 1 exercise covering Chest.
+		sets := wp.selectExercisesForDayWithPeriodization(
+			CategoryUpper,
+			[]string{"Chest", "Shoulders", "Triceps"}, // Three priorities, but can't all be satisfied.
+			3,
+			PeriodizationStrength,
+			make(map[int]bool),
+		)
+
+		if len(sets) == 0 {
+			t.Fatalf("want at least 1 exercise, got 0")
+		}
+
+		// Should select 1 exercise (Chest), then can't add more without overlap.
+		if len(sets) > 1 {
+			// Check that no primary muscle groups repeat.
+			seenPrimary := make(map[string]bool)
+			for _, es := range sets {
+				ex := findExercise(exercises, es.ExerciseID)
+				for _, mg := range ex.PrimaryMuscleGroups {
+					if seenPrimary[mg] {
+						t.Errorf("primary muscle group %q appears twice; expected graceful degradation to 1 exercise", mg)
+					}
+					seenPrimary[mg] = true
+				}
+			}
+		}
+	})
+}
+
 func findExercise(exercises []Exercise, id int) Exercise {
 	for _, ex := range exercises {
 		if ex.ID == id {
