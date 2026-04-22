@@ -306,7 +306,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil},
 		}
 
-		p := Preferences{TuesdayMinutes: 60} // 3 exercises
+		p := prefs(time.Tuesday) // 3 exercises
 		wp := NewWeeklyPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
@@ -348,7 +348,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 				PrimaryMuscleGroups: []string{"Chest", "Shoulders"}, SecondaryMuscleGroups: nil},
 		}
 
-		p := Preferences{TuesdayMinutes: 60} // 3 exercises
+		p := prefs(time.Tuesday) // 3 exercises
 		wp := NewWeeklyPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
@@ -394,7 +394,7 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil},
 		}
 
-		p := Preferences{TuesdayMinutes: 60}
+		p := prefs(time.Tuesday)
 		wp := NewWeeklyPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
@@ -463,7 +463,7 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil},
 		}
 
-		p := Preferences{TuesdayMinutes: 60} // Requests 3 exercises
+		p := prefs(time.Tuesday) // Requests 3 exercises
 		wp := NewWeeklyPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
