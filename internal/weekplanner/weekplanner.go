@@ -314,6 +314,17 @@ func scoreExercise(ex Exercise, priority []string, satisfied map[string]bool) in
 	return score
 }
 
+// primaryMuscleGroupsOverlap returns true if any of the exercise's primary muscle groups
+// are already in the selectedPrimaryMuscles set.
+func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]bool) bool {
+	for _, mg := range ex.PrimaryMuscleGroups {
+		if selectedPrimaryMuscles[mg] {
+			return true
+		}
+	}
+	return false
+}
+
 // selectExercisesForDay picks n exercises for a day via category-filtered, score-based
 // greedy selection. Uses Strength periodization by default.
 func (wp *WeeklyPlanner) selectExercisesForDay(
