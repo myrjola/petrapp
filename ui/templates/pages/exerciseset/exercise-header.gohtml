@@ -1,0 +1,109 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
+
+{{ define "exercise-header" }}
+    <header class="exercise-header">
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    display: grid;
+                    grid-template-columns: auto 1fr auto;
+                    align-items: center;
+                    gap: var(--size-3);
+                }
+
+                .back-link {
+                    color: var(--color-text-secondary);
+                    text-decoration: none;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: var(--size-1);
+                    padding: var(--size-2) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-5);
+                    transition: background-color 0.2s ease;
+
+                    &:hover {
+                        background: var(--color-surface);
+                    }
+
+                    &:focus-visible {
+                        outline: 2px solid var(--color-border-focus);
+                        outline-offset: 2px;
+                    }
+                }
+
+                .exercise-title {
+                    font-size: var(--font-size-4);
+                    font-weight: var(--font-weight-7);
+                    color: var(--color-text-primary);
+                    text-align: center;
+                    margin: 0;
+                    view-transition-name: exercise-title-{{ .ExerciseSet.Exercise.ID }};
+                }
+
+                .header-actions {
+                    display: flex;
+                    gap: var(--size-2);
+                    justify-content: flex-end;
+                }
+
+                .action-button {
+                    padding: var(--size-2) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-0);
+                    font-weight: var(--font-weight-6);
+                    text-decoration: none;
+                    transition: background-color 0.2s ease;
+
+                    &:focus-visible {
+                        outline: 2px solid var(--color-border-focus);
+                        outline-offset: 2px;
+                    }
+
+                    &.info-button {
+                        background: var(--color-info-bg);
+                        color: var(--color-info);
+
+                        &:hover {
+                            background: var(--sky-1);
+                        }
+                    }
+
+                    &.swap-button {
+                        background: var(--color-success-bg);
+                        color: var(--color-success);
+
+                        &:hover {
+                            background: var(--lime-1);
+                        }
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    :scope {
+                        grid-template-columns: auto 1fr;
+                        row-gap: var(--size-2);
+                    }
+
+                    .header-actions {
+                        grid-column: 1 / -1;
+                        justify-content: center;
+                    }
+                }
+            }
+        </style>
+        <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link"
+           aria-label="Back to workout">
+            <span aria-hidden="true">←</span>
+            <span>Back</span>
+        </a>
+        <h1 class="exercise-title"
+            data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+        <div class="header-actions">
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
+               class="action-button info-button" aria-label="View exercise information">Info</a>
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
+               class="action-button swap-button" aria-label="Swap exercise">Swap</a>
+        </div>
+    </header>
+{{ end }}

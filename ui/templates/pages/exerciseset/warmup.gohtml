@@ -1,0 +1,108 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
+
+{{ define "warmup" }}
+    <style {{ nonce }}>
+        @scope {
+            .warmup-banner {
+                padding: var(--size-4);
+                border-radius: var(--radius-3);
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-3);
+                align-items: center;
+                text-align: center;
+                border: 2px solid var(--color-info);
+                background: var(--color-info-bg);
+
+                .warmup-message {
+                    font-size: var(--font-size-2);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                }
+
+                .warmup-description {
+                    font-size: var(--font-size-1);
+                    color: var(--color-text-secondary);
+                    max-width: 500px;
+                    line-height: 1.5;
+                }
+
+                .warmup-complete-button {
+                    padding: var(--size-3) var(--size-6);
+                    background: var(--color-info);
+                    color: var(--white);
+                    border: none;
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-2);
+                    font-weight: var(--font-weight-6);
+                    cursor: pointer;
+                    transition: background-color 0.2s ease, transform 0.1s ease;
+                    min-width: 200px;
+
+                    &:hover {
+                        background: var(--sky-7);
+                        transform: translateY(-1px);
+                    }
+
+                    &:active {
+                        transform: translateY(0);
+                    }
+
+                    &:focus-visible {
+                        outline: 3px solid var(--color-border-focus);
+                        outline-offset: 2px;
+                    }
+                }
+            }
+
+            .warmup-status {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: var(--size-2);
+                padding: var(--size-2) var(--size-4);
+                border-radius: var(--radius-round);
+                background: var(--color-success-bg);
+                color: var(--color-success);
+                border: 1px solid var(--lime-3);
+                font-size: var(--font-size-1);
+                font-weight: var(--font-weight-6);
+                align-self: center;
+
+                .check {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 1.25rem;
+                    height: 1.25rem;
+                    border-radius: var(--radius-round);
+                    background: var(--color-success);
+                    color: var(--white);
+                    font-size: var(--font-size-0);
+                    font-weight: var(--font-weight-7);
+                }
+            }
+        }
+    </style>
+
+    {{ if not .ExerciseSet.WarmupCompletedAt }}
+        <div class="warmup-banner" role="region" aria-label="Warmup">
+            <div class="warmup-message">Complete your warmup first</div>
+            <div class="warmup-description">
+                Warming up properly prepares your muscles and joints for exercise, reducing injury risk and
+                improving performance.
+            </div>
+            <form method="post"
+                  action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete">
+                <button type="submit" class="warmup-complete-button">
+                    ✓ Mark Warmup Complete
+                </button>
+            </form>
+        </div>
+    {{ else }}
+        <div class="warmup-status">
+            <span class="check" aria-hidden="true">✓</span>
+            <span>Warmup complete — ready to exercise</span>
+        </div>
+    {{ end }}
+{{ end }}
