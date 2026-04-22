@@ -356,38 +356,121 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 		}
 	}
 
-	satisfied := make(map[string]bool)
+	selectedPrimaryMuscles := make(map[string]bool)
 	var selected []Exercise
 
-	for len(selected) < n && len(pool) > 0 {
-		// Find best score among remaining pool.
+	// Phase A: Try to satisfy each priority muscle group with a non-conflicting exercise.
+	for _, priorityMG := range priorityMuscleGroups {
+		if len(selected) >= n {
+			break // Already have enough exercises.
+		}
+		if selectedPrimaryMuscles[priorityMG] {
+			continue // Already satisfied by a previous exercise.
+		}
+
+		// Find best-scoring exercise that targets this priority muscle group
+		// and doesn't conflict.
 		bestScore := -1
-		for _, ex := range pool {
-			if s := scoreExercise(ex, priorityMuscleGroups, satisfied); s > bestScore {
-				bestScore = s
+		var bestCandidate *Exercise
+
+		for i := range pool {
+			ex := &pool[i]
+
+			// Skip if used earlier in the week.
+			if weekUsedExercises[ex.ID] {
+				continue
+			}
+
+			// Skip if primary muscles overlap with this session's selected muscles.
+			if primaryMuscleGroupsOverlap(*ex, selectedPrimaryMuscles) {
+				continue
+			}
+
+			// Must target this priority muscle group.
+			if !slices.Contains(ex.PrimaryMuscleGroups, priorityMG) {
+				continue
+			}
+
+			// Score it.
+			score := 0
+			for _, mg := range ex.PrimaryMuscleGroups {
+				if slices.Contains(priorityMuscleGroups, mg) && !selectedPrimaryMuscles[mg] {
+					score++
+				}
+			}
+
+			if score > bestScore {
+				bestScore = score
+				bestCandidate = ex
 			}
 		}
 
-		// Collect all exercises with best score.
-		var candidates []int
-		for i, ex := range pool {
-			if scoreExercise(ex, priorityMuscleGroups, satisfied) == bestScore {
-				candidates = append(candidates, i)
+		// If a candidate was found, select it.
+		if bestCandidate != nil {
+			selected = append(selected, *bestCandidate)
+			for _, mg := range bestCandidate.PrimaryMuscleGroups {
+				selectedPrimaryMuscles[mg] = true
+			}
+
+			// Remove from pool to avoid selecting the same exercise twice in this session.
+			newPool := make([]Exercise, 0, len(pool))
+			for i := range pool {
+				if pool[i].ID != bestCandidate.ID {
+					newPool = append(newPool, pool[i])
+				}
+			}
+			pool = newPool
+		}
+		// If no candidate found, this priority muscle group is skipped (graceful degradation).
+	}
+
+	// Phase B: Fill remaining slots with any non-conflicting exercise from the pool.
+	for len(selected) < n && len(pool) > 0 {
+		// Find best-scoring exercise among remaining pool.
+		bestScore := -1
+		bestIdx := -1
+
+		for i := range pool {
+			ex := &pool[i]
+
+			// Skip if used earlier in the week.
+			if weekUsedExercises[ex.ID] {
+				continue
+			}
+
+			// Skip if primary muscles overlap.
+			if primaryMuscleGroupsOverlap(*ex, selectedPrimaryMuscles) {
+				continue
+			}
+
+			// Score by how many priority muscle groups it covers.
+			score := 0
+			for _, mg := range ex.PrimaryMuscleGroups {
+				if slices.Contains(priorityMuscleGroups, mg) && !selectedPrimaryMuscles[mg] {
+					score++
+				}
+			}
+
+			if score > bestScore || (score == bestScore && bestIdx == -1) {
+				bestScore = score
+				bestIdx = i
 			}
 		}
 
-		// Pick one at random from best candidates.
-		chosen := candidates[wp.rng.IntN(len(candidates))]
-		ex := pool[chosen]
-		selected = append(selected, ex)
-
-		// Mark primary muscle groups satisfied.
-		for _, mg := range ex.PrimaryMuscleGroups {
-			satisfied[mg] = true
+		// If no qualifying exercise found, we're done (no more non-conflicting exercises).
+		if bestIdx == -1 {
+			break
 		}
 
-		// Remove chosen from pool.
-		pool = append(pool[:chosen], pool[chosen+1:]...)
+		// Select it.
+		bestCandidate := pool[bestIdx]
+		selected = append(selected, bestCandidate)
+		for _, mg := range bestCandidate.PrimaryMuscleGroups {
+			selectedPrimaryMuscles[mg] = true
+		}
+
+		// Remove from pool.
+		pool = append(pool[:bestIdx], pool[bestIdx+1:]...)
 	}
 
 	// Build PlannedExerciseSets.
