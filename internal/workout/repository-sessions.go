@@ -456,6 +456,39 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	return result, nil
 }
 
+// GetLatestStartingWeightBefore returns the weight of the first completed set
+// from the most recent session strictly before beforeDate. Returns 0 when no
+// completed history exists.
+func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+) (float64, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	beforeDateStr := formatDate(beforeDate)
+
+	var weightKg float64
+	err := r.db.ReadOnly.QueryRowContext(ctx, `
+		SELECT weight_kg
+		FROM exercise_sets
+		WHERE workout_user_id = ?
+		  AND exercise_id = ?
+		  AND workout_date < ?
+		  AND completed_reps IS NOT NULL
+		  AND weight_kg IS NOT NULL
+		ORDER BY workout_date DESC, set_number ASC
+		LIMIT 1`,
+		userID, exerciseID, beforeDateStr).Scan(&weightKg)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("query latest starting weight: %w", err)
+	}
+
+	return weightKg, nil
+}
+
 // scanExerciseSetWithDate scans one row from the ListSetsForExerciseSince query.
 func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 	rows *sql.Rows,
