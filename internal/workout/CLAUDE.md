@@ -112,9 +112,9 @@ func (s *Service) StartWorkout(ctx context.Context, date time.Time) error {
 
 ### Error Handling
 
-- Use sentinel errors for business conditions: `var ErrNotFound = sql.ErrNoRows`
+- Use sentinel errors for business conditions. The package currently exposes `ErrNotFound` (`repository.go`) aliased to `sql.ErrNoRows`
 - Wrap errors with context: `fmt.Errorf("operation description: %w", err)`
-- Check for specific errors using `errors.Is(err, ErrNotFound)`
+- Check for specific errors using `errors.Is(err, workout.ErrNotFound)`
 - Let service layer handle business validation, repository handles data access
 
 ### Context Propagation
@@ -176,24 +176,24 @@ err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, err
 ```go
 // Convert repository aggregate to domain model
 func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercise) (Session, error) {
-session := Session{
-Date:             agg.Date,
-DifficultyRating: agg.DifficultyRating,
-StartedAt:        agg.StartedAt,
-CompletedAt:      agg.CompletedAt,
-}
+    session := Session{
+        Date:             agg.Date,
+        DifficultyRating: agg.DifficultyRating,
+        StartedAt:        agg.StartedAt,
+        CompletedAt:      agg.CompletedAt,
+    }
 
-// Build exercise sets with domain exercises
-for _, setAgg := range agg.ExerciseSets {
-exercise := findExerciseByID(exercises, setAgg.ExerciseID)
-session.ExerciseSets = append(session.ExerciseSets, ExerciseSet{
-Exercise:          exercise,
-Sets:              setAgg.Sets,
-WarmupCompletedAt: setAgg.WarmupCompletedAt,
-})
-}
+    // Build exercise sets with domain exercises
+    for _, setAgg := range agg.ExerciseSets {
+        exercise := findExerciseByID(exercises, setAgg.ExerciseID)
+        session.ExerciseSets = append(session.ExerciseSets, ExerciseSet{
+            Exercise:          exercise,
+            Sets:              setAgg.Sets,
+            WarmupCompletedAt: setAgg.WarmupCompletedAt,
+        })
+    }
 
-return session, nil
+    return session, nil
 }
 ```
 
@@ -242,18 +242,17 @@ return session, nil
 
 ### Business Rule Violations
 
-```go
-// Define sentinel errors for business conditions
-var (
-    ErrWorkoutAlreadyStarted   = errors.New("workout already started")
-    ErrWorkoutNotFound        = errors.New("workout not found")
-    ErrInvalidDifficultyRating = errors.New("difficulty rating must be 1-5")
-)
+Today the package exposes a single sentinel error, defined in `repository.go`:
 
-// Check for specific errors in handlers
-if errors.Is(err, ErrWorkoutNotFound) {
-    // Handle not found case specifically
-}
+```go
+// ErrNotFound is returned when a record is not found.
+var ErrNotFound = sql.ErrNoRows
+```
+
+Handlers and callers check it with `errors.Is(err, workout.ErrNotFound)`. If you need a new sentinel for a business condition (e.g. "workout already started"), follow the `Err` prefix convention from the root CLAUDE.md:
+
+```go
+var ErrWorkoutAlreadyStarted = errors.New("workout already started")
 ```
 
 ### Validation and Input Sanitization
