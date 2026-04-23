@@ -130,13 +130,18 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("wait for validation error after empty schedule: %v", err)
 	}
 
-	// Step 2b: Submit a valid schedule — pick today's weekday so a workout is scheduled for today.
-	todayWeekday := time.Now().Weekday().String()
-	today := time.Now().Format("2006-01-02")
-	if _, err = page.GetByLabel(todayWeekday).SelectOption(playwright.SelectOptionValues{
-		Labels: &[]string{"1 hour"},
-	}); err != nil {
-		t.Fatalf("select %s duration: %v", todayWeekday, err)
+	// Step 2b: Submit a valid schedule. Schedule both today and the next weekday so that a
+	// midnight crossing between setting preferences and the server's notion of "today" still
+	// leaves today scheduled — covering both sides of the boundary.
+	testStart := time.Now()
+	todayWeekday := testStart.Weekday().String()
+	nextWeekday := testStart.AddDate(0, 0, 1).Weekday().String()
+	for _, day := range []string{todayWeekday, nextWeekday} {
+		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
+			Labels: &[]string{"1 hour"},
+		}); err != nil {
+			t.Fatalf("select %s duration: %v", day, err)
+		}
 	}
 	if err = startTrackingBtn.Click(); err != nil {
 		t.Fatalf("click Start Tracking with valid schedule: %v", err)
@@ -145,15 +150,20 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("expect redirect to / after valid schedule submission: %v", err)
 	}
 
-	// Step 3: Start today's workout.
+	// Step 3: Start today's workout. Extract today's date from the resulting URL rather than
+	// from the test's clock: if midnight crossed between scheduling and now, the server's
+	// authoritative "today" is the one that matters for the rest of the flow.
 	startWorkoutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start Workout"})
 	if err = startWorkoutBtn.Click(); err != nil {
 		t.Fatalf("click Start Workout: %v", err)
 	}
-	workoutURL := fmt.Sprintf("%s/workouts/%s", serverURL, today)
-	if err = page.WaitForURL(workoutURL); err != nil {
-		t.Fatalf("expect navigation to %s: %v", workoutURL, err)
+	workoutURLPattern := regexp.MustCompile(fmt.Sprintf(
+		`^%s/workouts/\d{4}-\d{2}-\d{2}$`, regexp.QuoteMeta(serverURL)))
+	if err = page.WaitForURL(workoutURLPattern); err != nil {
+		t.Fatalf("expect navigation to workout page: %v", err)
 	}
+	workoutURL := page.URL()
+	today := workoutURL[len(workoutURL)-len("2006-01-02"):]
 
 	// Step 4: Open the first exercise. The workout page renders each exercise as a link with
 	// the exercise name as its accessible text; we pick the first one via its data attribute.
