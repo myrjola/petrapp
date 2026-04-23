@@ -66,7 +66,9 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 
 ### Styling Components
 
-- **Colocate styles with markup.** Put a `<style {{ nonce }}>` block inside the component's root element and use a bare `@scope { :scope { ... } }` — the default scope root is the `<style>` tag's parent, so styles apply only to this instance of the component (position among siblings doesn't matter)
+- **Colocate styles with markup.** Emit a `<style {{ nonce }}>` block as a sibling immediately preceding the component root (not inside it — `<style>` is metadata content and is non-conforming inside interactive content like `<a>`, `<button>`, or form controls)
+- Use `@scope (<selector>) { :scope { ... } }` with a class or data attribute that uniquely identifies the component root. Example: `@scope (.back-link) { :scope { ... } }`
+- Pages that render their own elements matching the same selector will still override the component's rules via their own unlayered inline `<style>` blocks — unlayered wins by cascade proximity / source order
 - The whole component — markup and styles — lives in one file. Delete the file to delete the feature; nothing to hunt down in `main.css`
 - If a component is rendered many times on the same page and the duplicated `<style>` tag becomes a real cost, hoist the rule to `main.css` under `@layer components` (measure first; gzip makes duplicate inline `<style>` blocks cheap)
 - Only add rules to `main.css` if they need to apply to markup outside the component — otherwise keep them local
