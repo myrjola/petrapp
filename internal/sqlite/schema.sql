@@ -23,7 +23,7 @@ CREATE TABLE users
     is_admin         INTEGER NOT NULL DEFAULT 0 CHECK (is_admin IN (0, 1))
 ) STRICT;
 
-CREATE INDEX users_webauthn_user_id_idx ON users (webauthn_user_id);
+-- webauthn_user_id UNIQUE constraint already creates an implicit index; no separate index needed.
 
 CREATE TRIGGER users_updated_timestamp
     AFTER UPDATE
@@ -52,6 +52,8 @@ CREATE TABLE credentials
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated) = updated),
     user_id                     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE
 ) WITHOUT ROWID, STRICT;
+
+CREATE INDEX credentials_user_id_idx ON credentials (user_id);
 
 CREATE TRIGGER credentials_updated_timestamp
     AFTER UPDATE
@@ -88,8 +90,7 @@ CREATE TABLE exercises
 CREATE TABLE workout_sessions
 (
     user_id            INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    workout_date       TEXT    NOT NULL CHECK (LENGTH(workout_date) <= 10 AND
-                                               DATE(workout_date, '+0 days') IS workout_date),
+    workout_date       TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
     difficulty_rating  INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
     started_at         TEXT CHECK (started_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', started_at) = started_at),
     completed_at       TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
@@ -121,7 +122,7 @@ CREATE TABLE exercise_sets
     weight_kg       REAL CHECK (weight_kg IS NULL OR weight_kg >= 0),
     min_reps        INTEGER NOT NULL CHECK (min_reps > 0),
     max_reps        INTEGER NOT NULL CHECK (max_reps >= min_reps),
-    completed_reps  INTEGER,
+    completed_reps  INTEGER CHECK (completed_reps IS NULL OR completed_reps >= 0),
     completed_at    TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
     signal          TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
 
@@ -130,9 +131,13 @@ CREATE TABLE exercise_sets
     FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
 ) WITHOUT ROWID, STRICT;
 
+-- Supports queries that filter by (user, exercise) across dates, e.g. latest starting weight and per-exercise history.
+CREATE INDEX exercise_sets_user_exercise_date_idx
+    ON exercise_sets (workout_user_id, exercise_id, workout_date, set_number);
+
 CREATE TABLE muscle_groups
 (
-    name TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 64) PRIMARY KEY
+    name TEXT NOT NULL PRIMARY KEY CHECK (LENGTH(name) < 64)
 ) WITHOUT ROWID, STRICT;
 
 CREATE TABLE exercise_muscle_groups
@@ -146,7 +151,7 @@ CREATE TABLE exercise_muscle_groups
 
 CREATE TABLE muscle_group_weekly_targets
 (
-    muscle_group_name   TEXT    PRIMARY KEY REFERENCES muscle_groups (name),
+    muscle_group_name   TEXT    PRIMARY KEY REFERENCES muscle_groups (name) ON DELETE CASCADE,
     weekly_sets_target  INTEGER NOT NULL CHECK (weekly_sets_target > 0)
 ) WITHOUT ROWID, STRICT;
 
