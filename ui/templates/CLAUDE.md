@@ -10,6 +10,7 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 - Each page template defines a `{{ define "page" }}` block
 - All pages extend the base template which provides the HTML structure
 - Include gotype comments at the top: `{{- /*gotype: github.com/myrjola/petrapp/cmd/web.TemplateDataType*/ -}}`
+- Reusable components live in `/ui/templates/components/` and are available to every page automatically — see "Shared Components" below
 
 ### JavaScript in Templates
 
@@ -38,6 +39,36 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 - Template name corresponds to folder name in `pages/`
 - Base template wraps page content and provides shared HTML structure
 - Page-specific templates focus only on content within `<main>`
+
+## Shared Components
+
+### Where Components Live
+
+- Component templates live in `/ui/templates/components/*.gohtml`
+- Every file in this folder is parsed alongside every page, so any `{{ define "component-name" }}` block defined here is callable from any page via `{{ template "component-name" <data> }}`
+- One component per file; the filename should match the defined template name (e.g. `back-link.gohtml` defines `back-link`)
+- Keep the dot (`.`) passed to a component minimal — a string, a small struct — not the whole page data
+
+### When to Add a Component
+
+- **Extract only when real duplication exists.** Three nearly-identical sites is the threshold. Two is borderline; one is premature.
+- Prefer small, presentational components (anchors, buttons, banners) over wrappers that try to capture layout
+- If two candidate usages differ in more than trivial attributes (label wording, icon presence), consider whether they're really the same component or just look similar
+
+### Current Components
+
+- `back-link` — canonical "← Back" anchor wired into the Navigation API via `data-back-button`. Takes an href string as the dot.
+  ```gohtml
+  {{ template "back-link" "/" }}
+  {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
+  ```
+  Styled globally in `main.css` under `@layer components`. Pages that need a different look can still override via their own `@scope` block.
+
+### Styling Components
+
+- Global component CSS goes in `main.css` under `@layer components` with a class that matches the component's purpose
+- Pages can override component styling with their own `@scope { :scope { ... } }` block — scoped styles outrank layered ones
+- If a component needs dynamic styling from template context, inline a `<style {{ nonce }}>` block inside the component's markup
 
 ## Available Template Functions
 

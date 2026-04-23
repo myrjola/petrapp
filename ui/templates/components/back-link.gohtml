@@ -1,0 +1,16 @@
+{{- /*
+    back-link: anchor styled as a back button, wired into the Navigation API
+    smart-back-button behaviour via the data-back-button attribute.
+
+    Pass the href string as the dot. For a non-default label, use back-link-labelled.
+
+    Usage:
+        {{ template "back-link" "/" }}
+        {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
+*/ -}}
+{{ define "back-link" }}
+    <a href="{{ . }}" data-back-button class="back-link">
+        <span aria-hidden="true">←</span>
+        <span>Back</span>
+    </a>
+{{ end }}
