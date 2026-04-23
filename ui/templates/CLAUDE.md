@@ -62,13 +62,14 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
   {{ template "back-link" "/" }}
   {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
   ```
-  Styled globally in `main.css` under `@layer components`. Pages that need a different look can still override via their own `@scope` block.
+  Self-contained: styles live in the component file as a scoped `<style {{ nonce }}>` block.
 
 ### Styling Components
 
-- Global component CSS goes in `main.css` under `@layer components` with a class that matches the component's purpose
-- Pages can override component styling with their own `@scope { :scope { ... } }` block — scoped styles outrank layered ones
-- If a component needs dynamic styling from template context, inline a `<style {{ nonce }}>` block inside the component's markup
+- **Colocate styles with markup.** Put a `<style {{ nonce }}>` block as the first child of the component's root element and use a bare `@scope { :scope { ... } }` — the default scope root is the `<style>` tag's parent, so styles apply only to this instance of the component
+- The whole component — markup and styles — lives in one file. Delete the file to delete the feature; nothing to hunt down in `main.css`
+- If a component is rendered many times on the same page and the duplicated `<style>` tag becomes a real cost, hoist the rule to `main.css` under `@layer components` (measure first; gzip makes duplicate inline `<style>` blocks cheap)
+- Only add rules to `main.css` if they need to apply to markup outside the component — otherwise keep them local
 
 ## Available Template Functions
 
