@@ -9,7 +9,7 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 - Page templates are organized in `/ui/templates/pages/{pageName}/` folders
 - Each page template defines a `{{ define "page" }}` block
 - All pages extend the base template which provides the HTML structure
-- Include gotype comments at the top: `{{- /*gotype: github.com/myrjola/petrapp/cmd/web.TemplateDataType*/ -}}`
+- Include gotype comments at the top: `{{- /*gotype: github.com/myrjola/petrapp/cmd/web.TemplateDataType*/ -}}`. This is read by the JetBrains Go Template plugin to give type-aware completion inside the template. Keep the fully-qualified struct path in sync when you rename the Go type — nothing will fail to compile if it drifts, but IDE hints will silently go stale
 - Reusable components live in `/ui/templates/components/` and are available to every page automatically — see "Shared Components" below
 
 ### JavaScript in Templates
@@ -66,7 +66,7 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 
 ### Styling Components
 
-- **Colocate styles with markup.** Put a `<style {{ nonce }}>` block as the first child of the component's root element and use a bare `@scope { :scope { ... } }` — the default scope root is the `<style>` tag's parent, so styles apply only to this instance of the component
+- **Colocate styles with markup.** Put a `<style {{ nonce }}>` block inside the component's root element and use a bare `@scope { :scope { ... } }` — the default scope root is the `<style>` tag's parent, so styles apply only to this instance of the component (position among siblings doesn't matter)
 - The whole component — markup and styles — lives in one file. Delete the file to delete the feature; nothing to hunt down in `main.css`
 - If a component is rendered many times on the same page and the duplicated `<style>` tag becomes a real cost, hoist the rule to `main.css` under `@layer components` (measure first; gzip makes duplicate inline `<style>` blocks cheap)
 - Only add rules to `main.css` if they need to apply to markup outside the component — otherwise keep them local
@@ -157,7 +157,8 @@ Always verify these exist in `main.css` before using:
 - **Radius**: `--radius-1` through `--radius-6`, `--radius-round`
 - **Border sizes**: `--border-size-1` through `--border-size-5`
 - **Font weights**: `--font-weight-1` through `--font-weight-9`
-- **Font sizes**: `--font-size-0` through `--font-size-8`
+- **Font sizes**: `--font-size-00` (0.5rem) and `--font-size-0` through `--font-size-8`
+- **Fluid font sizes**: `--font-size-fluid-0` through `--font-size-fluid-3` (responsive via `clamp()`)
 
 ### Color Usage Patterns
 
@@ -195,6 +196,11 @@ The project uses CSS layers defined in main.css:
 - Use range loops for iteration, basic if/else for display logic
 - For complex formatting or calculations, prepare data in handlers
 - Avoid nested template logic - flatten data structures in Go code instead
+
+### URL Construction
+
+- Inline `printf` for URL formatting is fine and idiomatic here: `{{ printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .Exercise.ID }}`
+- Only pre-build URLs in the handler when the same URL is used in several places on the page, or the path depends on non-trivial logic
 
 ### Common Transformation Examples
 
