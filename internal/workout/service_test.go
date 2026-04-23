@@ -588,8 +588,10 @@ func Test_GetStartingWeight(t *testing.T) {
 
 	svc := workout.NewService(db, logger, "")
 
+	today := time.Now()
+
 	// No history: expect 0.
-	got, err := svc.GetStartingWeight(ctx, exerciseID)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today)
 	if err != nil {
 		t.Fatalf("GetStartingWeight no history: %v", err)
 	}
@@ -597,8 +599,8 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("no history: want 0, got %v", got)
 	}
 
-	// Insert a completed session with set 1 weight = 60kg.
-	dateStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	// Insert a completed session 7 days ago with set 1 weight = 60kg.
+	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
 		"INSERT INTO workout_sessions (user_id, workout_date, completed_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
 		userID, dateStr)
@@ -614,12 +616,39 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert set: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
 	}
 	if got != 60.0 {
 		t.Errorf("with history: want 60.0, got %v", got)
+	}
+
+	// Insert today's session with a different set 1 weight. The starting weight
+	// must remain anchored to the historical session, regardless of today's sets.
+	todayStr := today.Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date, started_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
+		userID, todayStr)
+	if err != nil {
+		t.Fatalf("insert today's session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps, signal)
+		 VALUES (?, ?, ?, 1, 75.0, 5, 5, 5, 'too_light'),
+		        (?, ?, ?, 2, 80.0, 5, 5, 5, 'on_target')`,
+		userID, todayStr, exerciseID, userID, todayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert today's sets: %v", err)
+	}
+
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today)
+	if err != nil {
+		t.Fatalf("GetStartingWeight ignoring today: %v", err)
+	}
+	if got != 60.0 {
+		t.Errorf("today ignored: want 60.0, got %v", got)
 	}
 }
 
