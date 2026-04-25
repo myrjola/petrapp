@@ -7,14 +7,7 @@ import (
 )
 
 func Test_redirectAfterPOST_StackNavRequest_Returns200WithHeaders(t *testing.T) {
-	app := &application{
-		logger:          nil,
-		webAuthnHandler: nil,
-		sessionManager:  nil,
-		templateFS:      nil,
-		workoutService:  nil,
-		flightRecorder:  nil,
-	}
+	app := &application{} //nolint:exhaustruct // this is a test
 	tests := []struct {
 		name          string
 		target        string
@@ -67,14 +60,7 @@ func Test_redirectAfterPOST_StackNavRequest_Returns200WithHeaders(t *testing.T) 
 }
 
 func Test_redirectAfterPOST_PlainRequest_Returns303(t *testing.T) {
-	app := &application{
-		logger:          nil,
-		webAuthnHandler: nil,
-		sessionManager:  nil,
-		templateFS:      nil,
-		workoutService:  nil,
-		flightRecorder:  nil,
-	}
+	app := &application{} //nolint:exhaustruct // this is a test
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
 	// no X-Requested-With
