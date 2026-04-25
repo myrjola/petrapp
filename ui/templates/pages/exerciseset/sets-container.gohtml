@@ -173,13 +173,6 @@
                         }
                     }
 
-                    .signal-radio {
-                        position: absolute;
-                        opacity: 0;
-                        width: 0;
-                        height: 0;
-                    }
-
                     .signal-btn {
                         display: inline-flex;
                         align-items: center;
@@ -194,7 +187,7 @@
                         min-height: 3rem;
                         transition: background-color 0.2s ease, box-shadow 0.2s ease;
 
-                        &:focus-within {
+                        &:focus-visible {
                             outline: 3px solid var(--color-border-focus);
                             outline-offset: 2px;
                         }
@@ -204,7 +197,7 @@
                             color: var(--red-8);
                             border-color: var(--red-3);
                             &:hover { background: var(--red-2); }
-                            &:has(input:checked) { background: var(--red-2); box-shadow: 0 0 0 3px var(--red-5); }
+                            &:active { background: var(--red-2); box-shadow: 0 0 0 3px var(--red-5); }
                         }
 
                         &.on-target-btn {
@@ -212,7 +205,7 @@
                             color: var(--color-success);
                             border-color: var(--lime-4);
                             &:hover { background: var(--lime-2); }
-                            &:has(input:checked) { background: var(--lime-2); box-shadow: 0 0 0 3px var(--lime-5); }
+                            &:active { background: var(--lime-2); box-shadow: 0 0 0 3px var(--lime-5); }
                         }
 
                         &.too-light-btn {
@@ -220,19 +213,8 @@
                             color: var(--color-info);
                             border-color: var(--sky-3);
                             &:hover { background: var(--sky-2); }
-                            &:has(input:checked) { background: var(--sky-2); box-shadow: 0 0 0 3px var(--sky-5); }
+                            &:active { background: var(--sky-2); box-shadow: 0 0 0 3px var(--sky-5); }
                         }
-                    }
-
-                    .reps-section {
-                        display: none;
-                        gap: var(--size-3);
-                        align-items: end;
-                        flex-wrap: wrap;
-                    }
-
-                    .signal-form:has(input[name="signal"][value="too_heavy"]:checked) .reps-section {
-                        display: flex;
                     }
 
                     .submit-button {
@@ -313,9 +295,8 @@
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.Exercise.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
-                              class="set-form signal-form"
+                              class="set-form"
                               aria-label="Complete current set">
-                            <input type="hidden" name="target_reps" value="{{ $.CurrentSetTarget.TargetReps }}">
                             <div class="input-field">
                                 <label for="weight-{{ $index }}">Weight (kg)</label>
                                 <input
@@ -330,42 +311,34 @@
                                 >
                                 <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
                             </div>
+                            <div class="input-field">
+                                <label for="reps-{{ $index }}">Actual reps</label>
+                                <input
+                                        id="reps-{{ $index }}"
+                                        inputmode="numeric"
+                                        pattern="[0-9]*"
+                                        name="reps"
+                                        value="{{ $.CurrentSetTarget.TargetReps }}"
+                                        required
+                                        class="reps-input"
+                                        aria-describedby="reps-help-{{ $index }}"
+                                >
+                                <div id="reps-help-{{ $index }}" class="sr-only">Enter actual repetitions completed</div>
+                            </div>
                             <fieldset class="signal-group">
                                 <legend>Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</legend>
                                 <div class="signal-buttons">
-                                    <label class="signal-btn too-heavy-btn">
-                                        <input type="radio" name="signal" value="too_heavy" class="signal-radio"
-                                               aria-label="No, I failed to reach target reps">
-                                        No
-                                    </label>
-                                    <label class="signal-btn on-target-btn">
-                                        <input type="radio" name="signal" value="on_target" class="signal-radio"
-                                               aria-label="Barely reached target reps">
-                                        Barely
-                                    </label>
-                                    <label class="signal-btn too-light-btn">
-                                        <input type="radio" name="signal" value="too_light" class="signal-radio"
-                                               aria-label="Could have done more reps">
-                                        Could do more
-                                    </label>
+                                    <button type="submit" name="signal" value="too_heavy"
+                                            class="signal-btn too-heavy-btn"
+                                            aria-label="No, I failed to reach target reps">No</button>
+                                    <button type="submit" name="signal" value="on_target"
+                                            class="signal-btn on-target-btn"
+                                            aria-label="Barely reached target reps">Barely</button>
+                                    <button type="submit" name="signal" value="too_light"
+                                            class="signal-btn too-light-btn"
+                                            aria-label="Could have done more reps">Could do more</button>
                                 </div>
                             </fieldset>
-                            <div class="reps-section">
-                                <div class="input-field">
-                                    <label for="reps-{{ $index }}">Actual reps</label>
-                                    <input
-                                            id="reps-{{ $index }}"
-                                            inputmode="numeric"
-                                            pattern="[0-9]*"
-                                            name="reps"
-                                            required
-                                            class="reps-input"
-                                            aria-describedby="reps-help-{{ $index }}"
-                                    >
-                                    <div id="reps-help-{{ $index }}" class="sr-only">Enter actual repetitions completed</div>
-                                </div>
-                                <button type="submit" class="submit-button" aria-label="Submit set">Submit</button>
-                            </div>
                         </form>
                     {{ else }}
                         <form method="post"

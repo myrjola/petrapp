@@ -204,23 +204,18 @@ func Test_playwright_smoketest(t *testing.T) {
 			break
 		}
 
-		// The weighted radios are visually hidden; the label wrapping each one is what the user
-		// actually sees and clicks. Count on the radio locator is enough to detect whether this
-		// is a weighted exercise, then we click the associated label to trigger the JS-initiated
-		// form submission.
-		couldDoMoreRadio := currentSet.GetByRole("radio",
+		// Weighted exercises show three named signal submit buttons; bodyweight exercises show
+		// a single "Complete set" submit button and require filling the reps input first.
+		couldDoMoreBtn := currentSet.GetByRole("button",
 			playwright.LocatorGetByRoleOptions{Name: "Could have done more reps"})
-		var radioCount int
-		if radioCount, err = couldDoMoreRadio.Count(); err != nil {
-			t.Fatalf("count weighted signal radios: %v", err)
+		var btnCount int
+		if btnCount, err = couldDoMoreBtn.Count(); err != nil {
+			t.Fatalf("count weighted signal buttons: %v", err)
 		}
 
-		if radioCount > 0 {
-			couldDoMoreLabel := currentSet.GetByText("Could do more", playwright.LocatorGetByTextOptions{
-				Exact: new(true),
-			})
-			if err = couldDoMoreLabel.Click(); err != nil {
-				t.Fatalf("click Could do more: %v", err)
+		if btnCount > 0 {
+			if err = couldDoMoreBtn.Click(); err != nil {
+				t.Fatalf("click Could have done more reps: %v", err)
 			}
 		} else {
 			repsInput := currentSet.GetByRole("textbox", playwright.LocatorGetByRoleOptions{Name: "Reps"})

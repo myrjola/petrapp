@@ -40,28 +40,10 @@
 
         <script {{ nonce }}>
           document.addEventListener("DOMContentLoaded", function () {
-            document.querySelectorAll('.signal-form').forEach(function (form) {
-              form.querySelectorAll('input[name="signal"]').forEach(function (radio) {
-                radio.addEventListener('change', function () {
-                  if (this.value !== 'too_heavy') {
-                    form.submit()
-                  } else {
-                    var repsInput = form.querySelector('.reps-input')
-                    if (repsInput) {
-                      setTimeout(function () { repsInput.focus() }, 50)
-                    }
-                  }
-                })
-              })
-            })
             const form = document.getElementById(`form-{{ $.EditingIndex }}`)
             if (form) {
               const repsInput = form.querySelector('.reps-input')
               if (repsInput) {
-                // Enable the reps input
-                repsInput.disabled = false
-
-                // Focus and select the text
                 setTimeout(() => {
                   repsInput.focus()
                   repsInput.select()

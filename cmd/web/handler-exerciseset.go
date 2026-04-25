@@ -228,19 +228,10 @@ func (app *application) recordWeightedSetCompletion(
 
 	signal := workout.Signal(r.PostForm.Get("signal"))
 
-	var reps int
-	if signal == workout.SignalTooHeavy {
-		reps, err = strconv.Atoi(r.PostForm.Get("reps"))
-		if err != nil {
-			app.serverError(w, r, fmt.Errorf("parse reps: %w", err))
-			return false
-		}
-	} else {
-		reps, err = strconv.Atoi(r.PostForm.Get("target_reps"))
-		if err != nil {
-			app.serverError(w, r, fmt.Errorf("parse target_reps: %w", err))
-			return false
-		}
+	reps, err := strconv.Atoi(r.PostForm.Get("reps"))
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("parse reps: %w", err))
+		return false
 	}
 
 	err = app.workoutService.RecordSetCompletion(r.Context(), date, exerciseID, setIndex, signal, weight, reps)

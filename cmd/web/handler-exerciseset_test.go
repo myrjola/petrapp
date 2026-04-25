@@ -130,10 +130,12 @@ func Test_application_exerciseSet(t *testing.T) {
 		}
 	}
 
-	// Find the signal form for completing a weighted set
-	setForm := doc.Find("form.signal-form").First()
+	// Find the form for completing a weighted set (has signal submit buttons).
+	setForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
 	if setForm.Length() == 0 {
-		t.Fatalf("Expected to find signal-form for active set")
+		t.Fatalf("Expected to find set form with signal buttons for active set")
 	}
 
 	setAction, exists := setForm.Attr("action")
@@ -142,9 +144,9 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	if doc, err = client.PostForm(ctx, doc, setAction, map[string]string{
-		"weight":      "20.5",
-		"signal":      "on_target",
-		"target_reps": "5",
+		"weight": "20.5",
+		"signal": "on_target",
+		"reps":   "5",
 	}); err != nil {
 		t.Fatalf("Failed to submit signal form: %v", err)
 	}
@@ -201,8 +203,10 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to load edit page: %v", err)
 	}
 
-	// Find the signal form for the edit page
-	editSignalForm := doc.Find("form.signal-form").First()
+	// Find the form for the edit page (has signal submit buttons).
+	editSignalForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
 	if editSignalForm.Length() == 0 {
 		t.Fatalf("Edit signal form not found")
 	}
@@ -225,9 +229,9 @@ func Test_application_exerciseSet(t *testing.T) {
 
 	// Update the completed set with new weight and signal
 	if doc, err = client.PostForm(ctx, doc, editAction, map[string]string{
-		"weight":      strconv.FormatFloat(newWeight, 'f', 1, 64),
-		"signal":      "on_target",
-		"target_reps": "12",
+		"weight": strconv.FormatFloat(newWeight, 'f', 1, 64),
+		"signal": "on_target",
+		"reps":   "12",
 	}); err != nil {
 		t.Fatalf("Failed to submit set update form: %v", err)
 	}
