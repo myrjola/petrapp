@@ -174,18 +174,18 @@ func Test_playwright_smoketest(t *testing.T) {
 //
 // The flows:
 //
-//	1. Same-URL replace (set update): submit on DETAIL → land at DETAIL, back goes
-//	   to parent (workout day overview), not the same DETAIL page.
-//	2. Cross-URL replace (swap): submit on SWAP redirecting to a different DETAIL
-//	   → land at DETAIL', back goes to the previous DETAIL (acceptable per spec),
-//	   second back goes to workout overview.
-//	3. Pop-or-replace (schedule): submit /schedule when / is in history → cursor
-//	   traverses to /, page reloads (bfcache marker bust), back exits the app rather
-//	   than returning to /schedule.
-//	4. Hierarchical back-link (data-back-button on swap page): click an in-page
-//	   "back to detail" link → traverse to existing detail entry rather than push.
-//	5. Validation error: submit empty schedule → URL stays at /schedule, alert role
-//	   visible, no new history entry pushed.
+//  1. Same-URL replace (set update): submit on DETAIL → land at DETAIL, back goes
+//     to parent (workout day overview), not the same DETAIL page.
+//  2. Cross-URL replace (swap): submit on SWAP redirecting to a different DETAIL
+//     → land at DETAIL', back goes to the previous DETAIL (acceptable per spec),
+//     second back goes to workout overview.
+//  3. Pop-or-replace (schedule): submit /schedule when / is in history → cursor
+//     traverses to /, page reloads (bfcache marker bust), back exits the app rather
+//     than returning to /schedule.
+//  4. Hierarchical back-link (data-back-button on swap page): click an in-page
+//     "back to detail" link → traverse to existing detail entry rather than push.
+//  5. Validation error: submit empty schedule → URL stays at /schedule, alert role
+//     visible, no new history entry pushed.
 func Test_playwright_stacknav(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow playwright stacknav test")
