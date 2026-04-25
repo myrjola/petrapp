@@ -76,7 +76,7 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Redirect to the completion form
-	redirect(w, r, fmt.Sprintf("/workouts/%s/complete", date.Format("2006-01-02")))
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s/complete", date.Format("2006-01-02")), "")
 }
 
 func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Redirect to the workout page
-	redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")), "")
 }
 
 func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +158,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Redirect back to the home page
-	redirect(w, r, "/")
+	app.redirectAfterPOST(w, r, "/", "")
 }
 
 // workoutSwapExerciseGET handles GET requests to show available exercises for swapping.
@@ -262,7 +262,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 	}
 
 	// Redirect to the exercise set page with the new exercise
-	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), newExerciseID))
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), newExerciseID), "")
 }
 
 // exerciseSwapTemplateData contains data for the exercise swap template.
@@ -361,5 +361,5 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 	}
 
 	// Redirect to the workout page
-	redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")), "")
 }

@@ -258,7 +258,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if preferences.IsEmpty() {
-			redirect(w, r, "/schedule")
+			http.Redirect(w, r, "/schedule", http.StatusSeeOther)
 			return
 		}
 

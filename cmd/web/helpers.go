@@ -44,18 +44,6 @@ func (app *application) redirectAfterPOST(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
-// redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
-// to the correct URL.
-func redirect(w http.ResponseWriter, r *http.Request, path string) {
-	if r.Header.Get("Sec-Fetch-Dest") == "empty" {
-		w.Header().Set("Content-Location", path)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	http.Redirect(w, r, path, http.StatusSeeOther)
-}
-
 const flashErrorKey = "flash_error"
 
 // putFlashError stores a flash error message in the session to be displayed on the next page load.

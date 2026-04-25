@@ -115,7 +115,7 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	redirect(w, r, "/")
+	app.redirectAfterPOST(w, r, "/", "")
 }
 
 func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +133,7 @@ func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirect(w, r, "/")
+	app.redirectAfterPOST(w, r, "/", "")
 }
 
 func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request) {

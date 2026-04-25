@@ -32,35 +32,47 @@ navigation.addEventListener('navigate', (e) => {
   // avoid is when we submit a form and return to the same URL as the form, we don't want the back button to be a
   // no-op.
   //
-  // Check how the backend is setting Content-Location HTTP header to understand better how this plumbs together
-  // with the backend.
+  // The backend uses X-Location and X-History-Action headers (returned with HTTP 200) when the request includes
+  // X-Requested-With: stacknav. Non-JS submits receive a standard 303 redirect instead.
   if (e.formData) {
     e.intercept({
       async handler() {
         try {
-          // Submit the form using fetch so that we can process the Content-Location header.
+          // Submit the form using fetch so that we can process the X-Location header.
           const body = new URLSearchParams(e.formData).toString()
           const result = await fetch(e.destination.url, {
             headers: {
-              "Content-Type": "application/x-www-form-urlencoded"
+              "Content-Type": "application/x-www-form-urlencoded",
+              "X-Requested-With": "stacknav",
             },
             method: "POST",
             body,
           })
           const baseUrl = window.location.origin
-          const location = result.headers.get("Content-Location")
-          const locationUrl = new URL(location, baseUrl)
-
-          // If there's an entry in the navigation history that matches the location, we want to replace it.
-          for (const entry of navigation.entries()) {
-            const entryUrl = new URL(entry.url)
-            if (entryUrl.pathname === locationUrl.pathname) {
-              await navigation.traverseTo(entry.key).committed
-              // This is a bit hacky to reload the page, but it's because the bfcache might show a stale page.
-              navigation.reload()
-              return
-            }
+          const location = result.headers.get("X-Location")
+          if (!location) {
+            // No X-Location header means the server did not handle this as a stacknav request.
+            // Fall back to a normal page load at the current URL to show any server-rendered response.
+            navigation.navigate(window.location.href, {history: "replace"})
+            return
           }
+          const locationUrl = new URL(location, baseUrl)
+          const action = result.headers.get("X-History-Action") || ""
+
+          if (action === "pop-or-replace") {
+            // Traverse backwards to an existing matching history entry when present.
+            for (const entry of navigation.entries()) {
+              const entryUrl = new URL(entry.url)
+              if (entryUrl.pathname === locationUrl.pathname) {
+                await navigation.traverseTo(entry.key).committed
+                // Reload to bust any stale bfcache content.
+                navigation.reload()
+                return
+              }
+            }
+            // No matching entry found — fall through to replace.
+          }
+
           await navigation.navigate(location, {history: "replace"})
         } catch (err) {
           // TODO: We need error feedback to the user.

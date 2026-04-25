@@ -41,7 +41,7 @@ func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
 
 	if prefs.IsEmpty() {
 		app.putFlashError(r.Context(), "Please schedule at least one workout day.")
-		redirect(w, r, "/schedule")
+		app.redirectAfterPOST(w, r, "/schedule", "")
 		return
 	}
 
@@ -50,5 +50,5 @@ func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirect(w, r, "/")
+	app.redirectAfterPOST(w, r, "/", "pop-or-replace")
 }

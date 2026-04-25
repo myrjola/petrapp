@@ -177,7 +177,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		slog.String("name", name))
 
 	// Redirect to exercise list
-	redirect(w, r, "/admin/exercises")
+	app.redirectAfterPOST(w, r, "/admin/exercises", "")
 }
 
 // adminExerciseGeneratePOST handles POST requests to generate a new exercise.
@@ -204,5 +204,5 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 	}
 
 	// Redirect to the newly created exercise.
-	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID), "")
 }

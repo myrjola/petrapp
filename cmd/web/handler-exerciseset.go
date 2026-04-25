@@ -298,7 +298,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID))
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID), "")
 }
 
 func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
@@ -326,5 +326,5 @@ func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *
 
 	// Redirect back to the exercise set page
 	redirectURL := fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), exerciseID)
-	redirect(w, r, redirectURL)
+	app.redirectAfterPOST(w, r, redirectURL, "")
 }
