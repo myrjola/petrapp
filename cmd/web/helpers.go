@@ -25,6 +25,25 @@ const defaultMaxFormSize = 1024
 // largeMaxFormSize is a larger maximum size for form data when there's more content to be expected.
 const largeMaxFormSize = 1024 * 10
 
+// redirectAfterPOST sends the client to target after a successful POST.
+// action is "" (default: replace) or "pop-or-replace" (client traverses to an
+// existing matching history entry when present, otherwise replace).
+//
+// JS-enhanced submits (X-Requested-With: stacknav) get HTTP 200 with X-Location
+// and optional X-History-Action headers and an empty body. Non-JS submits get a
+// standard 303 See Other redirect.
+func (app *application) redirectAfterPOST(w http.ResponseWriter, r *http.Request, target, action string) {
+	if r.Header.Get("X-Requested-With") == "stacknav" {
+		w.Header().Set("X-Location", target)
+		if action != "" {
+			w.Header().Set("X-History-Action", action)
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {
