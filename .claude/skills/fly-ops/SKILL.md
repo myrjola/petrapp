@@ -15,11 +15,14 @@ allowed-tools:
   - Bash(make fly-pprof-cpu*)
   - Bash(make fly-pprof-goroutine*)
   - Bash(make fly-sqlite3*)
+  - Bash(make migratetest*)
   - Bash(curl https://petra.fly.dev*)
   - Bash(curl https://petra-staging.fly.dev*)
+  - Bash(curl https://pr-*-myrjola-petrapp.fly.dev*)
   - Bash(fly status*)
   - Bash(fly logs*)
   - Bash(fly proxy*)
+  - Bash(fly releases*)
   - Bash(go tool pprof*)
 ---
 
@@ -30,14 +33,40 @@ You're operating against deployed Fly Machines. The deployment is a single-node 
 
 ## Environments
 
-| Target  | `FLY_APP`        | URL                              |
-|---------|------------------|----------------------------------|
-| Prod    | `petra`          | `https://petra.fly.dev`          |
-| Staging | `petra-staging`  | `https://petra-staging.fly.dev`  |
+| Target     | `FLY_APP`                       | URL                                              |
+|------------|---------------------------------|--------------------------------------------------|
+| Prod       | `petra`                         | `https://petra.fly.dev`                          |
+| Staging    | `petra-staging`                 | `https://petra-staging.fly.dev`                  |
+| Review app | `pr-<N>-myrjola-petrapp`        | `https://pr-<N>-myrjola-petrapp.fly.dev`         |
 
-**Default target is production (`petra`).** All `make fly-*` targets accept `FLY_APP=petra-staging`
-to retarget. Be explicit in every command you run — pass `FLY_APP=...` even when targeting prod, so
-the target is visible in the transcript.
+**Default target is production (`petra`).** All `make fly-*` targets accept `FLY_APP=...` to
+retarget. Be explicit in every command — pass `FLY_APP=...` even when targeting prod, so the
+target is visible in the transcript. Review-app names are derived from the GitHub repo slug
+(`myrjola/petrapp`), not the deployed app names — that's why prod is `petra` but PR apps say
+`petrapp`.
+
+## Deploys are continuous; do not run `fly deploy`
+
+Deployment is automated by GitHub Actions:
+
+- **Push to `main`** → tests run (`make ci` + `make migratetest` against the latest prod backup),
+  then Docker image is built and pushed, then staging is deployed, then prod is deployed if
+  staging passes.
+- **Open/sync a PR** → a review app at `pr-<N>-myrjola-petrapp.fly.dev` is provisioned. It tears
+  down on PR close.
+
+So when a user asks you to "deploy" a change, the answer is virtually always: **make sure CI is
+green, then merge the PR**. Don't run `fly deploy` from this skill. The only legitimate exception
+is a **rollback to a prior image** when CD itself is the cause of an incident — and that needs
+explicit human approval each time.
+
+The full flow lives in the README's "CI/CD and preview environments" section. When walking a user
+through a risky change, point them at:
+
+1. Open a PR → CI runs `make migratetest` against real prod data (this catches migration bugs).
+2. Manually smoke-test the review app with `make fly-* FLY_APP=pr-<N>-myrjola-petrapp`.
+3. Merge to `main` when happy → staging then prod auto-deploy.
+4. Watch `make fly-logs` on staging and prod for the migration log lines.
 
 ## Safety protocol
 
@@ -146,6 +175,8 @@ Pause and confirm with the user before any restore — it overwrites the live DB
 
 ## Don't
 
+- Don't run `fly deploy`. Deployment is CI-driven (push to `main` → staging → prod; PR → review
+  app). See the README "CI/CD and preview environments" section.
 - Don't invoke `fly` commands without `--app $FLY_APP` (they fail with a confusing error and may
   silently target the wrong app if `FLY_APP` happens to be exported).
 - Don't use `make fly-sqlite3` from this skill — it's an interactive REPL meant for humans. Use

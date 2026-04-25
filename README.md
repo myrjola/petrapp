@@ -173,7 +173,49 @@ go tool trace timeout-20250913-070211.trace
 
 ### CI/CD and preview environments
 
-This project uses [GitHub Actions](https://docs.github.com/en/actions) for CI/CD.
+This project deploys continuously via [GitHub Actions](https://docs.github.com/en/actions). **You
+should not run `fly deploy` by hand for routine changes** — the workflows below own that.
+
+#### Pushing to `main` deploys to staging then prod
+
+`.github/workflows/main.yml` runs on every push to `main`:
+
+1. **Test** — runs `make ci` (build, lint, test, govulncheck) plus `make migratetest`. The
+   migration test restores the latest **production** Litestream backup from S3 and runs the app's
+   `NewDatabase` (pre-migrations + declarative migrate) against it. Risky schema changes are
+   validated against real prod data here, before they ever reach a live machine.
+2. **Build & push** — Docker image tagged with the commit SHA, pushed to the Fly registry.
+3. **Staging deploy** — promotes the new image to `petra-staging`.
+4. **Prod deploy** — only runs after staging succeeds, then promotes to `petra`.
+
+If staging or its smoke test fails, prod is not touched. If you need to abort mid-pipeline, revert
+the offending commit on `main` — the next push will redeploy the previous code.
+
+#### Opening a PR creates a review app
+
+`.github/workflows/fly-review.yml` provisions a per-PR Fly app on PR open / sync, and tears it
+down on PR close. The pattern is:
+
+- App name: `pr-<PR-number>-myrjola-petrapp` (note: derived from the GitHub repo slug
+  `myrjola/petrapp`, not from the prod app name `petra`).
+- URL: `https://pr-<PR-number>-myrjola-petrapp.fly.dev`.
+
+Review apps use a **local Litestream replica** (`LITESTREAM_REPLICA_PATH=/data/backup`) — no S3
+push — so they don't pollute the prod backup bucket. They also wake-from-zero like prod, so the
+fly-ops `make` targets work against them with `FLY_APP=pr-<N>-myrjola-petrapp`.
+
+#### Day-to-day flow
+
+```sh
+# Routine change:
+git checkout -b my-change
+# ... commit, push, open PR. Wait for CI green and review app to come up.
+# Manually exercise https://pr-<N>-myrjola-petrapp.fly.dev. Merge to main when happy.
+# CI auto-deploys to staging then prod.
+
+# Hotfix straight to prod (rare):
+# Same as above — there is no manual override path.
+```
 
 ### Creating new deployment
 
