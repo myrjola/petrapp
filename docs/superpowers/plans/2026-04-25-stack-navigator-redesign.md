@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the `Content-Location` based stack navigator with a standards-clean Navigation API implementation: explicit `X-Requested-With: stacknav` request marker, `X-Location` and `X-History-Action` response headers, in-place validation rendering via `document.write`, and lazy bfcache invalidation via sessionStorage marker + `pageshow`.
+**Goal:** Replace the `Content-Location` based stack navigator with a standards-clean Navigation API implementation: explicit `X-Requested-With: stacknav` request marker, `X-Location` and `X-History-Action` response headers, lazy bfcache invalidation via sessionStorage marker + `pageshow`. Validation errors continue to use the existing `putFlashError` + redirect-to-form pattern (the app's CSP `require-trusted-types-for 'script'` blocks any in-place HTML rendering, so we lean on the established flash mechanism).
 
-**Architecture:** MPA-first progressive enhancement. Server sees `X-Requested-With: stacknav` and returns 200 + headers (no body) for JS clients; otherwise 303 redirect. Client interception is gated on `'navigation' in window`, classifies response status (200 → navigate, anything HTML → render in place, otherwise reload), and handles three history actions (push, replace, pop-or-replace). Spec details in `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md`.
+**Architecture:** MPA-first progressive enhancement. Server sees `X-Requested-With: stacknav` and returns 200 + headers (no body) for JS clients; otherwise 303 redirect. Client interception is gated on `'navigation' in window`, treats 200 as the only navigate-success path, and falls back to `location.reload()` on anything else. Two history actions: replace (default) and pop-or-replace. Spec details in `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md`.
 
 **Tech Stack:** Go 1.x with `net/http`, vanilla JS (no build step), Playwright (via `github.com/playwright-community/playwright-go`), goquery for handler tests.
 
@@ -16,7 +16,7 @@
 |---|---|---|
 | `cmd/web/helpers.go` | Modify | Replace `redirect` with `redirectAfterPOST` (POSTs only). Non-POST callers move to plain `http.Redirect`. |
 | `cmd/web/helpers_test.go` | Create | Unit tests for `redirectAfterPOST`. |
-| `cmd/web/handler-schedule.go` | Modify | Use `redirectAfterPOST`. Convert validation path from flash+redirect to inline 422 with `ValidationError` rendered. |
+| `cmd/web/handler-schedule.go` | Modify | Use `redirectAfterPOST` for both success and validation paths (validation keeps its existing flash + redirect-to-form pattern, just renamed call site). |
 | `cmd/web/handler-preferences.go` | Modify | Use `redirectAfterPOST` for two redirects. |
 | `cmd/web/handler-workout.go` | Modify | Use `redirectAfterPOST` for five redirects. |
 | `cmd/web/handler-exerciseset.go` | Modify | Use `redirectAfterPOST` for two redirects. |
@@ -26,7 +26,6 @@
 | `cmd/web/handler-home.go` | Modify | Replace `redirect` with `http.Redirect`. |
 | `cmd/web/middleware.go` | Modify | Replace `redirect` in `mustAuthenticate` with `http.Redirect`. |
 | `cmd/web/playwright_test.go` | Modify | Extend with `Test_playwright_stacknav` covering all five flows. |
-| `internal/e2etest/client.go` | Modify | Update `submitFormRequest` to accept 4xx HTML responses (returns doc and status). |
 | `ui/static/main.js` | Modify | Full rewrite of the stack-navigator portion. |
 
 ---
@@ -71,7 +70,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow playwright stacknav test")
 	}
-	t.Skip("not yet implemented; see plan tasks 2-6")
+	t.Skip("not yet implemented; see plan tasks 2-5")
 
 	// Boilerplate copied from Test_playwright_smoketest.
 	if err := playwright.Install(&playwright.RunOptions{
@@ -568,14 +567,26 @@ EOF
 
 Two distinct kinds of callers exist:
 
-- **POST handlers redirecting after success:** use `app.redirectAfterPOST(w, r, target, action)`. All use action `""` (= `replace`) except `schedulePOST` which uses `"pop-or-replace"`.
+- **POST handlers redirecting after success:** use `app.redirectAfterPOST(w, r, target, action)`. All use action `""` (= `replace`) except `schedulePOST`'s success branch which uses `"pop-or-replace"`. The schedule validation branch keeps its existing flash + redirect-to-form pattern, just routed through `redirectAfterPOST`.
 - **Non-POST callers** (auth bouncing, mid-request redirects): use `http.Redirect(w, r, target, http.StatusSeeOther)`.
-
-The schedule validation path is updated separately in Task 4.
 
 - [ ] **Step 1: Update POST handlers — schedule**
 
-Edit `cmd/web/handler-schedule.go`. Replace line 53:
+Edit `cmd/web/handler-schedule.go`. Two changes:
+
+Line 44 (validation branch):
+
+Old:
+```go
+		redirect(w, r, "/schedule")
+```
+
+New:
+```go
+		app.redirectAfterPOST(w, r, "/schedule", "")
+```
+
+Line 53 (success branch):
 
 Old:
 ```go
@@ -587,7 +598,7 @@ New:
 	app.redirectAfterPOST(w, r, "/", "pop-or-replace")
 ```
 
-Leave line 44 (`redirect(w, r, "/schedule")` for validation) alone — Task 4 rewrites this path entirely.
+Both branches keep their existing semantics: validation flashes an error and re-renders the form via the GET handler (popFlashError); success pops back to home.
 
 - [ ] **Step 2: Update POST handlers — preferences**
 
@@ -719,140 +730,7 @@ EOF
 
 ---
 
-## Task 4: Convert schedule validation to inline 422 + relax e2e test client
-
-**Files:**
-- Modify: `cmd/web/handler-schedule.go`
-- Modify: `internal/e2etest/client.go`
-
-The current `schedulePOST` validation path uses a flash message with redirect-back. Spec requires inline 422 with the validation error rendered in the same response.
-
-`scheduleTemplateData` already has a `ValidationError string` field; the GET handler reads it from `popFlashError`. We change the POST validation path to render directly with status 422, and leave the GET handler to keep working from flash for any other code that relies on it (none currently).
-
-The e2e test client's `submitFormRequest` rejects non-200 responses, which would break with 422. We update it to return the document and status code, letting callers check.
-
-- [ ] **Step 1: Update e2e test client — relax status check**
-
-Edit `internal/e2etest/client.go` lines 587–598. Replace:
-
-```go
-	if http.StatusOK != resp.StatusCode {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// Parse the response
-	newDoc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("create document from reader: %w", err)
-	}
-	newDoc.Url = resp.Request.URL
-	return newDoc, nil
-}
-```
-
-With:
-
-```go
-	// Accept any 2xx and 4xx status with HTML body. 5xx still treated as error.
-	if resp.StatusCode >= 500 {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// Parse the response
-	newDoc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("create document from reader: %w", err)
-	}
-	newDoc.Url = resp.Request.URL
-	return newDoc, nil
-}
-```
-
-This keeps the same return signature so callers don't change.
-
-- [ ] **Step 2: Verify no test relies on the strict 200 check breaking other 4xx**
-
-Run: `grep -rn 'SubmitForm' cmd/web/ --include="*_test.go" | head`
-Expected: callers all use the document return value or ignore it. No test asserts on `.StatusCode` from this path. (If any did, they'd need updating; verify by reading tests.)
-
-Run: `make test`
-Expected: still passes.
-
-- [ ] **Step 3: Convert schedulePOST validation path to 422 + render**
-
-Edit `cmd/web/handler-schedule.go`. Replace the entire `schedulePOST` function with:
-
-```go
-func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
-		return
-	}
-
-	prefs := weekdaysToPreferences(r)
-
-	if prefs.IsEmpty() {
-		data := scheduleTemplateData{
-			BaseTemplateData: newBaseTemplateData(r),
-			Weekdays:         preferencesToWeekdays(prefs),
-			DurationOptions:  getWorkoutDurationOptions(),
-			ValidationError:  "Please schedule at least one workout day.",
-		}
-		app.render(w, r, http.StatusUnprocessableEntity, "schedule", data)
-		return
-	}
-
-	if err := app.workoutService.SaveUserPreferences(r.Context(), prefs); err != nil {
-		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))
-		return
-	}
-
-	app.redirectAfterPOST(w, r, "/", "pop-or-replace")
-}
-```
-
-Key changes:
-- Empty-prefs branch no longer sets a flash and redirects; it renders the schedule template directly with status 422 and the inline error.
-- The user's selected (empty) values are echoed back via `preferencesToWeekdays(prefs)`, mirroring the form state.
-- The success branch still uses `redirectAfterPOST` with `pop-or-replace` (already done in Task 3).
-
-- [ ] **Step 4: Run go test for schedule and preferences**
-
-Run: `go test -count 1 -run Schedule ./cmd/web/`
-Expected: any existing schedule tests pass.
-
-Run: `go test -count 1 -run Preferences ./cmd/web/`
-Expected: passes (preferences tests submit `/schedule` as setup; the success path is unchanged so they should keep working).
-
-Run: `make test`
-Expected: all tests pass.
-
-- [ ] **Step 5: Run lint**
-
-Run: `make lint-fix`
-Expected: no errors.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add cmd/web/handler-schedule.go internal/e2etest/client.go
-git commit -m "$(cat <<'EOF'
-feat(schedule): inline 422 validation rendering
-
-Replaces flash+redirect with direct re-render at status 422 when the
-schedule form is empty. The e2e test client now accepts 4xx HTML
-responses as success (5xx still errors) so handler tests can exercise
-validation paths.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
-
----
-
-## Task 5: Rewrite `ui/static/main.js` stack navigator
+## Task 4: Rewrite `ui/static/main.js` stack navigator
 
 **Files:**
 - Modify: `ui/static/main.js`
@@ -921,15 +799,12 @@ async function submitForm(e) {
     return
   }
 
-  const ct = res.headers.get('Content-Type') || ''
-  if (ct.includes('text/html')) {
-    const html = await res.text()
-    document.open()
-    document.write(html)
-    document.close()
-    return
-  }
-
+  // Anything else (5xx, missing headers, unexpected status): reload
+  // to surface state. We can't render the response body in place
+  // because the CSP (require-trusted-types-for 'script') blocks
+  // document.write and innerHTML of HTML strings. Validation errors
+  // don't reach here — they use flash + redirect-to-form and arrive
+  // as a normal 200 + X-Location response.
   location.reload()
 }
 
@@ -1018,8 +893,7 @@ Key differences from the prior implementation:
 - bfcache invalidation is lazy: marker set on traversal, consumed on `pageshow`, reload only when restored from bfcache.
 - `pagereveal` uses `navigation.activation` index comparison instead of URL-depth heuristic; null-`from` no longer crashes; replace/reload skip the transition.
 - `data-back-button` click handler uses event delegation, walks backward, compares full URL.
-- Validation errors render in place via `document.write` for any non-200 HTML response.
-- Network errors fall back to `location.reload()`.
+- Validation errors arrive as normal 200 + `X-Location` (server uses flash + redirect-to-form), so the client treats them like any other navigation. The CSP blocks `document.write`/`innerHTML` of HTML strings, so any non-200 response triggers `location.reload()` as the safe fallback.
 
 - [ ] **Step 2: Smoke-check the file by serving it**
 
@@ -1027,14 +901,14 @@ Run: `go run ./cmd/web/ &` (or use whatever the project's local-run is — `make
 
 Expected: server starts. Open `http://localhost:<port>/main.js` in a browser; file should serve without errors.
 
-If you don't have a quick way to start the server, skip this manual check; Task 6 will verify via Playwright.
+If you don't have a quick way to start the server, skip this manual check; Task 5 will verify via Playwright.
 
 Stop the server: `kill %1` (or however the project's run is wired).
 
 - [ ] **Step 3: Run static asset tests if any**
 
 Run: `make test`
-Expected: passes. (No JS unit tests in this codebase — coverage comes from Playwright in Task 6.)
+Expected: passes. (No JS unit tests in this codebase — coverage comes from Playwright in Task 5.)
 
 - [ ] **Step 4: Run lint**
 
@@ -1054,11 +928,12 @@ client gated on 'navigation' in window. New behavior:
 - X-Requested-With: stacknav request marker
 - X-Location + X-History-Action response headers
 - popOrReplaceTo walks entries backward, compares full URL
-- bfcache invalidation via sessionStorage marker on pageshow (no flash)
+- bfcache invalidation via sessionStorage marker on pageshow
 - pagereveal uses navigation.activation index comparison (no URL-depth)
-- Validation errors render in place via document.write
 - Smart back-link uses event delegation and full-URL match
 - Feature-gated; no-op without Navigation API
+- Non-200 responses fall back to location.reload() (CSP blocks
+  in-place HTML rendering)
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1067,7 +942,7 @@ EOF
 
 ---
 
-## Task 6: Unskip Playwright spec, run, fix flakiness, full CI
+## Task 5: Unskip Playwright spec, run, fix flakiness, full CI
 
 **Files:**
 - Modify: `cmd/web/playwright_test.go`
@@ -1077,7 +952,7 @@ EOF
 Edit `cmd/web/playwright_test.go` `Test_playwright_stacknav`. Delete the line:
 
 ```go
-	t.Skip("not yet implemented; see plan tasks 2-6")
+	t.Skip("not yet implemented; see plan tasks 2-5")
 ```
 
 (Keep the `testing.Short()` skip — that's a different skip, gated on the `-short` flag.)
@@ -1127,16 +1002,16 @@ EOF
 
 The plan covers all sections of the spec:
 
-- Wire protocol → Tasks 2, 5.
-- Per-flow behavior (5 flows) → Task 1 (spec-as-test) + Task 6 (verification).
-- Server-side changes table → Task 3 (handler migration); schedule validation refactor → Task 4.
-- Client implementation (4a–4g of spec) → Task 5 (full file rewrite).
-- Testing → Task 1 (Playwright spec) + Task 2 (unit test) + Task 6 (verification).
+- Wire protocol → Tasks 2, 4.
+- Per-flow behavior (5 flows) → Task 1 (spec-as-test) + Task 5 (verification).
+- Server-side changes table → Task 3 (handler migration; schedule validation kept as flash + redirect-to-form).
+- Client implementation (sections of spec) → Task 4 (full file rewrite).
+- Testing → Task 1 (Playwright spec) + Task 2 (unit test) + Task 5 (verification).
 - Removed code (`redirect` helper, `Content-Location`, `Sec-Fetch-Dest` branch) → Task 3.
-- Browser support gate (`'navigation' in window`) → Task 5.
+- Browser support gate (`'navigation' in window`) → Task 4.
 
 Identifiers used consistently: `redirectAfterPOST`, `replaceTo`, `popOrReplaceTo`, `sameUrl`, `invalidateKey`, `submitForm`, `X-Requested-With: stacknav`, `X-Location`, `X-History-Action: replace | pop-or-replace`, `Test_playwright_stacknav`.
 
 No placeholders. Each step has either exact code, a concrete shell command with expected output, or a specific edit description.
 
-The Playwright test in Task 1 has Flow 1, 2, 4 navigation that depends on the actual page structure (button names, link selectors). The test code includes notes to run `PWDEBUG=1` and adjust if locators don't match. This is acknowledged-imprecise rather than wrong: the *assertions* (back-button URL after various submits) are exact; the *path to set them up* may need locator tweaks during Task 6.
+The Playwright test in Task 1 has Flow 1, 2, 4 navigation that depends on the actual page structure (button names, link selectors). The test code includes notes to run `PWDEBUG=1` and adjust if locators don't match. This is acknowledged-imprecise rather than wrong: the *assertions* (back-button URL after various submits) are exact; the *path to set them up* may need locator tweaks during Task 5.

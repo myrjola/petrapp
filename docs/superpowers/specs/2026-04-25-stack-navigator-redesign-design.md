@@ -22,7 +22,7 @@ This spec replaces the stack navigator with a smaller, standards-clean implement
 - Single roundtrip for enhanced submits (no redirect-follow penalty).
 - Standards-conformant: no misuse of `Content-Location`; clearly-named custom headers; explicit JS detection.
 - Progressive enhancement: forms work without JS via plain 303 PRG; the JS shim is a no-op without Navigation API.
-- Validation errors render in place without losing the URL.
+- Validation errors round-trip cleanly via flash + redirect-to-form (CSP `require-trusted-types-for 'script'` blocks in-place HTML rendering, so we keep the existing flash pattern).
 - Specified behavior verified by Playwright tests that drive the back button.
 
 ## Non-goals
@@ -61,7 +61,7 @@ func (app *application) redirectAfterPOST(w http.ResponseWriter, r *http.Request
 }
 ```
 
-The existing `redirect` is removed. Validation-error paths in handlers must respond with HTTP 422 and the re-rendered form HTML.
+The existing `redirect` is removed. Validation-error paths in handlers continue to use `putFlashError` + `redirectAfterPOST` back to the form URL — this fits the same wire protocol, and the GET handler pops the flash on re-render. (We cannot render the error response in place because the app's CSP includes `require-trusted-types-for 'script'`, which blocks `document.write` and `innerHTML` of HTML strings.)
 
 ### Client (`ui/static/main.js`)
 
@@ -87,13 +87,14 @@ Top-level pieces:
 
 Response status codes used by the contract:
 
-- **200**: success, navigate per `X-Location` and `X-History-Action`. Body empty.
-- **Any other 2xx/4xx/5xx with HTML body**: client replaces document content with response body via `document.write`; URL stays at the form's action URL. The server controls what the user sees (validation form, not-found page, server-error page) by what it renders.
-- **Network error / non-HTML body / no body**: client falls back to `location.reload()` to surface state.
-
-Validation errors should still use **HTTP 422** for correctness (some non-JS clients display their own error UI on 4xx, and 422 is the right semantic for "form data was unprocessable").
+- **200**: success or validation error, navigate per `X-Location` and `X-History-Action`. Body empty.
+  - Success → `X-Location` points to the next page.
+  - Validation error → server sets a flash message and `X-Location` points back to the form URL; the form's GET handler pops the flash on re-render.
+- **Anything else (5xx, network error, non-200)**: client falls back to `location.reload()` to surface state.
 
 Non-JS submits work unchanged: server returns 303, browser follows.
+
+The CSP (`require-trusted-types-for 'script'`) prevents the client from rendering arbitrary HTML in place via `document.write` or `innerHTML`. This is why validation flows use a re-redirect rather than a direct re-render.
 
 ## Per-flow behavior
 
@@ -133,9 +134,9 @@ If no matching entry exists (e.g. cold deep-link to SWAP), the click handler doe
 
 - Setup: at SCHEDULE.
 - Action: submit empty form.
-- Server: 422 with re-rendered SCHEDULE HTML containing the validation alert.
-- Client: `document.open(); document.write(html); document.close();`. URL unchanged. No history entry added.
-- Result: SCHEDULE re-rendered at the same URL with the alert visible.
+- Server: `putFlashError("Please schedule at least one workout day.")` then `redirectAfterPOST(w, r, "/schedule", "")` — same wire-protocol shape as a successful same-URL replace.
+- Client: 200 + `X-Location: /schedule` → `replaceTo("/schedule")` → fresh GET of `/schedule`, which pops the flash and renders the alert.
+- Result: SCHEDULE re-rendered at the same URL with the alert visible. URL unchanged. History `[…, /schedule]` (the original entry, replaced).
 
 ## Client implementation details
 
@@ -185,17 +186,11 @@ async function submitForm(e) {
     return;
   }
 
-  // Any non-200: render the server's response body in place. Covers
-  // validation errors (422), not-found, server errors. URL preserved.
-  const ct = res.headers.get('Content-Type') || '';
-  if (ct.includes('text/html')) {
-    const html = await res.text();
-    document.open();
-    document.write(html);
-    document.close();
-    return;
-  }
-
+  // Anything else (5xx, network shape, missing headers): reload the
+  // current page to surface state. We can't render the response body
+  // in place because the CSP blocks document.write/innerHTML of HTML
+  // strings. Validation errors don't reach this branch — they use
+  // flash + redirect-to-form and arrive as a normal 200 + X-Location.
   location.reload();
 }
 ```
