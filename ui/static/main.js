@@ -7,149 +7,134 @@ function me() {
   return document.currentScript.parentElement
 }
 
-/**
- * View transition handler for sliding animations for sliding left when we are going deeper in URL hierarchy and
- * sliding right when we are going shallower.
- */
-window.addEventListener('pagereveal', async (e) => {
-  if (!e.viewTransition) {
+const sameUrl = (a, b) =>
+  a.origin === b.origin && a.pathname === b.pathname && a.search === b.search
+
+const invalidateKey = (url) =>
+  'stacknav:invalidate:' + url.pathname + url.search
+
+if ('navigation' in window) {
+  navigation.addEventListener('navigate', (e) => {
+    if (!e.formData) return
+    if (!e.canIntercept || e.hashChange || e.downloadRequest) return
+    if (new URL(e.destination.url).origin !== location.origin) return
+    for (const [, v] of e.formData) {
+      if (v instanceof File) return
+    }
+    e.intercept({ handler: () => submitForm(e) })
+  })
+}
+
+async function submitForm(e) {
+  const body = new URLSearchParams(e.formData)
+  let res
+  try {
+    res = await fetch(e.destination.url, {
+      method: 'POST',
+      body,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'stacknav',
+      },
+      redirect: 'manual',
+    })
+  } catch (_) {
+    location.reload()
     return
   }
-  // Determine the direction of transition based on the depth difference between the from and entry URLs.
-  const fromUrl = navigation.activation.from.url
-  const entryUrl = navigation.activation.entry.url
-  const depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
-  if (depthDifference === 0) {
-    e.viewTransition.skipTransition()
+
+  if (res.status === 200) {
+    const target = res.headers.get('X-Location')
+    const action = res.headers.get('X-History-Action')
+    if (!target) {
+      location.reload()
+      return
+    }
+    if (action === 'pop-or-replace') popOrReplaceTo(target)
+    else replaceTo(target)
+    return
   }
-  e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward')
-})
 
-navigation.addEventListener('navigate', (e) => {
-  // Stack Navigation implementation using Navigation API.
-  //
-  // When a form is submitted, we want the browser's back button to behave sensibly. An example of what we want to
-  // avoid is when we submit a form and return to the same URL as the form, we don't want the back button to be a
-  // no-op.
-  //
-  // The backend uses X-Location and X-History-Action headers (returned with HTTP 200) when the request includes
-  // X-Requested-With: stacknav. Non-JS submits receive a standard 303 redirect instead.
-  if (e.formData) {
-    e.intercept({
-      async handler() {
-        try {
-          // Submit the form using fetch so that we can process the X-Location header.
-          const body = new URLSearchParams(e.formData).toString()
-          const result = await fetch(e.destination.url, {
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "X-Requested-With": "stacknav",
-            },
-            method: "POST",
-            body,
-          })
-          const baseUrl = window.location.origin
-          const location = result.headers.get("X-Location")
-          if (!location) {
-            // No X-Location header means the server did not handle this as a stacknav request.
-            // Fall back to a normal page load at the current URL to show any server-rendered response.
-            navigation.navigate(window.location.href, {history: "replace"})
-            return
-          }
-          const locationUrl = new URL(location, baseUrl)
-          const action = result.headers.get("X-History-Action") || ""
+  // Anything else (5xx, missing headers, unexpected status): reload
+  // to surface state. We can't render the response body in place
+  // because the CSP (require-trusted-types-for 'script') blocks
+  // document.write and innerHTML of HTML strings. Validation errors
+  // don't reach here — they use flash + redirect-to-form and arrive
+  // as a normal 200 + X-Location response.
+  location.reload()
+}
 
-          if (action === "pop-or-replace") {
-            // Traverse backwards to an existing matching history entry when present.
-            for (const entry of navigation.entries()) {
-              const entryUrl = new URL(entry.url)
-              if (entryUrl.pathname === locationUrl.pathname) {
-                await navigation.traverseTo(entry.key).committed
-                // Reload to bust any stale bfcache content.
-                navigation.reload()
-                return
-              }
-            }
-            // No matching entry found — fall through to replace.
-          }
+function replaceTo(target) {
+  navigation.navigate(target, { history: 'replace' })
+}
 
-          await navigation.navigate(location, {history: "replace"})
-        } catch (err) {
-          // TODO: We need error feedback to the user.
-          console.error("Failed to submit form:", err)
-        }
-      }
-    })
-  }
-})
-
-function findMatchingHistoryEntry(targetUrl) {
+function popOrReplaceTo(target) {
+  const targetUrl = new URL(target, location.origin)
   const entries = navigation.entries()
-  const currentIndex = navigation.currentEntry.index
-  const targetURL = new URL(targetUrl)
-
-  // Search backwards through history
-  for (let i = currentIndex - 1; i >= 0; i--) {
-    const entry = entries[i]
-    const entryURL = new URL(entry.url)
-
-    if (urlsMatch(entryURL, targetURL)) {
-      return entry
+  for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
+    if (sameUrl(new URL(entries[i].url), targetUrl)) {
+      sessionStorage.setItem(invalidateKey(targetUrl), '1')
+      navigation.traverseTo(entries[i].key)
+      return
     }
   }
-
-  return null
+  replaceTo(target)
 }
 
-function urlsMatch(url1, url2) {
-  return url1.href === url2.href ||
-    (url1.pathname === url2.pathname && url1.origin === url2.origin)
-}
-
-// Create a smart back button using the Navigation API to make it pop the navigation stack.
-document.addEventListener("DOMContentLoaded", function () {
-  // Find all anchors marked for back button enhancement.
-  const backLinks = document.querySelectorAll('a[data-back-button]')
-
-  backLinks.forEach(link => {
-    const destinationUrl = link.href
-
-    // Only enhance it if Navigation API is supported
-    if (typeof navigation !== 'undefined') {
-      link.addEventListener('click', async (e) => {
-        const matchingEntry = findMatchingHistoryEntry(destinationUrl)
-
-        if (matchingEntry) {
-          e.preventDefault()
-          await navigation.traverseTo(matchingEntry.key)
-        }
-      })
-    }
-  })
+window.addEventListener('pagereveal', (e) => {
+  if (!e.viewTransition) return
+  if (!('navigation' in window)) return
+  const act = navigation.activation
+  if (!act) return
+  if (act.navigationType === 'replace' || act.navigationType === 'reload') {
+    e.viewTransition.skipTransition()
+    return
+  }
+  let dir = 'forward'
+  if (act.navigationType === 'traverse' && act.from && act.entry) {
+    dir = act.entry.index < act.from.index ? 'backward' : 'forward'
+  }
+  e.viewTransition.types.add(dir)
 })
 
-// Form submission detector
-document.addEventListener('submit', function (e) {
+document.addEventListener('click', (e) => {
+  if (!('navigation' in window)) return
+  const link = e.target.closest('a[data-back-button]')
+  if (!link) return
+  const target = new URL(link.href)
+  const entries = navigation.entries()
+  for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
+    if (sameUrl(new URL(entries[i].url), target)) {
+      e.preventDefault()
+      navigation.traverseTo(entries[i].key)
+      return
+    }
+  }
+})
+
+// Form submission UI state.
+document.addEventListener('submit', (e) => {
   const form = e.target
+  if (!(form instanceof HTMLFormElement)) return
   form.classList.add('submitting')
-  const submitButton = form.querySelector("button[type=submit]")
-  if (submitButton) {
-    submitButton.disabled = true
-  }
+  const submitButton = form.querySelector('button[type=submit]')
+  if (submitButton) submitButton.disabled = true
 })
 
-// Reset form states when the page is loaded from the browser cache (back button).
-window.addEventListener('pageshow', function (event) {
-  // pageshow event fires when the page is loaded, including from cache.
-  // event.persisted is true when the page is loaded from the back/forward cache.
+// Reset submit state and process bfcache invalidation marker on pageshow.
+window.addEventListener('pageshow', (event) => {
+  // Reset submitting forms after bfcache restore.
   if (event.persisted) {
-    // This was a back/forward navigation from the cache.
-    document.querySelectorAll('form.submitting').forEach(form => {
+    document.querySelectorAll('form.submitting').forEach((form) => {
       form.classList.remove('submitting')
-      const submitButton = form.querySelector("button[type=submit]")
-      if (submitButton) {
-        submitButton.disabled = false
-      }
+      const submitButton = form.querySelector('button[type=submit]')
+      if (submitButton) submitButton.disabled = false
     })
   }
+
+  // Bfcache invalidation marker: reload if the entry was marked stale.
+  const key = invalidateKey(new URL(location.href))
+  const marker = sessionStorage.getItem(key)
+  if (marker) sessionStorage.removeItem(key)
+  if (event.persisted && marker) location.reload()
 })
