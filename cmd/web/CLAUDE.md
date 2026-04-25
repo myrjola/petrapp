@@ -104,11 +104,11 @@ if fieldValue == "" {
 
 ## Redirects and Navigation
 
-### Using redirect() Helper
+### Redirect Helpers
 
-- Use `redirect(w, r, "/path")` function for all redirects
-- Redirect after successful POST operations (POST-redirect-GET pattern)
-- Use appropriate redirect paths that match routing patterns
+- Use `app.redirectAfterPOST(w, r, "/path", action)` after successful POST operations. Pass action `""` for default replace, or `"pop-or-replace"` to traverse to an existing matching history entry when present.
+- Use `http.Redirect(w, r, "/path", http.StatusSeeOther)` for non-POST mid-request bounces (auth gates, GET-handler redirects when state is incomplete).
+- Both follow POST-redirect-GET semantics; the difference is whether the response carries the new wire protocol (X-Location/X-History-Action) for stacknav clients.
 
 ## Testing with e2etest
 
