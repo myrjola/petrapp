@@ -591,7 +591,7 @@ func Test_GetStartingWeight(t *testing.T) {
 	today := time.Now()
 
 	// No history: expect 0.
-	got, err := svc.GetStartingWeight(ctx, exerciseID, today)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight no history: %v", err)
 	}
@@ -599,10 +599,11 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("no history: want 0, got %v", got)
 	}
 
-	// Insert a completed session 7 days ago with set 1 weight = 60kg.
+	// Insert a completed strength session 7 days ago with set 1 weight = 100kg x5.
 	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_sessions (user_id, workout_date, completed_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, dateStr)
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
@@ -610,18 +611,29 @@ func Test_GetStartingWeight(t *testing.T) {
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
 		 weight_kg, min_reps, max_reps, completed_reps)
-		 VALUES (?, ?, ?, 1, 60.0, 5, 5, 5)`,
+		 VALUES (?, ?, ?, 1, 100.0, 5, 5, 5)`,
 		userID, dateStr, exerciseID)
 	if err != nil {
 		t.Fatalf("insert set: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today)
+	// Same periodization (strength → strength): weight carries over unchanged.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
 	}
-	if got != 60.0 {
-		t.Errorf("with history: want 60.0, got %v", got)
+	if got != 100.0 {
+		t.Errorf("strength → strength: want 100.0, got %v", got)
+	}
+
+	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): Epley conversion
+	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.1, rounded to 0.5 = 92.0.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationHypertrophy)
+	if err != nil {
+		t.Fatalf("GetStartingWeight cross-periodization: %v", err)
+	}
+	if got != 92.0 {
+		t.Errorf("strength → hypertrophy: want 92.0, got %v", got)
 	}
 
 	// Insert today's session with a different set 1 weight. The starting weight
@@ -643,12 +655,12 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert today's sets: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight ignoring today: %v", err)
 	}
-	if got != 60.0 {
-		t.Errorf("today ignored: want 60.0, got %v", got)
+	if got != 100.0 {
+		t.Errorf("today ignored: want 100.0, got %v", got)
 	}
 }
 
@@ -821,5 +833,88 @@ func Test_BuildProgression(t *testing.T) {
 	target = prog.CurrentSet()
 	if target.WeightKg != 2.5 {
 		t.Errorf("second set weight: want 2.5, got %v", target.WeightKg)
+	}
+}
+
+func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("bp-x-user"), "BPX User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
+		"Squat", "lower", "desc")
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Squat'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	// Prior strength session 7 days ago: completed first set 100 kg x 5.
+	prevStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
+		userID, prevStr)
+	if err != nil {
+		t.Fatalf("insert prev session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps)
+		 VALUES (?, ?, ?, 1, 100.0, 5, 5, 5)`,
+		userID, prevStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert prev set: %v", err)
+	}
+
+	// New hypertrophy session today.
+	todayStr := time.Now().Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
+		userID, todayStr)
+	if err != nil {
+		t.Fatalf("insert today session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
+		userID, todayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+	date, _ := time.Parse("2006-01-02", todayStr)
+
+	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression: %v", err)
+	}
+	target := prog.CurrentSet()
+	// Strength 100kg x5 → Hypertrophy 8 reps via Epley:
+	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.105, rounded to 0.5 = 92.0.
+	if target.WeightKg != 92.0 {
+		t.Errorf("first set weight: want 92.0, got %v", target.WeightKg)
+	}
+	if target.TargetReps != 8 {
+		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
 	}
 }
