@@ -22,18 +22,43 @@ can [attach a debugger](https://www.jetbrains.com/help/go/attach-to-running-go-p
 
 ## Operations
 
-### Select which Fly app is targeted.
+The deployment is a single-node Fly Machine that **scales to zero when idle**, with the SQLite volume continuously
+replicated by Litestream. The two environments are:
 
-If you get something like the following error when running the below commands:
+| Environment | Fly app          | URL                              |
+|-------------|------------------|----------------------------------|
+| Production  | `petra`          | `https://petra.fly.dev`          |
+| Staging     | `petra-staging`  | `https://petra-staging.fly.dev`  |
+
+### Select which Fly app is targeted
+
+The `make fly-*` ops targets default to `FLY_APP=petra`. Override per-invocation for staging:
+
+```sh
+make fly-logs FLY_APP=petra-staging
+```
+
+If you invoke `fly` directly and get:
 
 ```
 Error: the config for your app is missing an app name, add an app field to the fly.toml file or specify with the -a flag
 ```
 
-Then, you need to select the fly app you have deployed:
+…export `FLY_APP` or pass `--app`:
 
+```sh
+export FLY_APP=petra
 ```
-export FLY_APP=petrapp
+
+### Waking a cold instance
+
+Because the machine scales to zero, the first request after idle has to spin it up before any `fly ssh` /
+`fly proxy` command will work. The `make fly-wake` target sends a `GET /api/healthy` and waits for a 200; every
+other `make fly-*` target depends on it, so you don't normally invoke it manually.
+
+```sh
+make fly-wake                  # production
+make fly-wake FLY_APP=petra-staging
 ```
 
 ### Deploying
@@ -44,11 +69,27 @@ volume. Try `fly launch` to configure your own. You might also need to add some 
 
 ### Database access
 
-The container image contains sqlite3 binary to make it easy to manipulate the live production database.
+The container image contains the `sqlite3` binary so you can manipulate the live database. There are three flavours:
 
 ```sh
+# Interactive REPL (humans only).
 make fly-sqlite3
+
+# Non-interactive read-only — pass a SQL file.
+echo "SELECT COUNT(*) FROM users;" > /tmp/q.sql
+make fly-sql-readonly SCRIPT=/tmp/q.sql
+
+# Mutating SQL — automatically takes a Litestream-style on-machine snapshot first.
+make fly-sql-write SCRIPT=/tmp/migration.sql
 ```
+
+`fly-sql-write` always invokes `fly-backup` before running the script. `fly-backup` itself can be run on its own:
+
+```sh
+make fly-backup                # snapshots prod's /data/petrapp.sqlite3 → /data/snapshots/<timestamp>.sqlite3
+```
+
+The snapshot is created with sqlite3's `.backup` command, which produces a single consistent file (no separate WAL).
 
 ### Recovering database
 
@@ -59,9 +100,9 @@ command.
 
 ```
 # list databases
-fly ssh console --user petrapp -C "/dist/litestream databases"
+fly ssh console --app $FLY_APP --user petrapp -C "/dist/litestream databases"
 # restore latest backup to /data/petrapp4.sqlite
-fly ssh console --user petrapp -C "/dist/litestream restore -o /data/petrapp4.sqlite /data/petrapp.sqlite3"
+fly ssh console --app $FLY_APP --user petrapp -C "/dist/litestream restore -o /data/petrapp4.sqlite /data/petrapp.sqlite3"
 
 # Edit fly.toml env PETRAPP_SQLITE_URL = "/data/petrapp.sqlite3" before deploying to take new database into use
 vim fly.toml
@@ -74,24 +115,27 @@ fly deploy
 
 #### pprof
 
-Use [pprof](https://pkg.go.dev/net/http/pprof) for perfomance investigation.
-
-Proxy the pprof server to your local machine.
+Use [pprof](https://pkg.go.dev/net/http/pprof) for performance investigation. The `make` targets handle waking the
+machine, spawning the proxy as a background process, and tearing it down when the capture finishes:
 
 ```sh
-fly proxy 6060:6060
+make fly-pprof-cpu             # 30-second CPU profile → pprof/cpu-<app>-<timestamp>.pb.gz
+make fly-pprof-goroutine       # goroutine snapshot → pprof/goroutine-<app>-<timestamp>.pb.gz
 ```
 
-Capture a CPU profile of the running app.
+Inspect the resulting files:
 
 ```sh
+go tool pprof --http=: pprof/cpu-petra-*.pb.gz
+go tool pprof -top   pprof/goroutine-petra-*.pb.gz
+```
+
+If you'd rather drive the proxy yourself (e.g., to capture an unusual profile type):
+
+```sh
+make fly-wake                  # ensure the machine is running
+fly proxy --app $FLY_APP 6060:6060 &
 go tool pprof --http=: "http://localhost:6060/debug/pprof/profile?seconds=30"
-```
-
-Capture a goroutine stack traces.
-
-```sh
-go tool pprof -top "http://localhost:6060/debug/pprof/goroutine"
 ```
 
 #### Flight Controller for automatic trace capture
