@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -15,14 +16,16 @@ import (
 // exerciseGenerator generates exercises using OpenAI API.
 type exerciseGenerator struct {
 	client       openai.Client
+	logger       *slog.Logger
 	muscleGroups []string
 }
 
 // newExerciseGenerator creates a new exercise generator.
-func newExerciseGenerator(openaiAPIKey string, muscleGroups []string) *exerciseGenerator {
+func newExerciseGenerator(openaiAPIKey string, muscleGroups []string, logger *slog.Logger) *exerciseGenerator {
 	client := openai.NewClient(option.WithAPIKey(openaiAPIKey))
 	return &exerciseGenerator{
 		client:       client,
+		logger:       logger,
 		muscleGroups: muscleGroups,
 	}
 }
@@ -40,9 +43,8 @@ func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (Exercis
 	}
 
 	// Pass 2: Enhance with real URLs from web search (non-blocking failure)
-	if err := eg.enhanceWithWebSearch(ctx, &exercise); err != nil {
-		// Log error but don't fail - placeholders are acceptable
-		// In production, you'd log this: logger.Warnf("failed to enhance exercise with web search: %v", err)
+	if err = eg.enhanceWithWebSearch(ctx, &exercise); err != nil {
+		eg.logger.LogAttrs(ctx, slog.LevelWarn, "failed to enhance exercise with web search", slog.Any("error", err))
 	}
 
 	return exercise, nil
@@ -102,7 +104,7 @@ Return only the valid JSON object with no additional text or explanation.`,
 
 	// Query the OpenAI API with strict JSON mode
 	chat, err := eg.client.Chat.Completions.New(ctx,
-		openai.ChatCompletionNewParams{ //nolint:exhaustruct // only need to set a few fields.
+		openai.ChatCompletionNewParams{
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage(prompt),
 			},
@@ -216,19 +218,17 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 	inResourcesSection := false
 
 	for _, line := range lines {
-		if strings.HasPrefix(line, "## Resources") {
+		switch {
+		case strings.HasPrefix(line, "## Resources"):
 			inResourcesSection = true
 			result = append(result, line)
-			// Add real resources
 			for _, res := range resources {
 				result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
 			}
-		} else if inResourcesSection && strings.HasPrefix(line, "##") {
-			// End of resources section
+		case inResourcesSection && strings.HasPrefix(line, "##"):
 			inResourcesSection = false
 			result = append(result, line)
-		} else if !inResourcesSection {
-			// Keep non-resource lines
+		case !inResourcesSection:
 			if !strings.HasPrefix(line, "- [") || !inResourcesSection {
 				result = append(result, line)
 			}
