@@ -67,5 +67,5 @@ func (app *application) logout(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.redirectAfterPOST(w, r, "/", "")
+	redirect(w, r, "/")
 }

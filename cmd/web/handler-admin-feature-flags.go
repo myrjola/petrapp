@@ -60,5 +60,5 @@ func (app *application) adminFeatureFlagTogglePOST(w http.ResponseWriter, r *htt
 		slog.Bool("enabled", flag.Enabled))
 
 	// Redirect back to feature flags list
-	app.redirectAfterPOST(w, r, "/admin/feature-flags", "")
+	redirect(w, r, "/admin/feature-flags")
 }

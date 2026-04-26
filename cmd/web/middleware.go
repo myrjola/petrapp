@@ -178,7 +178,7 @@ func (app *application) mustAuthenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isAuthenticated := contexthelpers.IsAuthenticated(r.Context())
 		if !isAuthenticated {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			redirect(w, r, "/")
 			return
 		}
 		next.ServeHTTP(w, r)

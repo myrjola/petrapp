@@ -92,21 +92,16 @@ type workoutAction struct {
 }
 
 // determineWorkoutStatus determines the workout status based on session data and schedule.
-// Sets completed on a day other than the scheduled date still count toward progress, so session-level
-// StartedAt/CompletedAt are not the sole source of truth.
-func determineWorkoutStatus(session workout.Session, isScheduled bool, completedSets, totalSets int) string {
-	allSetsCompleted := totalSets > 0 && completedSets == totalSets
-	hasStarted := !session.StartedAt.IsZero() || completedSets > 0
-
+func determineWorkoutStatus(session workout.Session, isScheduled bool) string {
 	switch {
-	case !session.CompletedAt.IsZero() || allSetsCompleted:
-		return statusCompleted
-	case hasStarted:
-		return statusInProgress
-	case !isScheduled:
+	case !isScheduled && session.StartedAt.IsZero():
 		return statusUnscheduled
-	default:
+	case session.StartedAt.IsZero():
 		return statusNotStarted
+	case session.CompletedAt.IsZero():
+		return statusInProgress
+	default:
+		return statusCompleted
 	}
 }
 
@@ -221,8 +216,8 @@ func toDays(sessions []workout.Session, preferences workout.Preferences) []dayVi
 		isToday := date.Format("2006-01-02") == today.Format("2006-01-02")
 		isPast := date.Before(today)
 
+		workoutStatus := determineWorkoutStatus(session, isScheduled)
 		completedSets, totalSets, progressPercent := calculateProgress(session)
-		workoutStatus := determineWorkoutStatus(session, isScheduled, completedSets, totalSets)
 		difficultyStars := prepareDifficultyStars(session.DifficultyRating)
 		status, statusLabel := calculateDisplayStatus(workoutStatus, isToday, isPast)
 		action := calculateWorkoutAction(status, isToday)
@@ -263,7 +258,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if preferences.IsEmpty() {
-			http.Redirect(w, r, "/schedule", http.StatusSeeOther)
+			redirect(w, r, "/schedule")
 			return
 		}
 
