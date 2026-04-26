@@ -98,7 +98,7 @@
             <span>Back</span>
         </a>
         <h1 class="exercise-title"
-            data-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+            data-workout-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
         <div class="header-actions">
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/info"
                class="action-button info-button" aria-label="View exercise information">Info</a>

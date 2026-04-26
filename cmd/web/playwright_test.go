@@ -185,7 +185,7 @@ func Test_playwright_smoketest(t *testing.T) {
 
 	// Step 4: Open the first exercise. The workout page renders each exercise as a link with
 	// the exercise name as its accessible text; we pick the first one via its data attribute.
-	firstExercise := page.Locator("a[data-exercise-id]").First()
+	firstExercise := page.Locator("a[data-workout-exercise-id]").First()
 	exerciseName, err := firstExercise.InnerText()
 	if err != nil {
 		t.Fatalf("read first exercise name: %v", err)
