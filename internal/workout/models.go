@@ -51,6 +51,12 @@ type Exercise struct {
 	SecondaryMuscleGroups []string     `json:"secondary_muscle_groups"`
 }
 
+// Resource represents a learning resource for an exercise.
+type Resource struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
 type exerciseJSONSchema struct {
 	muscleGroups []string
 }

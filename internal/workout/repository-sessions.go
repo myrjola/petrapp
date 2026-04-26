@@ -456,6 +456,49 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	return result, nil
 }
 
+// GetLatestStartingWeightBefore returns the weight of the first completed set
+// from the most recent session strictly before beforeDate, along with that
+// session's periodization type. Returns a zero-value struct when no completed
+// history exists.
+func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+) (LatestStartingSet, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	beforeDateStr := formatDate(beforeDate)
+
+	var (
+		weightKg   float64
+		periodType string
+	)
+	err := r.db.ReadOnly.QueryRowContext(ctx, `
+		SELECT es.weight_kg, ws.periodization_type
+		FROM exercise_sets es
+		JOIN workout_sessions ws
+		  ON ws.user_id = es.workout_user_id
+		 AND ws.workout_date = es.workout_date
+		WHERE es.workout_user_id = ?
+		  AND es.exercise_id = ?
+		  AND es.workout_date < ?
+		  AND es.completed_reps IS NOT NULL
+		  AND es.weight_kg IS NOT NULL
+		ORDER BY es.workout_date DESC, es.set_number ASC
+		LIMIT 1`,
+		userID, exerciseID, beforeDateStr).Scan(&weightKg, &periodType)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return LatestStartingSet{WeightKg: 0, PeriodizationType: ""}, nil
+		}
+		return LatestStartingSet{WeightKg: 0, PeriodizationType: ""}, fmt.Errorf("query latest starting weight: %w", err)
+	}
+
+	return LatestStartingSet{
+		WeightKg:          weightKg,
+		PeriodizationType: PeriodizationType(periodType),
+	}, nil
+}
+
 // scanExerciseSetWithDate scans one row from the ListSetsForExerciseSince query.
 func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 	rows *sql.Rows,

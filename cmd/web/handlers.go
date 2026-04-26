@@ -51,12 +51,17 @@ func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncM
 // pageTemplate returns a template for the given page name.
 //
 // pageName corresponds to directory inside ui/templates/pages folder. It has to include a template named "page".
+// Shared component templates from ui/templates/components are also parsed and available to every page.
 func (app *application) pageTemplate(pageName string) (*template.Template, error) {
 	var err error
 	// We need to initialize the FuncMap before parsing the files. These will be overridden in the render function.
 	var t *template.Template
 	t = template.New(pageName).Funcs(app.baseTemplateFuncs())
-	if t, err = t.ParseFS(app.templateFS, "base.gohtml", fmt.Sprintf("pages/%s/*.gohtml", pageName)); err != nil {
+	if t, err = t.ParseFS(app.templateFS,
+		"base.gohtml",
+		"components/*.gohtml",
+		fmt.Sprintf("pages/%s/*.gohtml", pageName),
+	); err != nil {
 		return nil, fmt.Errorf("new template: %w", err)
 	}
 	return t, nil
