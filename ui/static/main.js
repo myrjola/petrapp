@@ -13,23 +13,33 @@ const sameUrl = (a, b) =>
 const invalidateKey = (url) =>
   'stacknav:invalidate:' + url.pathname + url.search
 
-if ('navigation' in window) {
-  navigation.addEventListener('navigate', (e) => {
-    if (!e.formData) return
-    if (!e.canIntercept || e.hashChange || e.downloadRequest) return
-    if (new URL(e.destination.url).origin !== location.origin) return
-    for (const [, v] of e.formData) {
-      if (v instanceof File) return
-    }
-    e.intercept({ handler: () => submitForm(e) })
-  })
-}
+// Intercept form submits via the submit event (not navigate+intercept) so that
+// we can call replaceTo() without the outer navigate event committing a push
+// entry first.  Using navigate+intercept causes a spurious push commit before
+// the handler's replaceTo fires, resulting in duplicate history entries.
+document.addEventListener('submit', (e) => {
+  const form = e.target
+  if (!(form instanceof HTMLFormElement)) return
+  if (!('navigation' in window)) return
+  if (form.method.toLowerCase() !== 'post') return
+  const formData = new FormData(form)
+  for (const [, v] of formData) {
+    if (v instanceof File) return // multipart not supported by shim
+  }
+  const action = new URL(form.action)
+  if (action.origin !== location.origin) return
+  e.preventDefault()
+  submitFormElement(form, action, new URLSearchParams(formData))
+})
 
-async function submitForm(e) {
-  const body = new URLSearchParams(e.formData)
+async function submitFormElement(form, action, body) {
+  form.classList.add('submitting')
+  const submitButton = form.querySelector('button[type=submit]')
+  if (submitButton) submitButton.disabled = true
+
   let res
   try {
-    res = await fetch(e.destination.url, {
+    res = await fetch(action.href, {
       method: 'POST',
       body,
       headers: {
@@ -45,12 +55,12 @@ async function submitForm(e) {
 
   if (res.status === 200) {
     const target = res.headers.get('X-Location')
-    const action = res.headers.get('X-History-Action')
+    const histAction = res.headers.get('X-History-Action')
     if (!target) {
       location.reload()
       return
     }
-    if (action === 'pop-or-replace') popOrReplaceTo(target)
+    if (histAction === 'pop-or-replace') popOrReplaceTo(target)
     else replaceTo(target)
     return
   }
@@ -65,7 +75,18 @@ async function submitForm(e) {
 }
 
 function replaceTo(target) {
-  navigation.navigate(target, { history: 'replace' })
+  // For same-document URL updates, navigation.navigate() with history:'replace'
+  // can cause competing navigations in Chrome. Use location.replace() to trigger
+  // a clean navigation that properly completes before subsequent history traversals.
+  const targetUrl = new URL(target, location.origin)
+  if (sameUrl(targetUrl, new URL(location.href))) {
+    // Same URL: use location.reload() to refresh without pushing to history.
+    // history.replaceState ensures the entry stays as-is before reload.
+    history.replaceState(history.state, '', target)
+    location.reload()
+  } else {
+    navigation.navigate(target, { history: 'replace' })
+  }
 }
 
 function popOrReplaceTo(target) {
@@ -81,21 +102,6 @@ function popOrReplaceTo(target) {
   replaceTo(target)
 }
 
-window.addEventListener('pagereveal', (e) => {
-  if (!e.viewTransition) return
-  if (!('navigation' in window)) return
-  const act = navigation.activation
-  if (!act) return
-  if (act.navigationType === 'replace' || act.navigationType === 'reload') {
-    e.viewTransition.skipTransition()
-    return
-  }
-  let dir = 'forward'
-  if (act.navigationType === 'traverse' && act.from && act.entry) {
-    dir = act.entry.index < act.from.index ? 'backward' : 'forward'
-  }
-  e.viewTransition.types.add(dir)
-})
 
 document.addEventListener('click', (e) => {
   if (!('navigation' in window)) return
@@ -110,15 +116,6 @@ document.addEventListener('click', (e) => {
       return
     }
   }
-})
-
-// Form submission UI state.
-document.addEventListener('submit', (e) => {
-  const form = e.target
-  if (!(form instanceof HTMLFormElement)) return
-  form.classList.add('submitting')
-  const submitButton = form.querySelector('button[type=submit]')
-  if (submitButton) submitButton.disabled = true
 })
 
 // Reset submit state and process bfcache invalidation marker on pageshow.

@@ -360,6 +360,7 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Redirect to the workout page
-	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")), "")
+	// Redirect to the workout page; pop-or-replace traverses back to the existing
+	// workout history entry so the add-exercise page is removed from the back stack.
+	app.redirectAfterPOST(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")), "pop-or-replace")
 }

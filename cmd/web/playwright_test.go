@@ -190,7 +190,6 @@ func Test_playwright_stacknav(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow playwright stacknav test")
 	}
-	t.Skip("not yet implemented; see plan tasks 2-5")
 
 	// Boilerplate copied from Test_playwright_smoketest.
 	if err := playwright.Install(&playwright.RunOptions{
@@ -290,7 +289,11 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Errorf("Flow 5: URL after validation error = %q, want %q", got, want)
 	}
 
-	// === Flow 3 setup: fill all weekdays so today has a workout. ===
+	// === Flow 3 setup: fill all weekdays, then submit to get to /. ===
+	// Because the server has no preferences yet, navigating to / redirects to
+	// /schedule — meaning / never lands in the navigation stack.  To get / into
+	// history we first submit the schedule once (landing at /) and then revisit
+	// /schedule directly.  The second submit is the actual Flow 3 exercise.
 	for _, day := range []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"} {
 		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
 			Labels: &[]string{"1 hour"},
@@ -298,20 +301,26 @@ func Test_playwright_stacknav(t *testing.T) {
 			t.Fatalf("select %s duration: %v", day, err)
 		}
 	}
-
-	// Confirm /schedule was preceded by / in history. The home handler does a
-	// server-side 302→/schedule when prefs are empty, but a fresh tab still has /
-	// as the navigation entry that triggered it. We make this explicit with a
-	// Goto("/").
-	if _, err = page.Goto(serverURL + "/"); err != nil {
-		t.Fatalf("goto home before schedule submit: %v", err)
+	// First submit: prefs saved, server responds with pop-or-replace → /.
+	// No / in history yet, so popOrReplaceTo falls back to replaceTo(/).
+	// History after: [..., /]  (the /schedule entry is replaced).
+	if err = startTrackingBtn.Click(); err != nil {
+		t.Fatalf("first schedule submit: %v", err)
 	}
-	// Server redirects again to /schedule because prefs still empty (we have not
-	// submitted yet). History: [HOME, SCHEDULE]. (302 redirects do not push,
-	// but the initial / entry is preserved.)
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect / after first schedule submit: %v", err)
+	}
+	// Navigate to /schedule directly — now history is [..., /, /schedule].
+	if _, err = page.Goto(serverURL + "/schedule"); err != nil {
+		t.Fatalf("goto /schedule for flow 3 setup: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
+		t.Fatalf("wait for /schedule: %v", err)
+	}
 
 	// === Flow 3: pop-or-replace (schedule submit) ===
-	// Re-fill the form because navigation reloaded it.
+	// Re-fill the form, then submit. Now / IS in history so popOrReplaceTo
+	// traverses to it instead of pushing — /schedule is removed from history.
 	for _, day := range []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"} {
 		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
 			Labels: &[]string{"1 hour"},
@@ -320,19 +329,20 @@ func Test_playwright_stacknav(t *testing.T) {
 		}
 	}
 	if err = startTrackingBtn.Click(); err != nil {
-		t.Fatalf("submit valid schedule: %v", err)
+		t.Fatalf("submit valid schedule (flow 3): %v", err)
 	}
 	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect / after valid schedule submit: %v", err)
+		t.Fatalf("expect / after flow 3 schedule submit: %v", err)
 	}
-	// Verify pop-or-replace traversed (rather than pushed): going back should not
-	// land on /schedule.
-	if _, err = page.GoBack(); err != nil {
-		// GoBack returns nil response if there's nothing to go back to. That's fine.
-		t.Logf("GoBack returned: %v (acceptable if no prior entry)", err)
+	// Verify pop-or-replace traversed (rather than pushed): /schedule must be
+	// in the FORWARD stack (not backward), which we prove by GoForward returning
+	// to /schedule.  A push-based implementation would instead have /schedule in
+	// the backward stack and GoForward would go somewhere else.
+	if _, err = page.GoForward(); err != nil {
+		t.Fatalf("Flow 3: GoForward after schedule submit: %v", err)
 	}
-	if got := page.URL(); got == serverURL+"/schedule" {
-		t.Errorf("Flow 3: back from / landed on /schedule, expected anywhere else")
+	if got, want := page.URL(), serverURL+"/schedule"; got != want {
+		t.Errorf("Flow 3: forward from / = %q, want %q (traversed /schedule must be in forward stack)", got, want)
 	}
 
 	// Return to / for the remaining flows.
@@ -340,32 +350,45 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Fatalf("goto home: %v", err)
 	}
 
-	// === Flow 1, 2, 4 require navigating into a workout day. The home page
-	// links to today's workout. Click it. ===
-	todayLink := page.Locator("a[href^='/workouts/']").First()
-	if err = todayLink.WaitFor(); err != nil {
-		t.Fatalf("wait for workout link on home: %v", err)
+	// === Flow 1, 2, 4 require navigating into a workout day. Today's workout
+	// has not been started yet, so the home page shows a "Start Workout" form
+	// button (not a plain link). Click it — the navigation API intercepts the
+	// POST and calls replaceTo(/workouts/{date}), landing us on the workout page.
+	startWorkoutBtn := page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Start Workout"})
+	if err = startWorkoutBtn.WaitFor(); err != nil {
+		t.Fatalf("wait for Start Workout button on home: %v", err)
 	}
-	workoutHref, err := todayLink.GetAttribute("href")
-	if err != nil {
-		t.Fatalf("get workout href: %v", err)
+	if err = startWorkoutBtn.Click(); err != nil {
+		t.Fatalf("click Start Workout: %v", err)
 	}
-	if err = todayLink.Click(); err != nil {
-		t.Fatalf("click workout link: %v", err)
+	// Wait for the final workout page URL (/workouts/YYYY-MM-DD, not /start).
+	// The navigate API commits the form's destination URL (/start) first, then
+	// replaceTo() fires and the URL settles at the workout overview page.
+	if err = page.WaitForURL(func(u string) bool {
+		return strings.Contains(u, "/workouts/") &&
+			!strings.Contains(u, "/start") &&
+			!strings.Contains(u, "/exercises/")
+	}); err != nil {
+		t.Fatalf("wait for workout URL after Start Workout: %v", err)
 	}
-	if err = page.WaitForURL(fmt.Sprintf("%s%s", serverURL, workoutHref)); err != nil {
-		t.Fatalf("expect %s: %v", workoutHref, err)
-	}
+	// Record the workout URL for later assertions.
+	workoutURL := page.URL()
+	workoutHref := strings.TrimPrefix(workoutURL, serverURL)
 
-	// Click "Start" to advance the workout state and reveal exercise links.
-	startBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start"})
-	if err = startBtn.Click(); err != nil {
-		t.Logf("Start button: %v (workout may already be in progress)", err)
+	// The weekly planner exhausts its exercise pool after a few days when
+	// scheduling all 7 days (weekUsedExercises prevents reuse). So later in the
+	// week (Saturday) may end up with 0 exercises. Add one manually if needed.
+	if noExercises, _ := page.Locator("a[href*='/exercises/']").Count(); noExercises == 0 {
+		addExerciseToWorkout(t, page, workoutURL)
 	}
 
 	// Click first exercise link to land on DETAIL.
 	exerciseLink := page.Locator("a[href*='/exercises/']").First()
 	if err = exerciseLink.WaitFor(); err != nil {
+		if content, contentErr := page.Content(); contentErr == nil {
+			t.Logf("workout page content on timeout:\n%s", content)
+		}
 		t.Fatalf("wait for exercise link: %v", err)
 	}
 	exerciseHref, err := exerciseLink.GetAttribute("href")
@@ -381,28 +404,48 @@ func Test_playwright_stacknav(t *testing.T) {
 	detailURL := page.URL()
 
 	// === Flow 1: same-URL replace (set update) ===
-	// Find the set form, fill it, submit. The exact form fields depend on the
-	// exercise type. For weighted exercises: weight + reps + signal. For others:
-	// reps. Look for a submit button labeled "Done" or similar.
-	//
-	// NOTE: This section may need adjustment based on actual page structure.
-	// Run with PWDEBUG=1 to inspect.
-	if err = page.GetByLabel("Reps").First().Fill("10"); err != nil {
-		t.Logf("fill reps: %v (may be weighted exercise — try weight+reps)", err)
-		if err = page.GetByLabel("Weight").First().Fill("50"); err != nil {
-			t.Fatalf("fill weight: %v", err)
-		}
-		if err = page.GetByLabel("Reps").First().Fill("10"); err != nil {
-			t.Fatalf("fill reps after weight: %v", err)
-		}
+	// All test exercises are weighted. The page shows a warmup banner first —
+	// complete it before the set form appears. Warmup uses replaceTo(same-URL),
+	// so history does not grow.
+	warmupBtn := page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Mark Warmup Complete"})
+	if err = warmupBtn.WaitFor(); err != nil {
+		t.Fatalf("wait for warmup button: %v", err)
 	}
-	doneBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Done"})
-	if err = doneBtn.Click(); err != nil {
-		t.Fatalf("click Done: %v", err)
+	if err = warmupBtn.Click(); err != nil {
+		t.Fatalf("click warmup button: %v", err)
 	}
-	// After replace, URL is still DETAIL.
-	if err = page.WaitForURL(detailURL); err != nil {
-		t.Fatalf("Flow 1: expected URL %s after set update: %v", detailURL, err)
+	// Wait for the reload triggered by replaceTo(same-URL) to fully settle.
+	if err = page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateLoad}); err != nil {
+		t.Fatalf("expect load after warmup complete: %v", err)
+	}
+
+	// Submit the first set via the "No" (too-heavy) signal path: select the
+	// radio, fill actual reps, then click Submit.  The "Barely" / "Could do
+	// more" labels auto-submit via form.submit() which may not carry formData
+	// to the navigation API, so we use the explicit submit-button path instead.
+	if err = page.Locator("label.too-heavy-btn").First().Click(); err != nil {
+		t.Fatalf("click No (too-heavy) signal: %v", err)
+	}
+	// The reps-section is now visible via CSS :has selector.
+	if err = page.GetByLabel("Actual reps").First().Fill("8"); err != nil {
+		t.Fatalf("fill actual reps: %v", err)
+	}
+	submitBtn := page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Submit"}).First()
+	if err = submitBtn.Click(); err != nil {
+		t.Fatalf("click Submit set button: %v", err)
+	}
+	// After the set update, replaceTo(same-URL) fires history.replaceState +
+	// location.reload().  Wait for the reload-triggered page navigation to fully
+	// commit by checking that the first set now shows as completed.  This is more
+	// reliable than WaitForURL (URL unchanged) or WaitForLoadState (already-load
+	// resolves immediately).
+	if err = page.Locator(".exercise-set.completed").First().WaitFor(); err != nil {
+		t.Fatalf("Flow 1: expected first set completed after set update: %v", err)
+	}
+	if got, want := page.URL(), detailURL; got != want {
+		t.Errorf("Flow 1: URL after set update = %q, want %q", got, want)
 	}
 	// Back should go to workout overview, NOT the same DETAIL.
 	if _, err = page.GoBack(); err != nil {
@@ -426,9 +469,10 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Fatalf("click swap link: %v", err)
 	}
 	swapURL := page.URL()
-	// Pick a different exercise on the swap page. The form has a hidden new_exercise_id
-	// or a submit button per option.
-	swapBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Swap"}).First()
+	// Pick a different exercise on the swap page. Each alternative exercise has
+	// a "Swap to this exercise" submit button.
+	swapBtn := page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Swap to this exercise"}).First()
 	if err = swapBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for swap button: %v", err)
 	}
@@ -451,16 +495,16 @@ func Test_playwright_stacknav(t *testing.T) {
 	}
 
 	// === Flow 4: hierarchical back-link via data-back-button ===
-	// Re-navigate forward to set up [WORKOUT, DETAIL, SWAP] state.
-	if _, err = page.Goto(detailURL); err != nil {
-		t.Fatalf("goto detailURL: %v", err)
+	// After Flow 2, the original exercise (detailURL) was swapped out — it is
+	// no longer part of the workout. Use newDetailURL (the swapped-in exercise)
+	// to set up [WORKOUT, newDETAIL, newSWAP] history state.
+	if _, err = page.Goto(newDetailURL); err != nil {
+		t.Fatalf("goto newDetailURL for flow 4: %v", err)
 	}
 	if err = page.Locator("a[href$='/swap']").First().Click(); err != nil {
-		t.Fatalf("click swap from detail: %v", err)
+		t.Fatalf("click swap from new detail: %v", err)
 	}
-	if err = page.WaitForURL(swapURL); err != nil {
-		t.Logf("swap URL changed (acceptable): %v", err)
-	}
+	flow4SwapURL := page.URL()
 	backLink := page.Locator("a[data-back-button]")
 	if err = backLink.WaitFor(); err != nil {
 		t.Fatalf("wait for data-back-button: %v", err)
@@ -468,15 +512,41 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = backLink.Click(); err != nil {
 		t.Fatalf("click data-back-button: %v", err)
 	}
-	// Should traverse to existing DETAIL entry rather than push.
-	if err = page.WaitForURL(detailURL); err != nil {
-		t.Fatalf("Flow 4: expected DETAIL URL after data-back-button: %v", err)
+	// Should traverse to existing newDETAIL entry rather than push.
+	if err = page.WaitForURL(newDetailURL); err != nil {
+		t.Fatalf("Flow 4: expected newDetailURL %s after data-back-button: %v", newDetailURL, err)
 	}
 	// Forward should go to SWAP (proves it was a traverse, not a push).
 	if _, err = page.GoForward(); err != nil {
 		t.Fatalf("Flow 4 forward: %v", err)
 	}
-	if got, want := page.URL(), swapURL; got != want {
+	if got, want := page.URL(), flow4SwapURL; got != want {
 		t.Errorf("Flow 4: forward URL = %q, want %q (traverse should preserve forward stack)", got, want)
+	}
+}
+
+// addExerciseToWorkout navigates from the workout page to the add-exercise page,
+// adds the first available exercise, and waits to return to workoutURL.
+// Used when the weekly planner exhausts its exercise pool and creates an empty workout.
+func addExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string) {
+	t.Helper()
+	var err error
+	if err = page.Locator("a.add-exercise-button").Click(); err != nil {
+		t.Fatalf("click Add Exercise link: %v", err)
+	}
+	if err = page.WaitForURL(func(u string) bool { return strings.Contains(u, "/add-exercise") }); err != nil {
+		t.Fatalf("wait for add-exercise page: %v", err)
+	}
+	addBtn := page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Add this exercise"}).First()
+	if err = addBtn.WaitFor(); err != nil {
+		t.Fatalf("wait for Add this exercise button: %v", err)
+	}
+	if err = addBtn.Click(); err != nil {
+		t.Fatalf("click Add this exercise: %v", err)
+	}
+	// The POST replaces the add-exercise entry back to workoutURL.
+	if err = page.WaitForURL(workoutURL); err != nil {
+		t.Fatalf("wait to return to workout page after add: %v", err)
 	}
 }
