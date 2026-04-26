@@ -4,7 +4,7 @@ A fitness tracking web application built with Go, SQLite, and server-side render
 
 ## Development Workflow
 
-When implementing features, follow this architectural flow:
+When a feature spans multiple layers, work outwards from the data model:
 
 1. **Database First** - Start with schema changes in `internal/sqlite/` (
    see [Database Guidelines](internal/sqlite/CLAUDE.md))
@@ -12,6 +12,13 @@ When implementing features, follow this architectural flow:
    see [Domain Guidelines](internal/workout/CLAUDE.md))
 3. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
 4. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
+
+If a change is scoped to one or two layers (e.g. a UI-only tweak or a handler-only bug fix), start at the lowest relevant layer — you don't have to touch the ones above.
+
+## Runtime Layout
+
+- Templates (`ui/templates/`) and static assets (`ui/static/`) are loaded from the filesystem at runtime (`os.DirFS`, not `//go:embed`). Editing a template and refreshing the browser is the whole dev loop — no rebuild needed.
+- In the Docker image, `main.css` and `main.js` are fingerprinted with an md5 hash at build time and `base.gohtml` is rewritten to reference the hashed names (see `Dockerfile`). Other static files (`webauthn.js`, icons) are served under their original names.
 
 ## Build & Run Commands
 

@@ -15,7 +15,7 @@ Guidelines for working with database schema, migrations, and data access pattern
 2. **Update Go models** in both domain (`internal/workout/models.go`) and repository layer
 3. **Update repository SQL queries** (SELECT, INSERT, UPDATE) to include new fields
 4. **Update service layer** conversion functions between domain and repository types
-5. **Test with `make test` to ensure migrations and queries work correctly
+5. **Test with `make test`** to ensure migrations and queries work correctly
 6. **Add test fixtures** in `fixtures.sql` if needed for new data that needs to be seeded
 
 ## Table Design Patterns
@@ -63,9 +63,14 @@ END;
 
 ### Foreign Key Patterns
 
+Match the FK column type to the referenced primary key. In this schema `users.id` is `INTEGER` and `credentials.id` is `BLOB` (WebAuthn credential ID), so pick accordingly:
+
 ```sql
--- Standard foreign key with cascade
-user_id BLOB NOT NULL REFERENCES users (id) ON DELETE CASCADE
+-- Standard foreign key with cascade (users.id is INTEGER)
+user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE
+
+-- BLOB foreign key when referencing credentials.id
+credential_id BLOB NOT NULL REFERENCES credentials (id) ON DELETE CASCADE
 
 -- Deferred foreign key (for complex relationships)
 FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED

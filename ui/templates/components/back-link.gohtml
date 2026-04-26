@@ -1,0 +1,41 @@
+{{- /*
+    back-link: anchor styled as a back button, wired into the Navigation API
+    smart-back-button behaviour via the data-back-button attribute.
+
+    Pass the href string as the dot.
+
+    Usage:
+        {{ template "back-link" "/" }}
+        {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
+*/ -}}
+{{- define "back-link" -}}
+    <style {{ nonce }}>
+        @scope (.back-link) {
+            :scope {
+                display: inline-flex;
+                align-items: center;
+                gap: var(--size-1);
+                padding: var(--size-2) var(--size-3);
+                border-radius: var(--radius-2);
+                color: var(--color-text-secondary);
+                text-decoration: none;
+                font-weight: var(--font-weight-5);
+                transition: background-color 0.2s ease, color 0.2s ease;
+
+                &:hover {
+                    background: var(--gray-1);
+                    color: var(--color-text-primary);
+                }
+
+                &:focus-visible {
+                    outline: var(--color-border-focus) solid 2px;
+                    outline-offset: 2px;
+                }
+            }
+        }
+    </style>
+    <a href="{{ . }}" data-back-button class="back-link">
+        <span aria-hidden="true">←</span>
+        <span>Back</span>
+    </a>
+{{- end }}
