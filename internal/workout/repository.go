@@ -12,10 +12,11 @@ import (
 
 // repository contains the repositories for the domain-driven design aggregates.
 type repository struct {
-	prefs        preferencesRepository
-	sessions     sessionRepository
-	exercises    exerciseRepository
-	featureFlags featureFlagRepository
+	prefs         preferencesRepository
+	sessions      sessionRepository
+	exercises     exerciseRepository
+	featureFlags  featureFlagRepository
+	muscleTargets muscleGroupTargetRepository
 }
 
 // preferencesRepository handles workout preferences.
@@ -47,6 +48,14 @@ type datedExerciseSetAggregate struct {
 	exerciseSetAggregate
 }
 
+// LatestStartingSet captures the weight of the most recent completed first set
+// for an exercise along with the periodization type of the session it came from.
+// PeriodizationType is empty when no history exists.
+type LatestStartingSet struct {
+	WeightKg          float64
+	PeriodizationType PeriodizationType
+}
+
 // sessionRepository handles workout sessions.
 type sessionRepository interface {
 	List(ctx context.Context, sinceDate time.Time) ([]sessionAggregate, error)
@@ -58,8 +67,15 @@ type sessionRepository interface {
 	Update(ctx context.Context, date time.Time, updateFn func(sess *sessionAggregate) (bool, error)) error
 	// ListSetsForExerciseSince retrieves all sets for a given exercise since a date, one aggregate per session.
 	ListSetsForExerciseSince(ctx context.Context, exerciseID int, sinceDate time.Time) ([]datedExerciseSetAggregate, error)
+	// GetLatestStartingWeightBefore returns the weight of the first completed set
+	// from the most recent session strictly before beforeDate, along with that
+	// session's periodization type. Returns a zero-value struct when no completed
+	// history exists.
+	GetLatestStartingWeightBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (LatestStartingSet, error)
 	// CountCompleted returns the count of sessions with completed_at IS NOT NULL.
 	CountCompleted(ctx context.Context) (int, error)
+	// CreateBatch creates multiple sessions atomically in a single transaction.
+	CreateBatch(ctx context.Context, sessions []sessionAggregate) error
 }
 
 // exerciseRepository handles exercises and sets.
@@ -80,6 +96,11 @@ type featureFlagRepository interface {
 	Get(ctx context.Context, name string) (FeatureFlag, error)
 	Set(ctx context.Context, flag FeatureFlag) error
 	List(ctx context.Context) ([]FeatureFlag, error)
+}
+
+// muscleGroupTargetRepository handles muscle group weekly volume targets.
+type muscleGroupTargetRepository interface {
+	List(ctx context.Context) ([]MuscleGroupTarget, error)
 }
 
 // baseRepository contains common functionality for all repositories.
@@ -144,13 +165,15 @@ func (f *repositoryFactory) newRepository() *repository {
 	preferencesRepo := newSQLitePreferenceRepository(f.db)
 	sessionRepo := newSQLiteSessionRepository(f.db)
 	featureFlagRepo := newSQLiteFeatureFlagRepository(f.db)
+	muscleTargetRepo := newSQLiteMuscleGroupTargetRepository(f.db)
 
 	// Return a composite repository
 	return &repository{
-		prefs:        preferencesRepo,
-		sessions:     sessionRepo,
-		exercises:    exerciseRepo,
-		featureFlags: featureFlagRepo,
+		prefs:         preferencesRepo,
+		sessions:      sessionRepo,
+		exercises:     exerciseRepo,
+		featureFlags:  featureFlagRepo,
+		muscleTargets: muscleTargetRepo,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/exerciseprogression"
 	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/weekplanner"
 )
 
 // Service handles the business logic for workout management.
@@ -49,91 +50,144 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 	return nil
 }
 
-// GenerateWorkout creates a new workout plan based on user preferences and history.
-func (s *Service) generateWorkout(ctx context.Context, date time.Time) (sessionAggregate, error) {
-	// Get user preferences.
-	prefs, err := s.repo.prefs.Get(ctx)
-	if err != nil {
-		return sessionAggregate{}, fmt.Errorf("get user preferences: %w", err)
-	}
-
-	// Get workout history (past 3 months).
-	threeMonthsAgo := date.AddDate(0, -3, 0)
-	history, err := s.repo.sessions.List(ctx, threeMonthsAgo)
-	if err != nil {
-		return sessionAggregate{}, fmt.Errorf("get workout history: %w", err)
-	}
-
-	// Get exercise pool.
-	exercisePool, err := s.repo.exercises.List(ctx)
-	if err != nil {
-		return sessionAggregate{}, fmt.Errorf("get exercise pool: %w", err)
-	}
-
-	// Initialize workout generator.
-	gen, err := newGenerator(prefs, history, exercisePool)
-	if err != nil {
-		return sessionAggregate{}, fmt.Errorf("initialize workout generator: %w", err)
-	}
-
-	// Generate the workout.
-	session, err := gen.Generate(date)
-	if err != nil {
-		return sessionAggregate{}, fmt.Errorf("generate workout: %w", err)
-	}
-
-	count, err := s.repo.sessions.CountCompleted(ctx)
-	if err != nil {
-		return sessionAggregate{}, fmt.Errorf("count completed sessions: %w", err)
-	}
-	if count%2 == 0 {
-		session.PeriodizationType = PeriodizationStrength
-	} else {
-		session.PeriodizationType = PeriodizationHypertrophy
-	}
-
-	return session, nil
-}
-
-// ResolveWeeklySchedule retrieves the workout schedule for a week.
+// ResolveWeeklySchedule retrieves the workout schedule for the current week.
+// If no sessions exist for the week, it generates all scheduled days at once using
+// the weekly planner and persists them in a single transaction.
 func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) {
-	workouts := make([]Session, 7) //nolint:mnd // 7 days in a week
-
-	// Get the current date.
 	now := time.Now()
-
-	// Calculate the current week's Monday.
 	offset := int(time.Monday - now.Weekday())
 	if offset > 0 {
-		offset = -6 //nolint:mnd // If today is Sunday, adjust the offset to get last Monday.
+		offset = -6 //nolint:mnd // If today is Sunday, adjust to get last Monday.
 	}
-	monday := now.AddDate(0, 0, offset)
+	monday := now.AddDate(0, 0, offset).Truncate(24 * time.Hour) //nolint:mnd // 24 hours in a day.
+	sunday := monday.AddDate(0, 0, 6)                            //nolint:mnd // 6 days after Monday is Sunday.
 
-	// Generate dates from Monday to Sunday
+	// Check for existing sessions this week.
+	existing, err := s.repo.sessions.List(ctx, monday)
+	if err != nil {
+		return nil, fmt.Errorf("list sessions for week: %w", err)
+	}
+	thisWeekCount := 0
+	for _, sess := range existing {
+		if !sess.Date.After(sunday) {
+			thisWeekCount++
+		}
+	}
+
+	if thisWeekCount == 0 {
+		if err = s.generateWeeklyPlan(ctx, monday); err != nil {
+			return nil, fmt.Errorf("generate weekly plan: %w", err)
+		}
+	}
+
+	// Build 7-day schedule: sessions from DB for scheduled days, empty for rest days.
+	workouts := make([]Session, 7) //nolint:mnd // 7 days in a week.
 	for i := range 7 {
 		day := monday.AddDate(0, 0, i)
+		sessionAggr, getErr := s.repo.sessions.Get(ctx, day)
+		if getErr != nil && !errors.Is(getErr, ErrNotFound) {
+			return nil, fmt.Errorf("get session %s: %w", formatDate(day), getErr)
+		}
+		if errors.Is(getErr, ErrNotFound) {
+			workouts[i] = Session{ //nolint:exhaustruct // Rest days have no exercise data.
+				Date: day,
+			}
+			continue
+		}
+		workouts[i], err = s.enrichSessionAggregate(ctx, sessionAggr)
+		if err != nil {
+			return nil, fmt.Errorf("enrich session %s: %w", formatDate(day), err)
+		}
+	}
+	return workouts, nil
+}
 
-		// Try to get existing session first
-		sessionAggr, err := s.repo.sessions.Get(ctx, day)
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			return nil, fmt.Errorf("get session %s: %w", formatDate(day), err)
+// generateWeeklyPlan uses the weekplanner to create all sessions for the week starting
+// on monday and persists them in a single DB transaction.
+func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) error {
+	prefs, err := s.repo.prefs.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+
+	exercises, err := s.repo.exercises.List(ctx)
+	if err != nil {
+		return fmt.Errorf("get exercises: %w", err)
+	}
+
+	targets, err := s.repo.muscleTargets.List(ctx)
+	if err != nil {
+		return fmt.Errorf("get muscle group targets: %w", err)
+	}
+
+	wpPrefs := weekplanner.Preferences{
+		MondayMinutes:    prefs.MondayMinutes,
+		TuesdayMinutes:   prefs.TuesdayMinutes,
+		WednesdayMinutes: prefs.WednesdayMinutes,
+		ThursdayMinutes:  prefs.ThursdayMinutes,
+		FridayMinutes:    prefs.FridayMinutes,
+		SaturdayMinutes:  prefs.SaturdayMinutes,
+		SundayMinutes:    prefs.SundayMinutes,
+	}
+
+	wpExercises := make([]weekplanner.Exercise, len(exercises))
+	for i, ex := range exercises {
+		wpExercises[i] = weekplanner.Exercise{
+			ID:                    ex.ID,
+			Category:              weekplanner.Category(ex.Category),
+			ExerciseType:          weekplanner.ExerciseType(ex.ExerciseType),
+			PrimaryMuscleGroups:   ex.PrimaryMuscleGroups,
+			SecondaryMuscleGroups: ex.SecondaryMuscleGroups,
+		}
+	}
+
+	wpTargets := make([]weekplanner.MuscleGroupTarget, len(targets))
+	for i, t := range targets {
+		wpTargets[i] = weekplanner.MuscleGroupTarget{
+			Name:            t.MuscleGroupName,
+			WeeklySetTarget: t.WeeklySetTarget,
+		}
+	}
+
+	planner := weekplanner.NewWeeklyPlanner(wpPrefs, wpExercises, wpTargets)
+	plannedSessions, err := planner.Plan(monday)
+	if err != nil {
+		return fmt.Errorf("plan week: %w", err)
+	}
+
+	sessionAggrs := make([]sessionAggregate, len(plannedSessions))
+	for i, ps := range plannedSessions {
+		periodType := PeriodizationStrength
+		if ps.PeriodizationType == weekplanner.PeriodizationHypertrophy {
+			periodType = PeriodizationHypertrophy
 		}
 
-		// If no existing session, generate a new one
-		if errors.Is(err, ErrNotFound) {
-			sessionAggr, err = s.generateWorkout(ctx, day)
-			if err != nil {
-				return nil, fmt.Errorf("generate workout %s: %w", formatDate(day), err)
+		exerciseSets := make([]exerciseSetAggregate, len(ps.ExerciseSets))
+		for j, pes := range ps.ExerciseSets {
+			sets := make([]Set, len(pes.Sets))
+			for k, planSet := range pes.Sets {
+				sets[k] = Set{ //nolint:exhaustruct // WeightKg, CompletedReps, CompletedAt, Signal start nil.
+					MinReps: planSet.MinReps,
+					MaxReps: planSet.MaxReps,
+				}
+			}
+			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // WarmupCompletedAt starts nil.
+				ExerciseID: pes.ExerciseID,
+				Sets:       sets,
 			}
 		}
 
-		workouts[i], err = s.enrichSessionAggregate(ctx, sessionAggr)
-		if err != nil {
-			return nil, fmt.Errorf("enrich workout %s: %w", formatDate(day), err)
+		sessionAggrs[i] = sessionAggregate{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+			Date:              ps.Date,
+			PeriodizationType: periodType,
+			ExerciseSets:      exerciseSets,
 		}
 	}
 
-	return workouts, nil
+	if err = s.repo.sessions.CreateBatch(ctx, sessionAggrs); err != nil {
+		return fmt.Errorf("create batch sessions: %w", err)
+	}
+	return nil
 }
 
 // GetSession retrieves a workout session for a specific date.
@@ -174,24 +228,37 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 	return session, nil
 }
 
+// mondayOf returns the Monday of the week containing date, truncated to midnight.
+func mondayOf(date time.Time) time.Time {
+	offset := int(time.Monday - date.Weekday())
+	if offset > 0 {
+		offset = -6 //nolint:mnd // If date is Sunday, step back to the preceding Monday.
+	}
+	return date.AddDate(0, 0, offset).Truncate(24 * time.Hour) //nolint:mnd // 24 hours in a day.
+}
+
 // StartSession starts a new workout session.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
-	// Generate workout if it doesn't exist
-	_, err := s.repo.sessions.Get(ctx, date)
-	if errors.Is(err, ErrNotFound) {
-		var sess sessionAggregate
-		if sess, err = s.generateWorkout(ctx, date); err != nil {
-			return fmt.Errorf("generate workout %s: %w", formatDate(date), err)
-		}
-		if err = s.repo.sessions.Create(ctx, sess); err != nil {
-			return fmt.Errorf("create session %s: %w", formatDate(date), err)
+	// Generate the week's plan if no sessions exist for this week yet.
+	monday := mondayOf(date)
+	existing, listErr := s.repo.sessions.List(ctx, monday)
+	if listErr != nil {
+		return fmt.Errorf("list sessions for week of %s: %w", formatDate(date), listErr)
+	}
+	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
+	weekCount := 0
+	for _, sess := range existing {
+		if !sess.Date.After(sunday) {
+			weekCount++
 		}
 	}
-	if err != nil {
-		return fmt.Errorf("get session %s: %w", formatDate(date), err)
+	if weekCount == 0 {
+		if genErr := s.generateWeeklyPlan(ctx, monday); genErr != nil {
+			return fmt.Errorf("generate weekly plan for %s: %w", formatDate(date), genErr)
+		}
 	}
 
-	if err = s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		if sess.StartedAt.IsZero() {
 			sess.StartedAt = time.Now()
 			return true, nil
@@ -441,21 +508,42 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 	}, nil
 }
 
-// GetStartingWeight returns the weight from the first set of the most recent completed
-// session for the given exercise. Returns 0 if no completed history exists.
-func (s *Service) GetStartingWeight(ctx context.Context, exerciseID int) (float64, error) {
-	since := time.Now().AddDate(0, -3, 0)
-	aggs, err := s.repo.sessions.ListSetsForExerciseSince(ctx, exerciseID, since)
+// GetStartingWeight returns the weight to seed a new session for the given exercise.
+// It pulls the first completed set from the most recent session strictly before
+// beforeDate, then converts the load via Epley 1RM-equivalence when that session's
+// periodization differs from targetType so the relative intensity carries across
+// rep schemes (e.g. 100 kg x5 strength → ~92 kg x8 hypertrophy). Using a cutoff
+// keeps the starting weight stable when earlier sets of beforeDate's session are
+// edited. Returns 0 if no completed history exists.
+func (s *Service) GetStartingWeight(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+	targetType PeriodizationType,
+) (float64, error) {
+	prev, err := s.repo.sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
 	if err != nil {
-		return 0, fmt.Errorf("list sets for exercise: %w", err)
+		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
-	// aggs is ordered DESC by date; first element is most recent session.
-	for _, agg := range aggs {
-		if len(agg.Sets) > 0 && agg.Sets[0].WeightKg != nil && agg.Sets[0].CompletedReps != nil {
-			return *agg.Sets[0].WeightKg, nil
-		}
+	if prev.PeriodizationType == "" || prev.PeriodizationType == targetType {
+		return prev.WeightKg, nil
 	}
-	return 0, nil
+	fromReps := exerciseprogression.TargetReps(periodizationToProgression(prev.PeriodizationType))
+	toReps := exerciseprogression.TargetReps(periodizationToProgression(targetType))
+	return exerciseprogression.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
+}
+
+// periodizationToProgression maps a workout periodization to its exerciseprogression
+// counterpart. Unknown values default to Strength.
+func periodizationToProgression(p PeriodizationType) exerciseprogression.PeriodizationType {
+	switch p {
+	case PeriodizationHypertrophy:
+		return exerciseprogression.Hypertrophy
+	case PeriodizationStrength:
+		return exerciseprogression.Strength
+	default:
+		return exerciseprogression.Strength
+	}
 }
 
 // BuildProgression constructs an exerciseprogression.Progression for the given exercise
@@ -470,18 +558,12 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	startingWeight, err := s.GetStartingWeight(ctx, exerciseID)
+	startingWeight, err := s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
 	if err != nil {
 		return nil, fmt.Errorf("get starting weight: %w", err)
 	}
 
-	var epType exerciseprogression.PeriodizationType
-	switch sess.PeriodizationType {
-	case PeriodizationHypertrophy:
-		epType = exerciseprogression.Hypertrophy
-	case PeriodizationStrength:
-		epType = exerciseprogression.Strength
-	}
+	epType := periodizationToProgression(sess.PeriodizationType)
 
 	config := exerciseprogression.Config{
 		Type:           epType,

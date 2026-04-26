@@ -55,36 +55,17 @@
                         background-color: var(--lime-7);
                     }
                 }
-
-                .secondary-button {
-                    background-color: var(--gray-2);
-                    color: var(--gray-9);
-                    border: none;
-                    border-radius: var(--radius-2);
-                    padding: var(--size-3) var(--size-4);
-                    font-weight: var(--font-weight-5);
-                    cursor: pointer;
-                    text-decoration: none;
-                    display: inline-block;
-                    font-size: var(--font-size-1);
-
-                    &:hover {
-                        background-color: var(--gray-3);
-                    }
-                }
             }
         </style>
 
         <div class="message">
-            <h1>Workout Not Found</h1>
-            <p>There's no workout scheduled for {{ .Date.Format "January 2, 2006" }}. Would you like to create one?</p>
+            <h1>Not in This Week's Plan</h1>
+            <p>{{ .Date.Format "January 2, 2006" }} is not part of your current weekly plan.
+                Your plan is generated each Monday based on your scheduled workout days.</p>
         </div>
 
         <div class="actions">
-            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                <button type="submit" class="primary-button">Create Workout</button>
-            </form>
-            <a href="/" class="secondary-button">Back to Home</a>
+            <a href="/" class="primary-button">Back to Home</a>
         </div>
     </main>
 {{ end }}

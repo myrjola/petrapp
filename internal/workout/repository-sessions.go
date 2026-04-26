@@ -456,6 +456,49 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	return result, nil
 }
 
+// GetLatestStartingWeightBefore returns the weight of the first completed set
+// from the most recent session strictly before beforeDate, along with that
+// session's periodization type. Returns a zero-value struct when no completed
+// history exists.
+func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+) (LatestStartingSet, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	beforeDateStr := formatDate(beforeDate)
+
+	var (
+		weightKg   float64
+		periodType string
+	)
+	err := r.db.ReadOnly.QueryRowContext(ctx, `
+		SELECT es.weight_kg, ws.periodization_type
+		FROM exercise_sets es
+		JOIN workout_sessions ws
+		  ON ws.user_id = es.workout_user_id
+		 AND ws.workout_date = es.workout_date
+		WHERE es.workout_user_id = ?
+		  AND es.exercise_id = ?
+		  AND es.workout_date < ?
+		  AND es.completed_reps IS NOT NULL
+		  AND es.weight_kg IS NOT NULL
+		ORDER BY es.workout_date DESC, es.set_number ASC
+		LIMIT 1`,
+		userID, exerciseID, beforeDateStr).Scan(&weightKg, &periodType)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return LatestStartingSet{WeightKg: 0, PeriodizationType: ""}, nil
+		}
+		return LatestStartingSet{WeightKg: 0, PeriodizationType: ""}, fmt.Errorf("query latest starting weight: %w", err)
+	}
+
+	return LatestStartingSet{
+		WeightKg:          weightKg,
+		PeriodizationType: PeriodizationType(periodType),
+	}, nil
+}
+
 // scanExerciseSetWithDate scans one row from the ListSetsForExerciseSince query.
 func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 	rows *sql.Rows,
@@ -493,6 +536,42 @@ func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, erro
 		return 0, fmt.Errorf("count completed sessions: %w", err)
 	}
 	return count, nil
+}
+
+// CreateBatch creates multiple sessions atomically in a single transaction.
+func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []sessionAggregate) (err error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+
+	for _, sess := range sessions {
+		dateStr := formatDate(sess.Date)
+		if _, execErr := tx.ExecContext(ctx, `
+			INSERT INTO workout_sessions (
+				user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
+			) VALUES (?, ?, ?, ?, ?, ?)`,
+			userID, dateStr, sess.DifficultyRating,
+			formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
+			sess.PeriodizationType); execErr != nil {
+			return fmt.Errorf("insert session %s: %w", dateStr, execErr)
+		}
+		if saveErr := r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); saveErr != nil {
+			return fmt.Errorf("save exercise sets %s: %w", dateStr, saveErr)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit batch sessions: %w", err)
+	}
+	return nil
 }
 
 // saveExerciseSets inserts or updates exercise sets for a session.

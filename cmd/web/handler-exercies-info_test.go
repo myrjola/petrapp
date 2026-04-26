@@ -30,9 +30,9 @@ func Test_application_exerciseInfo(t *testing.T) {
 			t.Fatalf("Failed to register: %v", err)
 		}
 
-		// Set workout preferences
+		// Set workout preferences (enable today's weekday).
 		formData := map[string]string{
-			"Monday": "60",
+			time.Now().Weekday().String(): "60",
 		}
 		if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 			t.Fatalf("Failed to get preferences: %v", err)

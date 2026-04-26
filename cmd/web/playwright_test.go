@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
@@ -128,11 +130,18 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("wait for validation error after empty schedule: %v", err)
 	}
 
-	// Step 2b: Submit a valid schedule — navigator replaces /schedule with / in history.
-	if _, err = page.GetByLabel("Monday").SelectOption(playwright.SelectOptionValues{
-		Labels: &[]string{"1 hour"},
-	}); err != nil {
-		t.Fatalf("select Monday duration: %v", err)
+	// Step 2b: Submit a valid schedule. Schedule both today and the next weekday so that a
+	// midnight crossing between setting preferences and the server's notion of "today" still
+	// leaves today scheduled — covering both sides of the boundary.
+	testStart := time.Now()
+	todayWeekday := testStart.Weekday().String()
+	nextWeekday := testStart.AddDate(0, 0, 1).Weekday().String()
+	for _, day := range []string{todayWeekday, nextWeekday} {
+		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
+			Labels: &[]string{"1 hour"},
+		}); err != nil {
+			t.Fatalf("select %s duration: %v", day, err)
+		}
 	}
 	if err = startTrackingBtn.Click(); err != nil {
 		t.Fatalf("click Start Tracking with valid schedule: %v", err)
@@ -141,7 +150,125 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("expect redirect to / after valid schedule submission: %v", err)
 	}
 
-	// Step 3: Logout.
+	// Step 3: Start today's workout. Extract today's date from the resulting URL rather than
+	// from the test's clock: if midnight crossed between scheduling and now, the server's
+	// authoritative "today" is the one that matters for the rest of the flow.
+	startWorkoutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start Workout"})
+	if err = startWorkoutBtn.Click(); err != nil {
+		t.Fatalf("click Start Workout: %v", err)
+	}
+	workoutURLPattern := regexp.MustCompile(fmt.Sprintf(
+		`^%s/workouts/\d{4}-\d{2}-\d{2}$`, regexp.QuoteMeta(serverURL)))
+	if err = page.WaitForURL(workoutURLPattern); err != nil {
+		t.Fatalf("expect navigation to workout page: %v", err)
+	}
+	workoutURL := page.URL()
+	today := workoutURL[len(workoutURL)-len("2006-01-02"):]
+
+	// Step 4: Open the first exercise. The workout page renders each exercise as a link with
+	// the exercise name as its accessible text; we pick the first one via its data attribute.
+	firstExercise := page.Locator("a[data-exercise-id]").First()
+	exerciseName, err := firstExercise.InnerText()
+	if err != nil {
+		t.Fatalf("read first exercise name: %v", err)
+	}
+	if err = firstExercise.Click(); err != nil {
+		t.Fatalf("click first exercise %q: %v", exerciseName, err)
+	}
+	exerciseURLPattern := regexp.MustCompile(fmt.Sprintf(`/workouts/%s/exercises/\d+$`, today))
+	if err = page.WaitForURL(exerciseURLPattern); err != nil {
+		t.Fatalf("expect navigation to exercise page: %v", err)
+	}
+
+	// Step 5: Complete the warmup.
+	warmupBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Mark Warmup Complete"})
+	if err = warmupBtn.Click(); err != nil {
+		t.Fatalf("click Mark Warmup Complete: %v", err)
+	}
+	// The warmup status indicator replaces the banner once complete.
+	if err = page.GetByText("Warmup complete").WaitFor(); err != nil {
+		t.Fatalf("wait for warmup completion: %v", err)
+	}
+
+	// Step 6: Complete every set for this exercise. Both weighted and bodyweight exercises are
+	// handled — weighted forms auto-submit when a signal radio is selected, bodyweight forms
+	// require filling the reps input and pressing the submit button.
+	currentSet := page.GetByRole("group", playwright.PageGetByRoleOptions{Name: "Current set"})
+	const maxSetsPerExercise = 10
+	for range maxSetsPerExercise {
+		var visible bool
+		if visible, err = currentSet.IsVisible(); err != nil {
+			t.Fatalf("check current set visibility: %v", err)
+		}
+		if !visible {
+			break
+		}
+
+		// The weighted radios are visually hidden; the label wrapping each one is what the user
+		// actually sees and clicks. Count on the radio locator is enough to detect whether this
+		// is a weighted exercise, then we click the associated label to trigger the JS-initiated
+		// form submission.
+		couldDoMoreRadio := currentSet.GetByRole("radio",
+			playwright.LocatorGetByRoleOptions{Name: "Could have done more reps"})
+		var radioCount int
+		if radioCount, err = couldDoMoreRadio.Count(); err != nil {
+			t.Fatalf("count weighted signal radios: %v", err)
+		}
+
+		if radioCount > 0 {
+			couldDoMoreLabel := currentSet.GetByText("Could do more", playwright.LocatorGetByTextOptions{
+				Exact: new(true),
+			})
+			if err = couldDoMoreLabel.Click(); err != nil {
+				t.Fatalf("click Could do more: %v", err)
+			}
+		} else {
+			repsInput := currentSet.GetByRole("textbox", playwright.LocatorGetByRoleOptions{Name: "Reps"})
+			if err = repsInput.Fill("10"); err != nil {
+				t.Fatalf("fill reps: %v", err)
+			}
+			completeSetBtn := currentSet.GetByRole("button",
+				playwright.LocatorGetByRoleOptions{Name: "Complete set"})
+			if err = completeSetBtn.Click(); err != nil {
+				t.Fatalf("click Complete set: %v", err)
+			}
+		}
+
+		// Each submission reloads the exercise page with the next set (or none) active.
+		if err = page.WaitForURL(exerciseURLPattern); err != nil {
+			t.Fatalf("expect reload of exercise page after set submission: %v", err)
+		}
+	}
+
+	// Step 7: Navigate back to the workout overview.
+	backLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Back to workout"})
+	if err = backLink.Click(); err != nil {
+		t.Fatalf("click Back to workout: %v", err)
+	}
+	if err = page.WaitForURL(workoutURL); err != nil {
+		t.Fatalf("expect navigation to %s: %v", workoutURL, err)
+	}
+
+	// Step 8: Complete the workout.
+	completeWorkoutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Complete workout"})
+	if err = completeWorkoutBtn.Click(); err != nil {
+		t.Fatalf("click Complete workout: %v", err)
+	}
+	completionURL := fmt.Sprintf("%s/workouts/%s/complete", serverURL, today)
+	if err = page.WaitForURL(completionURL); err != nil {
+		t.Fatalf("expect navigation to %s: %v", completionURL, err)
+	}
+
+	// Step 9: Submit a difficulty rating and land back on the home page.
+	justRightBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Just right"})
+	if err = justRightBtn.Click(); err != nil {
+		t.Fatalf("click Just right: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect redirect to / after submitting feedback: %v", err)
+	}
+
+	// Step 10: Logout.
 	menuLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Menu"})
 	if err = menuLink.Click(); err != nil {
 		t.Fatalf("click Menu link: %v", err)
@@ -153,12 +280,12 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("expect redirect to / after logout: %v", err)
 	}
 
-	// Step 4: Verify unauthenticated state.
+	// Step 11: Verify unauthenticated state.
 	if err = registerBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for Register button after logout: %v", err)
 	}
 
-	// Step 5: Login — JS calls window.location.reload() after finishing.
+	// Step 12: Login — JS calls window.location.reload() after finishing.
 	if err = signInBtn.Click(); err != nil {
 		t.Fatalf("login click: %v", err)
 	}

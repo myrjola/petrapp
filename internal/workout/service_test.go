@@ -3,6 +3,7 @@ package workout_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,111 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/myrjola/petrapp/internal/workout"
 )
+
+func setupTestService(t *testing.T) (context.Context, *workout.Service) {
+	t.Helper()
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create test database: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("test-user"), "Test User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert test user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	// Set preferences: Mon, Wed, Fri at 60 min.
+	svc := workout.NewService(db, logger, "")
+	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+		MondayMinutes:    60,
+		WednesdayMinutes: 60,
+		FridayMinutes:    60,
+	}); err != nil {
+		t.Fatalf("save preferences: %v", err)
+	}
+	return ctx, svc
+}
+
+func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
+	ctx, svc := setupTestService(t)
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+	if len(sessions) != 7 {
+		t.Fatalf("want 7 sessions (one per day), got %d", len(sessions))
+	}
+
+	// Scheduled days (Mon=0, Wed=2, Fri=4) must have exercises.
+	for _, i := range []int{0, 2, 4} {
+		if len(sessions[i].ExerciseSets) == 0 {
+			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
+		}
+	}
+
+	// Rest days must be empty sessions.
+	for _, i := range []int{1, 3, 5, 6} {
+		if len(sessions[i].ExerciseSets) != 0 {
+			t.Errorf("sessions[%d] (%s) must be empty (rest day)", i, sessions[i].Date.Weekday())
+		}
+	}
+}
+
+func Test_ResolveWeeklySchedule_DoesNotRegenerateExistingSessions(t *testing.T) {
+	ctx, svc := setupTestService(t)
+
+	sessions1, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("first ResolveWeeklySchedule: %v", err)
+	}
+
+	sessions2, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("second ResolveWeeklySchedule: %v", err)
+	}
+
+	// Same scheduled days must have the same exercise IDs on both calls.
+	for _, i := range []int{0, 2, 4} {
+		ids1 := extractExerciseIDs(sessions1[i])
+		ids2 := extractExerciseIDs(sessions2[i])
+		if !slices.Equal(ids1, ids2) {
+			t.Errorf("sessions[%d] exercise IDs changed on second call: %v → %v", i, ids1, ids2)
+		}
+	}
+}
+
+func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
+	ctx, svc := setupTestService(t)
+
+	// Generate this week's plan.
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Request a date in a different week.
+	nextWeekTuesday := time.Now().AddDate(0, 0, 14)
+	_, err := svc.GetSession(ctx, nextWeekTuesday)
+	if !errors.Is(err, workout.ErrNotFound) {
+		t.Errorf("want ErrNotFound for unplanned date, got %v", err)
+	}
+}
+
+func extractExerciseIDs(session workout.Session) []int {
+	ids := make([]int, len(session.ExerciseSets))
+	for i, es := range session.ExerciseSets {
+		ids[i] = es.Exercise.ID
+	}
+	return ids
+}
 
 func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	ctx := t.Context()
@@ -396,7 +502,7 @@ func workoutExistsForDate(ctx context.Context, t *testing.T, svc *workout.Servic
 	return true, nil
 }
 
-func Test_GenerateWorkout_PeriodizationTypeCycles(t *testing.T) {
+func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
@@ -416,63 +522,36 @@ func Test_GenerateWorkout_PeriodizationTypeCycles(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_preferences (user_id, monday_minutes) VALUES (?, ?)", userID, 60)
-	if err != nil {
-		t.Fatalf("insert preferences: %v", err)
-	}
-
 	svc := workout.NewService(db, logger, "")
 
-	// Session 0 completed: expect Strength.
-	monday := nextMonday(t)
-	if err = svc.StartSession(ctx, monday); err != nil {
-		t.Fatalf("StartSession 1: %v", err)
-	}
-	sess, err := svc.GetSession(ctx, monday)
-	if err != nil {
-		t.Fatalf("GetSession 1: %v", err)
-	}
-	if sess.PeriodizationType != workout.PeriodizationStrength {
-		t.Errorf("session 1: want Strength, got %q", sess.PeriodizationType)
-	}
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"UPDATE workout_sessions SET completed_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE user_id = ? AND workout_date = ?",
-		userID, monday.Format("2006-01-02"))
-	if err != nil {
-		t.Fatalf("complete session 1: %v", err)
+	// Save preferences with Mon, Wed, Fri as workout days.
+	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+		MondayMinutes:    60,
+		WednesdayMinutes: 60,
+		FridayMinutes:    60,
+	}); err != nil {
+		t.Fatalf("save preferences: %v", err)
 	}
 
-	// Session 1 completed: expect Hypertrophy.
-	tuesday := monday.AddDate(0, 0, 1)
-	if err = svc.StartSession(ctx, tuesday); err != nil {
-		t.Fatalf("StartSession 2: %v", err)
-	}
-	sess, err = svc.GetSession(ctx, tuesday)
+	// Generate this week's plan and collect periodization types for all 3 workout days.
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
-		t.Fatalf("GetSession 2: %v", err)
-	}
-	if sess.PeriodizationType != workout.PeriodizationHypertrophy {
-		t.Errorf("session 2: want Hypertrophy, got %q", sess.PeriodizationType)
-	}
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"UPDATE workout_sessions SET completed_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE user_id = ? AND workout_date = ?",
-		userID, tuesday.Format("2006-01-02"))
-	if err != nil {
-		t.Fatalf("complete session 2: %v", err)
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
 
-	// Session 2 completed: wraps back to Strength.
-	wednesday := monday.AddDate(0, 0, 2)
-	if err = svc.StartSession(ctx, wednesday); err != nil {
-		t.Fatalf("StartSession 3: %v", err)
+	// Collect periodization types for scheduled days (Mon=0, Wed=2, Fri=4).
+	scheduledIndices := []int{0, 2, 4}
+	types := make([]workout.PeriodizationType, len(scheduledIndices))
+	for j, i := range scheduledIndices {
+		types[j] = sessions[i].PeriodizationType
 	}
-	sess, err = svc.GetSession(ctx, wednesday)
-	if err != nil {
-		t.Fatalf("GetSession 3: %v", err)
-	}
-	if sess.PeriodizationType != workout.PeriodizationStrength {
-		t.Errorf("session 3: want Strength, got %q", sess.PeriodizationType)
+
+	// Each consecutive session must alternate periodization type.
+	for i := 1; i < len(types); i++ {
+		if types[i] == types[i-1] {
+			t.Errorf("sessions[%d] and sessions[%d] have the same periodization type %q; want alternating",
+				i-1, i, types[i])
+		}
 	}
 }
 
@@ -509,8 +588,10 @@ func Test_GetStartingWeight(t *testing.T) {
 
 	svc := workout.NewService(db, logger, "")
 
+	today := time.Now()
+
 	// No history: expect 0.
-	got, err := svc.GetStartingWeight(ctx, exerciseID)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight no history: %v", err)
 	}
@@ -518,10 +599,11 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("no history: want 0, got %v", got)
 	}
 
-	// Insert a completed session with set 1 weight = 60kg.
-	dateStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	// Insert a completed strength session 7 days ago with set 1 weight = 100kg x5.
+	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_sessions (user_id, workout_date, completed_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, dateStr)
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
@@ -529,18 +611,56 @@ func Test_GetStartingWeight(t *testing.T) {
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
 		 weight_kg, min_reps, max_reps, completed_reps)
-		 VALUES (?, ?, ?, 1, 60.0, 5, 5, 5)`,
+		 VALUES (?, ?, ?, 1, 100.0, 5, 5, 5)`,
 		userID, dateStr, exerciseID)
 	if err != nil {
 		t.Fatalf("insert set: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID)
+	// Same periodization (strength → strength): weight carries over unchanged.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
 	}
-	if got != 60.0 {
-		t.Errorf("with history: want 60.0, got %v", got)
+	if got != 100.0 {
+		t.Errorf("strength → strength: want 100.0, got %v", got)
+	}
+
+	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): Epley conversion
+	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.1, rounded to 0.5 = 92.0.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationHypertrophy)
+	if err != nil {
+		t.Fatalf("GetStartingWeight cross-periodization: %v", err)
+	}
+	if got != 92.0 {
+		t.Errorf("strength → hypertrophy: want 92.0, got %v", got)
+	}
+
+	// Insert today's session with a different set 1 weight. The starting weight
+	// must remain anchored to the historical session, regardless of today's sets.
+	todayStr := today.Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date, started_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
+		userID, todayStr)
+	if err != nil {
+		t.Fatalf("insert today's session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps, signal)
+		 VALUES (?, ?, ?, 1, 75.0, 5, 5, 5, 'too_light'),
+		        (?, ?, ?, 2, 80.0, 5, 5, 5, 'on_target')`,
+		userID, todayStr, exerciseID, userID, todayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert today's sets: %v", err)
+	}
+
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	if err != nil {
+		t.Fatalf("GetStartingWeight ignoring today: %v", err)
+	}
+	if got != 100.0 {
+		t.Errorf("today ignored: want 100.0, got %v", got)
 	}
 }
 
@@ -716,12 +836,85 @@ func Test_BuildProgression(t *testing.T) {
 	}
 }
 
-func nextMonday(t *testing.T) time.Time {
-	t.Helper()
-	now := time.Now()
-	daysUntilMonday := (int(time.Monday) - int(now.Weekday()) + 7) % 7
-	if daysUntilMonday == 0 {
-		daysUntilMonday = 7
+func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
 	}
-	return now.AddDate(0, 0, daysUntilMonday).Truncate(24 * time.Hour)
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("bp-x-user"), "BPX User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
+		"Squat", "lower", "desc")
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Squat'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	// Prior strength session 7 days ago: completed first set 100 kg x 5.
+	prevStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
+		userID, prevStr)
+	if err != nil {
+		t.Fatalf("insert prev session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps)
+		 VALUES (?, ?, ?, 1, 100.0, 5, 5, 5)`,
+		userID, prevStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert prev set: %v", err)
+	}
+
+	// New hypertrophy session today.
+	todayStr := time.Now().Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
+		userID, todayStr)
+	if err != nil {
+		t.Fatalf("insert today session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
+		userID, todayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+	date, _ := time.Parse("2006-01-02", todayStr)
+
+	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression: %v", err)
+	}
+	target := prog.CurrentSet()
+	// Strength 100kg x5 → Hypertrophy 8 reps via Epley:
+	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.105, rounded to 0.5 = 92.0.
+	if target.WeightKg != 92.0 {
+		t.Errorf("first set weight: want 92.0, got %v", target.WeightKg)
+	}
+	if target.TargetReps != 8 {
+		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
+	}
 }
