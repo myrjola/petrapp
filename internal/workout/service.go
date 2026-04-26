@@ -657,7 +657,7 @@ func (s *Service) generateExerciseContent(ctx context.Context, name string) Exer
 	}
 
 	// Try to generate a better exercise with AI
-	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups)
+	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups, s.logger)
 	generated, err := generator.Generate(ctx, name)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to generate exercise details",

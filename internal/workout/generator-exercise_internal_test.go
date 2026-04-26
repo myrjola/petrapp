@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func TestExerciseGenerator_Generate(t *testing.T) {
@@ -17,7 +19,7 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 	}
 
 	muscleGroups := []string{"quadriceps", "glutes", "hamstrings", "calves", "core"}
-	eg := newExerciseGenerator(openaiAPIKey, muscleGroups)
+	eg := newExerciseGenerator(openaiAPIKey, muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
 
 	// Test successful generation
 	t.Run("Successful generation", func(t *testing.T) {
