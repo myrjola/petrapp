@@ -114,7 +114,7 @@ Return only the valid JSON object with no additional text or explanation.`,
 				},
 				OfJSONObject: nil,
 			},
-			Model: openai.ChatModelGPT4o2024_08_06,
+			Model: openai.ChatModelGPT5_4,
 		})
 
 	if err != nil {
@@ -178,7 +178,7 @@ Return only the JSON object.`, exercise.Name)
 			Messages: []openai.ChatCompletionMessageParamUnion{
 				openai.UserMessage(prompt),
 			},
-			Model: openai.ChatModelGPT4o2024_08_06,
+			Model: openai.ChatModelGPT5_4,
 		})
 
 	if err != nil {
