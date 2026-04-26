@@ -22,6 +22,16 @@
               }
             }
         </script>
+        <script type="speculationrules" {{ nonce }}>
+            {
+              "prefetch": [{
+                "where": {
+                  "href_matches": "/*"
+                },
+                "eagerness": "conservative"
+              }]
+            }
+        </script>
         <script {{nonce}} src="/main.js"></script>
     </head>
     <body>
