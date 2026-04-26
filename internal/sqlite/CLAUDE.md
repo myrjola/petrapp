@@ -18,6 +18,43 @@ Guidelines for working with database schema, migrations, and data access pattern
 5. **Test with `make test`** to ensure migrations and queries work correctly
 6. **Add test fixtures** in `fixtures.sql` if needed for new data that needs to be seeded
 
+### Premigration Escape Hatch
+
+The declarative migrator in `migrate.go` is purely structural: it diffs the live schema against
+`schema.sql` and rebuilds tables when needed, but it cannot infer how to populate new columns,
+re-key foreign keys, or otherwise transform existing rows. For changes the migrator cannot express,
+add a one-shot **premigration** that runs *before* `migrateTo` and rewrites the legacy data into
+the new shape. After the rewrite, the declarative migrator sees a database that already matches
+`schema.sql` and is a no-op.
+
+When you need a premigration:
+
+1. Create `internal/sqlite/premigrate.go` with a `(db *Database) preMigrate<Name>(ctx)` method
+   that:
+   - **Detects already-migrated state first** via `pragma_table_info` or `sqlite_master` and
+     returns early. Must also short-circuit on a fresh database (no legacy table) so
+     test/in-memory startups skip it. Idempotent — safe to run on every boot.
+   - **Disables foreign keys** (`PRAGMA foreign_keys = OFF`) before the table swap. The
+     declarative migrator re-enables them in its own `defer`.
+   - Runs the rewrite inside a single transaction with rollback on error.
+   - Uses the `CREATE TABLE *_new` → `INSERT … SELECT` → `DROP TABLE` → `ALTER TABLE … RENAME`
+     pattern. When merging data sources (e.g., legacy rows + rows synthesized from a child
+     table), `UNION` them in the `INSERT … SELECT`.
+2. Wire it into `NewDatabase` in `sqlite.go` *between* `connect` and `migrateTo`.
+3. Add a test in `migrate_internal_test.go` that:
+   - Defines a `legacyWorkoutSchema`-style const reproducing the pre-migration table shapes
+     (the live `schema.sql` no longer contains them).
+   - Seeds realistic edge-case data (e.g., child rows with no parent, NULL columns).
+   - Calls the premigration, asserts post-state, calls it again to prove idempotence, then
+     calls `migrateTo(schemaDefinition)` to confirm the declarative migrator accepts the
+     rewritten schema without further changes.
+4. After the premigration has run in production, **delete the file, the call site, the test, and
+   the legacy-schema fixture in the same commit**. There is no version table — the only signal
+   that a premigration is no longer needed is that production has booted past it.
+
+See git history for `internal/sqlite/premigrate.go` (workout_exercise stable-id migration,
+PR #75) for a worked example.
+
 ## Table Design Patterns
 
 ### STRICT Mode and Constraints
