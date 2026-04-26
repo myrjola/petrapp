@@ -11,6 +11,13 @@ import (
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
+// queryer is satisfied by both *sql.DB and *sql.Tx, so read helpers can run
+// either standalone or inside an open transaction.
+type queryer interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // sqliteSessionRepository implements sessionRepository.
 type sqliteSessionRepository struct {
 	baseRepository
@@ -68,9 +75,8 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 			return nil, err
 		}
 
-		// Load exercise sets for the session
 		var exerciseSets []exerciseSetAggregate
-		exerciseSets, err = r.loadExerciseSets(ctx, userID, session.Date)
+		exerciseSets, err = r.loadExerciseSets(ctx, r.db.ReadOnly, userID, session.Date)
 		if err != nil {
 			return nil, err
 		}
@@ -88,6 +94,16 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 
 // Get retrieves a workout session for a specific date.
 func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sessionAggregate, error) {
+	return r.get(ctx, r.db.ReadOnly, date)
+}
+
+// get retrieves a workout session using the supplied queryer, so it can run
+// either standalone or inside an open transaction.
+func (r *sqliteSessionRepository) get(
+	ctx context.Context,
+	q queryer,
+	date time.Time,
+) (sessionAggregate, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	dateStr := formatDate(date)
 
@@ -99,7 +115,7 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sess
 		periodizationType PeriodizationType
 	)
 
-	err := r.db.ReadOnly.QueryRowContext(ctx, `
+	err := q.QueryRowContext(ctx, `
 		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date = ?`,
@@ -117,8 +133,7 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sess
 		return sessionAggregate{}, err
 	}
 
-	// Load exercise sets for the session
-	exerciseSets, err := r.loadExerciseSets(ctx, userID, session.Date)
+	exerciseSets, err := r.loadExerciseSets(ctx, q, userID, session.Date)
 	if err != nil {
 		return sessionAggregate{}, err
 	}
@@ -128,20 +143,7 @@ func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (sess
 }
 
 // Create adds new workout session.
-func (r *sqliteSessionRepository) Create(ctx context.Context, sess sessionAggregate) error {
-	if err := r.set(ctx, sess, false); err != nil {
-		return fmt.Errorf("create session: %w", err)
-	}
-
-	return nil
-}
-
-// set creates a new workout session with optional upsert.
-func (r *sqliteSessionRepository) set(ctx context.Context, sess sessionAggregate, upsert bool) (err error) {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	dateStr := formatDate(sess.Date)
-
-	// Begin transaction
+func (r *sqliteSessionRepository) Create(ctx context.Context, sess sessionAggregate) (err error) {
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -152,65 +154,105 @@ func (r *sqliteSessionRepository) set(ctx context.Context, sess sessionAggregate
 		}
 	}()
 
-	// We delete the session so that it can be reinserted.
-	if upsert {
-		_, err = tx.ExecContext(ctx, `
-			DELETE FROM workout_sessions
-			WHERE user_id = ? AND workout_date = ?`,
-			userID, dateStr)
-		if err != nil {
-			return fmt.Errorf("delete session: %w", err)
-		}
-	}
-
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO workout_sessions (
-			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
-		) VALUES (?, ?, ?, ?, ?, ?)`,
-		userID, dateStr, sess.DifficultyRating, formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
-		sess.PeriodizationType)
-
-	if err != nil {
-		return fmt.Errorf("insert session: %w", err)
-	}
-
-	// Insert exercise sets
-	if err = r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); err != nil {
-		return fmt.Errorf("save exercise sets: %w", err)
+	if err = r.insertSession(ctx, tx, sess); err != nil {
+		return fmt.Errorf("create session: %w", err)
 	}
 
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
-
 	return nil
 }
 
-// Update modifies an existing workout session.
+// Update modifies an existing workout session within a single transaction.
+// The read happens inside the same BEGIN IMMEDIATE transaction as the write,
+// so concurrent updates cannot interleave a read-modify-write race.
 func (r *sqliteSessionRepository) Update(
 	ctx context.Context,
 	date time.Time,
 	updateFn func(sess *sessionAggregate) (bool, error),
-) error {
-	// Get current session
-	session, err := r.Get(ctx, date)
+) (err error) {
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+
+	session, err := r.get(ctx, tx, date)
 	if err != nil {
 		return fmt.Errorf("get session for update: %w", err)
 	}
 
-	// Apply updates
 	updated, err := updateFn(&session)
 	if err != nil {
 		return fmt.Errorf("update function: %w", err)
 	}
 
-	// Save if changed
-	if updated {
-		if err = r.set(ctx, session, true); err != nil {
-			return fmt.Errorf("save updated session: %w", err)
-		}
+	if !updated {
+		return nil
 	}
 
+	if err = r.deleteSession(ctx, tx, date); err != nil {
+		return err
+	}
+	if err = r.insertSession(ctx, tx, session); err != nil {
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// insertSession writes a session and its sets within an existing transaction.
+// The caller is responsible for ensuring no row already exists for
+// (user_id, workout_date); use deleteSession first when replacing.
+func (r *sqliteSessionRepository) insertSession(
+	ctx context.Context,
+	tx *sql.Tx,
+	sess sessionAggregate,
+) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	dateStr := formatDate(sess.Date)
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO workout_sessions (
+			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
+		) VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, dateStr, sess.DifficultyRating,
+		formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
+		sess.PeriodizationType); err != nil {
+		return fmt.Errorf("insert session: %w", err)
+	}
+
+	if err := r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); err != nil {
+		return fmt.Errorf("save exercise sets: %w", err)
+	}
+	return nil
+}
+
+// deleteSession removes a session within an existing transaction. The
+// ON DELETE CASCADE foreign keys clear the related workout_exercise and
+// exercise_sets rows.
+func (r *sqliteSessionRepository) deleteSession(
+	ctx context.Context,
+	tx *sql.Tx,
+	date time.Time,
+) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	dateStr := formatDate(date)
+
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM workout_sessions
+		WHERE user_id = ? AND workout_date = ?`,
+		userID, dateStr); err != nil {
+		return fmt.Errorf("delete session: %w", err)
+	}
 	return nil
 }
 
@@ -257,13 +299,14 @@ func (r *sqliteSessionRepository) parseSessionRow(
 // loadExerciseSets fetches all exercise sets for a session.
 func (r *sqliteSessionRepository) loadExerciseSets(
 	ctx context.Context,
+	q queryer,
 	userID int,
 	date time.Time,
 ) (_ []exerciseSetAggregate, err error) {
 	dateStr := formatDate(date)
 
 	// Query for exercise sets with warmup completion timestamp
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+	rows, err := q.QueryContext(ctx, `
 		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps,
 		       es.completed_at, we.warmup_completed_at, es.signal
 		FROM exercise_sets es
