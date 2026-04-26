@@ -21,7 +21,14 @@ Guidelines for working with HTTP handlers, routing, middleware, and web server c
 
 - Create dedicated structs for each template that embed `BaseTemplateData`
 - Transform all data in handlers before passing to templates - avoid complex template logic
-- Use `newBaseTemplateData(r)` to create base data with security context
+- Use `newBaseTemplateData(r)` to populate the embed from request context
+
+`BaseTemplateData` (defined in `templates.go`) exposes two fields that every page template can read:
+
+- `Authenticated bool` — set from `contexthelpers.IsAuthenticated(r.Context())`
+- `IsAdmin bool` — set from `contexthelpers.IsAdmin(r.Context())`
+
+The CSP nonce and CSRF plumbing do **not** travel on this struct — the nonce is injected as a template function (`{{ nonce }}`) via `contextTemplateFuncs` in `handlers.go`, and CSRF is handled in middleware. Anything that renders outside `app.render(...)` needs to wire those in explicitly.
 
 Example:
 
@@ -113,6 +120,8 @@ if fieldValue == "" {
 
 ## Testing with e2etest
 
+The `e2etest` package (`internal/e2etest/`) provides a real HTTP server bound to a random port plus a `Client` with cookie jar and form helpers. Handler tests use it instead of `httptest` so session middleware, CSRF, and the full middleware stack are exercised.
+
 ### End-to-End Testing Pattern
 
 ```go
@@ -122,6 +131,11 @@ if err != nil {
 }
 client := server.Client()
 ```
+
+Key entry points:
+
+- `e2etest.StartServer(ctx, out, lookupEnv, runFn) (*Server, error)` — `server.go`
+- `(*Client).SubmitForm(ctx, doc, actionPath, fields) (*goquery.Document, error)` — `client.go`; resolves the form by `action`, fills matching labels/fields, submits, returns the parsed response
 
 ### DOM Testing with goquery
 
@@ -177,6 +191,8 @@ if doc.Find("h1:contains('Add Exercise')").Length() == 0 {
 
 ### Route Registration
 
-- Group related routes together in routes.go
+- Routing uses the stdlib `http.ServeMux` with Go 1.22+ method+pattern syntax (e.g. `mux.Handle("GET /workouts/{date}", ...)`). No third-party router.
+- Path parameters are read with `r.PathValue("name")` inside the handler
+- Group related routes together in `routes.go`
 - Use descriptive route patterns that map to handler names
-- Include HTTP method constraints in routing configuration
+- Include HTTP method constraints in the pattern (`GET`, `POST`, etc.) — ServeMux returns 405 automatically for mismatches
