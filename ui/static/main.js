@@ -19,6 +19,10 @@ if ('navigation' in window) {
         for (const [, v] of e.formData) {
             if (v instanceof File) return
         }
+        // TODO: when precommitHandler works in iOS, it might be an even better
+        //       way to handle this since we can pass e.signal and also reject inside the handler
+        //       to have centralised error handling.
+        //       https://bugs.webkit.org/show_bug.cgi?id=293952
         e.preventDefault()
         await submitForm(e)
     })
