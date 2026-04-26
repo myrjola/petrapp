@@ -296,7 +296,24 @@ func (r *sqliteSessionRepository) parseSessionRow(
 	return session, nil
 }
 
-// loadExerciseSets fetches all exercise sets for a session.
+// loadExerciseSetsRow holds one row of the loadExerciseSets join: the
+// workout_exercise columns plus the optional exercise_sets columns.
+type loadExerciseSetsRow struct {
+	weID                 int
+	exerciseID           int
+	warmupCompletedAtStr sql.NullString
+	setNumber            sql.NullInt32
+	weightKg             sql.NullFloat64
+	minReps              sql.NullInt32
+	maxReps              sql.NullInt32
+	completedReps        sql.NullInt32
+	completedAtStr       sql.NullString
+	signalStr            sql.NullString
+}
+
+// loadExerciseSets fetches all exercise slots for a session, including ones with
+// no sets yet (e.g. just-swapped exercises). The driving table is workout_exercise
+// so empty slots still appear; sets are LEFT-JOINed in.
 func (r *sqliteSessionRepository) loadExerciseSets(
 	ctx context.Context,
 	q queryer,
@@ -305,16 +322,14 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 ) (_ []exerciseSetAggregate, err error) {
 	dateStr := formatDate(date)
 
-	// Query for exercise sets with warmup completion timestamp
 	rows, err := q.QueryContext(ctx, `
-		SELECT es.exercise_id, es.weight_kg, es.min_reps, es.max_reps, es.completed_reps,
-		       es.completed_at, we.warmup_completed_at, es.signal
-		FROM exercise_sets es
-		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id
-		                              AND we.workout_date = es.workout_date
-		                              AND we.exercise_id = es.exercise_id
-		WHERE es.workout_user_id = ? AND es.workout_date = ?
-		ORDER BY es.exercise_id, es.set_number`,
+		SELECT we.id, we.exercise_id, we.warmup_completed_at,
+		       es.set_number, es.weight_kg, es.min_reps, es.max_reps,
+		       es.completed_reps, es.completed_at, es.signal
+		FROM workout_exercise we
+		LEFT JOIN exercise_sets es ON es.workout_exercise_id = we.id
+		WHERE we.workout_user_id = ? AND we.workout_date = ?
+		ORDER BY we.id, es.set_number`,
 		userID, dateStr)
 	if err != nil {
 		return nil, fmt.Errorf("query exercise sets: %w", err)
@@ -326,58 +341,40 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	}()
 
 	var exerciseSets []exerciseSetAggregate
-	var currentExerciseSet exerciseSetAggregate
-	currentExerciseSet.ExerciseID = -1
+	var current exerciseSetAggregate
+	current.ID = -1
 
 	for rows.Next() {
-		var (
-			exerciseID           int
-			set                  Set
-			completedAtStr       sql.NullString
-			warmupCompletedAtStr sql.NullString
-			signalStr            sql.NullString
-		)
-		err = rows.Scan(&exerciseID, &set.WeightKg, &set.MinReps, &set.MaxReps,
-			&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr, &signalStr)
-		if err != nil {
+		var row loadExerciseSetsRow
+		if err = rows.Scan(&row.weID, &row.exerciseID, &row.warmupCompletedAtStr,
+			&row.setNumber, &row.weightKg, &row.minReps, &row.maxReps,
+			&row.completedReps, &row.completedAtStr, &row.signalStr); err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
 
-		// Parse the completed_at timestamp
-		if err = r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
-			return nil, err
-		}
-
-		if signalStr.Valid {
-			s := Signal(signalStr.String)
-			set.Signal = &s
-		}
-
-		if exerciseID != currentExerciseSet.ExerciseID {
-			// Add the previous exercise set if it exists
-			if currentExerciseSet.ExerciseID != -1 {
-				exerciseSets = append(exerciseSets, currentExerciseSet)
+		if row.weID != current.ID {
+			if current.ID != -1 {
+				exerciseSets = append(exerciseSets, current)
 			}
-
-			// Create new exercise set with parsed warmup timestamp
-			warmupCompletedAt, parseErr := r.parseWarmupCompletedAtTimestamp(warmupCompletedAtStr)
-			if parseErr != nil {
-				return nil, parseErr
-			}
-
-			currentExerciseSet = exerciseSetAggregate{
-				ExerciseID:        exerciseID,
-				Sets:              []Set{},
-				WarmupCompletedAt: warmupCompletedAt,
+			if current, err = r.startAggregate(row); err != nil {
+				return nil, err
 			}
 		}
 
-		currentExerciseSet.Sets = append(currentExerciseSet.Sets, set)
+		// LEFT JOIN can yield a workout_exercise row with no sets (set_number IS NULL).
+		if !row.setNumber.Valid {
+			continue
+		}
+
+		set, parseErr := r.buildSet(row)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		current.Sets = append(current.Sets, set)
 	}
 
-	// Add the last exercise if it exists
-	if currentExerciseSet.ExerciseID != -1 {
-		exerciseSets = append(exerciseSets, currentExerciseSet)
+	if current.ID != -1 {
+		exerciseSets = append(exerciseSets, current)
 	}
 
 	if err = rows.Err(); err != nil {
@@ -385,6 +382,45 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	}
 
 	return exerciseSets, nil
+}
+
+// startAggregate constructs a fresh exerciseSetAggregate when the workout_exercise
+// id changes between rows.
+func (r *sqliteSessionRepository) startAggregate(row loadExerciseSetsRow) (exerciseSetAggregate, error) {
+	warmupCompletedAt, err := r.parseWarmupCompletedAtTimestamp(row.warmupCompletedAtStr)
+	if err != nil {
+		return exerciseSetAggregate{}, err
+	}
+	return exerciseSetAggregate{
+		ID:                row.weID,
+		ExerciseID:        row.exerciseID,
+		Sets:              []Set{},
+		WarmupCompletedAt: warmupCompletedAt,
+	}, nil
+}
+
+// buildSet materialises a Set from a row that has set_number populated.
+func (r *sqliteSessionRepository) buildSet(row loadExerciseSetsRow) (Set, error) {
+	set := Set{ //nolint:exhaustruct // CompletedReps, CompletedAt, Signal are populated below.
+		MinReps: int(row.minReps.Int32),
+		MaxReps: int(row.maxReps.Int32),
+	}
+	if row.weightKg.Valid {
+		w := row.weightKg.Float64
+		set.WeightKg = &w
+	}
+	if row.completedReps.Valid {
+		c := int(row.completedReps.Int32)
+		set.CompletedReps = &c
+	}
+	if err := r.parseCompletedAtTimestamp(row.completedAtStr, &set); err != nil {
+		return Set{}, err
+	}
+	if row.signalStr.Valid {
+		s := Signal(row.signalStr.String)
+		set.Signal = &s
+	}
+	return set, nil
 }
 
 // parseCompletedAtTimestamp parses the completed_at timestamp and sets it on the set if valid.
@@ -431,14 +467,12 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	sinceDateStr := formatDate(sinceDate)
 
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT es.workout_date, es.weight_kg, es.min_reps, es.max_reps,
+		SELECT we.workout_date, es.weight_kg, es.min_reps, es.max_reps,
 		       es.completed_reps, es.completed_at, we.warmup_completed_at, es.signal
-		FROM exercise_sets es
-		LEFT JOIN workout_exercise we ON we.workout_user_id = es.workout_user_id
-		                              AND we.workout_date = es.workout_date
-		                              AND we.exercise_id = es.exercise_id
-		WHERE es.workout_user_id = ? AND es.exercise_id = ? AND es.workout_date >= ?
-		ORDER BY es.workout_date DESC, es.set_number`,
+		FROM workout_exercise we
+		JOIN exercise_sets es ON es.workout_exercise_id = we.id
+		WHERE we.workout_user_id = ? AND we.exercise_id = ? AND we.workout_date >= ?
+		ORDER BY we.workout_date DESC, es.set_number`,
 		userID, exerciseID, sinceDateStr)
 	if err != nil {
 		return nil, fmt.Errorf("query exercise sets for exercise: %w", err)
@@ -475,9 +509,10 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 				return nil, parseWarmupErr
 			}
 
+			// ID stays zero — this aggregate spans history, not a single live slot.
 			current = datedExerciseSetAggregate{
 				Date: date,
-				exerciseSetAggregate: exerciseSetAggregate{
+				exerciseSetAggregate: exerciseSetAggregate{ //nolint:exhaustruct // ID intentionally unset.
 					ExerciseID:        exerciseID,
 					Sets:              []Set{},
 					WarmupCompletedAt: warmupCompletedAt,
@@ -518,15 +553,16 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT es.weight_kg, ws.periodization_type
 		FROM exercise_sets es
+		JOIN workout_exercise we ON we.id = es.workout_exercise_id
 		JOIN workout_sessions ws
-		  ON ws.user_id = es.workout_user_id
-		 AND ws.workout_date = es.workout_date
-		WHERE es.workout_user_id = ?
-		  AND es.exercise_id = ?
-		  AND es.workout_date < ?
+		  ON ws.user_id = we.workout_user_id
+		 AND ws.workout_date = we.workout_date
+		WHERE we.workout_user_id = ?
+		  AND we.exercise_id = ?
+		  AND we.workout_date < ?
 		  AND es.completed_reps IS NOT NULL
 		  AND es.weight_kg IS NOT NULL
-		ORDER BY es.workout_date DESC, es.set_number ASC
+		ORDER BY we.workout_date DESC, es.set_number ASC
 		LIMIT 1`,
 		userID, exerciseID, beforeDateStr).Scan(&weightKg, &periodType)
 	if err != nil {
@@ -617,7 +653,10 @@ func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []se
 	return nil
 }
 
-// saveExerciseSets inserts or updates exercise sets for a session.
+// saveExerciseSets writes the workout_exercise rows and their child exercise_sets
+// for a session. Each aggregate gets one workout_exercise row; pre-existing IDs
+// are preserved so the URL stays stable across delete-and-reinsert cycles in
+// Update, while new aggregates (ID == 0) get an auto-assigned id.
 func (r *sqliteSessionRepository) saveExerciseSets(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -628,8 +667,28 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
 	for _, exerciseSet := range exerciseSets {
+		var idArg any
+		if exerciseSet.ID > 0 {
+			idArg = exerciseSet.ID
+		}
+
+		var warmupArg any
+		if exerciseSet.WarmupCompletedAt != nil {
+			warmupArg = formatTimestamp(*exerciseSet.WarmupCompletedAt)
+		}
+
+		var weID int
+		err := tx.QueryRowContext(ctx, `
+			INSERT INTO workout_exercise (
+				id, workout_user_id, workout_date, exercise_id, warmup_completed_at
+			) VALUES (?, ?, ?, ?, ?)
+			RETURNING id`,
+			idArg, userID, dateStr, exerciseSet.ExerciseID, warmupArg).Scan(&weID)
+		if err != nil {
+			return fmt.Errorf("insert workout exercise: %w", err)
+		}
+
 		for i, set := range exerciseSet.Sets {
-			// Format CompletedAt timestamp if it's not nil
 			var completedAtStr any
 			if set.CompletedAt != nil {
 				completedAtStr = formatTimestamp(*set.CompletedAt)
@@ -640,31 +699,14 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 				signalValue = string(*set.Signal)
 			}
 
-			_, err := tx.ExecContext(ctx, `
+			if _, err = tx.ExecContext(ctx, `
 				INSERT INTO exercise_sets (
-					workout_user_id, workout_date, exercise_id, set_number,
+					workout_exercise_id, set_number,
 					weight_kg, min_reps, max_reps, completed_reps, completed_at, signal
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				userID, dateStr, exerciseSet.ExerciseID, i+1,
-				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps, completedAtStr, signalValue)
-
-			if err != nil {
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				weID, i+1,
+				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps, completedAtStr, signalValue); err != nil {
 				return fmt.Errorf("insert exercise set: %w", err)
-			}
-		}
-
-		// Insert or update workout_exercise record for warmup completion tracking
-		if exerciseSet.WarmupCompletedAt != nil {
-			warmupCompletedAtStr := formatTimestamp(*exerciseSet.WarmupCompletedAt)
-
-			_, err := tx.ExecContext(ctx, `
-				INSERT OR REPLACE INTO workout_exercise (
-					workout_user_id, workout_date, exercise_id, warmup_completed_at
-				) VALUES (?, ?, ?, ?)`,
-				userID, dateStr, exerciseSet.ExerciseID, warmupCompletedAtStr)
-
-			if err != nil {
-				return fmt.Errorf("insert workout exercise: %w", err)
 			}
 		}
 	}

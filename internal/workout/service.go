@@ -171,7 +171,7 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 					MaxReps: planSet.MaxReps,
 				}
 			}
-			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // WarmupCompletedAt starts nil.
+			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
 				ExerciseID: pes.ExerciseID,
 				Sets:       sets,
 			}
@@ -221,6 +221,7 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 		if err != nil {
 			return Session{}, fmt.Errorf("get exercise %d: %w", ex.ExerciseID, err)
 		}
+		session.ExerciseSets[i].ID = ex.ID
 		session.ExerciseSets[i].Exercise = exercise
 		session.ExerciseSets[i].Sets = ex.Sets
 		session.ExerciseSets[i].WarmupCompletedAt = ex.WarmupCompletedAt
@@ -325,13 +326,13 @@ func (s *Service) UpdateSetWeight(
 func (s *Service) UpdateCompletedReps(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 	setIndex int,
 	completedReps int,
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for _, ex := range sess.ExerciseSets {
-			if ex.ExerciseID == exerciseID {
+			if ex.ID == workoutExerciseID {
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
@@ -341,7 +342,7 @@ func (s *Service) UpdateCompletedReps(
 				return true, nil
 			}
 		}
-		return false, errors.New("exercise not found")
+		return false, errors.New("workout exercise not found")
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
@@ -353,7 +354,7 @@ func (s *Service) UpdateCompletedReps(
 func (s *Service) RecordSetCompletion(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 	setIndex int,
 	signal Signal,
 	weightKg float64,
@@ -361,7 +362,7 @@ func (s *Service) RecordSetCompletion(
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ExerciseID == exerciseID {
+			if sess.ExerciseSets[i].ID == workoutExerciseID {
 				if setIndex >= len(sess.ExerciseSets[i].Sets) {
 					return false, fmt.Errorf("set index %d out of bounds", setIndex)
 				}
@@ -373,28 +374,28 @@ func (s *Service) RecordSetCompletion(
 				return true, nil
 			}
 		}
-		return false, errors.New("exercise not found")
+		return false, errors.New("workout exercise not found")
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
 	return nil
 }
 
-// MarkWarmupComplete marks the warmup as complete for a specific exercise.
+// MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
 func (s *Service) MarkWarmupComplete(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ExerciseID == exerciseID {
+			if sess.ExerciseSets[i].ID == workoutExerciseID {
 				now := time.Now().UTC()
 				sess.ExerciseSets[i].WarmupCompletedAt = &now
 				return true, nil
 			}
 		}
-		return false, errors.New("exercise not found")
+		return false, errors.New("workout exercise not found")
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
@@ -459,6 +460,7 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 				}
 
 				enrichedSession.ExerciseSets[i] = ExerciseSet{
+					ID:                es.ID,
 					Exercise:          ex,
 					Sets:              es.Sets,
 					WarmupCompletedAt: es.WarmupCompletedAt,
@@ -681,43 +683,30 @@ func createMinimalExercise(name string) Exercise {
 	}
 }
 
-// SwapExercise replaces an exercise in a workout with another exercise.
-// It retrieves weights from the previous time the new exercise was used.
+// SwapExercise replaces the exercise occupying a workout slot (identified by
+// workoutExerciseID) with newExerciseID. The workout slot's stable ID is
+// preserved so URLs targeting the slot keep working.
+//
+// Sets recorded against the old exercise are dropped — replaced with historical
+// data for the new exercise when available, otherwise empty placeholders matching
+// the old set count.
 func (s *Service) SwapExercise(
 	ctx context.Context,
 	date time.Time,
-	currentExerciseID int,
+	workoutExerciseID int,
 	newExerciseID int,
 ) error {
-	// 1. Validate both exercises exist
-	if err := s.validateExercises(ctx, currentExerciseID, newExerciseID); err != nil {
-		return err
+	if _, err := s.repo.exercises.Get(ctx, newExerciseID); err != nil {
+		return fmt.Errorf("get new exercise: %w", err)
 	}
 
-	// 2. Find historical data for the new exercise
 	historicalSets, err := s.findHistoricalSets(ctx, date, newExerciseID)
 	if err != nil {
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
-	// 3. Update the session with the new exercise
-	if err = s.replaceExerciseInSession(ctx, date, currentExerciseID, newExerciseID, historicalSets); err != nil {
+	if err = s.replaceExerciseInSession(ctx, date, workoutExerciseID, newExerciseID, historicalSets); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// validateExercises checks if both exercises exist in the repository.
-func (s *Service) validateExercises(ctx context.Context, currentID, newID int) error {
-	_, err := s.repo.exercises.Get(ctx, currentID)
-	if err != nil {
-		return fmt.Errorf("get current exercise: %w", err)
-	}
-
-	_, err = s.repo.exercises.Get(ctx, newID)
-	if err != nil {
-		return fmt.Errorf("get new exercise: %w", err)
 	}
 
 	return nil
@@ -788,34 +777,33 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 	return result
 }
 
-// replaceExerciseInSession updates a session by replacing one exercise with another.
+// replaceExerciseInSession swaps the exercise occupying a workout slot, keeping
+// the slot's stable ID intact. Any previously recorded sets on the slot are
+// dropped — historicalSets seeds the replacement when present, otherwise we
+// generate empty placeholders matching the old set count.
 func (s *Service) replaceExerciseInSession(
 	ctx context.Context,
 	date time.Time,
-	currentExerciseID int,
+	workoutExerciseID int,
 	newExerciseID int,
 	historicalSets []Set,
 ) error {
 	err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		// Find the exercise set to replace
 		for i, exerciseSet := range sess.ExerciseSets {
-			if exerciseSet.ExerciseID == currentExerciseID {
-				// Replace the exercise ID
-				sess.ExerciseSets[i].ExerciseID = newExerciseID
-
-				// Replace sets with historical ones or empty sets
-				if historicalSets != nil {
-					sess.ExerciseSets[i].Sets = historicalSets
-				} else {
-					sess.ExerciseSets[i].Sets = s.createEmptySets(exerciseSet.Sets)
-				}
-
-				return true, nil
+			if exerciseSet.ID != workoutExerciseID {
+				continue
 			}
+			sess.ExerciseSets[i].ExerciseID = newExerciseID
+			sess.ExerciseSets[i].WarmupCompletedAt = nil
+			if historicalSets != nil {
+				sess.ExerciseSets[i].Sets = historicalSets
+			} else {
+				sess.ExerciseSets[i].Sets = s.createEmptySets(exerciseSet.Sets)
+			}
+			return true, nil
 		}
-
-		return false, fmt.Errorf("exercise %d not found in workout for date %s",
-			currentExerciseID, formatDate(date))
+		return false, fmt.Errorf("workout exercise %d not found in workout for date %s",
+			workoutExerciseID, formatDate(date))
 	})
 	if err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
@@ -916,8 +904,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			}
 		}
 
-		// Add the new exercise to the session
-		newExerciseSet := exerciseSetAggregate{
+		// Add the new exercise to the session. ID stays 0 so the repository
+		// assigns a fresh workout_exercise.id on insert.
+		newExerciseSet := exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned by repository.
 			ExerciseID:        exerciseID,
 			Sets:              newSets,
 			WarmupCompletedAt: nil,

@@ -38,7 +38,7 @@
                     color: var(--color-text-primary);
                     text-align: center;
                     margin: 0;
-                    view-transition-name: exercise-title-{{ .ExerciseSet.Exercise.ID }};
+                    view-transition-name: exercise-title-{{ .ExerciseSet.ID }};
                 }
 
                 .header-actions {
@@ -98,11 +98,11 @@
             <span>Back</span>
         </a>
         <h1 class="exercise-title"
-            data-exercise-id="{{ .ExerciseSet.Exercise.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+            data-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
         <div class="header-actions">
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/info"
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/info"
                class="action-button info-button" aria-label="View exercise information">Info</a>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/swap"
+            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/swap"
                class="action-button swap-button" aria-label="Swap exercise">Swap</a>
         </div>
     </header>

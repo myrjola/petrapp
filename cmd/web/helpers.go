@@ -62,15 +62,15 @@ func (app *application) parseDateParam(w http.ResponseWriter, r *http.Request) (
 	return date, true
 }
 
-// parseExerciseIDParam parses the "exerciseID" path parameter from the request URL.
-// Returns the parsed exercise ID and true if successful, or zero and false if parsing fails.
-// On failure, sends HTTP 404 response automatically.
-func (app *application) parseExerciseIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
+// parseWorkoutExerciseIDParam parses the "workoutExerciseID" path parameter from
+// the request URL. Returns the parsed ID and true on success, or zero and false
+// on failure (sending HTTP 404 automatically).
+func (app *application) parseWorkoutExerciseIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
+	idStr := r.PathValue("workoutExerciseID")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		app.notFound(w, r)
 		return 0, false
 	}
-	return exerciseID, true
+	return id, true
 }

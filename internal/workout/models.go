@@ -134,6 +134,9 @@ type Set struct {
 
 // ExerciseSet groups all sets for a specific exercise in a workout.
 type ExerciseSet struct {
+	// ID is the stable identifier of this exercise slot within the workout. It survives
+	// swapping the exercise to a different one, which is what keeps URLs stable.
+	ID                int
 	Exercise          Exercise
 	Sets              []Set
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed

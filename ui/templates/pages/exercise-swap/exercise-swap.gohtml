@@ -42,7 +42,7 @@
                     }
                 }
             </style>
-            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .CurrentExercise.ID) }}
+            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
             <h1>Swap Exercise</h1>
         </header>
 
@@ -162,7 +162,7 @@
                             </div>
                         </div>
                         <form method="post"
-                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.CurrentExercise.ID }}/swap">
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.WorkoutExerciseID }}/swap">
                             <input type="hidden" name="new_exercise_id" value="{{ .ID }}">
                             <button type="submit" class="swap-button">Swap to this exercise</button>
                         </form>

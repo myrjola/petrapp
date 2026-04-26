@@ -191,9 +191,9 @@
                     {{ end }}
                 {{ end }}
                 {{ $isStarted := and $hasSomeCompleted (not $allSetsCompleted) }}
-                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
+                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
                    class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ else if $isStarted }} started{{ end }}"
-                   data-exercise-id="{{ .Exercise.ID }}">
+                   data-exercise-id="{{ .ID }}">
                     <span>{{ .Exercise.Name }}</span>
                 </a>
             {{ end }}

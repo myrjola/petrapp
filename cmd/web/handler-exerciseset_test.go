@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -253,6 +254,126 @@ func Test_application_exerciseSet(t *testing.T) {
 	// Check if the reps have been updated (should contain "12")
 	if setReps != "12 reps" {
 		t.Errorf("Expected reps to be updated to 12, got %s", setReps)
+	}
+}
+
+// Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets verifies
+// that swapping an exercise keeps the workout slot's stable URL working (regression
+// for navigating-back-after-swap hitting 404), and that completed sets recorded
+// against the previous exercise do not carry over.
+func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("Submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("Start workout: %v", err)
+	}
+
+	// Pick the first exercise's slot URL.
+	var slotURL string
+	doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
+		if i == 0 {
+			if href, exists := s.Attr("href"); exists {
+				slotURL = href
+			}
+		}
+	})
+	if slotURL == "" {
+		t.Fatal("No exercise found on workout page")
+	}
+
+	// Visit slot, complete warmup, complete a set so we can assert it gets dropped.
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("Get slot page: %v", err)
+	}
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+	}).First()
+	if warmupForm.Length() > 0 {
+		action, _ := warmupForm.Attr("action")
+		if doc, err = client.SubmitForm(ctx, doc, action, nil); err != nil {
+			t.Fatalf("Submit warmup: %v", err)
+		}
+	}
+	setForm := doc.Find("form.signal-form").First()
+	if setForm.Length() == 0 {
+		t.Fatal("No signal form on slot page")
+	}
+	setAction, _ := setForm.Attr("action")
+	if doc, err = client.PostForm(ctx, doc, setAction, map[string]string{
+		"weight":      "42.5",
+		"signal":      "on_target",
+		"target_reps": "5",
+	}); err != nil {
+		t.Fatalf("Submit set: %v", err)
+	}
+	if doc.Find(".exercise-set.completed").Length() == 0 {
+		t.Fatal("Expected a completed set before swap")
+	}
+
+	// Swap the exercise in this slot to one of the offered alternatives.
+	if doc, err = client.GetDoc(ctx, slotURL+"/swap"); err != nil {
+		t.Fatalf("Get swap page: %v", err)
+	}
+	swapForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		action, exists := s.Attr("action")
+		return exists && strings.HasSuffix(action, "/swap")
+	}).First()
+	if swapForm.Length() == 0 {
+		t.Fatal("No swap form found on swap page")
+	}
+	swapAction, _ := swapForm.Attr("action")
+	newExerciseID, exists := swapForm.Find("input[name='new_exercise_id']").Attr("value")
+	if !exists || newExerciseID == "" {
+		t.Fatal("No new_exercise_id offered on swap page")
+	}
+	if _, err = client.PostForm(ctx, doc, swapAction, map[string]string{
+		"new_exercise_id": newExerciseID,
+	}); err != nil {
+		t.Fatalf("Submit swap: %v", err)
+	}
+
+	// The original slot URL must still resolve to a 200 — that's the whole point
+	// of stable IDs.
+	resp, err := client.Get(ctx, slotURL)
+	if err != nil {
+		t.Fatalf("Get slot URL after swap: %v", err)
+	}
+	if cerr := resp.Body.Close(); cerr != nil {
+		t.Errorf("Close body: %v", cerr)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected slot URL to remain valid after swap, got status %d", resp.StatusCode)
+	}
+
+	// Re-fetch the page to confirm the previously completed set is gone.
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("Get slot page after swap: %v", err)
+	}
+	if doc.Find(".exercise-set.completed").Length() != 0 {
+		t.Error("Completed sets from the pre-swap exercise must not carry over")
 	}
 }
 
