@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the `Content-Location` based stack navigator with a standards-clean Navigation API implementation: explicit `X-Requested-With: stacknav` request marker, `X-Location` and `X-History-Action` response headers, lazy bfcache invalidation via sessionStorage marker + `pageshow`. Validation errors continue to use the existing `putFlashError` + redirect-to-form pattern (the app's CSP `require-trusted-types-for 'script'` blocks any in-place HTML rendering, so we lean on the established flash mechanism).
+> **Status:** Executed. The simplifications below are already in the codebase. The plan was originally drafted around a richer protocol (`X-History-Action`, bfcache invalidation marker, dedicated `redirectAfterPOST` helper); during implementation we collapsed to a single history strategy (pop-or-replace) and reused the existing `redirect` helper. The spec at `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md` reflects what was built.
 
-**Architecture:** MPA-first progressive enhancement. Server sees `X-Requested-With: stacknav` and returns 200 + headers (no body) for JS clients; otherwise 303 redirect. Client interception is gated on `'navigation' in window`, treats 200 as the only navigate-success path, and falls back to `location.reload()` on anything else. Two history actions: replace (default) and pop-or-replace. Spec details in `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md`.
+**Goal:** Replace the `Content-Location` based stack navigator with a standards-clean Navigation API implementation: explicit `X-Requested-With: stacknav` request marker, `X-Location` response header, single pop-or-replace history strategy on the client. Validation errors continue to use the existing `putFlashError` + redirect-to-form pattern (the app's CSP `require-trusted-types-for 'script'` blocks any in-place HTML rendering, so we lean on the established flash mechanism).
+
+**Architecture:** MPA-first progressive enhancement. Server sees `X-Requested-With: stacknav` and returns 200 + `X-Location` (no body) for JS clients; otherwise 303 redirect. Client interception is gated on `'navigation' in window`, uses `e.preventDefault()` (not `e.intercept()`, due to iOS WebKit bug 293952), treats 200 as the only navigate-success path, and falls back to `location.reload()` on anything else. One history strategy: pop-or-replace — walk back through history for a URL match, traverse if found, otherwise replace. Spec details in `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md`.
 
 **Tech Stack:** Go 1.x with `net/http`, vanilla JS (no build step), Playwright (via `github.com/playwright-community/playwright-go`), goquery for handler tests.
 
@@ -14,17 +16,16 @@
 
 | File | Change | Responsibility |
 |---|---|---|
-| `cmd/web/helpers.go` | Modify | Replace `redirect` with `redirectAfterPOST` (POSTs only). Non-POST callers move to plain `http.Redirect`. |
-| `cmd/web/helpers_test.go` | Create | Unit tests for `redirectAfterPOST`. |
-| `cmd/web/handler-schedule.go` | Modify | Use `redirectAfterPOST` for both success and validation paths (validation keeps its existing flash + redirect-to-form pattern, just renamed call site). |
-| `cmd/web/handler-preferences.go` | Modify | Use `redirectAfterPOST` for two redirects. |
-| `cmd/web/handler-workout.go` | Modify | Use `redirectAfterPOST` for five redirects. |
-| `cmd/web/handler-exerciseset.go` | Modify | Use `redirectAfterPOST` for two redirects. |
-| `cmd/web/handler-admin-exercises.go` | Modify | Use `redirectAfterPOST` for two redirects. |
-| `cmd/web/handler-admin-feature-flags.go` | Modify | Use `redirectAfterPOST` for one redirect. |
-| `cmd/web/handlers-webauthn.go` | Modify | Replace `redirect` with `http.Redirect` (GET-flow, not POST result). |
-| `cmd/web/handler-home.go` | Modify | Replace `redirect` with `http.Redirect`. |
-| `cmd/web/middleware.go` | Modify | Replace `redirect` in `mustAuthenticate` with `http.Redirect`. |
+| `cmd/web/helpers.go` | Modify | Rewrite `redirect` to negotiate the wire protocol (200 + `X-Location` for stacknav clients, 303 otherwise). Same signature, same call sites. |
+| `cmd/web/handler-schedule.go` | Unchanged call site | Existing `redirect` calls now route through the new wire protocol. |
+| `cmd/web/handler-preferences.go` | Unchanged call site | Same. |
+| `cmd/web/handler-workout.go` | Unchanged call site | Same. |
+| `cmd/web/handler-exerciseset.go` | Unchanged call site | Same. |
+| `cmd/web/handler-admin-exercises.go` | Unchanged call site | Same. |
+| `cmd/web/handler-admin-feature-flags.go` | Unchanged call site | Same. |
+| `cmd/web/handlers-webauthn.go` | Unchanged call site | Same (non-POST callers transparently fall through to 303 since they don't carry `X-Requested-With`). |
+| `cmd/web/handler-home.go` | Unchanged call site | Same. |
+| `cmd/web/middleware.go` | Unchanged call site | Same. |
 | `cmd/web/playwright_test.go` | Modify | Extend with `Test_playwright_stacknav` covering all five flows. |
 | `ui/static/main.js` | Modify | Full rewrite of the stack-navigator portion. |
 
@@ -411,279 +412,23 @@ EOF
 
 ---
 
-## Task 2: Add `redirectAfterPOST` helper with unit test
+## Task 2: Rewrite the `redirect` helper
 
 **Files:**
 - Modify: `cmd/web/helpers.go`
-- Create: `cmd/web/helpers_test.go`
 
-- [ ] **Step 1: Write the failing test**
+The dispatch is updated in place; the signature and every call site stay the same. POST handlers and non-POST mid-request bounces all use this single helper. Non-POST callers transparently fall through to `http.Redirect` because they don't carry `X-Requested-With: stacknav`.
 
-Create `cmd/web/helpers_test.go`:
+- [ ] **Step 1: Replace the function body**
 
-```go
-package main
-
-import (
-	"net/http"
-	"net/http/httptest"
-	"testing"
-)
-
-func Test_redirectAfterPOST_StackNavRequest_Returns200WithHeaders(t *testing.T) {
-	app := &application{}
-	tests := []struct {
-		name           string
-		target         string
-		action         string
-		wantAction     string
-		wantActionSet  bool
-	}{
-		{name: "default replace", target: "/foo", action: "", wantAction: "", wantActionSet: false},
-		{name: "explicit pop-or-replace", target: "/", action: "pop-or-replace", wantAction: "pop-or-replace", wantActionSet: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := httptest.NewRecorder()
-			r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
-			r.Header.Set("X-Requested-With", "stacknav")
-
-			app.redirectAfterPOST(w, r, tt.target, tt.action)
-
-			if got := w.Code; got != http.StatusOK {
-				t.Errorf("status = %d, want %d", got, http.StatusOK)
-			}
-			if got := w.Header().Get("X-Location"); got != tt.target {
-				t.Errorf("X-Location = %q, want %q", got, tt.target)
-			}
-			gotAction := w.Header().Get("X-History-Action")
-			if tt.wantActionSet {
-				if gotAction != tt.wantAction {
-					t.Errorf("X-History-Action = %q, want %q", gotAction, tt.wantAction)
-				}
-			} else if gotAction != "" {
-				t.Errorf("X-History-Action = %q, want empty", gotAction)
-			}
-			if got := w.Body.Len(); got != 0 {
-				t.Errorf("body length = %d, want 0", got)
-			}
-		})
-	}
-}
-
-func Test_redirectAfterPOST_PlainRequest_Returns303(t *testing.T) {
-	app := &application{}
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
-	// no X-Requested-With
-
-	app.redirectAfterPOST(w, r, "/target", "")
-
-	if got := w.Code; got != http.StatusSeeOther {
-		t.Errorf("status = %d, want %d", got, http.StatusSeeOther)
-	}
-	if got := w.Header().Get("Location"); got != "/target" {
-		t.Errorf("Location = %q, want /target", got)
-	}
-	if got := w.Header().Get("X-Location"); got != "" {
-		t.Errorf("X-Location should not be set for plain request, got %q", got)
-	}
-}
-```
-
-- [ ] **Step 2: Run test, expect failure**
-
-Run: `go test -count 1 -run Test_redirectAfterPOST ./cmd/web/`
-Expected: FAIL — `redirectAfterPOST` does not exist on `application`.
-
-- [ ] **Step 3: Add the helper**
-
-Edit `cmd/web/helpers.go`. Add the new function after `defaultMaxFormSize` block, before the existing `redirect` function:
+Edit `cmd/web/helpers.go`:
 
 ```go
-// redirectAfterPOST sends the client to target after a successful POST.
-// action is "" (default: replace) or "pop-or-replace" (client traverses to an
-// existing matching history entry when present, otherwise replace).
-//
-// JS-enhanced submits (X-Requested-With: stacknav) get HTTP 200 with X-Location
-// and optional X-History-Action headers and an empty body. Non-JS submits get a
-// standard 303 See Other redirect.
-func (app *application) redirectAfterPOST(w http.ResponseWriter, r *http.Request, target, action string) {
-	if r.Header.Get("X-Requested-With") == "stacknav" {
-		w.Header().Set("X-Location", target)
-		if action != "" {
-			w.Header().Set("X-History-Action", action)
-		}
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
-}
-```
-
-Leave the existing `redirect` function in place — Task 3 removes it.
-
-- [ ] **Step 4: Run test, expect pass**
-
-Run: `go test -count 1 -run Test_redirectAfterPOST ./cmd/web/`
-Expected: PASS for both subtests.
-
-- [ ] **Step 5: Run lint**
-
-Run: `make lint-fix`
-Expected: no errors.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add cmd/web/helpers.go cmd/web/helpers_test.go
-git commit -m "$(cat <<'EOF'
-feat(web): add redirectAfterPOST helper
-
-Replaces Sec-Fetch-Dest sniffing with explicit X-Requested-With marker.
-Returns 200 + X-Location + optional X-History-Action for stacknav clients;
-303 See Other otherwise.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
-
----
-
-## Task 3: Migrate all callers of `redirect` and remove the helper
-
-**Files:**
-- Modify: `cmd/web/handler-schedule.go`
-- Modify: `cmd/web/handler-preferences.go`
-- Modify: `cmd/web/handler-workout.go`
-- Modify: `cmd/web/handler-exerciseset.go`
-- Modify: `cmd/web/handler-admin-exercises.go`
-- Modify: `cmd/web/handler-admin-feature-flags.go`
-- Modify: `cmd/web/handlers-webauthn.go`
-- Modify: `cmd/web/handler-home.go`
-- Modify: `cmd/web/middleware.go`
-- Modify: `cmd/web/helpers.go`
-
-Two distinct kinds of callers exist:
-
-- **POST handlers redirecting after success:** use `app.redirectAfterPOST(w, r, target, action)`. All use action `""` (= `replace`) except `schedulePOST`'s success branch which uses `"pop-or-replace"`. The schedule validation branch keeps its existing flash + redirect-to-form pattern, just routed through `redirectAfterPOST`.
-- **Non-POST callers** (auth bouncing, mid-request redirects): use `http.Redirect(w, r, target, http.StatusSeeOther)`.
-
-- [ ] **Step 1: Update POST handlers — schedule**
-
-Edit `cmd/web/handler-schedule.go`. Two changes:
-
-Line 44 (validation branch):
-
-Old:
-```go
-		redirect(w, r, "/schedule")
-```
-
-New:
-```go
-		app.redirectAfterPOST(w, r, "/schedule", "")
-```
-
-Line 53 (success branch):
-
-Old:
-```go
-	redirect(w, r, "/")
-```
-
-New:
-```go
-	app.redirectAfterPOST(w, r, "/", "pop-or-replace")
-```
-
-Both branches keep their existing semantics: validation flashes an error and re-renders the form via the GET handler (popFlashError); success pops back to home.
-
-- [ ] **Step 2: Update POST handlers — preferences**
-
-Edit `cmd/web/handler-preferences.go`. Two occurrences of `redirect(w, r, "/")` at lines 118 and 136. Replace both with:
-
-```go
-	app.redirectAfterPOST(w, r, "/", "")
-```
-
-- [ ] **Step 3: Update POST handlers — workout**
-
-Edit `cmd/web/handler-workout.go`. Replace each `redirect(w, r, ...)` call with `app.redirectAfterPOST(w, r, ..., "")`:
-
-- Line 79 (`workoutCompletePOST` redirecting to `.../complete`).
-- Line 104 (`workoutStartPOST` redirecting to `/workouts/{date}`).
-- Line 161 (`workoutFeedbackPOST` redirecting to `/`).
-- Line 265 (`workoutSwapExercisePOST` redirecting to new exercise).
-- Line 364 (`workoutAddExercisePOST` redirecting to `/workouts/{date}`).
-
-For each, the change is exactly:
-
-Old: `redirect(w, r, X)`
-New: `app.redirectAfterPOST(w, r, X, "")`
-
-- [ ] **Step 4: Update POST handlers — exercise set**
-
-Edit `cmd/web/handler-exerciseset.go`. Two occurrences:
-
-- Line 301 (`exerciseSetUpdatePOST`).
-- Line 329 (`exerciseSetWarmupCompletePOST`).
-
-For each: `redirect(w, r, X)` → `app.redirectAfterPOST(w, r, X, "")`.
-
-- [ ] **Step 5: Update POST handlers — admin**
-
-Edit `cmd/web/handler-admin-exercises.go`. Two occurrences at lines 180 and 207:
-
-`redirect(w, r, X)` → `app.redirectAfterPOST(w, r, X, "")`.
-
-Edit `cmd/web/handler-admin-feature-flags.go`. One occurrence at line 63:
-
-`redirect(w, r, "/admin/feature-flags")` → `app.redirectAfterPOST(w, r, "/admin/feature-flags", "")`.
-
-- [ ] **Step 6: Update non-POST callers — webauthn handler**
-
-Edit `cmd/web/handlers-webauthn.go`. The `redirect(w, r, "/")` at line 70 is reached after successful registration completion via a non-POST path (or after logout); it's a redirect to home rather than a POST result. Replace with:
-
-```go
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-```
-
-Note: read the surrounding context to confirm this is correct; if the call is reached as a POST handler's success path, use `app.redirectAfterPOST(w, r, "/", "")` instead.
-
-- [ ] **Step 7: Update non-POST callers — home**
-
-Edit `cmd/web/handler-home.go` line 261. The `redirect(w, r, "/schedule")` happens during a GET when prefs are empty. Replace with:
-
-```go
-	http.Redirect(w, r, "/schedule", http.StatusSeeOther)
-```
-
-- [ ] **Step 8: Update non-POST callers — middleware**
-
-Edit `cmd/web/middleware.go` line 181 in `mustAuthenticate`. Replace:
-
-```go
-	redirect(w, r, "/")
-```
-
-with:
-
-```go
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-```
-
-- [ ] **Step 9: Remove the `redirect` helper**
-
-Edit `cmd/web/helpers.go`. Delete the entire `redirect` function (lines 28–38 in the current file):
-
-```go
-// redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
-// to the correct URL.
+// redirect detects if the request is originating from a fetch API call or a
+// top-level navigation and points the user to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {
-	if r.Header.Get("Sec-Fetch-Dest") == "empty" {
-		w.Header().Set("Content-Location", path)
+	if r.Header.Get("X-Requested-With") == "stacknav" {
+		w.Header().Set("X-Location", path)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -692,36 +437,32 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 }
 ```
 
-- [ ] **Step 10: Verify no callers remain**
+The old body sniffed `Sec-Fetch-Dest: empty` and set `Content-Location`; both are gone.
 
-Run: `grep -rn '\bredirect(' cmd/web/ --include="*.go"`
-Expected: only the helper definition was removed; no other callers should exist. The output should be empty (or only show comment text, not actual function calls).
-
-If any matches remain, they were missed in steps 1–8 — fix them.
-
-- [ ] **Step 11: Build and run all tests**
+- [ ] **Step 2: Build and run all tests**
 
 Run: `go build ./...`
 Expected: no errors.
 
 Run: `make test`
-Expected: all tests pass.
+Expected: all tests pass. The existing handler tests cover the redirect call sites; the playwright smoke test covers the JS path end-to-end.
 
-- [ ] **Step 12: Run lint**
+- [ ] **Step 3: Run lint**
 
 Run: `make lint-fix`
 Expected: no errors.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add cmd/web/
+git add cmd/web/helpers.go
 git commit -m "$(cat <<'EOF'
-refactor(web): migrate redirect callers to redirectAfterPOST and http.Redirect
+refactor(web): rewrite redirect to use X-Requested-With/X-Location protocol
 
-POST handlers now use redirectAfterPOST with explicit history action.
-Non-POST callers (mid-request bounces) use plain http.Redirect.
-Removes the now-unused redirect helper that misused Content-Location.
+Replaces Sec-Fetch-Dest sniffing and Content-Location misuse with an
+explicit X-Requested-With: stacknav marker on the request and an
+X-Location header on the 200 response. Non-stacknav requests still get
+a 303 See Other. All call sites are unchanged.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -730,185 +471,44 @@ EOF
 
 ---
 
-## Task 4: Rewrite `ui/static/main.js` stack navigator
+## Task 3: Rewrite `ui/static/main.js` stack navigator
 
 **Files:**
 - Modify: `ui/static/main.js`
 
-This task is the core client-side rewrite. It produces a new file from scratch (replacing the existing implementation) so it's presented as a single Write operation rather than a series of edits.
+This task is the core client-side rewrite. The current file is replaced wholesale; see `ui/static/main.js` for the as-built version. Key shape:
 
-- [ ] **Step 1: Replace the file contents**
-
-Overwrite `ui/static/main.js` with:
-
-```js
-/**
- * Convenience function to get the parent element of the current script tag.
- * Inspired by https://github.com/gnat/surreal.
- * @returns {HTMLElement}
- */
-function me() {
-  return document.currentScript.parentElement
-}
-
-const sameUrl = (a, b) =>
-  a.origin === b.origin && a.pathname === b.pathname && a.search === b.search
-
-const invalidateKey = (url) =>
-  'stacknav:invalidate:' + url.pathname + url.search
-
-if ('navigation' in window) {
-  navigation.addEventListener('navigate', (e) => {
-    if (!e.formData) return
-    if (!e.canIntercept || e.hashChange || e.downloadRequest) return
-    if (new URL(e.destination.url).origin !== location.origin) return
-    for (const [, v] of e.formData) {
-      if (v instanceof File) return
-    }
-    e.intercept({ handler: () => submitForm(e) })
-  })
-}
-
-async function submitForm(e) {
-  const body = new URLSearchParams(e.formData)
-  let res
-  try {
-    res = await fetch(e.destination.url, {
-      method: 'POST',
-      body,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'stacknav',
-      },
-      redirect: 'manual',
-    })
-  } catch (_) {
-    location.reload()
-    return
-  }
-
-  if (res.status === 200) {
-    const target = res.headers.get('X-Location')
-    const action = res.headers.get('X-History-Action')
-    if (!target) {
-      location.reload()
-      return
-    }
-    if (action === 'pop-or-replace') popOrReplaceTo(target)
-    else replaceTo(target)
-    return
-  }
-
-  // Anything else (5xx, missing headers, unexpected status): reload
-  // to surface state. We can't render the response body in place
-  // because the CSP (require-trusted-types-for 'script') blocks
-  // document.write and innerHTML of HTML strings. Validation errors
-  // don't reach here — they use flash + redirect-to-form and arrive
-  // as a normal 200 + X-Location response.
-  location.reload()
-}
-
-function replaceTo(target) {
-  navigation.navigate(target, { history: 'replace' })
-}
-
-function popOrReplaceTo(target) {
-  const targetUrl = new URL(target, location.origin)
-  const entries = navigation.entries()
-  for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
-    if (sameUrl(new URL(entries[i].url), targetUrl)) {
-      sessionStorage.setItem(invalidateKey(targetUrl), '1')
-      navigation.traverseTo(entries[i].key)
-      return
-    }
-  }
-  replaceTo(target)
-}
-
-window.addEventListener('pagereveal', (e) => {
-  if (!e.viewTransition) return
-  if (!('navigation' in window)) return
-  const act = navigation.activation
-  if (!act) return
-  if (act.navigationType === 'replace' || act.navigationType === 'reload') {
-    e.viewTransition.skipTransition()
-    return
-  }
-  let dir = 'forward'
-  if (act.navigationType === 'traverse' && act.from && act.entry) {
-    dir = act.entry.index < act.from.index ? 'backward' : 'forward'
-  }
-  e.viewTransition.types.add(dir)
-})
-
-document.addEventListener('click', (e) => {
-  if (!('navigation' in window)) return
-  const link = e.target.closest('a[data-back-button]')
-  if (!link) return
-  const target = new URL(link.href)
-  const entries = navigation.entries()
-  for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
-    if (sameUrl(new URL(entries[i].url), target)) {
-      e.preventDefault()
-      navigation.traverseTo(entries[i].key)
-      return
-    }
-  }
-})
-
-// Form submission UI state.
-document.addEventListener('submit', (e) => {
-  const form = e.target
-  if (!(form instanceof HTMLFormElement)) return
-  form.classList.add('submitting')
-  const submitButton = form.querySelector('button[type=submit]')
-  if (submitButton) submitButton.disabled = true
-})
-
-// Reset submit state and process bfcache invalidation marker on pageshow.
-window.addEventListener('pageshow', (event) => {
-  // Reset submitting forms after bfcache restore.
-  if (event.persisted) {
-    document.querySelectorAll('form.submitting').forEach((form) => {
-      form.classList.remove('submitting')
-      const submitButton = form.querySelector('button[type=submit]')
-      if (submitButton) submitButton.disabled = false
-    })
-  }
-
-  // Bfcache invalidation marker: reload if the entry was marked stale.
-  const key = invalidateKey(new URL(location.href))
-  const marker = sessionStorage.getItem(key)
-  if (marker) sessionStorage.removeItem(key)
-  if (event.persisted && marker) location.reload()
-})
-```
+- Top-of-file JSDoc block documenting the architecture (mission, wire protocol, navigation strategy, hierarchical back link, why `preventDefault` over `intercept`, progressive enhancement).
+- `navigate` listener gated on `'navigation' in window` that filters non-form events and calls `e.preventDefault()` + `submitForm(e)`. We use `preventDefault()` rather than `e.intercept()` because iOS Safari does not yet fire precommit handlers (WebKit bug 293952); revisit when that ships.
+- `submitForm` issues the POST with `X-Requested-With: stacknav`, treats 200 + `X-Location` as success and falls back to `location.reload()` on anything else (CSP blocks in-place HTML rendering).
+- `popOrReplaceTo` walks `navigation.entries()` backward from the entry behind the cursor, traverses to the first URL match, otherwise calls `navigation.navigate(target, { history: 'replace' })`. One strategy covers every flow.
+- `pagereveal` listener uses `navigation.activation` index comparison to set `forward`/`backward` view-transition types; replace/reload skip the transition; null-`from` no longer crashes.
+- `click` delegator on `a[data-back-button]` uses the same backward walk; on no match the link's natural href takes over.
+- `submit` and `pageshow` listeners handle the `.submitting` class and submit-button disable across bfcache restores.
 
 Key differences from the prior implementation:
 
 - Feature-gated on `'navigation' in window`.
-- Uses `X-Requested-With: stacknav` request marker; reads `X-Location` and `X-History-Action` instead of `Content-Location`.
+- Uses `X-Requested-With: stacknav` request marker and `X-Location` response header instead of `Content-Location`.
+- One history strategy (pop-or-replace); no `X-History-Action` discriminator.
 - `popOrReplaceTo` walks entries backward from `currentEntry.index - 1` (was forward, picking oldest match).
 - `sameUrl` compares `origin + pathname + search` (was pathname-only).
-- bfcache invalidation is lazy: marker set on traversal, consumed on `pageshow`, reload only when restored from bfcache.
 - `pagereveal` uses `navigation.activation` index comparison instead of URL-depth heuristic; null-`from` no longer crashes; replace/reload skip the transition.
 - `data-back-button` click handler uses event delegation, walks backward, compares full URL.
 - Validation errors arrive as normal 200 + `X-Location` (server uses flash + redirect-to-form), so the client treats them like any other navigation. The CSP blocks `document.write`/`innerHTML` of HTML strings, so any non-200 response triggers `location.reload()` as the safe fallback.
 
 - [ ] **Step 2: Smoke-check the file by serving it**
 
-Run: `go run ./cmd/web/ &` (or use whatever the project's local-run is — `make run` if defined; check `Makefile`)
+Run: `make run` (or whatever the project's local-run is — check `Makefile`).
 
 Expected: server starts. Open `http://localhost:<port>/main.js` in a browser; file should serve without errors.
 
-If you don't have a quick way to start the server, skip this manual check; Task 5 will verify via Playwright.
-
-Stop the server: `kill %1` (or however the project's run is wired).
+If you don't have a quick way to start the server, skip this manual check; Task 4 will verify via Playwright.
 
 - [ ] **Step 3: Run static asset tests if any**
 
 Run: `make test`
-Expected: passes. (No JS unit tests in this codebase — coverage comes from Playwright in Task 5.)
+Expected: passes. (No JS unit tests in this codebase — coverage comes from Playwright in Task 4.)
 
 - [ ] **Step 4: Run lint**
 
@@ -920,15 +520,17 @@ Expected: no Go-side errors. (No JS linter is configured in this project.)
 ```bash
 git add ui/static/main.js
 git commit -m "$(cat <<'EOF'
-feat(stacknav): rewrite client to use X-Location/X-History-Action protocol
+feat(stacknav): rewrite client to use X-Location protocol
 
 Replaces the Content-Location-based interceptor with a Navigation API
 client gated on 'navigation' in window. New behavior:
 
 - X-Requested-With: stacknav request marker
-- X-Location + X-History-Action response headers
-- popOrReplaceTo walks entries backward, compares full URL
-- bfcache invalidation via sessionStorage marker on pageshow
+- X-Location response header
+- One history strategy (pop-or-replace); walks entries backward,
+  compares full URL, falls through to replace on no match
+- e.preventDefault() instead of e.intercept() — iOS Safari precommit
+  handlers are not yet implemented (WebKit bug 293952)
 - pagereveal uses navigation.activation index comparison (no URL-depth)
 - Smart back-link uses event delegation and full-URL match
 - Feature-gated; no-op without Navigation API
@@ -942,7 +544,7 @@ EOF
 
 ---
 
-## Task 5: Unskip Playwright spec, run, fix flakiness, full CI
+## Task 4: Unskip Playwright spec, run, fix flakiness, full CI
 
 **Files:**
 - Modify: `cmd/web/playwright_test.go`
@@ -970,7 +572,7 @@ Expected: test passes. If it fails, the failure is informative — read the asse
 - [ ] **Step 3: Run the existing smoke test to confirm no regression**
 
 Run: `go test -count 1 -v -run Test_playwright_smoketest ./cmd/web/`
-Expected: passes. The schedule submit flow now exercises the new `redirectAfterPOST` + JS path.
+Expected: passes. The schedule submit flow now exercises the new `redirect` + JS path.
 
 - [ ] **Step 4: Run full CI**
 
@@ -985,9 +587,9 @@ git commit -m "$(cat <<'EOF'
 test: enable stacknav playwright spec
 
 Verifies the five flows from the design spec end-to-end:
-1. Same-URL replace (set update)
-2. Cross-URL replace (swap exercise)
-3. Pop-or-replace (schedule submit)
+1. Same-URL submit (set update)
+2. Cross-URL submit, target absent (swap exercise)
+3. Cross-URL submit, target present (schedule submit)
 4. Hierarchical back-link (data-back-button)
 5. Validation error (empty schedule)
 
@@ -1002,16 +604,14 @@ EOF
 
 The plan covers all sections of the spec:
 
-- Wire protocol → Tasks 2, 4.
-- Per-flow behavior (5 flows) → Task 1 (spec-as-test) + Task 5 (verification).
-- Server-side changes table → Task 3 (handler migration; schedule validation kept as flash + redirect-to-form).
-- Client implementation (sections of spec) → Task 4 (full file rewrite).
-- Testing → Task 1 (Playwright spec) + Task 2 (unit test) + Task 5 (verification).
-- Removed code (`redirect` helper, `Content-Location`, `Sec-Fetch-Dest` branch) → Task 3.
-- Browser support gate (`'navigation' in window`) → Task 4.
+- Wire protocol → Tasks 2, 3.
+- Per-flow behavior (5 flows) → Task 1 (spec-as-test) + Task 4 (verification).
+- Server-side changes → Task 2 (single helper rewrite, all call sites unchanged).
+- Client implementation → Task 3 (full file rewrite).
+- Testing → Task 1 (Playwright spec) + Task 4 (verification).
+- Removed code (`Content-Location`, `Sec-Fetch-Dest` branch) → Task 2.
+- Browser support gate (`'navigation' in window`) → Task 3.
 
-Identifiers used consistently: `redirectAfterPOST`, `replaceTo`, `popOrReplaceTo`, `sameUrl`, `invalidateKey`, `submitForm`, `X-Requested-With: stacknav`, `X-Location`, `X-History-Action: replace | pop-or-replace`, `Test_playwright_stacknav`.
+Identifiers used consistently: `redirect`, `popOrReplaceTo`, `sameUrl`, `submitForm`, `X-Requested-With: stacknav`, `X-Location`, `Test_playwright_stacknav`.
 
-No placeholders. Each step has either exact code, a concrete shell command with expected output, or a specific edit description.
-
-The Playwright test in Task 1 has Flow 1, 2, 4 navigation that depends on the actual page structure (button names, link selectors). The test code includes notes to run `PWDEBUG=1` and adjust if locators don't match. This is acknowledged-imprecise rather than wrong: the *assertions* (back-button URL after various submits) are exact; the *path to set them up* may need locator tweaks during Task 5.
+The Playwright test in Task 1 has Flow 1, 2, 4 navigation that depends on the actual page structure (button names, link selectors). The test code includes notes to run `PWDEBUG=1` and adjust if locators don't match. This is acknowledged-imprecise rather than wrong: the *assertions* (back-button URL after various submits) are exact; the *path to set them up* may need locator tweaks during Task 4.
