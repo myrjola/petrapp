@@ -106,9 +106,10 @@ if fieldValue == "" {
 
 ### Using redirect() Helper
 
-- Use `redirect(w, r, "/path")` function for all redirects
-- Redirect after successful POST operations (POST-redirect-GET pattern)
-- Use appropriate redirect paths that match routing patterns
+- Use `redirect(w, r, "/path")` for all redirects (POST results, GET-handler bounces, auth gates, validation re-renders via flash + redirect-to-form).
+- The helper negotiates the stack navigator wire protocol: requests carrying `X-Requested-With: stacknav` (set by the JS shim's POST fetch) get HTTP 200 + `X-Location: /path` and an empty body; everything else gets a standard 303 See Other. Non-POST callers transparently fall through to 303 because they don't carry the header.
+- The client treats every successful 200 as pop-or-replace: walks history backward looking for a URL match, traverses if found, otherwise replaces the current entry. There is no server-side history-action discriminator.
+- See `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md` for the full protocol and the per-flow behavior.
 
 ## Testing with e2etest
 
