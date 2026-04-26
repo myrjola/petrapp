@@ -28,8 +28,8 @@ const largeMaxFormSize = 1024 * 10
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {
-	if r.Header.Get("Sec-Fetch-Dest") == "empty" {
-		w.Header().Set("Content-Location", path)
+	if r.Header.Get("X-Requested-With") == "stacknav" {
+		w.Header().Set("X-Location", path)
 		w.WriteHeader(http.StatusOK)
 		return
 	}

@@ -208,31 +208,41 @@
 
               // When going to an exercise page, set the exercise title view transition name on the relevant exercise.
               window.addEventListener('pageswap', async (e) => {
-                if (e.viewTransition) {
-                  const targetUrl = new URL(e.activation.entry.url)
-                  const exercise = extractExerciseIdFromUrl(targetUrl)
-                  if (exercise) {
-                    const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
-                    element.style.viewTransitionName = `exercise-title-${exercise}`
-                    await e.viewTransition.finished
-                    element.style.viewTransitionName = ''
-                  }
+                if (!e.viewTransition) return
+                const entry = e.activation?.entry
+                if (!entry) return
+                const targetUrl = new URL(entry.url)
+                const exercise = extractExerciseIdFromUrl(targetUrl)
+                if (!exercise) return
+                const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
+                if (!element) return
+                element.style.viewTransitionName = `exercise-title-${exercise}`
+                try {
+                  await e.viewTransition.finished
+                } catch (_) {
+                  // Transition may be aborted; ignore.
                 }
+                element.style.viewTransitionName = ''
               })
 
               // When going from an exercise page to the workout page, set view transition names on the relevant
               // exercise in the list.
               window.addEventListener('pagereveal', async (e) => {
-                if (e.viewTransition) {
-                  const fromUrl = new URL(navigation.activation.from.url)
-                  const exercise = extractExerciseIdFromUrl(fromUrl)
-                  if (exercise) {
-                    const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
-                    element.style.viewTransitionName = `exercise-title-${exercise}`
-                    await e.viewTransition.finished
-                    element.style.viewTransitionName = ''
-                  }
+                if (!e.viewTransition) return
+                const from = navigation.activation?.from
+                if (!from) return
+                const fromUrl = new URL(from.url)
+                const exercise = extractExerciseIdFromUrl(fromUrl)
+                if (!exercise) return
+                const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
+                if (!element) return
+                element.style.viewTransitionName = `exercise-title-${exercise}`
+                try {
+                  await e.viewTransition.finished
+                } catch (_) {
+                  // Transition may be aborted if a new navigation starts; ignore.
                 }
+                element.style.viewTransitionName = ''
               })
             </script>
 
