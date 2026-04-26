@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 )
 
 // exerciseGenerator generates exercises using OpenAI API.
