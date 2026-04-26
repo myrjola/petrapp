@@ -95,6 +95,11 @@ async function submitForm(e) {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-Requested-With': 'stacknav',
             },
+            // Surface server-side redirects (e.g., a future auth bounce that
+            // doesn't go through redirect()) as opaqueredirect responses
+            // rather than transparently following them — fall through to the
+            // unexpected-status branch below and reload to surface state.
+            redirect: 'manual',
         })
     } catch (_) {
         location.reload()
@@ -153,7 +158,9 @@ document.addEventListener('click', (e) => {
     for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
         if (sameUrl(new URL(entries[i].url), target)) {
             e.preventDefault()
-            navigation.traverseTo(entries[i].key)
+            // If the entry was pruned between our read of entries() and the
+            // traverse, fall back to a normal navigation rather than no-op.
+            navigation.traverseTo(entries[i].key).committed.catch(() => location.assign(link.href))
             return
         }
     }
