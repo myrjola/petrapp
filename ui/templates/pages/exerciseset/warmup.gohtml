@@ -93,7 +93,7 @@
                 improving performance.
             </div>
             <form method="post"
-                  action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.Exercise.ID }}/warmup/complete">
+                  action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/warmup/complete">
                 <button type="submit" class="warmup-complete-button">
                     ✓ Mark Warmup Complete
                 </button>

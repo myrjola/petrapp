@@ -19,15 +19,15 @@ import (
 // exerciseInfoTemplateData contains data for the exercise info template.
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
-	Date           time.Time
-	Exercise       workout.Exercise
-	IsAdmin        bool
-	ProgressPoints []ExerciseProgressDataPoint
+	Date              time.Time
+	WorkoutExerciseID int
+	Exercise          workout.Exercise
+	IsAdmin           bool
+	ProgressPoints    []ExerciseProgressDataPoint
 }
 
 // exerciseInfoGET handles GET requests to view exercise information.
 func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) {
-	// Parse date from URL path
 	dateStr := r.PathValue("date")
 	date, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
@@ -35,16 +35,15 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Parse exercise ID from URL path
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
+	workoutExerciseIDStr := r.PathValue("workoutExerciseID")
+	workoutExerciseID, err := strconv.Atoi(workoutExerciseIDStr)
 	if err != nil {
 		app.notFound(w, r)
 		return
 	}
 
-	// Get the exercise.
-	exercise, err := app.workoutService.GetExercise(r.Context(), exerciseID)
+	// Resolve the slot to its current exercise via the workout session.
+	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		if errors.Is(err, workout.ErrNotFound) {
 			app.notFound(w, r)
@@ -53,6 +52,12 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		app.serverError(w, r, err)
 		return
 	}
+	exerciseSet, found := findExerciseSetInSession(&session, workoutExerciseID)
+	if !found {
+		app.notFound(w, r)
+		return
+	}
+	exercise := exerciseSet.Exercise
 
 	// Fetch the progress data.
 	progressData, err := app.generateExerciseProgressData(r.Context(), date, exercise)
@@ -65,11 +70,12 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	isAdmin := contexthelpers.IsAdmin(r.Context())
 
 	data := exerciseInfoTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Date:             date,
-		Exercise:         exercise,
-		IsAdmin:          isAdmin,
-		ProgressPoints:   progressData,
+		BaseTemplateData:  newBaseTemplateData(r),
+		Date:              date,
+		WorkoutExerciseID: workoutExerciseID,
+		Exercise:          exercise,
+		IsAdmin:           isAdmin,
+		ProgressPoints:    progressData,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-info", data)

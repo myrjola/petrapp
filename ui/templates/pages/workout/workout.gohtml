@@ -191,9 +191,9 @@
                     {{ end }}
                 {{ end }}
                 {{ $isStarted := and $hasSomeCompleted (not $allSetsCompleted) }}
-                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}"
+                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
                    class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ else if $isStarted }} started{{ end }}"
-                   data-exercise-id="{{ .Exercise.ID }}">
+                   data-workout-exercise-id="{{ .ID }}">
                     <span>{{ .Exercise.Name }}</span>
                 </a>
             {{ end }}
@@ -201,7 +201,7 @@
             <script {{ nonce }}>
               const exercisePagePattern = new URLPattern(`/workouts/:date/exercises/:exerciseId`, window.origin)
 
-              const extractExerciseIdFromUrl = (url) => {
+              const extractWorkoutExerciseIdFromUrl = (url) => {
                 const match = exercisePagePattern.exec(url)
                 return match?.pathname.groups.exerciseId
               }
@@ -212,9 +212,9 @@
                 const entry = e.activation?.entry
                 if (!entry) return
                 const targetUrl = new URL(entry.url)
-                const exercise = extractExerciseIdFromUrl(targetUrl)
+                const exercise = extractWorkoutExerciseIdFromUrl(targetUrl)
                 if (!exercise) return
-                const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
+                const element = document.querySelector(`a.exercise[data-workout-exercise-id="${exercise}"] span`)
                 if (!element) return
                 element.style.viewTransitionName = `exercise-title-${exercise}`
                 try {
@@ -232,11 +232,11 @@
                 const from = navigation.activation?.from
                 if (!from) return
                 const fromUrl = new URL(from.url)
-                const exercise = extractExerciseIdFromUrl(fromUrl)
-                if (!exercise) return
-                const element = document.querySelector(`a.exercise[data-exercise-id="${exercise}"] span`)
+                const workoutExerciseId = extractWorkoutExerciseIdFromUrl(fromUrl)
+                if (!workoutExerciseId) return
+                const element = document.querySelector(`a.exercise[data-workout-exercise-id="${workoutExerciseId}"] span`)
                 if (!element) return
-                element.style.viewTransitionName = `exercise-title-${exercise}`
+                element.style.viewTransitionName = `exercise-title-${workoutExerciseId}`
                 try {
                   await e.viewTransition.finished
                 } catch (_) {

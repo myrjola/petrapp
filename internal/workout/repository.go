@@ -27,6 +27,9 @@ type preferencesRepository interface {
 
 // exerciseSetAggregate groups all sets for a specific exercise in a workout.
 type exerciseSetAggregate struct {
+	// ID is the stable workout_exercise.id; zero means the slot is new and the
+	// repository should let SQLite assign one on insert.
+	ID                int
 	ExerciseID        int
 	Sets              []Set
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
