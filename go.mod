@@ -10,7 +10,7 @@ require (
 	github.com/go-webauthn/webauthn v0.16.1
 	github.com/google/go-cmp v0.7.0
 	github.com/mattn/go-sqlite3 v1.14.37
-	github.com/openai/openai-go v1.12.0
+	github.com/openai/openai-go/v3 v3.32.0
 	github.com/playwright-community/playwright-go v0.5700.1
 	github.com/yuin/goldmark v1.7.16
 	golang.org/x/sync v0.20.0

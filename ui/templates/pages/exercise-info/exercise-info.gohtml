@@ -57,9 +57,7 @@
                     }
                 }
             </style>
-            <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Exercise.ID }}" data-back-button>
-                ← Back
-            </a>
+            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .Exercise.ID) }}
             <h1>{{ .Exercise.Name }}</h1>
             {{ if .IsAdmin }}
                 <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>

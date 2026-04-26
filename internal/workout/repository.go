@@ -48,6 +48,14 @@ type datedExerciseSetAggregate struct {
 	exerciseSetAggregate
 }
 
+// LatestStartingSet captures the weight of the most recent completed first set
+// for an exercise along with the periodization type of the session it came from.
+// PeriodizationType is empty when no history exists.
+type LatestStartingSet struct {
+	WeightKg          float64
+	PeriodizationType PeriodizationType
+}
+
 // sessionRepository handles workout sessions.
 type sessionRepository interface {
 	List(ctx context.Context, sinceDate time.Time) ([]sessionAggregate, error)
@@ -59,6 +67,11 @@ type sessionRepository interface {
 	Update(ctx context.Context, date time.Time, updateFn func(sess *sessionAggregate) (bool, error)) error
 	// ListSetsForExerciseSince retrieves all sets for a given exercise since a date, one aggregate per session.
 	ListSetsForExerciseSince(ctx context.Context, exerciseID int, sinceDate time.Time) ([]datedExerciseSetAggregate, error)
+	// GetLatestStartingWeightBefore returns the weight of the first completed set
+	// from the most recent session strictly before beforeDate, along with that
+	// session's periodization type. Returns a zero-value struct when no completed
+	// history exists.
+	GetLatestStartingWeightBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (LatestStartingSet, error)
 	// CountCompleted returns the count of sessions with completed_at IS NOT NULL.
 	CountCompleted(ctx context.Context) (int, error)
 	// CreateBatch creates multiple sessions atomically in a single transaction.

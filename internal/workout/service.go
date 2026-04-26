@@ -508,21 +508,42 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 	}, nil
 }
 
-// GetStartingWeight returns the weight from the first set of the most recent completed
-// session for the given exercise. Returns 0 if no completed history exists.
-func (s *Service) GetStartingWeight(ctx context.Context, exerciseID int) (float64, error) {
-	since := time.Now().AddDate(0, -3, 0)
-	aggs, err := s.repo.sessions.ListSetsForExerciseSince(ctx, exerciseID, since)
+// GetStartingWeight returns the weight to seed a new session for the given exercise.
+// It pulls the first completed set from the most recent session strictly before
+// beforeDate, then converts the load via Epley 1RM-equivalence when that session's
+// periodization differs from targetType so the relative intensity carries across
+// rep schemes (e.g. 100 kg x5 strength → ~92 kg x8 hypertrophy). Using a cutoff
+// keeps the starting weight stable when earlier sets of beforeDate's session are
+// edited. Returns 0 if no completed history exists.
+func (s *Service) GetStartingWeight(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+	targetType PeriodizationType,
+) (float64, error) {
+	prev, err := s.repo.sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
 	if err != nil {
-		return 0, fmt.Errorf("list sets for exercise: %w", err)
+		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
-	// aggs is ordered DESC by date; first element is most recent session.
-	for _, agg := range aggs {
-		if len(agg.Sets) > 0 && agg.Sets[0].WeightKg != nil && agg.Sets[0].CompletedReps != nil {
-			return *agg.Sets[0].WeightKg, nil
-		}
+	if prev.PeriodizationType == "" || prev.PeriodizationType == targetType {
+		return prev.WeightKg, nil
 	}
-	return 0, nil
+	fromReps := exerciseprogression.TargetReps(periodizationToProgression(prev.PeriodizationType))
+	toReps := exerciseprogression.TargetReps(periodizationToProgression(targetType))
+	return exerciseprogression.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
+}
+
+// periodizationToProgression maps a workout periodization to its exerciseprogression
+// counterpart. Unknown values default to Strength.
+func periodizationToProgression(p PeriodizationType) exerciseprogression.PeriodizationType {
+	switch p {
+	case PeriodizationHypertrophy:
+		return exerciseprogression.Hypertrophy
+	case PeriodizationStrength:
+		return exerciseprogression.Strength
+	default:
+		return exerciseprogression.Strength
+	}
 }
 
 // BuildProgression constructs an exerciseprogression.Progression for the given exercise
@@ -537,18 +558,12 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	startingWeight, err := s.GetStartingWeight(ctx, exerciseID)
+	startingWeight, err := s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
 	if err != nil {
 		return nil, fmt.Errorf("get starting weight: %w", err)
 	}
 
-	var epType exerciseprogression.PeriodizationType
-	switch sess.PeriodizationType {
-	case PeriodizationHypertrophy:
-		epType = exerciseprogression.Hypertrophy
-	case PeriodizationStrength:
-		epType = exerciseprogression.Strength
-	}
+	epType := periodizationToProgression(sess.PeriodizationType)
 
 	config := exerciseprogression.Config{
 		Type:           epType,
