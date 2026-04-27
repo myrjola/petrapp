@@ -116,8 +116,10 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := app.workoutService.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
-		app.serverError(w, r, fmt.Errorf("regenerate weekly plan: %w", err))
-		return
+		// Preferences are already saved; regeneration failure is not fatal because
+		// ResolveWeeklySchedule on the home page will regenerate the plan automatically.
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "regenerate weekly plan after preference save",
+			slog.Any("error", err))
 	}
 
 	redirect(w, r, "/")

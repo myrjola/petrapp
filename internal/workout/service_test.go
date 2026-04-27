@@ -111,6 +111,26 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 	}
 }
 
+func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet
+
+	// Call directly without seeding via ResolveWeeklySchedule first.
+	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted on empty week: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after empty-week regenerate: %v", err)
+	}
+	// Mon=0, Wed=2, Fri=4 must have exercises.
+	for _, i := range []int{0, 2, 4} {
+		if len(sessions[i].ExerciseSets) == 0 {
+			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
+		}
+	}
+}
+
 func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *testing.T) {
 	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
 

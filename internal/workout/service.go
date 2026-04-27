@@ -53,6 +53,11 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 // RegenerateWeeklyPlanIfUnstarted replaces the current week's generated plan with one
 // that reflects the latest preferences, but only when no session has been started yet.
 // If any workout this week has a non-zero StartedAt the existing plan is left intact.
+//
+// The delete and generate steps are not wrapped in a single transaction. If the process
+// fails between the two, the week is left with no sessions. This is self-healing: the
+// next call to ResolveWeeklySchedule (e.g. on the home page redirect) detects zero
+// sessions and regenerates automatically.
 func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 	monday := mondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
@@ -62,6 +67,8 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 		return fmt.Errorf("list sessions for week: %w", err)
 	}
 
+	// List returns sessions from monday onwards (possibly spanning future weeks);
+	// only sessions within this week are relevant for the started check.
 	for _, sess := range existing {
 		if !sess.Date.After(sunday) && !sess.StartedAt.IsZero() {
 			return nil
