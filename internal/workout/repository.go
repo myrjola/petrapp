@@ -79,6 +79,8 @@ type sessionRepository interface {
 	CountCompleted(ctx context.Context) (int, error)
 	// CreateBatch creates multiple sessions atomically in a single transaction.
 	CreateBatch(ctx context.Context, sessions []sessionAggregate) error
+	// DeleteWeek removes all sessions for the 7-day window starting on monday.
+	DeleteWeek(ctx context.Context, monday time.Time) error
 }
 
 // exerciseRepository handles exercises and sets.

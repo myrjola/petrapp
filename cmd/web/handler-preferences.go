@@ -115,6 +115,11 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if err := app.workoutService.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
+		app.serverError(w, r, fmt.Errorf("regenerate weekly plan: %w", err))
+		return
+	}
+
 	redirect(w, r, "/")
 }
 
