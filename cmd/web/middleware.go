@@ -83,6 +83,7 @@ report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 	})
 }
 
+// cacheForever for static assets ensures they are cached indefinitely.
 func cacheForever(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -91,10 +92,20 @@ func cacheForever(next http.Handler) http.Handler {
 	})
 }
 
+// noCache ensures authenticated requests force revalidation.
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
+		w.Header().Set("Vary", "Vary: Cookie, Accept")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noStore is used for authentication routes to prevent caching sensitive data anywhere.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, max-age=0, must-revalidate")
+		w.Header().Set("Vary", "Vary: Cookie, Accept")
 		next.ServeHTTP(w, r)
 	})
 }

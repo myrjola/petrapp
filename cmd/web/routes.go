@@ -19,9 +19,15 @@ func (app *application) routes() (*http.ServeMux, error) {
 		noAuth = func(next http.Handler) http.Handler {
 			return app.recoverPanic(withoutMaintenanceMode(next))
 		}
+		sessionShared = func(next http.Handler) http.Handler {
+			return app.sessionManager.LoadAndSave(
+				app.webAuthnHandler.AuthenticateMiddleware(shared(next)))
+		}
 		session = func(next http.Handler) http.Handler {
-			return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(
-				app.webAuthnHandler.AuthenticateMiddleware(shared(next)))))
+			return app.recoverPanic(noCache(sessionShared(next)))
+		}
+		noStoreSession = func(next http.Handler) http.Handler {
+			return app.recoverPanic(noStore(sessionShared(next)))
 		}
 		mustSession = func(next http.Handler) http.Handler {
 			return session(app.mustAuthenticate(next))
@@ -62,11 +68,12 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("GET /preferences/export-data", mustSession(http.HandlerFunc(app.exportUserDataGET)))
 	mux.Handle("POST /preferences/delete-user", mustSession(http.HandlerFunc(app.deleteUserPOST)))
 
-	mux.Handle("POST /api/registration/start", session(http.HandlerFunc(app.beginRegistration)))
-	mux.Handle("POST /api/registration/finish", session(http.HandlerFunc(app.finishRegistration)))
-	mux.Handle("POST /api/login/start", session(http.HandlerFunc(app.beginLogin)))
-	mux.Handle("POST /api/login/finish", session(http.HandlerFunc(app.finishLogin)))
-	mux.Handle("POST /api/logout", session(http.HandlerFunc(app.logout)))
+	mux.Handle("POST /api/registration/start", noStoreSession(http.HandlerFunc(app.beginRegistration)))
+	mux.Handle("POST /api/registration/finish", noStoreSession(http.HandlerFunc(app.finishRegistration)))
+	mux.Handle("POST /api/login/start", noStoreSession(http.HandlerFunc(app.beginLogin)))
+	mux.Handle("POST /api/login/finish", noStoreSession(http.HandlerFunc(app.finishLogin)))
+	mux.Handle("POST /api/logout", noStoreSession(http.HandlerFunc(app.logout)))
+
 	mux.Handle("GET /api/healthy", session(http.HandlerFunc(app.healthy)))
 	mux.Handle("POST /api/reports", noAuth(http.HandlerFunc(app.reportingAPI)))
 	mux.Handle("GET /api/test/timeout", noAuth(http.HandlerFunc(app.testTimeout)))
