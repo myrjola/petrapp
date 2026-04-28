@@ -70,7 +70,10 @@ func New(
 
 		// Top origins are, to my understanding, used for cross-origin Passkeys. We don't need it here.
 		RPTopOrigins:                nil,
-		RPTopOriginVerificationMode: protocol.TopOriginIgnoreVerificationMode,
+		RPTopOriginVerificationMode: protocol.TopOriginExplicitVerificationMode,
+		RPAllowCrossOrigin:          false,
+
+		Filtering: nil,
 
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
