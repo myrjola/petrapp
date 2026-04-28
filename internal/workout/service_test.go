@@ -111,6 +111,107 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 	}
 }
 
+func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet
+
+	// Call directly without seeding via ResolveWeeklySchedule first.
+	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted on empty week: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after empty-week regenerate: %v", err)
+	}
+	// Mon=0, Wed=2, Fri=4 must have exercises.
+	for _, i := range []int{0, 2, 4} {
+		if len(sessions[i].ExerciseSets) == 0 {
+			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
+		}
+	}
+}
+
+func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
+
+	// Generate the initial plan.
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Change to Tue, Thu, Sat at 45 min.
+	if err := svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+		TuesdayMinutes:  45,
+		ThursdayMinutes: 45,
+		SaturdayMinutes: 45,
+	}); err != nil {
+		t.Fatalf("save preferences: %v", err)
+	}
+
+	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after regenerate: %v", err)
+	}
+
+	// Tue=1, Thu=3, Sat=5 must have exercises; Mon=0, Wed=2, Fri=4, Sun=6 must be rest.
+	for _, i := range []int{1, 3, 5} {
+		if len(sessions[i].ExerciseSets) == 0 {
+			t.Errorf("sessions[%d] (%s) must have exercise sets after preference change", i, sessions[i].Date.Weekday())
+		}
+	}
+	for _, i := range []int{0, 2, 4, 6} {
+		if len(sessions[i].ExerciseSets) != 0 {
+			t.Errorf("sessions[%d] (%s) must be a rest day after preference change", i, sessions[i].Date.Weekday())
+		}
+	}
+}
+
+func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Start the first scheduled workout (Monday, index 0).
+	if err = svc.StartSession(ctx, sessions[0].Date); err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+
+	// Change preferences to Tue, Thu, Sat.
+	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+		TuesdayMinutes:  45,
+		ThursdayMinutes: 45,
+		SaturdayMinutes: 45,
+	}); err != nil {
+		t.Fatalf("save preferences: %v", err)
+	}
+
+	if err = svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
+	}
+
+	sessions2, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after skip: %v", err)
+	}
+
+	// Monday (index 0) must still have exercises — the original plan was kept.
+	if len(sessions2[0].ExerciseSets) == 0 {
+		t.Error("sessions2[0] (Monday) must still have exercise sets; workout was already started")
+	}
+
+	// Tuesday must still be a rest day — the new preferences were not applied.
+	if len(sessions2[1].ExerciseSets) != 0 {
+		t.Error("sessions2[1] (Tuesday) must remain a rest day; new preferences must not be applied")
+	}
+}
+
 func extractExerciseIDs(session workout.Session) []int {
 	ids := make([]int, len(session.ExerciseSets))
 	for i, es := range session.ExerciseSets {

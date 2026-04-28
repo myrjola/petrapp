@@ -603,6 +603,20 @@ func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 	return workoutDateStr, set, warmupCompletedAtStr, nil
 }
 
+// DeleteWeek removes all sessions for the 7-day window [monday, monday+6].
+// The ON DELETE CASCADE foreign keys clear related workout_exercise and exercise_sets rows.
+func (r *sqliteSessionRepository) DeleteWeek(ctx context.Context, monday time.Time) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
+	if _, err := r.db.ReadWrite.ExecContext(ctx, `
+		DELETE FROM workout_sessions
+		WHERE user_id = ? AND workout_date >= ? AND workout_date <= ?`,
+		userID, formatDate(monday), formatDate(sunday)); err != nil {
+		return fmt.Errorf("delete week sessions: %w", err)
+	}
+	return nil
+}
+
 // CountCompleted returns the number of completed sessions for the authenticated user.
 func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
