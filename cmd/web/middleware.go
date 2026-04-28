@@ -76,6 +76,8 @@ report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 		w.Header().Set("X-XSS-Protection", "0")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+		// Prevent unload handlers from disabling bfcache.
+		w.Header().Set("Permissions-Policy", "unload=()")
 
 		r = contexthelpers.SetCSPNonce(r, cspNonce)
 
