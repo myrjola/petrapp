@@ -287,7 +287,7 @@ func setInvalidationCookieOnPost(next http.Handler) http.Handler {
 				Name:     "inv_bfcache",
 				Value:    rand.Text(),
 				Path:     "/",
-				MaxAge:   60,
+				MaxAge:   60, //nolint:mnd // One shot cookie cleared client side.
 				SameSite: http.SameSiteLaxMode,
 				Secure:   true,
 				HttpOnly: false, // We need this client side to trigger busting of bfcache in pageshow handler.

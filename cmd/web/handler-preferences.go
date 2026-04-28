@@ -146,7 +146,8 @@ func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
 
 // clearSiteData to ensure you can't navigate backwards to sensitive content after logging out.
 func clearSiteData(w http.ResponseWriter) {
-	w.Header().Set("Clear-Site-Data", "\"cache\", \"cookies\", \"storage\", \"executionContexts\", \"prefetchCache\", \"prerenderCache\"")
+	w.Header().Set("Clear-Site-Data",
+		"\"cache\", \"cookies\", \"storage\", \"executionContexts\", \"prefetchCache\", \"prerenderCache\"")
 }
 
 func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request) {
