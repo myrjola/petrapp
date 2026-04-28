@@ -175,9 +175,16 @@ document.addEventListener('submit', (e) => {
     if (submitButton) submitButton.disabled = true
 })
 
-// Reset submit state after bfcache restore.
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
+        // Refetch page if invalidation cookie is present.
+        const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/);
+        if (m) {
+            document.cookie = 'inv_bfcache=; Path=/; Max-Age=0; SameSite=Lax; Secure';
+            setTimeout(() => navigation.reload(), 300)
+        }
+
+        // Reset submit state after bfcache restore.
         document.querySelectorAll('form.submitting').forEach((form) => {
             form.classList.remove('submitting')
             const submitButton = form.querySelector('button[type=submit]')

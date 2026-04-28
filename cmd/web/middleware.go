@@ -278,3 +278,21 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// setInvalidationCookieOnPost busts bfcache by setting a cookie.
+func setInvalidationCookieOnPost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			http.SetCookie(w, &http.Cookie{
+				Name:     "inv_bfcache",
+				Value:    rand.Text(),
+				Path:     "/",
+				MaxAge:   60,
+				SameSite: http.SameSiteLaxMode,
+				Secure:   true,
+				HttpOnly: false, // We need this client side to trigger busting of bfcache in pageshow handler.
+			})
+		}
+		next.ServeHTTP(w, r)
+	})
+}

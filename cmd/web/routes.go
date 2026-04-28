@@ -14,7 +14,7 @@ func (app *application) routes() (*http.ServeMux, error) {
 				commonContext(app.timeout(next)))))
 		}
 		shared = func(next http.Handler) http.Handler {
-			return withoutMaintenanceMode(app.maintenanceMode(next))
+			return withoutMaintenanceMode(app.maintenanceMode(setInvalidationCookieOnPost(next)))
 		}
 		noAuth = func(next http.Handler) http.Handler {
 			return app.recoverPanic(withoutMaintenanceMode(next))
