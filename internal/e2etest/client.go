@@ -399,8 +399,13 @@ func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPat
 }
 
 // SubmitForm submits a form in the doc identified with action formActionUrlPath and returns the response document.
-// formFields is a map of label text to value. The function will find the form element by label and set its value.
-// For select elements with the multiple attribute, use comma-separated values (e.g., "option1,option2,option3").
+// Each entry in formFields is resolved against the form using these strategies, in order:
+//  1. submit button: matches a button[name=key][value=value], representing a click on that button.
+//  2. direct field by name: matches an input/select/textarea with name=key.
+//  3. label text: matches a <label> whose text contains key, then resolves to its associated input or select.
+//
+// For multi-select fields, pass comma-separated values (e.g., "option1,option2"). Hidden inputs in the matching
+// form(s) are included automatically; explicit fields override hidden values when names collide.
 func (c *Client) SubmitForm(
 	ctx context.Context,
 	doc *goquery.Document,
@@ -438,7 +443,7 @@ func (c *Client) prepareFormData(
 	// Initialize form data with hidden fields
 	formData := neturl.Values{}
 	for name, value := range hiddenFields {
-		formData.Add(name, value)
+		formData.Set(name, value)
 	}
 
 	// Process form fields
@@ -449,118 +454,113 @@ func (c *Client) prepareFormData(
 	return formData, nil
 }
 
-// processFormFields finds form elements by label and adds their values to formData.
+// processFormFields resolves each entry in formFields against the form and writes values into formData.
 func (c *Client) processFormFields(
 	form *goquery.Selection,
 	formFields map[string]string,
 	formData neturl.Values,
 ) error {
-	for labelText, value := range formFields {
-		if err := c.processFormField(form, labelText, value, formData); err != nil {
+	for key, value := range formFields {
+		if err := c.processFormField(form, key, value, formData); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// processFormField processes a single form field.
+// processFormField processes a single form field, trying submit-button, name-attribute, and label lookups in order.
 func (c *Client) processFormField(
 	form *goquery.Selection,
-	labelText string,
+	key string,
 	value string,
 	formData neturl.Values,
 ) error {
-	// Try to find an input element first
-	input, inputErr := FindInputForLabel(form, labelText)
-	if inputErr == nil {
-		return c.processInputField(input, labelText, value, formData)
+	if matchesSubmitButton(form, key, value) {
+		formData.Set(key, value)
+		return nil
 	}
 
-	// If no input was found, try to find a select element
-	selectElement, selectErr := FindSelectForLabel(form, labelText)
-	if selectErr != nil {
-		// Neither input nor select found for this label
-		return fmt.Errorf("form element not found for label: %s", labelText)
+	if hasNamedField(form, "input", key) || hasNamedField(form, "textarea", key) {
+		formData.Set(key, value)
+		return nil
 	}
 
-	return c.processSelectField(selectElement, labelText, value, formData)
+	if selectElement := findNamedField(form, "select", key); selectElement != nil {
+		setSelectValue(selectElement, key, value, formData)
+		return nil
+	}
+
+	if input, err := FindInputForLabel(form, key); err == nil {
+		return setInputValue(input, key, value, formData)
+	}
+	if selectElement, err := FindSelectForLabel(form, key); err == nil {
+		name, exists := selectElement.Attr("name")
+		if !exists {
+			return fmt.Errorf("select has no name attribute (label: %s)", key)
+		}
+		setSelectValue(selectElement, name, value, formData)
+		return nil
+	}
+
+	return fmt.Errorf("form element not found for: %s", key)
 }
 
-// processInputField adds an input field to the form data.
-func (c *Client) processInputField(
-	input *goquery.Selection,
-	labelText string,
-	value string,
-	formData neturl.Values,
-) error {
+// matchesSubmitButton reports whether the form contains a submit button with the given name/value pair.
+func matchesSubmitButton(form *goquery.Selection, name, value string) bool {
+	found := false
+	form.Find("button").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		btnName, hasName := s.Attr("name")
+		btnValue, hasValue := s.Attr("value")
+		if hasName && hasValue && btnName == name && btnValue == value {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// findNamedField returns the first element of the given tag with name=key in the form, or nil if none.
+func findNamedField(form *goquery.Selection, tag, key string) *goquery.Selection {
+	var found *goquery.Selection
+	form.Find(tag).EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		if name, exists := s.Attr("name"); exists && name == key {
+			found = s
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// hasNamedField reports whether the form has an element of the given tag with name=key.
+func hasNamedField(form *goquery.Selection, tag, key string) bool {
+	return findNamedField(form, tag, key) != nil
+}
+
+// setInputValue writes an input field's name/value into formData.
+func setInputValue(input *goquery.Selection, key, value string, formData neturl.Values) error {
 	name, exists := input.Attr("name")
 	if !exists {
-		return fmt.Errorf("input has no name attribute (label: %s)", labelText)
+		return fmt.Errorf("input has no name attribute (label: %s)", key)
 	}
-	formData.Add(name, value)
+	formData.Set(name, value)
 	return nil
 }
 
-// processSelectField adds a select field to the form data.
-func (c *Client) processSelectField(
-	selectElement *goquery.Selection,
-	labelText string,
-	value string,
-	formData neturl.Values,
-) error {
-	name, exists := selectElement.Attr("name")
-	if !exists {
-		return fmt.Errorf("select has no name attribute (label: %s)", labelText)
-	}
-
+// setSelectValue writes a select field's value(s) into formData. For multi-selects, value is split on commas.
+func setSelectValue(selectElement *goquery.Selection, name, value string, formData neturl.Values) {
 	if IsMultipleSelect(selectElement) {
-		return c.processMultipleSelect(name, value, formData)
-	}
-
-	// For single select, just add the value
-	formData.Add(name, value)
-	return nil
-}
-
-// processMultipleSelect handles multiple select fields with comma-separated values.
-func (c *Client) processMultipleSelect(
-	name string,
-	value string,
-	formData neturl.Values,
-) error {
-	options := strings.SplitSeq(value, ",")
-	for option := range options {
-		trimmedOption := strings.TrimSpace(option)
-		if trimmedOption != "" {
-			formData.Add(name, trimmedOption)
+		formData.Del(name)
+		for option := range strings.SplitSeq(value, ",") {
+			trimmed := strings.TrimSpace(option)
+			if trimmed != "" {
+				formData.Add(name, trimmed)
+			}
 		}
+		return
 	}
-	return nil
-}
-
-// PostForm submits a POST request to the given URL path with the provided field names and values.
-// Unlike SubmitForm, field keys are treated as field names (not label text) and no hidden field extraction is done.
-// The CSRF token is extracted from the page's hidden fields for the given action URL.
-func (c *Client) PostForm(
-	ctx context.Context,
-	doc *goquery.Document,
-	formActionURLPath string,
-	fields map[string]string,
-) (*goquery.Document, error) {
-	hiddenFields, err := c.extractHiddenFormFields(doc, formActionURLPath)
-	if err != nil {
-		return nil, fmt.Errorf("extract hidden form fields: %w", err)
-	}
-
-	formData := neturl.Values{}
-	for name, value := range hiddenFields {
-		formData.Set(name, value)
-	}
-	for name, value := range fields {
-		formData.Set(name, value)
-	}
-
-	return c.submitFormRequest(ctx, formActionURLPath, formData)
+	formData.Set(name, value)
 }
 
 // submitFormRequest submits the form data to the specified URL and returns the response document.

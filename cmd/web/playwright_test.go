@@ -487,21 +487,14 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Fatalf("expect load after warmup complete: %v", err)
 	}
 
-	// Submit the first set via the "No" (too-heavy) signal path: select the
-	// radio, fill actual reps, then click Submit.  The "Barely" / "Could do
-	// more" labels auto-submit via form.submit() which may not carry formData
-	// to the navigation API, so we use the explicit submit-button path instead.
-	if err = page.Locator("label.too-heavy-btn").First().Click(); err != nil {
-		t.Fatalf("click No (too-heavy) signal: %v", err)
-	}
-	// The reps-section is now visible via CSS :has selector.
+	// Submit the first set via the "No" (too-heavy) signal submit button. The
+	// reps input is pre-filled with the target; we override it before clicking
+	// the named submit button, which sends signal=too_heavy along with the form.
 	if err = page.GetByLabel("Actual reps").First().Fill("8"); err != nil {
 		t.Fatalf("fill actual reps: %v", err)
 	}
-	submitBtn := page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Submit"}).First()
-	if err = submitBtn.Click(); err != nil {
-		t.Fatalf("click Submit set button: %v", err)
+	if err = page.Locator("button.too-heavy-btn").First().Click(); err != nil {
+		t.Fatalf("click No (too-heavy) signal: %v", err)
 	}
 	// After the set update, replaceTo(same-URL) fires history.replaceState +
 	// location.reload().  Wait for the reload-triggered page navigation to fully

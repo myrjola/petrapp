@@ -144,7 +144,7 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Signal form has no action attribute")
 	}
 
-	if doc, err = client.PostForm(ctx, doc, setAction, map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, setAction, map[string]string{
 		"weight": "20.5",
 		"signal": "on_target",
 		"reps":   "5",
@@ -229,7 +229,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	newWeight := weightFloat + 2.5 // Increase by 2.5 kg
 
 	// Update the completed set with new weight and signal
-	if doc, err = client.PostForm(ctx, doc, editAction, map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, editAction, map[string]string{
 		"weight": strconv.FormatFloat(newWeight, 'f', 1, 64),
 		"signal": "on_target",
 		"reps":   "12",
@@ -321,15 +321,17 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 			t.Fatalf("Submit warmup: %v", err)
 		}
 	}
-	setForm := doc.Find("form.signal-form").First()
+	setForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
 	if setForm.Length() == 0 {
 		t.Fatal("No signal form on slot page")
 	}
 	setAction, _ := setForm.Attr("action")
-	if doc, err = client.PostForm(ctx, doc, setAction, map[string]string{
-		"weight":      "42.5",
-		"signal":      "on_target",
-		"target_reps": "5",
+	if doc, err = client.SubmitForm(ctx, doc, setAction, map[string]string{
+		"weight": "42.5",
+		"signal": "on_target",
+		"reps":   "5",
 	}); err != nil {
 		t.Fatalf("Submit set: %v", err)
 	}
@@ -353,7 +355,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 	if !exists || newExerciseID == "" {
 		t.Fatal("No new_exercise_id offered on swap page")
 	}
-	if _, err = client.PostForm(ctx, doc, swapAction, map[string]string{
+	if _, err = client.SubmitForm(ctx, doc, swapAction, map[string]string{
 		"new_exercise_id": newExerciseID,
 	}); err != nil {
 		t.Fatalf("Submit swap: %v", err)
