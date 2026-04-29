@@ -166,15 +166,6 @@ document.addEventListener('click', (e) => {
     }
 })
 
-// Form submission UI state.
-document.addEventListener('submit', (e) => {
-    const form = e.target
-    if (!(form instanceof HTMLFormElement)) return
-    form.classList.add('submitting')
-    const submitButton = form.querySelector('button[type=submit]')
-    if (submitButton) submitButton.disabled = true
-})
-
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
         // Reload if the invalidation cookie has changed since this page was rendered.
@@ -191,12 +182,5 @@ window.addEventListener('pageshow', (event) => {
                 location.reload()
             }
         }
-
-        // Reset submit state after bfcache restore.
-        document.querySelectorAll('form.submitting').forEach((form) => {
-            form.classList.remove('submitting')
-            const submitButton = form.querySelector('button[type=submit]')
-            if (submitButton) submitButton.disabled = false
-        })
     }
 })
