@@ -175,9 +175,24 @@ document.addEventListener('submit', (e) => {
     if (submitButton) submitButton.disabled = true
 })
 
-// Reset submit state after bfcache restore.
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
+        // Reload if the invalidation cookie has changed since this page was rendered.
+        // The render-time value is baked into a <meta> tag; a mismatch means a POST
+        // ran while we were in bfcache and our state may be stale.
+        const meta = document.querySelector('meta[name="invalidation-token"]')
+        const rendered = meta ? meta.content : ''
+        const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
+        const current = m ? m[1] : ''
+        if (rendered !== current) {
+            if ('navigation' in window) {
+                navigation.reload()
+            } else {
+                location.reload()
+            }
+        }
+
+        // Reset submit state after bfcache restore.
         document.querySelectorAll('form.submitting').forEach((form) => {
             form.classList.remove('submitting')
             const submitButton = form.querySelector('button[type=submit]')

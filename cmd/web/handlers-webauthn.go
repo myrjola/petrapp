@@ -63,6 +63,7 @@ func (app *application) finishLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) logout(w http.ResponseWriter, r *http.Request) {
+	clearSiteData(w)
 	if err := app.webAuthnHandler.Logout(r.Context()); err != nil {
 		app.serverError(w, r, err)
 		return
