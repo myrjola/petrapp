@@ -83,6 +83,11 @@
         --radius-6: 8rem;
         --radius-round: 9999px;
 
+        /* Shadows (elevation) */
+        --shadow-1: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-2: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        --shadow-3: 0 2px 4px 0 rgb(0 0 0 / 0.1);
+
         /* Fonts */
         --font-system-ui: system-ui, sans-serif;
         --font-monospace-code: Dank Mono, Operator Mono, Inconsolata, Fira Mono, ui-monospace, SF Mono, Monaco, Droid Sans Mono, Source Code Pro, Cascadia Code, Menlo, Consolas, DejaVu Sans Mono, monospace;

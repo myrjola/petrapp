@@ -82,6 +82,10 @@ func (app *application) routes() (*http.ServeMux, error) {
 	// Privacy page
 	mux.Handle("GET /privacy", session(http.HandlerFunc(app.privacy)))
 
+	// Developer-only design-token reference. Gated inside the handler on app.devMode
+	// so prod returns 404; route is registered unconditionally to keep startup simple.
+	mux.Handle("GET /dev/styleguide", session(http.HandlerFunc(app.styleguideGET)))
+
 	// Home route (most specific)
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
 

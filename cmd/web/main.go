@@ -29,6 +29,9 @@ type application struct {
 	templateFS      fs.FS
 	workoutService  *workout.Service
 	flightRecorder  *flightrecorder.Service
+	// devMode is true when running outside the Fly.io production deployment.
+	// It enables developer-only routes like /dev/styleguide.
+	devMode bool
 }
 
 type config struct {
@@ -127,6 +130,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		templateFS:      os.DirFS(htmlTemplatePath),
 		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
 		flightRecorder:  flightRecorderService,
+		devMode:         cfg.FlyAppName == "",
 	}
 
 	routes, err := app.routes()
