@@ -115,6 +115,13 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if err := app.workoutService.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
+		// Preferences are already saved; regeneration failure is not fatal because
+		// ResolveWeeklySchedule on the home page will regenerate the plan automatically.
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "regenerate weekly plan after preference save",
+			slog.Any("error", err))
+	}
+
 	redirect(w, r, "/")
 }
 
@@ -128,12 +135,19 @@ func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the user out by clearing the session and redirect home.
+	clearSiteData(w)
 	if err := app.webAuthnHandler.Logout(ctx); err != nil {
 		app.serverError(w, r, fmt.Errorf("logout after user deletion: %w", err))
 		return
 	}
 
 	redirect(w, r, "/")
+}
+
+// clearSiteData to ensure you can't navigate backwards to sensitive content after logging out.
+func clearSiteData(w http.ResponseWriter) {
+	w.Header().Set("Clear-Site-Data",
+		"\"cache\", \"cookies\", \"storage\", \"executionContexts\", \"prefetchCache\", \"prerenderCache\"")
 }
 
 func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request) {

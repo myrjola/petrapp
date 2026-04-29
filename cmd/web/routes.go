@@ -14,14 +14,20 @@ func (app *application) routes() (*http.ServeMux, error) {
 				commonContext(app.timeout(next)))))
 		}
 		shared = func(next http.Handler) http.Handler {
-			return withoutMaintenanceMode(app.maintenanceMode(next))
+			return withoutMaintenanceMode(app.maintenanceMode(setInvalidationCookieOnPost(next)))
 		}
 		noAuth = func(next http.Handler) http.Handler {
 			return app.recoverPanic(withoutMaintenanceMode(next))
 		}
+		sessionShared = func(next http.Handler) http.Handler {
+			return app.sessionManager.LoadAndSave(
+				app.webAuthnHandler.AuthenticateMiddleware(shared(next)))
+		}
 		session = func(next http.Handler) http.Handler {
-			return app.recoverPanic(noCache(app.sessionManager.LoadAndSave(
-				app.webAuthnHandler.AuthenticateMiddleware(shared(next)))))
+			return app.recoverPanic(noCache(sessionShared(next)))
+		}
+		noStoreSession = func(next http.Handler) http.Handler {
+			return app.recoverPanic(noStore(sessionShared(next)))
 		}
 		mustSession = func(next http.Handler) http.Handler {
 			return session(app.mustAuthenticate(next))
@@ -36,15 +42,17 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("POST /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletePOST)))
 	mux.Handle("GET /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletionGET)))
 
-	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}", mustSession(http.HandlerFunc(app.exerciseSetGET)))
-	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/sets/{setIndex}/update",
+	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}",
+		mustSession(http.HandlerFunc(app.exerciseSetGET)))
+	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/sets/{setIndex}/update",
 		mustSession(http.HandlerFunc(app.exerciseSetUpdatePOST)))
-	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/warmup/complete",
+	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/warmup/complete",
 		mustSession(http.HandlerFunc(app.exerciseSetWarmupCompletePOST)))
-	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/info", mustSession(http.HandlerFunc(app.exerciseInfoGET)))
-	mux.Handle("GET /workouts/{date}/exercises/{exerciseID}/swap",
+	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}/info",
+		mustSession(http.HandlerFunc(app.exerciseInfoGET)))
+	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}/swap",
 		mustSession(http.HandlerFunc(app.workoutSwapExerciseGET)))
-	mux.Handle("POST /workouts/{date}/exercises/{exerciseID}/swap",
+	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/swap",
 		mustSession(http.HandlerFunc(app.workoutSwapExercisePOST)))
 	mux.Handle("GET /workouts/{date}/add-exercise",
 		mustSession(http.HandlerFunc(app.workoutAddExerciseGET)))
@@ -60,11 +68,12 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("GET /preferences/export-data", mustSession(http.HandlerFunc(app.exportUserDataGET)))
 	mux.Handle("POST /preferences/delete-user", mustSession(http.HandlerFunc(app.deleteUserPOST)))
 
-	mux.Handle("POST /api/registration/start", session(http.HandlerFunc(app.beginRegistration)))
-	mux.Handle("POST /api/registration/finish", session(http.HandlerFunc(app.finishRegistration)))
-	mux.Handle("POST /api/login/start", session(http.HandlerFunc(app.beginLogin)))
-	mux.Handle("POST /api/login/finish", session(http.HandlerFunc(app.finishLogin)))
-	mux.Handle("POST /api/logout", session(http.HandlerFunc(app.logout)))
+	mux.Handle("POST /api/registration/start", noStoreSession(http.HandlerFunc(app.beginRegistration)))
+	mux.Handle("POST /api/registration/finish", noStoreSession(http.HandlerFunc(app.finishRegistration)))
+	mux.Handle("POST /api/login/start", noStoreSession(http.HandlerFunc(app.beginLogin)))
+	mux.Handle("POST /api/login/finish", noStoreSession(http.HandlerFunc(app.finishLogin)))
+	mux.Handle("POST /api/logout", noStoreSession(http.HandlerFunc(app.logout)))
+
 	mux.Handle("GET /api/healthy", session(http.HandlerFunc(app.healthy)))
 	mux.Handle("POST /api/reports", noAuth(http.HandlerFunc(app.reportingAPI)))
 	mux.Handle("GET /api/test/timeout", noAuth(http.HandlerFunc(app.testTimeout)))
@@ -79,6 +88,10 @@ func (app *application) routes() (*http.ServeMux, error) {
 
 	// Privacy page
 	mux.Handle("GET /privacy", session(http.HandlerFunc(app.privacy)))
+
+	// Developer-only design-token reference. Gated inside the handler on app.devMode
+	// so prod returns 404; route is registered unconditionally to keep startup simple.
+	mux.Handle("GET /dev/styleguide", session(http.HandlerFunc(app.styleguideGET)))
 
 	// Home route (most specific)
 	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))

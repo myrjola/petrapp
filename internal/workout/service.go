@@ -50,6 +50,40 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 	return nil
 }
 
+// RegenerateWeeklyPlanIfUnstarted replaces the current week's generated plan with one
+// that reflects the latest preferences, but only when no session has been started yet.
+// If any workout this week has a non-zero StartedAt the existing plan is left intact.
+//
+// The delete and generate steps are not wrapped in a single transaction. If the process
+// fails between the two, the week is left with no sessions. This is self-healing: the
+// next call to ResolveWeeklySchedule (e.g. on the home page redirect) detects zero
+// sessions and regenerates automatically.
+func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
+	monday := mondayOf(time.Now())
+	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
+
+	existing, err := s.repo.sessions.List(ctx, monday)
+	if err != nil {
+		return fmt.Errorf("list sessions for week: %w", err)
+	}
+
+	// List returns sessions from monday onwards (possibly spanning future weeks);
+	// only sessions within this week are relevant for the started check.
+	for _, sess := range existing {
+		if !sess.Date.After(sunday) && !sess.StartedAt.IsZero() {
+			return nil
+		}
+	}
+
+	if err = s.repo.sessions.DeleteWeek(ctx, monday); err != nil {
+		return fmt.Errorf("delete current week: %w", err)
+	}
+	if err = s.generateWeeklyPlan(ctx, monday); err != nil {
+		return fmt.Errorf("generate weekly plan: %w", err)
+	}
+	return nil
+}
+
 // ResolveWeeklySchedule retrieves the workout schedule for the current week.
 // If no sessions exist for the week, it generates all scheduled days at once using
 // the weekly planner and persists them in a single transaction.
@@ -171,7 +205,7 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 					MaxReps: planSet.MaxReps,
 				}
 			}
-			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // WarmupCompletedAt starts nil.
+			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
 				ExerciseID: pes.ExerciseID,
 				Sets:       sets,
 			}
@@ -221,6 +255,7 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 		if err != nil {
 			return Session{}, fmt.Errorf("get exercise %d: %w", ex.ExerciseID, err)
 		}
+		session.ExerciseSets[i].ID = ex.ID
 		session.ExerciseSets[i].Exercise = exercise
 		session.ExerciseSets[i].Sets = ex.Sets
 		session.ExerciseSets[i].WarmupCompletedAt = ex.WarmupCompletedAt
@@ -325,13 +360,13 @@ func (s *Service) UpdateSetWeight(
 func (s *Service) UpdateCompletedReps(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 	setIndex int,
 	completedReps int,
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for _, ex := range sess.ExerciseSets {
-			if ex.ExerciseID == exerciseID {
+			if ex.ID == workoutExerciseID {
 				if setIndex >= len(ex.Sets) {
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
@@ -341,7 +376,7 @@ func (s *Service) UpdateCompletedReps(
 				return true, nil
 			}
 		}
-		return false, errors.New("exercise not found")
+		return false, errors.New("workout exercise not found")
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
@@ -353,7 +388,7 @@ func (s *Service) UpdateCompletedReps(
 func (s *Service) RecordSetCompletion(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 	setIndex int,
 	signal Signal,
 	weightKg float64,
@@ -361,7 +396,7 @@ func (s *Service) RecordSetCompletion(
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ExerciseID == exerciseID {
+			if sess.ExerciseSets[i].ID == workoutExerciseID {
 				if setIndex >= len(sess.ExerciseSets[i].Sets) {
 					return false, fmt.Errorf("set index %d out of bounds", setIndex)
 				}
@@ -373,28 +408,28 @@ func (s *Service) RecordSetCompletion(
 				return true, nil
 			}
 		}
-		return false, errors.New("exercise not found")
+		return false, errors.New("workout exercise not found")
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
 	return nil
 }
 
-// MarkWarmupComplete marks the warmup as complete for a specific exercise.
+// MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
 func (s *Service) MarkWarmupComplete(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ExerciseID == exerciseID {
+			if sess.ExerciseSets[i].ID == workoutExerciseID {
 				now := time.Now().UTC()
 				sess.ExerciseSets[i].WarmupCompletedAt = &now
 				return true, nil
 			}
 		}
-		return false, errors.New("exercise not found")
+		return false, errors.New("workout exercise not found")
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
 	}
@@ -459,6 +494,7 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 				}
 
 				enrichedSession.ExerciseSets[i] = ExerciseSet{
+					ID:                es.ID,
 					Exercise:          ex,
 					Sets:              es.Sets,
 					WarmupCompletedAt: es.WarmupCompletedAt,
@@ -508,16 +544,42 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 	}, nil
 }
 
-// GetStartingWeight returns the weight of the first completed set from the most recent
-// session strictly before beforeDate. Using a cutoff keeps the starting weight stable
-// when earlier sets of beforeDate's session are edited. Returns 0 if no completed
-// history exists.
-func (s *Service) GetStartingWeight(ctx context.Context, exerciseID int, beforeDate time.Time) (float64, error) {
-	weight, err := s.repo.sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
+// GetStartingWeight returns the weight to seed a new session for the given exercise.
+// It pulls the first completed set from the most recent session strictly before
+// beforeDate, then converts the load via Epley 1RM-equivalence when that session's
+// periodization differs from targetType so the relative intensity carries across
+// rep schemes (e.g. 100 kg x5 strength → ~92 kg x8 hypertrophy). Using a cutoff
+// keeps the starting weight stable when earlier sets of beforeDate's session are
+// edited. Returns 0 if no completed history exists.
+func (s *Service) GetStartingWeight(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+	targetType PeriodizationType,
+) (float64, error) {
+	prev, err := s.repo.sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
 	if err != nil {
 		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
-	return weight, nil
+	if prev.PeriodizationType == "" || prev.PeriodizationType == targetType {
+		return prev.WeightKg, nil
+	}
+	fromReps := exerciseprogression.TargetReps(periodizationToProgression(prev.PeriodizationType))
+	toReps := exerciseprogression.TargetReps(periodizationToProgression(targetType))
+	return exerciseprogression.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
+}
+
+// periodizationToProgression maps a workout periodization to its exerciseprogression
+// counterpart. Unknown values default to Strength.
+func periodizationToProgression(p PeriodizationType) exerciseprogression.PeriodizationType {
+	switch p {
+	case PeriodizationHypertrophy:
+		return exerciseprogression.Hypertrophy
+	case PeriodizationStrength:
+		return exerciseprogression.Strength
+	default:
+		return exerciseprogression.Strength
+	}
 }
 
 // BuildProgression constructs an exerciseprogression.Progression for the given exercise
@@ -532,18 +594,12 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	startingWeight, err := s.GetStartingWeight(ctx, exerciseID, date)
+	startingWeight, err := s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
 	if err != nil {
 		return nil, fmt.Errorf("get starting weight: %w", err)
 	}
 
-	var epType exerciseprogression.PeriodizationType
-	switch sess.PeriodizationType {
-	case PeriodizationHypertrophy:
-		epType = exerciseprogression.Hypertrophy
-	case PeriodizationStrength:
-		epType = exerciseprogression.Strength
-	}
+	epType := periodizationToProgression(sess.PeriodizationType)
 
 	config := exerciseprogression.Config{
 		Type:           epType,
@@ -637,7 +693,7 @@ func (s *Service) generateExerciseContent(ctx context.Context, name string) Exer
 	}
 
 	// Try to generate a better exercise with AI
-	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups)
+	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups, s.logger)
 	generated, err := generator.Generate(ctx, name)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to generate exercise details",
@@ -661,43 +717,30 @@ func createMinimalExercise(name string) Exercise {
 	}
 }
 
-// SwapExercise replaces an exercise in a workout with another exercise.
-// It retrieves weights from the previous time the new exercise was used.
+// SwapExercise replaces the exercise occupying a workout slot (identified by
+// workoutExerciseID) with newExerciseID. The workout slot's stable ID is
+// preserved so URLs targeting the slot keep working.
+//
+// Sets recorded against the old exercise are dropped — replaced with historical
+// data for the new exercise when available, otherwise empty placeholders matching
+// the old set count.
 func (s *Service) SwapExercise(
 	ctx context.Context,
 	date time.Time,
-	currentExerciseID int,
+	workoutExerciseID int,
 	newExerciseID int,
 ) error {
-	// 1. Validate both exercises exist
-	if err := s.validateExercises(ctx, currentExerciseID, newExerciseID); err != nil {
-		return err
+	if _, err := s.repo.exercises.Get(ctx, newExerciseID); err != nil {
+		return fmt.Errorf("get new exercise: %w", err)
 	}
 
-	// 2. Find historical data for the new exercise
 	historicalSets, err := s.findHistoricalSets(ctx, date, newExerciseID)
 	if err != nil {
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
-	// 3. Update the session with the new exercise
-	if err = s.replaceExerciseInSession(ctx, date, currentExerciseID, newExerciseID, historicalSets); err != nil {
+	if err = s.replaceExerciseInSession(ctx, date, workoutExerciseID, newExerciseID, historicalSets); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// validateExercises checks if both exercises exist in the repository.
-func (s *Service) validateExercises(ctx context.Context, currentID, newID int) error {
-	_, err := s.repo.exercises.Get(ctx, currentID)
-	if err != nil {
-		return fmt.Errorf("get current exercise: %w", err)
-	}
-
-	_, err = s.repo.exercises.Get(ctx, newID)
-	if err != nil {
-		return fmt.Errorf("get new exercise: %w", err)
 	}
 
 	return nil
@@ -768,34 +811,33 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 	return result
 }
 
-// replaceExerciseInSession updates a session by replacing one exercise with another.
+// replaceExerciseInSession swaps the exercise occupying a workout slot, keeping
+// the slot's stable ID intact. Any previously recorded sets on the slot are
+// dropped — historicalSets seeds the replacement when present, otherwise we
+// generate empty placeholders matching the old set count.
 func (s *Service) replaceExerciseInSession(
 	ctx context.Context,
 	date time.Time,
-	currentExerciseID int,
+	workoutExerciseID int,
 	newExerciseID int,
 	historicalSets []Set,
 ) error {
 	err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		// Find the exercise set to replace
 		for i, exerciseSet := range sess.ExerciseSets {
-			if exerciseSet.ExerciseID == currentExerciseID {
-				// Replace the exercise ID
-				sess.ExerciseSets[i].ExerciseID = newExerciseID
-
-				// Replace sets with historical ones or empty sets
-				if historicalSets != nil {
-					sess.ExerciseSets[i].Sets = historicalSets
-				} else {
-					sess.ExerciseSets[i].Sets = s.createEmptySets(exerciseSet.Sets)
-				}
-
-				return true, nil
+			if exerciseSet.ID != workoutExerciseID {
+				continue
 			}
+			sess.ExerciseSets[i].ExerciseID = newExerciseID
+			sess.ExerciseSets[i].WarmupCompletedAt = nil
+			if historicalSets != nil {
+				sess.ExerciseSets[i].Sets = historicalSets
+			} else {
+				sess.ExerciseSets[i].Sets = s.createEmptySets(exerciseSet.Sets)
+			}
+			return true, nil
 		}
-
-		return false, fmt.Errorf("exercise %d not found in workout for date %s",
-			currentExerciseID, formatDate(date))
+		return false, fmt.Errorf("workout exercise %d not found in workout for date %s",
+			workoutExerciseID, formatDate(date))
 	})
 	if err != nil {
 		return fmt.Errorf("update session %s: %w", formatDate(date), err)
@@ -896,8 +938,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			}
 		}
 
-		// Add the new exercise to the session
-		newExerciseSet := exerciseSetAggregate{
+		// Add the new exercise to the session. ID stays 0 so the repository
+		// assigns a fresh workout_exercise.id on insert.
+		newExerciseSet := exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned by repository.
 			ExerciseID:        exerciseID,
 			Sets:              newSets,
 			WarmupCompletedAt: nil,

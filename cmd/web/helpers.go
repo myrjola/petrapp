@@ -28,8 +28,8 @@ const largeMaxFormSize = 1024 * 10
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
 func redirect(w http.ResponseWriter, r *http.Request, path string) {
-	if r.Header.Get("Sec-Fetch-Dest") == "empty" {
-		w.Header().Set("Content-Location", path)
+	if r.Header.Get("X-Requested-With") == "stacknav" {
+		w.Header().Set("X-Location", path)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -62,15 +62,15 @@ func (app *application) parseDateParam(w http.ResponseWriter, r *http.Request) (
 	return date, true
 }
 
-// parseExerciseIDParam parses the "exerciseID" path parameter from the request URL.
-// Returns the parsed exercise ID and true if successful, or zero and false if parsing fails.
-// On failure, sends HTTP 404 response automatically.
-func (app *application) parseExerciseIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
-	exerciseIDStr := r.PathValue("exerciseID")
-	exerciseID, err := strconv.Atoi(exerciseIDStr)
+// parseWorkoutExerciseIDParam parses the "workoutExerciseID" path parameter from
+// the request URL. Returns the parsed ID and true on success, or zero and false
+// on failure (sending HTTP 404 automatically).
+func (app *application) parseWorkoutExerciseIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
+	idStr := r.PathValue("workoutExerciseID")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		app.notFound(w, r)
 		return 0, false
 	}
-	return exerciseID, true
+	return id, true
 }

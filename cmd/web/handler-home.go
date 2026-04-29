@@ -201,6 +201,11 @@ func calculateWorkoutAction(status string, isToday bool) *workoutAction {
 			StartWorkout: false,
 			Label:        "View Details",
 		}
+	case statusUpcoming:
+		return &workoutAction{
+			StartWorkout: true,
+			Label:        "Start Early",
+		}
 	case statusPastIncomplete:
 		return &workoutAction{
 			StartWorkout: false,

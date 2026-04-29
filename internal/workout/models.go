@@ -51,6 +51,12 @@ type Exercise struct {
 	SecondaryMuscleGroups []string     `json:"secondary_muscle_groups"`
 }
 
+// Resource represents a learning resource for an exercise.
+type Resource struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
 type exerciseJSONSchema struct {
 	muscleGroups []string
 }
@@ -128,6 +134,9 @@ type Set struct {
 
 // ExerciseSet groups all sets for a specific exercise in a workout.
 type ExerciseSet struct {
+	// ID is the stable identifier of this exercise slot within the workout. It survives
+	// swapping the exercise to a different one, which is what keeps URLs stable.
+	ID                int
 	Exercise          Exercise
 	Sets              []Set
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed

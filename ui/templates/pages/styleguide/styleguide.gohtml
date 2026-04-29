@@ -1,0 +1,306 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.styleguideTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    max-width: 64rem;
+                    margin: 0 auto;
+                    padding: var(--size-6) var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-8);
+                }
+
+                h1 {
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-7);
+                    color: var(--color-text-primary);
+                }
+
+                h2 {
+                    font-size: var(--font-size-4);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin-bottom: var(--size-3);
+                    padding-bottom: var(--size-2);
+                    border-bottom: var(--border-size-1) solid var(--color-border);
+                }
+
+                h3 {
+                    font-size: var(--font-size-2);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-secondary);
+                    margin-top: var(--size-5);
+                    margin-bottom: var(--size-3);
+                }
+
+                .lead {
+                    color: var(--color-text-secondary);
+                    font-size: var(--font-size-2);
+                }
+
+                /* Color swatches */
+                .color-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+                    gap: var(--size-2);
+                }
+
+                .swatch {
+                    display: flex;
+                    flex-direction: column;
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    overflow: hidden;
+                    background: var(--color-surface-elevated);
+                    box-shadow: var(--shadow-1);
+                }
+
+                .swatch-color {
+                    height: var(--size-9);
+                }
+
+                .swatch-label {
+                    padding: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    color: var(--color-text-secondary);
+                }
+
+                /* Spacing scale */
+                .scale-row {
+                    display: grid;
+                    grid-template-columns: 6rem 1fr;
+                    align-items: center;
+                    gap: var(--size-3);
+                    padding: var(--size-2) 0;
+                    border-bottom: var(--border-size-1) solid var(--gray-1);
+                }
+
+                .scale-name {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    color: var(--color-text-secondary);
+                }
+
+                .scale-bar {
+                    height: var(--size-3);
+                    background: var(--sky-5);
+                    border-radius: var(--radius-1);
+                }
+
+                /* Typography */
+                .type-sample {
+                    margin-bottom: var(--size-2);
+                    color: var(--color-text-primary);
+                }
+
+                /* Radius */
+                .radius-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+                    gap: var(--size-3);
+                }
+
+                .radius-sample {
+                    background: var(--sky-2);
+                    height: var(--size-9);
+                    display: flex;
+                    align-items: end;
+                    justify-content: center;
+                    padding: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    color: var(--sky-9);
+                }
+
+                /* Shadows */
+                .shadow-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+                    gap: var(--size-5);
+                    padding: var(--size-3);
+                    background: var(--gray-1);
+                    border-radius: var(--radius-2);
+                }
+
+                .shadow-sample {
+                    background: var(--white);
+                    border-radius: var(--radius-2);
+                    height: var(--size-9);
+                    display: flex;
+                    align-items: end;
+                    justify-content: center;
+                    padding: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    color: var(--gray-7);
+                }
+
+                .shadow-1 { box-shadow: var(--shadow-1); }
+                .shadow-2 { box-shadow: var(--shadow-2); }
+                .shadow-3 { box-shadow: var(--shadow-3); }
+
+                /* Component samples */
+                .component-sample {
+                    padding: var(--size-4);
+                    background: var(--color-surface);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--size-3);
+                    align-items: center;
+                }
+
+                /* Token utility classes — generated per token so the markup stays
+                   declarative and CSP can keep blocking inline `style` attrs. */
+                {{ range $name := .ColorTokens }}.bg-{{ $name }} { background: var(--{{ $name }}); }
+                {{ end }}
+                {{ range $name := .Sizes }}.w-{{ $name }} { width: var(--{{ $name }}); }
+                {{ end }}
+                {{ range $name := .FontSizes }}.fs-{{ $name }} { font-size: var(--{{ $name }}); }
+                {{ end }}
+                {{ range $name := .FluidFontSizes }}.fs-{{ $name }} { font-size: var(--{{ $name }}); }
+                {{ end }}
+                {{ range $name := .FontWeights }}.fw-{{ $name }} { font-weight: var(--{{ $name }}); }
+                {{ end }}
+                {{ range $name := .Radii }}.r-{{ $name }} { border-radius: var(--{{ $name }}); }
+                {{ end }}
+            }
+        </style>
+
+        <header>
+            <h1>Styleguide</h1>
+            <p class="lead">Design-token and component reference. Dev-only — returns 404 in production.</p>
+        </header>
+
+        <section>
+            <h2>Colors</h2>
+
+            <h3>Gray</h3>
+            <div class="color-grid">
+                {{ range $name := .Grays }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Sky (info / accent)</h3>
+            <div class="color-grid">
+                {{ range $name := .Skies }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Lime (success)</h3>
+            <div class="color-grid">
+                {{ range $name := .Limes }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Red (error)</h3>
+            <div class="color-grid">
+                {{ range $name := .Reds }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Yellow (warning)</h3>
+            <div class="color-grid">
+                {{ range $name := .Yellows }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Semantic</h3>
+            <div class="color-grid">
+                {{ range $name := .SemanticColors }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+        </section>
+
+        <section>
+            <h2>Spacing</h2>
+            {{ range $name := .Sizes }}
+                <div class="scale-row">
+                    <span class="scale-name">--{{ $name }}</span>
+                    <div class="scale-bar w-{{ $name }}"></div>
+                </div>
+            {{ end }}
+        </section>
+
+        <section>
+            <h2>Typography</h2>
+
+            <h3>Font sizes</h3>
+            {{ range $name := .FontSizes }}
+                <div class="type-sample fs-{{ $name }}">--{{ $name }} — Sphinx of black quartz</div>
+            {{ end }}
+
+            <h3>Fluid font sizes (resize the window)</h3>
+            {{ range $name := .FluidFontSizes }}
+                <div class="type-sample fs-{{ $name }}">--{{ $name }} — Sphinx of black quartz</div>
+            {{ end }}
+
+            <h3>Font weights</h3>
+            {{ range $name := .FontWeights }}
+                <div class="type-sample fw-{{ $name }}">--{{ $name }} — Sphinx of black quartz</div>
+            {{ end }}
+        </section>
+
+        <section>
+            <h2>Border radius</h2>
+            <div class="radius-grid">
+                {{ range $name := .Radii }}
+                    <div class="radius-sample r-{{ $name }}">--{{ $name }}</div>
+                {{ end }}
+            </div>
+        </section>
+
+        <section>
+            <h2>Shadows (elevation)</h2>
+            <div class="shadow-grid">
+                <div class="shadow-sample shadow-1">--shadow-1</div>
+                <div class="shadow-sample shadow-2">--shadow-2</div>
+                <div class="shadow-sample shadow-3">--shadow-3</div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Components</h2>
+
+            <h3>Buttons</h3>
+            <div class="component-sample">
+                <button type="button">Default</button>
+                <a class="btn" href="#">Anchor as button</a>
+            </div>
+
+            <h3>Back link</h3>
+            <div class="component-sample">
+                {{ template "back-link" "/dev/styleguide" }}
+            </div>
+        </section>
+    </main>
+{{ end }}

@@ -82,8 +82,10 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 
 ### Important Security Requirements
 
-- **NEVER use inline styles without nonce** - all `<style>` tags must include `{{ nonce }}`
-- Use `{{ nonce }}` for any `<script>` tags as well
+- **All `<style>` and `<script>` tags must carry `{{ nonce }}`** so the CSP nonce-allowlist accepts them.
+- **Never use inline `style="..."` attributes on elements.** The CSP `style-src` directive uses a nonce, and once a nonce is present in CSP Level 3 the `'unsafe-inline'` keyword is ignored even for style attributes — the browser silently drops the rule. Nonces apply to `<style>` elements, not to attributes; there is no way to "nonce" an inline attribute.
+  - **For dynamic CSS values driven by template data** (e.g. one rule per token, or a value that depends on a handler-prepared list): emit the rules from inside a nonce'd `<style>` block by ranging over the data, then reference them from the markup as plain class names. See `ui/templates/pages/styleguide/styleguide.gohtml` for a worked example — it generates `.bg-{token}`, `.w-{token}`, `.fs-{token}` etc. inside `<style {{ nonce }}>` and the markup just uses the class.
+  - **For one-off dynamic values** (e.g. a unique `view-transition-name` per row): same approach — emit a single rule inside a `<style {{ nonce }}>` adjacent to the element, scoped via `@scope` or a unique class/data-attribute.
 
 Example:
 
@@ -158,6 +160,7 @@ Always verify these exist in `main.css` before using:
 
 - **Radius**: `--radius-1` through `--radius-6`, `--radius-round`
 - **Border sizes**: `--border-size-1` through `--border-size-5`
+- **Shadows (elevation)**: `--shadow-1` (subtle), `--shadow-2` (card), `--shadow-3` (raised). Use these instead of inline `box-shadow` values; reach for raw `box-shadow` only for color-tinted glows or focus rings.
 - **Font weights**: `--font-weight-1` through `--font-weight-9`
 - **Font sizes**: `--font-size-00` (0.5rem) and `--font-size-0` through `--font-size-8`
 - **Fluid font sizes**: `--font-size-fluid-0` through `--font-size-fluid-3` (responsive via `clamp()`)

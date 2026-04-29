@@ -37,6 +37,10 @@ node_modules
 # Trace files
 /traces/
 
+# Local pprof profiles and ad-hoc DB backups produced by make fly-* targets
+/pprof/
+/backups/
+
 # Temporary files
 /tmp
 /test-results/
@@ -56,3 +60,4 @@ node_modules
 .air
 /web
 .superpowers
+.worktrees

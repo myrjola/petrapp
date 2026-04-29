@@ -102,38 +102,35 @@ CREATE TABLE workout_sessions
 
 CREATE TABLE workout_exercise
 (
+    id                  INTEGER PRIMARY KEY,
     workout_user_id     INTEGER NOT NULL,
     workout_date        TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
     exercise_id         INTEGER NOT NULL,
     warmup_completed_at TEXT CHECK (warmup_completed_at IS NULL OR
                                     STRFTIME('%Y-%m-%dT%H:%M:%fZ', warmup_completed_at) = warmup_completed_at),
 
-    PRIMARY KEY (workout_user_id, workout_date, exercise_id),
+    UNIQUE (workout_user_id, workout_date, exercise_id),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
-) WITHOUT ROWID, STRICT;
+) STRICT;
+
+-- Supports lookups of an exercise's history across workouts, e.g. latest starting weight.
+CREATE INDEX workout_exercise_user_exercise_date_idx
+    ON workout_exercise (workout_user_id, exercise_id, workout_date);
 
 CREATE TABLE exercise_sets
 (
-    workout_user_id INTEGER NOT NULL,
-    workout_date    TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
-    exercise_id     INTEGER NOT NULL,
-    set_number      INTEGER NOT NULL CHECK (set_number > 0),
-    weight_kg       REAL CHECK (weight_kg IS NULL OR weight_kg >= 0),
-    min_reps        INTEGER NOT NULL CHECK (min_reps > 0),
-    max_reps        INTEGER NOT NULL CHECK (max_reps >= min_reps),
-    completed_reps  INTEGER CHECK (completed_reps IS NULL OR completed_reps >= 0),
-    completed_at    TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
-    signal          TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
+    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercise (id) ON DELETE CASCADE,
+    set_number          INTEGER NOT NULL CHECK (set_number > 0),
+    weight_kg           REAL CHECK (weight_kg IS NULL OR weight_kg >= 0),
+    min_reps            INTEGER NOT NULL CHECK (min_reps > 0),
+    max_reps            INTEGER NOT NULL CHECK (max_reps >= min_reps),
+    completed_reps      INTEGER CHECK (completed_reps IS NULL OR completed_reps >= 0),
+    completed_at        TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    signal              TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
 
-    PRIMARY KEY (workout_user_id, workout_date, exercise_id, set_number),
-    FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
-    FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
+    PRIMARY KEY (workout_exercise_id, set_number)
 ) WITHOUT ROWID, STRICT;
-
--- Supports queries that filter by (user, exercise) across dates, e.g. latest starting weight and per-exercise history.
-CREATE INDEX exercise_sets_user_exercise_date_idx
-    ON exercise_sets (workout_user_id, exercise_id, workout_date, set_number);
 
 CREATE TABLE muscle_groups
 (

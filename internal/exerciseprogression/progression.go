@@ -76,7 +76,7 @@ func NewFromHistory(config Config, completed []SetResult) *Progression {
 
 // CurrentSet returns the recommended target for the next set.
 func (p *Progression) CurrentSet() SetTarget {
-	reps := targetReps(p.config.Type)
+	reps := TargetReps(p.config.Type)
 	if len(p.completed) == 0 {
 		return SetTarget{WeightKg: p.config.StartingWeight, TargetReps: reps}
 	}
@@ -95,7 +95,8 @@ func (p *Progression) SetsCompleted() int {
 	return len(p.completed)
 }
 
-func targetReps(t PeriodizationType) int {
+// TargetReps returns the canonical target rep count for a periodization.
+func TargetReps(t PeriodizationType) int {
 	switch t {
 	case Strength:
 		return repsStrength

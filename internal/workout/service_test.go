@@ -111,6 +111,107 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 	}
 }
 
+func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet
+
+	// Call directly without seeding via ResolveWeeklySchedule first.
+	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted on empty week: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after empty-week regenerate: %v", err)
+	}
+	// Mon=0, Wed=2, Fri=4 must have exercises.
+	for _, i := range []int{0, 2, 4} {
+		if len(sessions[i].ExerciseSets) == 0 {
+			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
+		}
+	}
+}
+
+func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
+
+	// Generate the initial plan.
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Change to Tue, Thu, Sat at 45 min.
+	if err := svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+		TuesdayMinutes:  45,
+		ThursdayMinutes: 45,
+		SaturdayMinutes: 45,
+	}); err != nil {
+		t.Fatalf("save preferences: %v", err)
+	}
+
+	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after regenerate: %v", err)
+	}
+
+	// Tue=1, Thu=3, Sat=5 must have exercises; Mon=0, Wed=2, Fri=4, Sun=6 must be rest.
+	for _, i := range []int{1, 3, 5} {
+		if len(sessions[i].ExerciseSets) == 0 {
+			t.Errorf("sessions[%d] (%s) must have exercise sets after preference change", i, sessions[i].Date.Weekday())
+		}
+	}
+	for _, i := range []int{0, 2, 4, 6} {
+		if len(sessions[i].ExerciseSets) != 0 {
+			t.Errorf("sessions[%d] (%s) must be a rest day after preference change", i, sessions[i].Date.Weekday())
+		}
+	}
+}
+
+func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *testing.T) {
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Start the first scheduled workout (Monday, index 0).
+	if err = svc.StartSession(ctx, sessions[0].Date); err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+
+	// Change preferences to Tue, Thu, Sat.
+	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+		TuesdayMinutes:  45,
+		ThursdayMinutes: 45,
+		SaturdayMinutes: 45,
+	}); err != nil {
+		t.Fatalf("save preferences: %v", err)
+	}
+
+	if err = svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
+	}
+
+	sessions2, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after skip: %v", err)
+	}
+
+	// Monday (index 0) must still have exercises — the original plan was kept.
+	if len(sessions2[0].ExerciseSets) == 0 {
+		t.Error("sessions2[0] (Monday) must still have exercise sets; workout was already started")
+	}
+
+	// Tuesday must still be a rest day — the new preferences were not applied.
+	if len(sessions2[1].ExerciseSets) != 0 {
+		t.Error("sessions2[1] (Tuesday) must remain a rest day; new preferences must not be applied")
+	}
+}
+
 func extractExerciseIDs(session workout.Session) []int {
 	ids := make([]int, len(session.ExerciseSets))
 	for i, es := range session.ExerciseSets {
@@ -191,12 +292,19 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		t.Fatalf("Failed to insert workout session: %v", err)
 	}
 
-	// Insert exercise set
+	// Insert workout_exercise slot and one set hanging off it.
+	var weID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, dateStr, exerciseID).Scan(&weID)
+	if err != nil {
+		t.Fatalf("Failed to insert workout_exercise: %v", err)
+	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets 
-		(workout_user_id, workout_date, exercise_id, set_number, weight_kg, min_reps, max_reps)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		userID, dateStr, exerciseID, 1, 50.0, 8, 12)
+		`INSERT INTO exercise_sets
+		(workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
+		VALUES (?, ?, ?, ?, ?)`,
+		weID, 1, 50.0, 8, 12)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise set: %v", err)
 	}
@@ -249,7 +357,9 @@ func countExerciseSets(t *testing.T, db *sqlite.Database, exerciseID int) (int, 
 	t.Helper()
 	var count int
 	err := db.ReadOnly.QueryRow(
-		"SELECT COUNT(*) FROM exercise_sets WHERE exercise_id = ?",
+		`SELECT COUNT(*) FROM exercise_sets es
+		 JOIN workout_exercise we ON we.id = es.workout_exercise_id
+		 WHERE we.exercise_id = ?`,
 		exerciseID,
 	).Scan(&count)
 	return count, err
@@ -323,12 +433,19 @@ func Test_AddExercise(t *testing.T) {
 		t.Fatalf("Failed to insert workout session: %v", err)
 	}
 
-	// Insert exercise set for exercise 1
+	// Insert workout_exercise slot for exercise 1 with one set.
+	var weID1 int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, dateStr, exercise1ID).Scan(&weID1)
+	if err != nil {
+		t.Fatalf("Failed to insert workout_exercise: %v", err)
+	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets 
-		(workout_user_id, workout_date, exercise_id, set_number, weight_kg, min_reps, max_reps)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		userID, dateStr, exercise1ID, 1, 50.0, 8, 12)
+		`INSERT INTO exercise_sets
+		(workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
+		VALUES (?, ?, ?, ?, ?)`,
+		weID1, 1, 50.0, 8, 12)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise set: %v", err)
 	}
@@ -591,7 +708,7 @@ func Test_GetStartingWeight(t *testing.T) {
 	today := time.Now()
 
 	// No history: expect 0.
-	got, err := svc.GetStartingWeight(ctx, exerciseID, today)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight no history: %v", err)
 	}
@@ -599,29 +716,48 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("no history: want 0, got %v", got)
 	}
 
-	// Insert a completed session 7 days ago with set 1 weight = 60kg.
+	// Insert a completed strength session 7 days ago with set 1 weight = 100kg x5.
 	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_sessions (user_id, workout_date, completed_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, dateStr)
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
+	var weHistID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, dateStr, exerciseID).Scan(&weHistID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
 		 weight_kg, min_reps, max_reps, completed_reps)
-		 VALUES (?, ?, ?, 1, 60.0, 5, 5, 5)`,
-		userID, dateStr, exerciseID)
+		 VALUES (?, 1, 100.0, 5, 5, 5)`,
+		weHistID)
 	if err != nil {
 		t.Fatalf("insert set: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today)
+	// Same periodization (strength → strength): weight carries over unchanged.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
 	}
-	if got != 60.0 {
-		t.Errorf("with history: want 60.0, got %v", got)
+	if got != 100.0 {
+		t.Errorf("strength → strength: want 100.0, got %v", got)
+	}
+
+	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): Epley conversion
+	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.1, rounded to 0.5 = 92.0.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationHypertrophy)
+	if err != nil {
+		t.Fatalf("GetStartingWeight cross-periodization: %v", err)
+	}
+	if got != 92.0 {
+		t.Errorf("strength → hypertrophy: want 92.0, got %v", got)
 	}
 
 	// Insert today's session with a different set 1 weight. The starting weight
@@ -633,22 +769,29 @@ func Test_GetStartingWeight(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert today's session: %v", err)
 	}
+	var weTodayID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, todayStr, exerciseID).Scan(&weTodayID)
+	if err != nil {
+		t.Fatalf("insert today's workout_exercise: %v", err)
+	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
 		 weight_kg, min_reps, max_reps, completed_reps, signal)
-		 VALUES (?, ?, ?, 1, 75.0, 5, 5, 5, 'too_light'),
-		        (?, ?, ?, 2, 80.0, 5, 5, 5, 'on_target')`,
-		userID, todayStr, exerciseID, userID, todayStr, exerciseID)
+		 VALUES (?, 1, 75.0, 5, 5, 5, 'too_light'),
+		        (?, 2, 80.0, 5, 5, 5, 'on_target')`,
+		weTodayID, weTodayID)
 	if err != nil {
 		t.Fatalf("insert today's sets: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight ignoring today: %v", err)
 	}
-	if got != 60.0 {
-		t.Errorf("today ignored: want 60.0, got %v", got)
+	if got != 100.0 {
+		t.Errorf("today ignored: want 100.0, got %v", got)
 	}
 }
 
@@ -685,25 +828,26 @@ func Test_RecordSetCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
-	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number,
-		 weight_kg, min_reps, max_reps)
-		 VALUES (?, ?, ?, 1, 100.0, 5, 5)`,
-		userID, today, exerciseID)
-	if err != nil {
-		t.Fatalf("insert set: %v", err)
-	}
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
-		userID, today, exerciseID)
+	var weID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id",
+		userID, today, exerciseID).Scan(&weID)
 	if err != nil {
 		t.Fatalf("insert workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		 weight_kg, min_reps, max_reps)
+		 VALUES (?, 1, 100.0, 5, 5)`,
+		weID)
+	if err != nil {
+		t.Fatalf("insert set: %v", err)
 	}
 
 	svc := workout.NewService(db, logger, "")
 	date, _ := time.Parse("2006-01-02", today)
 
-	if err = svc.RecordSetCompletion(ctx, date, exerciseID, 0, workout.SignalOnTarget, 102.5, 5); err != nil {
+	if err = svc.RecordSetCompletion(ctx, date, weID, 0, workout.SignalOnTarget, 102.5, 5); err != nil {
 		t.Fatalf("RecordSetCompletion: %v", err)
 	}
 
@@ -778,18 +922,19 @@ func Test_BuildProgression(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
-	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_user_id, workout_date, exercise_id, set_number, weight_kg, min_reps, max_reps)
-		 VALUES (?, ?, ?, 1, 40.0, 8, 8), (?, ?, ?, 2, 40.0, 8, 8), (?, ?, ?, 3, 40.0, 8, 8)`,
-		userID, today, exerciseID, userID, today, exerciseID, userID, today, exerciseID)
-	if err != nil {
-		t.Fatalf("insert sets: %v", err)
-	}
-	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
-		userID, today, exerciseID)
+	var weID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id",
+		userID, today, exerciseID).Scan(&weID)
 	if err != nil {
 		t.Fatalf("insert workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
+		 VALUES (?, 1, 40.0, 8, 8), (?, 2, 40.0, 8, 8), (?, 3, 40.0, 8, 8)`,
+		weID, weID, weID)
+	if err != nil {
+		t.Fatalf("insert sets: %v", err)
 	}
 
 	svc := workout.NewService(db, logger, "")
@@ -809,7 +954,7 @@ func Test_BuildProgression(t *testing.T) {
 	}
 
 	// Record set 0 as TooLight at 0kg.
-	if err = svc.RecordSetCompletion(ctx, date, exerciseID, 0, workout.SignalTooLight, 0, 8); err != nil {
+	if err = svc.RecordSetCompletion(ctx, date, weID, 0, workout.SignalTooLight, 0, 8); err != nil {
 		t.Fatalf("RecordSetCompletion: %v", err)
 	}
 
@@ -821,5 +966,95 @@ func Test_BuildProgression(t *testing.T) {
 	target = prog.CurrentSet()
 	if target.WeightKg != 2.5 {
 		t.Errorf("second set weight: want 2.5, got %v", target.WeightKg)
+	}
+}
+
+func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("bp-x-user"), "BPX User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
+		"Squat", "lower", "desc")
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Squat'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	// Prior strength session 7 days ago: completed first set 100 kg x 5.
+	prevStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
+		userID, prevStr)
+	if err != nil {
+		t.Fatalf("insert prev session: %v", err)
+	}
+	var wePrevID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id",
+		userID, prevStr, exerciseID).Scan(&wePrevID)
+	if err != nil {
+		t.Fatalf("insert prev workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps)
+		 VALUES (?, 1, 100.0, 5, 5, 5)`,
+		wePrevID)
+	if err != nil {
+		t.Fatalf("insert prev set: %v", err)
+	}
+
+	// New hypertrophy session today.
+	todayStr := time.Now().Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
+		userID, todayStr)
+	if err != nil {
+		t.Fatalf("insert today session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
+		userID, todayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+	date, _ := time.Parse("2006-01-02", todayStr)
+
+	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression: %v", err)
+	}
+	target := prog.CurrentSet()
+	// Strength 100kg x5 → Hypertrophy 8 reps via Epley:
+	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.105, rounded to 0.5 = 92.0.
+	if target.WeightKg != 92.0 {
+		t.Errorf("first set weight: want 92.0, got %v", target.WeightKg)
+	}
+	if target.TargetReps != 8 {
+		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
 	}
 }

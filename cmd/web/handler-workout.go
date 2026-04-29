@@ -163,58 +163,53 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 
 // workoutSwapExerciseGET handles GET requests to show available exercises for swapping.
 func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Request) {
-	// Parse date from URL path
 	date, ok := app.parseDateParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Parse exercise ID from URL path
-	exerciseID, ok := app.parseExerciseIDParam(w, r)
+	workoutExerciseID, ok := app.parseWorkoutExerciseIDParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Get current exercise
-	currentExercise, err := app.workoutService.GetExercise(r.Context(), exerciseID)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
-	// Get the current workout session to see which exercises are already included
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Create a map of exercise IDs that are already in the workout
+	currentSlot, found := findExerciseSetInSession(&session, workoutExerciseID)
+	if !found {
+		app.notFound(w, r)
+		return
+	}
+
+	// Map of exercises already used in this workout — they're filtered out below
+	// so the user can't pick one that would collide with the UNIQUE constraint.
 	existingExerciseIDs := make(map[int]bool)
 	for _, exerciseSet := range session.ExerciseSets {
 		existingExerciseIDs[exerciseSet.Exercise.ID] = true
 	}
 
-	// Get all exercises
 	allExercises, err := app.workoutService.List(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Filter out exercises that are already in the workout (except the current one being swapped)
 	var compatibleExercises []workout.Exercise
 	for _, exercise := range allExercises {
-		if exercise.ID != exerciseID && !existingExerciseIDs[exercise.ID] {
+		if exercise.ID != currentSlot.Exercise.ID && !existingExerciseIDs[exercise.ID] {
 			compatibleExercises = append(compatibleExercises, exercise)
 		}
 	}
 
-	// Prepare template data
 	data := exerciseSwapTemplateData{
 		BaseTemplateData:    newBaseTemplateData(r),
 		Date:                date,
-		CurrentExercise:     currentExercise,
+		WorkoutExerciseID:   workoutExerciseID,
+		CurrentExercise:     currentSlot.Exercise,
 		CompatibleExercises: compatibleExercises,
 	}
 
@@ -223,26 +218,22 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 
 // workoutSwapExercisePOST handles POST requests to swap an exercise.
 func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.Request) {
-	// Parse date from URL path
 	date, ok := app.parseDateParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Parse current exercise ID from URL path
-	currentExerciseID, ok := app.parseExerciseIDParam(w, r)
+	workoutExerciseID, ok := app.parseWorkoutExerciseIDParam(w, r)
 	if !ok {
 		return
 	}
 
-	// Parse form
 	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
 		return
 	}
 
-	// Get new exercise ID from form
 	newExerciseIDStr := r.PostForm.Get("new_exercise_id")
 	if newExerciseIDStr == "" {
 		app.serverError(w, r, errors.New("new exercise ID not provided"))
@@ -255,20 +246,20 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Swap exercise
-	if err = app.workoutService.SwapExercise(r.Context(), date, currentExerciseID, newExerciseID); err != nil {
+	if err = app.workoutService.SwapExercise(r.Context(), date, workoutExerciseID, newExerciseID); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Redirect to the exercise set page with the new exercise
-	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), newExerciseID))
+	// URL keeps the same workoutExerciseID so any back-navigation still hits this slot.
+	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), workoutExerciseID))
 }
 
 // exerciseSwapTemplateData contains data for the exercise swap template.
 type exerciseSwapTemplateData struct {
 	BaseTemplateData
 	Date                time.Time
+	WorkoutExerciseID   int
 	CurrentExercise     workout.Exercise
 	CompatibleExercises []workout.Exercise
 }

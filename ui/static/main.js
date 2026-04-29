@@ -1,143 +1,202 @@
 /**
+ * Stack Navigator
+ * ===============
+ *
+ * Mission: make this server-rendered MPA feel native by intercepting form
+ * POSTs, replaying them as fetch, and steering the History API so the back
+ * button mirrors the user's mental model. The URL is the source of truth —
+ * there is no virtual stack or in-memory page cache.
+ *
+ * Wire protocol
+ * -------------
+ *   Request:  X-Requested-With: stacknav (set by the JS shim's fetch)
+ *   Response: 200 + X-Location: <url> (where to navigate; body empty)
+ *
+ * Without the X-Requested-With header, the server returns a plain 303 See
+ * Other and the browser follows. That is the no-JS / no-Navigation-API path.
+ *
+ * Navigation strategy: pop-or-replace
+ * -----------------------------------
+ * One strategy covers every flow: walk back through history looking for an
+ * entry whose URL matches the target; traverse to it if found, otherwise
+ * replace the current entry. This collapses correctly across all real cases:
+ *
+ *   1. Same-URL submit (e.g., set update on DETAIL → DETAIL): no older
+ *      DETAIL entry behind us, so we fall through to replace. Back goes to
+ *      the parent rather than the form-submit page.
+ *   2. Cross-URL submit, target present (e.g. schedule → home): traverse
+ *      back to the existing home entry instead of pushing a duplicate.
+ *   3. Cross-URL submit, target absent: fall through to replace. The
+ *      form page leaves no trace in history.
+ *
+ * Validation errors use putFlashError + redirect-to-form on the server, so
+ * they arrive as a plain 200 + X-Location pointing back at the form. The
+ * CSP (require-trusted-types-for 'script') blocks any in-place HTML render,
+ * so we keep the wire shape uniform across success and failure.
+ *
+ * Hierarchical backlink (data-back-button)
+ * -----------------------------------------
+ * Click delegation finds the closest <a data-back-button>; if a matching
+ * URL exists earlier in the stack we traverse to it instead of pushing.
+ * Without a match the link's natural href takes over — it becomes a regular
+ * "up" navigation.
+ *
+ * Why preventDefault instead of intercept()
+ * -----------------------------------------
+ * iOS Safari does not yet fire precommit handlers (WebKit bug 293952), so
+ * the validation we want to do before touching history is unreliable through
+ * e.intercept(). preventDefault() + an awaited fetch is consistent across
+ * browsers. Revisit when the WebKit bug closes — intercept() also gives us
+ * e.signal for cancellation and centralized error handling.
+ *
+ * Progressive enhancement
+ * -----------------------
+ * Everything is gated on 'navigation' in window. Without the Navigation API
+ * forms submit natively (303 redirect path) and the app works as a plain MPA.
+ */
+
+/**
  * Convenience function to get the parent element of the current script tag.
  * Inspired by https://github.com/gnat/surreal.
  * @returns {HTMLElement}
  */
 function me() {
-  return document.currentScript.parentElement
+    return document.currentScript.parentElement
 }
 
-/**
- * View transition handler for sliding animations for sliding left when we are going deeper in URL hierarchy and
- * sliding right when we are going shallower.
- */
-window.addEventListener('pagereveal', async (e) => {
-  if (!e.viewTransition) {
-    return
-  }
-  // Determine the direction of transition based on the depth difference between the from and entry URLs.
-  const fromUrl = navigation.activation.from.url
-  const entryUrl = navigation.activation.entry.url
-  const depthDifference = fromUrl.split('/').length - entryUrl.split('/').length
-  if (depthDifference === 0) {
-    e.viewTransition.skipTransition()
-  }
-  e.viewTransition.types.add(depthDifference > 0 ? 'backward' : 'forward')
-})
+const sameUrl = (a, b) =>
+    a.origin === b.origin && a.pathname === b.pathname && a.search === b.search
 
-navigation.addEventListener('navigate', (e) => {
-  // Stack Navigation implementation using Navigation API.
-  //
-  // When a form is submitted, we want the browser's back button to behave sensibly. An example of what we want to
-  // avoid is when we submit a form and return to the same URL as the form, we don't want the back button to be a
-  // no-op.
-  //
-  // Check how the backend is setting Content-Location HTTP header to understand better how this plumbs together
-  // with the backend.
-  if (e.formData) {
-    e.intercept({
-      async handler() {
-        try {
-          // Submit the form using fetch so that we can process the Content-Location header.
-          const body = new URLSearchParams(e.formData).toString()
-          const result = await fetch(e.destination.url, {
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded"
-            },
-            method: "POST",
+if ('navigation' in window) {
+    navigation.addEventListener('navigate', async (e) => {
+        if (!e.formData) return
+        if (!e.canIntercept || e.hashChange || e.downloadRequest) return
+        if (new URL(e.destination.url).origin !== location.origin) return
+        for (const [, v] of e.formData) {
+            if (v instanceof File) return
+        }
+        // TODO: when precommitHandler works in iOS, it might be an even better
+        //       way to handle this since we can pass e.signal and also reject inside the handler
+        //       to have centralised error handling.
+        //       https://bugs.webkit.org/show_bug.cgi?id=293952
+        e.preventDefault()
+        await submitForm(e)
+    })
+}
+
+async function submitForm(e) {
+    const body = new URLSearchParams(e.formData)
+    let res
+    try {
+        res = await fetch(e.destination.url, {
+            method: 'POST',
             body,
-          })
-          const baseUrl = window.location.origin
-          const location = result.headers.get("Content-Location")
-          const locationUrl = new URL(location, baseUrl)
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'stacknav',
+            },
+            // Surface server-side redirects (e.g., a future auth bounce that
+            // doesn't go through redirect()) as opaqueredirect responses
+            // rather than transparently following them — fall through to the
+            // unexpected-status branch below and reload to surface state.
+            redirect: 'manual',
+        })
+    } catch (_) {
+        location.reload()
+        return
+    }
 
-          // If there's an entry in the navigation history that matches the location, we want to replace it.
-          for (const entry of navigation.entries()) {
-            const entryUrl = new URL(entry.url)
-            if (entryUrl.pathname === locationUrl.pathname) {
-              await navigation.traverseTo(entry.key).committed
-              // This is a bit hacky to reload the page, but it's because the bfcache might show a stale page.
-              navigation.reload()
-              return
+    if (res.status === 200) {
+        const target = res.headers.get('X-Location')
+        if (!target) {
+            location.reload()
+            return
+        }
+        await popOrReplaceTo(target)
+        return
+    }
+
+    // CSP blocks document.write/innerHTML, so we can't render the response
+    // body in place. Reload to surface the server state on any unexpected status.
+    location.reload()
+}
+
+async function popOrReplaceTo(target) {
+    const targetUrl = new URL(target, location.origin)
+    const entries = navigation.entries()
+    for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
+        if (sameUrl(new URL(entries[i].url), targetUrl)) {
+            await navigation.traverseTo(entries[i].key).committed
+            return
+        }
+    }
+    navigation.navigate(target, {history: 'replace'})
+}
+
+window.addEventListener('pagereveal', (e) => {
+    if (!e.viewTransition) return
+    if (!('navigation' in window)) return
+    const act = navigation.activation
+    if (!act) return
+    if (act.navigationType === 'replace' || act.navigationType === 'reload') {
+        e.viewTransition.skipTransition()
+        return
+    }
+    let dir = 'forward'
+    if (act.navigationType === 'traverse' && act.from && act.entry) {
+        dir = act.entry.index < act.from.index ? 'backward' : 'forward'
+    }
+    e.viewTransition.types.add(dir)
+})
+
+document.addEventListener('click', (e) => {
+    if (!('navigation' in window)) return
+    const link = e.target.closest('a[data-back-button]')
+    if (!link) return
+    const target = new URL(link.href)
+    const entries = navigation.entries()
+    for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
+        if (sameUrl(new URL(entries[i].url), target)) {
+            e.preventDefault()
+            // If the entry was pruned between our read of entries() and the
+            // traverse, fall back to a normal navigation rather than no-op.
+            navigation.traverseTo(entries[i].key).committed.catch(() => location.assign(link.href))
+            return
+        }
+    }
+})
+
+// Form submission UI state.
+document.addEventListener('submit', (e) => {
+    const form = e.target
+    if (!(form instanceof HTMLFormElement)) return
+    form.classList.add('submitting')
+    const submitButton = form.querySelector('button[type=submit]')
+    if (submitButton) submitButton.disabled = true
+})
+
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        // Reload if the invalidation cookie has changed since this page was rendered.
+        // The render-time value is baked into a <meta> tag; a mismatch means a POST
+        // ran while we were in bfcache and our state may be stale.
+        const meta = document.querySelector('meta[name="invalidation-token"]')
+        const rendered = meta ? meta.content : ''
+        const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
+        const current = m ? m[1] : ''
+        if (rendered !== current) {
+            if ('navigation' in window) {
+                navigation.reload()
+            } else {
+                location.reload()
             }
-          }
-          await navigation.navigate(location, {history: "replace"})
-        } catch (err) {
-          // TODO: We need error feedback to the user.
-          console.error("Failed to submit form:", err)
         }
-      }
-    })
-  }
-})
 
-function findMatchingHistoryEntry(targetUrl) {
-  const entries = navigation.entries()
-  const currentIndex = navigation.currentEntry.index
-  const targetURL = new URL(targetUrl)
-
-  // Search backwards through history
-  for (let i = currentIndex - 1; i >= 0; i--) {
-    const entry = entries[i]
-    const entryURL = new URL(entry.url)
-
-    if (urlsMatch(entryURL, targetURL)) {
-      return entry
+        // Reset submit state after bfcache restore.
+        document.querySelectorAll('form.submitting').forEach((form) => {
+            form.classList.remove('submitting')
+            const submitButton = form.querySelector('button[type=submit]')
+            if (submitButton) submitButton.disabled = false
+        })
     }
-  }
-
-  return null
-}
-
-function urlsMatch(url1, url2) {
-  return url1.href === url2.href ||
-    (url1.pathname === url2.pathname && url1.origin === url2.origin)
-}
-
-// Create a smart back button using the Navigation API to make it pop the navigation stack.
-document.addEventListener("DOMContentLoaded", function () {
-  // Find all anchors marked for back button enhancement.
-  const backLinks = document.querySelectorAll('a[data-back-button]')
-
-  backLinks.forEach(link => {
-    const destinationUrl = link.href
-
-    // Only enhance it if Navigation API is supported
-    if (typeof navigation !== 'undefined') {
-      link.addEventListener('click', async (e) => {
-        const matchingEntry = findMatchingHistoryEntry(destinationUrl)
-
-        if (matchingEntry) {
-          e.preventDefault()
-          await navigation.traverseTo(matchingEntry.key)
-        }
-      })
-    }
-  })
-})
-
-// Form submission detector
-document.addEventListener('submit', function (e) {
-  const form = e.target
-  form.classList.add('submitting')
-  const submitButton = form.querySelector("button[type=submit]")
-  if (submitButton) {
-    submitButton.disabled = true
-  }
-})
-
-// Reset form states when the page is loaded from the browser cache (back button).
-window.addEventListener('pageshow', function (event) {
-  // pageshow event fires when the page is loaded, including from cache.
-  // event.persisted is true when the page is loaded from the back/forward cache.
-  if (event.persisted) {
-    // This was a back/forward navigation from the cache.
-    document.querySelectorAll('form.submitting').forEach(form => {
-      form.classList.remove('submitting')
-      const submitButton = form.querySelector("button[type=submit]")
-      if (submitButton) {
-        submitButton.disabled = false
-      }
-    })
-  }
 })

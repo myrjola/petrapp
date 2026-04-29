@@ -10,14 +10,20 @@ import (
 )
 
 type BaseTemplateData struct {
-	Authenticated bool
-	IsAdmin       bool
+	Authenticated     bool
+	IsAdmin           bool
+	InvalidationToken string
 }
 
 func newBaseTemplateData(r *http.Request) BaseTemplateData {
+	var token string
+	if c, err := r.Cookie("inv_bfcache"); err == nil {
+		token = c.Value
+	}
 	return BaseTemplateData{
-		Authenticated: contexthelpers.IsAuthenticated(r.Context()),
-		IsAdmin:       contexthelpers.IsAdmin(r.Context()),
+		Authenticated:     contexthelpers.IsAuthenticated(r.Context()),
+		IsAdmin:           contexthelpers.IsAdmin(r.Context()),
+		InvalidationToken: token,
 	}
 }
 
