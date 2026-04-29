@@ -185,7 +185,7 @@ window.addEventListener('pageshow', (event) => {
         const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
         const current = m ? m[1] : ''
         if (rendered !== current) {
-            setTimeout(() => navigation.reload(), 300)
+            navigation.reload()
         }
 
         // Reset submit state after bfcache restore.
