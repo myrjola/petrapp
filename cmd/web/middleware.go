@@ -76,6 +76,8 @@ report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 		w.Header().Set("X-XSS-Protection", "0")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+		// Prevent unload handlers from disabling bfcache.
+		w.Header().Set("Permissions-Policy", "unload=()")
 
 		r = contexthelpers.SetCSPNonce(r, cspNonce)
 
@@ -83,6 +85,7 @@ report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 	})
 }
 
+// cacheForever for static assets ensures they are cached indefinitely.
 func cacheForever(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
@@ -91,10 +94,20 @@ func cacheForever(next http.Handler) http.Handler {
 	})
 }
 
+// noCache ensures authenticated requests force revalidation.
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
+		w.Header().Set("Vary", "Cookie, Accept")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noStore is used for authentication routes to prevent caching sensitive data anywhere.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, max-age=0, must-revalidate")
+		w.Header().Set("Vary", "Cookie, Accept")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -262,6 +275,24 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// setInvalidationCookieOnPost busts bfcache by setting a cookie.
+func setInvalidationCookieOnPost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			http.SetCookie(w, &http.Cookie{
+				Name:     "inv_bfcache",
+				Value:    rand.Text(),
+				Path:     "/",
+				MaxAge:   60, //nolint:mnd // Lives long enough for a back-button after a POST to detect staleness.
+				SameSite: http.SameSiteLaxMode,
+				Secure:   true,
+				HttpOnly: false, // Read client-side in the pageshow handler to compare against the rendered snapshot.
+			})
+		}
 		next.ServeHTTP(w, r)
 	})
 }
