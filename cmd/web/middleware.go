@@ -98,7 +98,7 @@ func cacheForever(next http.Handler) http.Handler {
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate")
-		w.Header().Set("Vary", "Vary: Cookie, Accept")
+		w.Header().Set("Vary", "Cookie, Accept")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -107,7 +107,7 @@ func noCache(next http.Handler) http.Handler {
 func noStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store, max-age=0, must-revalidate")
-		w.Header().Set("Vary", "Vary: Cookie, Accept")
+		w.Header().Set("Vary", "Cookie, Accept")
 		next.ServeHTTP(w, r)
 	})
 }
