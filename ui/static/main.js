@@ -177,10 +177,14 @@ document.addEventListener('submit', (e) => {
 
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
-        // Refetch page if invalidation cookie is present.
-        const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/);
-        if (m) {
-            document.cookie = 'inv_bfcache=; Path=/; Max-Age=0; SameSite=Lax; Secure';
+        // Reload if the invalidation cookie has changed since this page was rendered.
+        // The render-time value is baked into a <meta> tag; a mismatch means a POST
+        // ran while we were in bfcache and our state may be stale.
+        const meta = document.querySelector('meta[name="invalidation-token"]')
+        const rendered = meta ? meta.content : ''
+        const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
+        const current = m ? m[1] : ''
+        if (rendered !== current) {
             setTimeout(() => navigation.reload(), 300)
         }
 
