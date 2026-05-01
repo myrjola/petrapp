@@ -108,19 +108,6 @@
                             font-size: var(--font-size-1);
                             background: var(--white);
                         }
-
-                        button {
-                            padding: var(--size-2) var(--size-3);
-                            border: 1px solid var(--gray-3);
-                            border-radius: var(--radius-2);
-                            background: var(--gray-1);
-                            cursor: pointer;
-                            font-weight: var(--font-weight-6);
-
-                            &:hover {
-                                background: var(--gray-2);
-                            }
-                        }
                     }
                 }
             </style>
@@ -134,23 +121,6 @@
                        autocomplete="off"
                        inputmode="search">
                 <button type="submit">Search</button>
-                <script {{ nonce }}>
-                  (() => {
-                    const form = me()
-                    const input = form.elements.q
-                    let timer
-                    input.addEventListener('input', () => {
-                      clearTimeout(timer)
-                      timer = setTimeout(() => {
-                        if (!('navigation' in window)) return
-                        const url = new URL(location.href)
-                        if (input.value) url.searchParams.set('q', input.value)
-                        else url.searchParams.delete('q')
-                        navigation.navigate(url.toString(), {history: 'replace'})
-                      }, 150)
-                    })
-                  })()
-                </script>
             </form>
         </section>
 
