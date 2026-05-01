@@ -517,8 +517,8 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
          RETURNING id`, assistedID, today).Scan(&slotID); err != nil {
 		t.Fatalf("insert assisted slot: %v", err)
 	}
-	// Seed three placeholder sets so the form has rows to submit against.
-	for setNum := 1; setNum <= 3; setNum++ {
+	// Seed four placeholder sets so the form has rows to submit against.
+	for setNum := 1; setNum <= 4; setNum++ {
 		if _, err = db.ExecContext(ctx,
 			`INSERT INTO exercise_sets (workout_exercise_id, set_number,
                 weight_kg, min_reps, max_reps)
@@ -569,7 +569,7 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Fatalf("expected signal form for set 2")
 	}
 	setAction2, _ := setForm2.Attr("action")
-	if _, err = client.SubmitForm(ctx, doc, setAction2, map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, setAction2, map[string]string{
 		"weight": "5",
 		// no "assisted" field → unchecked
 		"signal": "on_target",
@@ -587,5 +587,34 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 	}
 	if weight2 != 5.0 {
 		t.Errorf("set 2 weight = %v, want +5.0 (no checkbox should leave sign positive)", weight2)
+	}
+
+	// Submit set 3 with a negative input AND assisted=on → guard prevents double-negation.
+	// (Pattern attr forbids minus; this protects against paste/devtools bypass.)
+	setForm3 := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
+	if setForm3.Length() == 0 {
+		t.Fatalf("expected signal form for set 3")
+	}
+	setAction3, _ := setForm3.Attr("action")
+	if doc, err = client.SubmitForm(ctx, doc, setAction3, map[string]string{
+		"weight":   "-15",
+		"assisted": "on",
+		"signal":   "on_target",
+		"reps":     "8",
+	}); err != nil {
+		t.Fatalf("submit assisted set with negative input: %v", err)
+	}
+
+	var weight3 float64
+	if err = db.QueryRowContext(ctx,
+		`SELECT weight_kg FROM exercise_sets
+         WHERE workout_exercise_id = ? AND set_number = 3`,
+		slotID).Scan(&weight3); err != nil {
+		t.Fatalf("query set 3 weight: %v", err)
+	}
+	if weight3 != -15.0 {
+		t.Errorf("set 3 weight = %v, want -15.0 (negative input + assisted=on must not double-negate)", weight3)
 	}
 }

@@ -220,7 +220,7 @@ func (app *application) recordSetCompletionWithWeight(
 
 	if exercise.ExerciseType == workout.ExerciseTypeAssisted &&
 		r.PostForm.Get("assisted") != "" {
-		weight = -weight
+		weight = -math.Abs(weight)
 	}
 
 	signal := workout.Signal(r.PostForm.Get("signal"))
