@@ -145,7 +145,9 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if exerciseType != workout.ExerciseTypeWeighted && exerciseType != workout.ExerciseTypeBodyweight {
+	if exerciseType != workout.ExerciseTypeWeighted &&
+		exerciseType != workout.ExerciseTypeBodyweight &&
+		exerciseType != workout.ExerciseTypeAssisted {
 		app.serverError(w, r, errors.New("invalid exercise type"))
 		return
 	}
