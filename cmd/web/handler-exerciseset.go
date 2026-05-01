@@ -200,7 +200,7 @@ func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exe
 	return weight, reps, nil
 }
 
-// recordSetCompletionWithWeight handles parsing and persisting a weighted set completion from form data.
+// recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
 func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
 	date time.Time, workoutExerciseID, setIndex int, dateStr string,
