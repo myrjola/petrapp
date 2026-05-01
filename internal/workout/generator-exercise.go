@@ -66,7 +66,7 @@ The response must strictly follow this JSON structure:
 }
 
 For "category", use one of: "full_body", "upper", "lower"
-For "exercise_type", use one of: "weighted", "bodyweight"
+For "exercise_type", use one of: "weighted", "bodyweight", "assisted"
 For "muscle_groups", use only from this list: %s
 
 The "description_markdown" must follow this exact structure:
