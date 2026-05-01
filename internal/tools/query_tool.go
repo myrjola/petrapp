@@ -66,10 +66,10 @@ func (sqt *SecureQueryTool) ExecuteQuery(ctx context.Context, query string) (*Qu
 // executeQueryWithPragma executes the query using a transaction with query_only pragma.
 func (sqt *SecureQueryTool) executeQueryWithPragma(ctx context.Context, query string) (_ *QueryResult, err error) {
 	// We use a dedicated connection to ensure the PRAGMA settings are applied and reverted correctly.
-	var (
-		conn *sql.Conn
-	)
-	conn, err = sqt.db.Conn(ctx)
+	conn, err := sqt.db.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("acquire db connection: %w", err)
+	}
 	defer func() {
 		// Close the sqlite connection so that the pragmas are reset when a new connection is created.
 		if rawErr := conn.Raw(func(_ any) error {
