@@ -209,12 +209,18 @@ func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exe
 func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
 	date time.Time, workoutExerciseID, setIndex int, dateStr string,
+	exercise workout.Exercise,
 ) bool {
 	weightStr := strings.Replace(r.PostForm.Get("weight"), ",", ".", 1)
 	weight, err := strconv.ParseFloat(weightStr, 64)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
 		return false
+	}
+
+	if exercise.ExerciseType == workout.ExerciseTypeAssisted &&
+		r.PostForm.Get("assisted") != "" {
+		weight = -weight
 	}
 
 	signal := workout.Signal(r.PostForm.Get("signal"))
@@ -269,7 +275,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	if exercise.ExerciseType == workout.ExerciseTypeWeighted ||
 		exercise.ExerciseType == workout.ExerciseTypeAssisted {
-		if !app.recordSetCompletionWithWeight(w, r, date, workoutExerciseID, setIndex, dateStr) {
+		if !app.recordSetCompletionWithWeight(w, r, date, workoutExerciseID, setIndex, dateStr, exercise) {
 			return
 		}
 	} else {

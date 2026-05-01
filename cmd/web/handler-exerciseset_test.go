@@ -465,3 +465,127 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 		t.Error("Expected custom 404 page to contain 'Go Back' button")
 	}
 }
+
+func Test_application_exerciseSet_assisted_storage(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	// Set preferences and start a workout for today.
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	// Look up the seeded "Assisted Pull-Up" id (added in Task 6) and the
+	// current authenticated user id (Register stores it in the session).
+	db := server.DB()
+	var assistedID int
+	if err = db.QueryRowContext(ctx,
+		`SELECT id FROM exercises WHERE name = 'Assisted Pull-Up'`).Scan(&assistedID); err != nil {
+		t.Fatalf("get Assisted Pull-Up id: %v", err)
+	}
+
+	// Insert a workout_exercise row pointing at Assisted Pull-Up, attached to
+	// the just-started session for the test user. This avoids depending on
+	// the swap UI's offered-alternatives logic.
+	var slotID int
+	if err = db.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+            warmup_completed_at)
+         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions WHERE workout_date = ?
+         RETURNING id`, assistedID, today).Scan(&slotID); err != nil {
+		t.Fatalf("insert assisted slot: %v", err)
+	}
+	// Seed three placeholder sets so the form has rows to submit against.
+	for setNum := 1; setNum <= 3; setNum++ {
+		if _, err = db.ExecContext(ctx,
+			`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+                weight_kg, min_reps, max_reps)
+             VALUES (?, ?, 0.0, 5, 5)`, slotID, setNum); err != nil {
+			t.Fatalf("insert placeholder set %d: %v", setNum, err)
+		}
+	}
+
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
+		t.Fatalf("get exercise set: %v", err)
+	}
+
+	setForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
+	if setForm.Length() == 0 {
+		t.Fatalf("expected signal form on assisted exercise")
+	}
+	setAction, _ := setForm.Attr("action")
+
+	// Submit set 1 with Assisted checkbox CHECKED → expect stored as negative.
+	if doc, err = client.SubmitForm(ctx, doc, setAction, map[string]string{
+		"weight":   "20",
+		"assisted": "on",
+		"signal":   "on_target",
+		"reps":     "8",
+	}); err != nil {
+		t.Fatalf("submit assisted set: %v", err)
+	}
+
+	var weight1 float64
+	if err = db.QueryRowContext(ctx,
+		`SELECT weight_kg FROM exercise_sets
+         WHERE workout_exercise_id = ? AND set_number = 1`,
+		slotID).Scan(&weight1); err != nil {
+		t.Fatalf("query set 1 weight: %v", err)
+	}
+	if weight1 != -20.0 {
+		t.Errorf("set 1 weight = %v, want -20.0 (assisted checkbox should negate)", weight1)
+	}
+
+	// Submit set 2 with Assisted checkbox UNCHECKED → expect stored as positive.
+	setForm2 := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
+	if setForm2.Length() == 0 {
+		t.Fatalf("expected signal form for set 2")
+	}
+	setAction2, _ := setForm2.Attr("action")
+	if _, err = client.SubmitForm(ctx, doc, setAction2, map[string]string{
+		"weight": "5",
+		// no "assisted" field → unchecked
+		"signal": "on_target",
+		"reps":   "8",
+	}); err != nil {
+		t.Fatalf("submit weighted set on assisted exercise: %v", err)
+	}
+
+	var weight2 float64
+	if err = db.QueryRowContext(ctx,
+		`SELECT weight_kg FROM exercise_sets
+         WHERE workout_exercise_id = ? AND set_number = 2`,
+		slotID).Scan(&weight2); err != nil {
+		t.Fatalf("query set 2 weight: %v", err)
+	}
+	if weight2 != 5.0 {
+		t.Errorf("set 2 weight = %v, want +5.0 (no checkbox should leave sign positive)", weight2)
+	}
+}
