@@ -234,3 +234,73 @@ func TestSetsCompleted(t *testing.T) {
 		t.Errorf("SetsCompleted after 2 sets = %d, want 2", p.SetsCompleted())
 	}
 }
+
+func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
+	tests := []struct {
+		name       string
+		lastWeight float64
+		signal     exerciseprogression.Signal
+		wantWeight float64
+	}{
+		{
+			name:       "negative TooHeavy goes further negative (more assistance)",
+			lastWeight: -20.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: -22.5,
+		},
+		{
+			name:       "zero TooHeavy goes negative (zero boundary fixed)",
+			lastWeight: 0.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: -2.5,
+		},
+		{
+			name:       "negative TooLight goes less negative (less assistance)",
+			lastWeight: -20.0,
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: -17.5,
+		},
+		{
+			name:       "negative OnTarget holds steady",
+			lastWeight: -20.0,
+			signal:     exerciseprogression.SignalOnTarget,
+			wantWeight: -20.0,
+		},
+		{
+			name:       "low positive TooHeavy uses 2.5kg minimum decrement",
+			lastWeight: 10.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: 7.5,
+		},
+		{
+			name:       "high positive TooHeavy uses percentage (regression)",
+			lastWeight: 100.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: 90.0,
+		},
+		{
+			name:       "mid positive TooHeavy uses percentage (regression)",
+			lastWeight: 50.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: 45.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := exerciseprogression.NewFromHistory(
+				exerciseprogression.Config{
+					Type:           exerciseprogression.Strength,
+					StartingWeight: 0,
+				},
+				[]exerciseprogression.SetResult{
+					{ActualReps: 5, Signal: tt.signal, WeightKg: tt.lastWeight},
+				},
+			)
+			got := p.CurrentSet().WeightKg
+			if got != tt.wantWeight {
+				t.Errorf("WeightKg = %v, want %v", got, tt.wantWeight)
+			}
+		})
+	}
+}

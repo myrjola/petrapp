@@ -5,7 +5,9 @@ package exerciseprogression
 // It uses the Epley formula: 1RM = w * (1 + r/30).
 //
 // Returns weight unchanged when fromReps == toReps, or when any input is
-// non-positive.
+// non-positive. Non-positive weights cover assisted exercises (negative
+// weight_kg representing assistance), where there is no meaningful 1RM
+// analog — the assistance value is preserved verbatim across periodizations.
 func ConvertWeight(weight float64, fromReps, toReps int) float64 {
 	if weight <= 0 || fromReps <= 0 || toReps <= 0 || fromReps == toReps {
 		return weight

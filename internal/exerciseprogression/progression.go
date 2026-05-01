@@ -114,8 +114,8 @@ func adjustedWeight(last SetResult) float64 {
 	case SignalTooLight:
 		return last.WeightKg + weightIncrementKg
 	case SignalTooHeavy:
-		decreased := last.WeightKg * (1 - weightDecrementFactor)
-		return roundToHalf(decreased)
+		decrement := math.Max(weightIncrementKg, math.Abs(last.WeightKg)*weightDecrementFactor)
+		return roundToHalf(last.WeightKg - decrement)
 	case SignalOnTarget:
 		return last.WeightKg
 	case SignalUnknown:
