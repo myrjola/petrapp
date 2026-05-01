@@ -75,9 +75,9 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 			wantWeight: 102.5,
 		},
 		{
-			name:       "TooHeavy decreases by 10 percent rounded to 0.5kg",
+			name:       "TooHeavy decreases by max(2.5kg, 10%)",
 			signal:     exerciseprogression.SignalTooHeavy,
-			wantWeight: 90.0, // 100 * 0.9 = 90.0
+			wantWeight: 90.0, // |w|*0.10 = 10kg > 2.5kg minimum → 100 - 10 = 90.0
 		},
 		{
 			name:       "OnTarget keeps same weight",
@@ -106,7 +106,7 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 }
 
 func TestCurrentSet_TooHeavyRounding(t *testing.T) {
-	// 23kg * 0.9 = 20.7kg → rounds to 20.5
+	// 23kg: |w|*0.10 = 2.3, below the 2.5kg minimum step → 23 - 2.5 = 20.5
 	p := exerciseprogression.New(exerciseprogression.Config{
 		Type:           exerciseprogression.Hypertrophy,
 		StartingWeight: 23.0,
