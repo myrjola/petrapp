@@ -91,6 +91,39 @@
             </div>
         </section>
 
+        <section class="exercise-search">
+            <style {{ nonce }}>
+                @scope {
+                    :scope {
+                        form {
+                            display: flex;
+                            gap: var(--size-2);
+                        }
+
+                        input[type="search"] {
+                            flex: 1;
+                            padding: var(--size-2) var(--size-3);
+                            border: 1px solid var(--gray-3);
+                            border-radius: var(--radius-2);
+                            font-size: var(--font-size-1);
+                            background: var(--white);
+                        }
+                    }
+                }
+            </style>
+            <form method="get" role="search">
+                <label for="exercise-search-q" class="sr-only">Search exercises</label>
+                <input id="exercise-search-q"
+                       type="search"
+                       name="q"
+                       value="{{ .Query }}"
+                       placeholder="Search exercises…"
+                       autocomplete="off"
+                       inputmode="search">
+                <button type="submit">Search</button>
+            </form>
+        </section>
+
         <section class="alternative-exercises">
             <style {{ nonce }}>
                 @scope {
@@ -142,12 +175,19 @@
                                 background-color: var(--lime-3);
                             }
                         }
+
+                        .no-results {
+                            color: var(--gray-6);
+                            padding: var(--size-4) 0;
+                            text-align: center;
+                        }
                     }
                 }
             </style>
             <h2>Choose Alternative Exercise</h2>
 
             <div class="alternatives-list">
+                {{ if .CompatibleExercises }}
                 {{ range .CompatibleExercises }}
                     <div class="exercise-option">
                         <div class="exercise-name">{{ .Name }}</div>
@@ -231,6 +271,11 @@
                             Info
                         </button>
                     </div>
+                {{ end }}
+                {{ else }}
+                    <p class="no-results">
+                        {{ if .Query }}No exercises match &ldquo;{{ .Query }}&rdquo;.{{ else }}No alternative exercises available.{{ end }}
+                    </p>
                 {{ end }}
             </div>
         </section>

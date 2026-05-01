@@ -212,6 +212,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	// handled — weighted forms auto-submit when a signal radio is selected, bodyweight forms
 	// require filling the reps input and pressing the submit button.
 	currentSet := page.GetByRole("group", playwright.PageGetByRoleOptions{Name: "Current set"})
+	completedSets := page.Locator(".exercise-set.completed")
 	const maxSetsPerExercise = 10
 	for range maxSetsPerExercise {
 		var visible bool
@@ -220,6 +221,15 @@ func Test_playwright_smoketest(t *testing.T) {
 		}
 		if !visible {
 			break
+		}
+
+		// Snapshot the completed-set count before submitting so we can wait for the
+		// post-submit reload to commit. WaitForURL is unreliable here: each submit
+		// goes through popOrReplaceTo with the same target URL, so the URL never
+		// changes and the wait can return before the new DOM has rendered.
+		var completedBefore int
+		if completedBefore, err = completedSets.Count(); err != nil {
+			t.Fatalf("count completed sets: %v", err)
 		}
 
 		// Weighted exercises show three named signal submit buttons; bodyweight exercises show
@@ -247,9 +257,15 @@ func Test_playwright_smoketest(t *testing.T) {
 			}
 		}
 
-		// Each submission reloads the exercise page with the next set (or none) active.
-		if err = page.WaitForURL(exerciseURLPattern); err != nil {
-			t.Fatalf("expect reload of exercise page after set submission: %v", err)
+		// Wait for the new DOM to render: the just-submitted set must show as
+		// completed before we trust currentSet.IsVisible() on the next iteration.
+		// page.WaitForURL is not enough — the URL is unchanged across replace
+		// navigations, so it can resolve against the pre-submit DOM.
+		if err = completedSets.Nth(completedBefore).WaitFor(); err != nil {
+			t.Fatalf("expect set %d to render as completed: %v", completedBefore+1, err)
+		}
+		if got := page.URL(); !exerciseURLPattern.MatchString(got) {
+			t.Fatalf("expect URL to match %s after set submission, got %q", exerciseURLPattern, got)
 		}
 	}
 

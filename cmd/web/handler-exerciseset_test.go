@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -380,6 +381,119 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 	}
 	if doc.Find(".exercise-set.completed").Length() != 0 {
 		t.Error("Completed sets from the pre-swap exercise must not carry over")
+	}
+}
+
+// Test_application_workoutSwapExercise_search_filters_by_name verifies that the
+// swap page filters compatible exercises by name substring (case-insensitive)
+// when ?q= is set, echoes the query into the search input, and renders an empty
+// state when nothing matches.
+func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("Submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("Start workout: %v", err)
+	}
+
+	var slotURL string
+	doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
+		if i == 0 {
+			if href, exists := s.Attr("href"); exists {
+				slotURL = href
+			}
+		}
+	})
+	if slotURL == "" {
+		t.Fatal("No exercise found on workout page")
+	}
+
+	// Collect the unfiltered set of compatible exercise names so the test is
+	// data-driven against fixtures rather than coupled to specific names.
+	if doc, err = client.GetDoc(ctx, slotURL+"/swap"); err != nil {
+		t.Fatalf("Get swap page: %v", err)
+	}
+	var allNames []string
+	doc.Find(".exercise-option .exercise-name").Each(func(_ int, s *goquery.Selection) {
+		allNames = append(allNames, strings.TrimSpace(s.Text()))
+	})
+	if len(allNames) < 2 {
+		t.Fatalf("Need at least 2 compatible exercises to exercise the filter, got %d", len(allNames))
+	}
+
+	// Pick the first word of the first exercise name as the search substring.
+	// "Bench Press" → "bench". Mixed case to verify case-insensitivity.
+	firstWord := strings.Fields(allNames[0])[0]
+	if len(firstWord) < 3 {
+		t.Fatalf("First word too short to be a useful filter: %q", firstWord)
+	}
+	needle := strings.ToUpper(firstWord)
+
+	// Filtered query should return a (non-empty) subset, all containing the
+	// substring case-insensitively.
+	if doc, err = client.GetDoc(ctx, slotURL+"/swap?q="+url.QueryEscape(needle)); err != nil {
+		t.Fatalf("Get swap page with query: %v", err)
+	}
+	var filteredNames []string
+	doc.Find(".exercise-option .exercise-name").Each(func(_ int, s *goquery.Selection) {
+		filteredNames = append(filteredNames, strings.TrimSpace(s.Text()))
+	})
+	if len(filteredNames) == 0 {
+		t.Fatalf("Expected at least one match for %q, got none", needle)
+	}
+	if len(filteredNames) > len(allNames) {
+		t.Errorf("Filtered list (%d) larger than unfiltered (%d)", len(filteredNames), len(allNames))
+	}
+	needleLower := strings.ToLower(needle)
+	for _, name := range filteredNames {
+		if !strings.Contains(strings.ToLower(name), needleLower) {
+			t.Errorf("Result %q does not contain %q", name, needle)
+		}
+	}
+
+	// Search input must echo the query so reloading preserves state.
+	gotQuery, _ := doc.Find("input[name='q']").Attr("value")
+	if gotQuery != needle {
+		t.Errorf("Search input value = %q, want %q", gotQuery, needle)
+	}
+
+	// A query that matches nothing must render the empty-state copy and no
+	// swap forms.
+	noMatch := "zzznotreal"
+	if doc, err = client.GetDoc(ctx, slotURL+"/swap?q="+url.QueryEscape(noMatch)); err != nil {
+		t.Fatalf("Get swap page with no-match query: %v", err)
+	}
+	if doc.Find(".exercise-option").Length() != 0 {
+		t.Error("Expected zero exercise options when query matches nothing")
+	}
+	emptyState := doc.Find(".no-results")
+	if emptyState.Length() == 0 {
+		t.Fatal("Expected .no-results empty state when query matches nothing")
+	}
+	if !strings.Contains(emptyState.Text(), noMatch) {
+		t.Errorf("Empty state %q should echo the query %q", strings.TrimSpace(emptyState.Text()), noMatch)
 	}
 }
 
