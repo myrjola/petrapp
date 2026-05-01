@@ -110,7 +110,8 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var currentSetTarget exerciseprogression.SetTarget
-	if exerciseSet.Exercise.ExerciseType == workout.ExerciseTypeWeighted {
+	if exerciseSet.Exercise.ExerciseType == workout.ExerciseTypeWeighted ||
+		exerciseSet.Exercise.ExerciseType == workout.ExerciseTypeAssisted {
 		progression, progressionErr := app.workoutService.BuildProgression(r.Context(), date, exerciseSet.Exercise.ID)
 		if progressionErr != nil {
 			app.serverError(w, r, progressionErr)
@@ -199,8 +200,8 @@ func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exe
 	return weight, reps, nil
 }
 
-// recordWeightedSetCompletion handles parsing and persisting a weighted set completion from form data.
-func (app *application) recordWeightedSetCompletion(
+// recordSetCompletionWithWeight handles parsing and persisting a weighted set completion from form data.
+func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
 	date time.Time, workoutExerciseID, setIndex int, dateStr string,
 ) bool {
@@ -261,8 +262,9 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	}
 	exercise := exerciseSet.Exercise
 
-	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
-		if !app.recordWeightedSetCompletion(w, r, date, workoutExerciseID, setIndex, dateStr) {
+	if exercise.ExerciseType == workout.ExerciseTypeWeighted ||
+		exercise.ExerciseType == workout.ExerciseTypeAssisted {
+		if !app.recordSetCompletionWithWeight(w, r, date, workoutExerciseID, setIndex, dateStr) {
 			return
 		}
 	} else {
