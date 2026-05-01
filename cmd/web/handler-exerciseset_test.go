@@ -492,7 +492,7 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Fatalf("submit preferences: %v", err)
 	}
 	today := time.Now().Format("2006-01-02")
-	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("start workout: %v", err)
 	}
 
@@ -598,7 +598,7 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Fatalf("expected signal form for set 3")
 	}
 	setAction3, _ := setForm3.Attr("action")
-	if doc, err = client.SubmitForm(ctx, doc, setAction3, map[string]string{
+	if _, err = client.SubmitForm(ctx, doc, setAction3, map[string]string{
 		"weight":   "-15",
 		"assisted": "on",
 		"signal":   "on_target",
