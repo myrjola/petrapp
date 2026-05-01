@@ -23,6 +23,7 @@ type ExerciseType string
 const (
 	ExerciseTypeWeighted   ExerciseType = "weighted"
 	ExerciseTypeBodyweight ExerciseType = "bodyweight"
+	ExerciseTypeAssisted   ExerciseType = "assisted"
 )
 
 // PeriodizationType controls rep targets for the session.
