@@ -98,8 +98,6 @@ func (app *application) renderMarkdownToHTML(ctx context.Context, markdown strin
 
 // ExerciseProgressDataPoint represents a single data point for the exercise chart.
 type ExerciseProgressDataPoint struct {
-	// Progress is a numerical value for the y-axis on the line chart. In most cases, it represents the max weight.
-	Progress float64
 	// Date of the exercise session.
 	Date time.Time
 	// SetDescriptions is a list of sets formatted as "8x10kg".
@@ -107,33 +105,26 @@ type ExerciseProgressDataPoint struct {
 }
 
 // processEntryData extracts chart metrics from a single exercise progress entry.
-// For weighted exercises Progress is the max weight lifted; for bodyweight it is the max reps completed.
 func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseType) ExerciseProgressDataPoint {
-	var progress float64
 	var setDescriptions []string
 
 	for _, set := range entry.Sets {
 		reps := *set.CompletedReps // service guarantees CompletedReps != nil
 
 		switch typ {
+		// Weighted and assisted share the same metric: signed weight.
+		// `-20 → -10 → 0 → +5` describes a continuous progression.
 		case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
 			if set.WeightKg != nil {
 				weight := *set.WeightKg
-				if weight > progress {
-					progress = weight
-				}
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))
 			}
 		case workout.ExerciseTypeBodyweight:
-			if float64(reps) > progress {
-				progress = float64(reps)
-			}
 			setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", reps))
 		}
 	}
 
 	return ExerciseProgressDataPoint{
-		Progress:        progress,
 		Date:            entry.Date,
 		SetDescriptions: setDescriptions,
 	}

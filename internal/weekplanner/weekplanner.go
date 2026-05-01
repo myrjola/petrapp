@@ -17,7 +17,7 @@ const (
 	CategoryLower    Category = "lower"
 )
 
-// ExerciseType distinguishes weighted from bodyweight exercises.
+// ExerciseType distinguishes weighted, bodyweight, and assisted exercises.
 type ExerciseType string
 
 const (

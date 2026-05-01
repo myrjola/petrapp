@@ -1,5 +1,6 @@
 // Package exerciseprogression manages set-to-set weight progression for a single
-// weighted exercise execution using RIR-based auto-regulation.
+// exercise execution (weighted, assisted, or any signed-weight scheme) using
+// RIR-based auto-regulation.
 package exerciseprogression
 
 import (
