@@ -116,7 +116,7 @@ func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseT
 		reps := *set.CompletedReps // service guarantees CompletedReps != nil
 
 		switch typ {
-		case workout.ExerciseTypeWeighted:
+		case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
 			if set.WeightKg != nil {
 				weight := *set.WeightKg
 				if weight > progress {
