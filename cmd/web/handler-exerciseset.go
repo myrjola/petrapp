@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ type exerciseSetTemplateData struct {
 	IsEditing            bool                          // Whether we're in edit mode
 	LastCompletedAt      *time.Time                    // Timestamp of most recently completed set
 	CurrentSetTarget     exerciseprogression.SetTarget // Recommended weight and reps from progression
+	AbsCurrentWeight     float64                       // |CurrentSetTarget.WeightKg|, for assisted form input
 }
 
 func formatRepRange(minReps, maxReps int) string {
@@ -120,6 +122,8 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		currentSetTarget = progression.CurrentSet()
 	}
 
+	absCurrentWeight := math.Abs(currentSetTarget.WeightKg)
+
 	data := exerciseSetTemplateData{
 		BaseTemplateData:     newBaseTemplateData(r),
 		Date:                 date,
@@ -130,6 +134,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		IsEditing:            isEditing,
 		LastCompletedAt:      getLastCompletedAt(exerciseSet.Sets),
 		CurrentSetTarget:     currentSetTarget,
+		AbsCurrentWeight:     absCurrentWeight,
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)

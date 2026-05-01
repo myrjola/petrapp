@@ -145,6 +145,37 @@
                         }
                     }
 
+                    .assisted-field {
+                        flex-direction: row;
+                        align-items: center;
+                        gap: var(--size-2);
+
+                        label {
+                            display: flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            font-size: var(--font-size-1);
+                            color: var(--color-text-primary);
+                            cursor: pointer;
+                        }
+
+                        input[type="checkbox"] {
+                            width: auto;
+                            height: 1.25rem;
+                            margin: 0;
+                        }
+
+                        details {
+                            font-size: var(--font-size-0);
+                            color: var(--color-text-secondary);
+
+                            summary {
+                                cursor: pointer;
+                                color: var(--color-info);
+                            }
+                        }
+                    }
+
                     .signal-group {
                         display: flex;
                         flex-direction: column;
@@ -263,7 +294,7 @@
                  {{ if $isActive }}aria-current="step"{{ end }}
                  aria-label="{{ if $set.CompletedReps }}Completed set{{ else if $isActive }}Current set{{ else }}Upcoming set{{ end }}">
                 <div class="set-info">
-                    {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                    {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
                         {{ if $set.CompletedReps }}
                             <span class="status-icon" aria-hidden="true">✓</span>
                             <span class="weight" aria-label="Weight">{{ formatFloat $set.WeightKg }} kg</span>
@@ -291,7 +322,7 @@
                 </div>
 
                 {{ if $isActive }}
-                    {{ if eq $.ExerciseSet.Exercise.ExerciseType "weighted" }}
+                    {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
@@ -304,13 +335,27 @@
                                         inputmode="decimal"
                                         pattern="[0-9,\.]*"
                                         name="weight"
-                                        value="{{ formatFloat $.CurrentSetTarget.WeightKg }}"
+                                        value="{{ formatFloat $.AbsCurrentWeight }}"
                                         step="0.5"
                                         required
                                         aria-describedby="weight-help-{{ $index }}"
                                 >
                                 <div id="weight-help-{{ $index }}" class="sr-only">Enter weight in kilograms</div>
                             </div>
+                            {{ if eq $.ExerciseSet.Exercise.ExerciseType "assisted" }}
+                            <div class="input-field assisted-field">
+                                <label>
+                                    <input type="checkbox" name="assisted"
+                                           {{ if lt $.CurrentSetTarget.WeightKg 0.0 }}checked{{ end }}>
+                                    Assisted (band/machine)
+                                </label>
+                                <details>
+                                    <summary>What's this?</summary>
+                                    <p>Check this when you used a band or machine to make the exercise easier.
+                                       Leave it unchecked if you added weight (e.g. with a belt).</p>
+                                </details>
+                            </div>
+                            {{ end }}
                             <div class="input-field">
                                 <label for="reps-{{ $index }}">Actual reps</label>
                                 <input
