@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/workout"
@@ -173,6 +174,8 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
@@ -198,11 +201,16 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	queryLower := strings.ToLower(query)
 	var compatibleExercises []workout.Exercise
 	for _, exercise := range allExercises {
-		if exercise.ID != currentSlot.Exercise.ID && !existingExerciseIDs[exercise.ID] {
-			compatibleExercises = append(compatibleExercises, exercise)
+		if exercise.ID == currentSlot.Exercise.ID || existingExerciseIDs[exercise.ID] {
+			continue
 		}
+		if queryLower != "" && !strings.Contains(strings.ToLower(exercise.Name), queryLower) {
+			continue
+		}
+		compatibleExercises = append(compatibleExercises, exercise)
 	}
 
 	data := exerciseSwapTemplateData{
@@ -211,6 +219,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		WorkoutExerciseID:   workoutExerciseID,
 		CurrentExercise:     currentSlot.Exercise,
 		CompatibleExercises: compatibleExercises,
+		Query:               query,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-swap", data)
@@ -262,6 +271,7 @@ type exerciseSwapTemplateData struct {
 	WorkoutExerciseID   int
 	CurrentExercise     workout.Exercise
 	CompatibleExercises []workout.Exercise
+	Query               string
 }
 
 // exerciseAddTemplateData contains data for the exercise add template.
