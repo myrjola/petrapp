@@ -16,17 +16,21 @@ import (
 
 type timeoutResponseWriter struct {
 	httptest.ResponseRecorder
+	writeDeadlineSet bool
 }
 
 func newTimeoutResponseWriter() *timeoutResponseWriter {
 	return &timeoutResponseWriter{
 		ResponseRecorder: *httptest.NewRecorder(),
+		writeDeadlineSet: false,
 	}
 }
 
 // SetWriteDeadline is needed to not get "feature not implemented" error.
+//
+//nolint:unparam // signature dictated by http.NewResponseController.
 func (w *timeoutResponseWriter) SetWriteDeadline(_ time.Time) error {
-	// No-op for testing
+	w.writeDeadlineSet = true
 	return nil
 }
 
@@ -97,6 +101,11 @@ func Test_application_timeout(t *testing.T) {
 					}
 				} else if w.Code != http.StatusOK {
 					t.Errorf("Expected status 200, got %d", w.Code)
+				}
+
+				// Both admin and non-admin paths must call SetWriteDeadline.
+				if !w.writeDeadlineSet {
+					t.Errorf("Expected SetWriteDeadline to be called for isAdmin=%v", tt.isAdmin)
 				}
 			})
 		})

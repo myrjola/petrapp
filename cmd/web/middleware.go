@@ -225,20 +225,26 @@ func (app *application) crossOriginProtection(next http.Handler) http.Handler {
 }
 
 // timeout times out the request and cancels the context using http.TimeoutHandler.
-// Admins get a longer timeout so that they can call external services.
+// Admins get a longer timeout so that they can call external services. Both
+// branches set a write deadline on the underlying connection so the per-request
+// contract holds even if the handler stalls inside Write().
 func (app *application) timeout(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := http.NewResponseController(w)
-		timeout := defaultTimeout - (200 * time.Millisecond) //nolint:mnd // writing the response takes time.
+		// Writing the response takes time, so reserve a margin for it before
+		// the connection-level write deadline fires.
+		const writeMargin = 200 * time.Millisecond
+		writeDeadline := defaultTimeout
+		handlerTimeout := defaultTimeout - writeMargin
 		if contexthelpers.IsAdmin(r.Context()) {
-			timeout = 29 * time.Second                                   //nolint:mnd // slow external services.
-			err := rc.SetWriteDeadline(time.Now().Add(30 * time.Second)) //nolint:mnd // slow external services.
-			if err != nil {
-				app.serverError(w, r, err)
-				return
-			}
+			writeDeadline = 30 * time.Second //nolint:mnd // slow external services.
+			handlerTimeout = writeDeadline - 1*time.Second
 		}
-		http.TimeoutHandler(next, timeout, "timed out").ServeHTTP(w, r)
+		if err := rc.SetWriteDeadline(time.Now().Add(writeDeadline)); err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		http.TimeoutHandler(next, handlerTimeout, "timed out").ServeHTTP(w, r)
 	})
 }
 
