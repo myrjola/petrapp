@@ -341,7 +341,7 @@ VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
 - [Video tutorial](https://www.youtube.com/watch?v=ASdvN_XEl_c)
 - [Form guide](https://www.verywellfit.com/how-to-do-a-plank-3120068)
 '),
-       (22, 'Assisted Pull-Up', 'upper', 'assisted', '## Instructions
+       (24, 'Assisted Pull-Up', 'upper', 'assisted', '## Instructions
 1. Set up the assistance: loop a resistance band over the pull-up bar and place one foot or knee in the loop, or use an assisted pull-up machine and select an assistance weight.
 2. Grip the bar slightly wider than shoulder width with palms facing away.
 3. Engage your lats and pull your chest toward the bar, keeping elbows tucked and shoulders down.
@@ -357,9 +357,8 @@ VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
 - [Form guide](https://www.verywellfit.com/how-to-do-the-assisted-pull-up-3498379)
 
 ## Tracking your progress
-Check the **Assisted** box and enter the assistance amount as a positive number — the app stores it as negative weight. As you get stronger, reduce the assistance. Once you can do unassisted reps, leave the box unchecked. To progress further, add weight with a belt and continue with the box unchecked.') ON CONFLICT(id) DO
-UPDATE SET name = excluded.name,
-    category = excluded.category,
+Check the **Assisted** box and enter the assistance amount as a positive number — the app stores it as negative weight. As you get stronger, reduce the assistance. Once you can do unassisted reps, leave the box unchecked. To progress further, add weight with a belt and continue with the box unchecked.') ON CONFLICT(name) DO
+UPDATE SET category = excluded.category,
     exercise_type = excluded.exercise_type,
     description_markdown = excluded.description_markdown;
 
@@ -439,10 +438,10 @@ VALUES (1, 'Forearms', 0),
        (21, 'Shoulders', 0),
        (21, 'Glutes', 0),
 -- Assisted exercises
-       (22, 'Lats', 1),
-       (22, 'Biceps', 1),
-       (22, 'Upper Back', 0),
-       (22, 'Forearms', 0) ON CONFLICT(exercise_id, muscle_group_name) DO
+       (24, 'Lats', 1),
+       (24, 'Biceps', 1),
+       (24, 'Upper Back', 0),
+       (24, 'Forearms', 0) ON CONFLICT(exercise_id, muscle_group_name) DO
 UPDATE SET is_primary = excluded.is_primary;
 
 INSERT INTO feature_flags (name, enabled)
