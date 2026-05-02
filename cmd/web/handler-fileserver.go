@@ -5,49 +5,71 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
-	"strings"
 )
+
+// notFoundInterceptor wraps http.ResponseWriter so we can detect when
+// http.FileServer returns 404 (file not found) and substitute our custom
+// 404 page instead. This eliminates the per-request os.Stat the handler
+// previously used to make the same decision up-front.
+//
+// The interceptor buffers the WriteHeader call so headers set by upstream
+// middleware (e.g. Cache-Control: public from cacheForever) are not flushed
+// before we know the response is a 404.
+type notFoundInterceptor struct {
+	http.ResponseWriter
+	is404         bool
+	headerWritten bool
+}
+
+func (i *notFoundInterceptor) WriteHeader(status int) {
+	if status == http.StatusNotFound {
+		i.is404 = true
+		return
+	}
+	i.headerWritten = true
+	i.ResponseWriter.WriteHeader(status)
+}
+
+func (i *notFoundInterceptor) Write(b []byte) (int, error) {
+	if i.is404 {
+		// Discard the body http.FileServer would write ("404 page not found\n").
+		return len(b), nil
+	}
+	if !i.headerWritten {
+		i.headerWritten = true
+		i.ResponseWriter.WriteHeader(http.StatusOK)
+	}
+	written, err := i.ResponseWriter.Write(b)
+	if err != nil {
+		return written, fmt.Errorf("write static asset: %w", err)
+	}
+	return written, nil
+}
 
 // fileServerHandler creates a file server handler with custom 404 handling.
 func (app *application) fileServerHandler() (http.Handler, error) {
 	fileRoot := path.Join(".", "ui", "static")
-	var err error
-	if _, err = os.Stat(fileRoot); os.IsNotExist(err) {
-		var dir string
-		dir, err = findModuleDir()
-		if err != nil {
-			return nil, fmt.Errorf("findModuleDir: %w", err)
+	if _, err := os.Stat(fileRoot); os.IsNotExist(err) {
+		dir, findErr := findModuleDir()
+		if findErr != nil {
+			return nil, fmt.Errorf("findModuleDir: %w", findErr)
 		}
 		fileRoot = path.Join(dir, "ui", "static")
 	}
-	var stat os.FileInfo
-	if stat, err = os.Stat(fileRoot); os.IsNotExist(err) || !stat.IsDir() {
+	stat, err := os.Stat(fileRoot)
+	if err != nil || !stat.IsDir() {
 		return nil, fmt.Errorf("file server root %s does not exist or is not a directory", fileRoot)
 	}
-	httpDir := http.Dir(fileRoot)
 
-	// File server with custom 404 handling
-	fileServer := http.FileServer(httpDir)
+	fileServer := http.FileServer(http.Dir(fileRoot))
+	notFoundHandler := app.sessionDeltaStack(http.HandlerFunc(app.notFound))
 
 	return app.noAuthStack(cacheForever(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Check if this is a request for a static file that doesn't exist
-			// Sanitize the URL path to prevent directory traversal attacks
-			cleanPath := filepath.Clean(r.URL.Path)
-			if strings.Contains(cleanPath, "..") {
-				// Path contains directory traversal, use 404 handler
-				app.sessionDeltaStack(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
-				return
+			interceptor := &notFoundInterceptor{ResponseWriter: w, is404: false, headerWritten: false}
+			fileServer.ServeHTTP(interceptor, r)
+			if interceptor.is404 {
+				notFoundHandler.ServeHTTP(w, r)
 			}
-			staticPath := filepath.Join(fileRoot, cleanPath)
-			if _, statErr := os.Stat(staticPath); os.IsNotExist(statErr) {
-				// File doesn't exist, use our custom 404 handler with session middleware
-				app.sessionDeltaStack(http.HandlerFunc(app.notFound)).ServeHTTP(w, r)
-				return
-			}
-
-			// File exists, serve it normally
-			fileServer.ServeHTTP(w, r)
 		}))), nil
 }
