@@ -892,7 +892,7 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 	for i, set := range templateSets {
 		var weight *float64
 		if set.WeightKg != nil {
-			weight = &[]float64{0}[0] // Empty weight for weighted exercises
+			weight = new(float64) // Empty weight for weighted exercises
 		}
 		result[i] = Set{
 			WeightKg:      weight,
@@ -1005,31 +1005,17 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			newSets = historicalSets
 		} else {
 			// Create default sets if no historical data exists
-			newSets = []Set{
-				{
-					WeightKg:      &[]float64{0}[0],
+			const defaultSetCount = 3
+			newSets = make([]Set, defaultSetCount)
+			for i := range newSets {
+				newSets[i] = Set{
+					WeightKg:      new(float64),
 					MinReps:       defaultMinReps,
 					MaxReps:       defaultMaxReps,
 					CompletedReps: nil,
 					CompletedAt:   nil,
 					Signal:        nil,
-				},
-				{
-					WeightKg:      &[]float64{0}[0],
-					MinReps:       defaultMinReps,
-					MaxReps:       defaultMaxReps,
-					CompletedReps: nil,
-					CompletedAt:   nil,
-					Signal:        nil,
-				},
-				{
-					WeightKg:      &[]float64{0}[0],
-					MinReps:       defaultMinReps,
-					MaxReps:       defaultMaxReps,
-					CompletedReps: nil,
-					CompletedAt:   nil,
-					Signal:        nil,
-				},
+				}
 			}
 		}
 
