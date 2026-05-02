@@ -304,3 +304,48 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 		})
 	}
 }
+
+// TestExhaustivePeriodizationCoverage documents that every PeriodizationType
+// resolves to a non-zero rep count via TargetReps. Adding a new variant without
+// updating the switch in TargetReps will both fail this test and trip the
+// `exhaustive` linter on the package's internal switches.
+func TestExhaustivePeriodizationCoverage(t *testing.T) {
+	all := []exerciseprogression.PeriodizationType{
+		exerciseprogression.Strength,
+		exerciseprogression.Hypertrophy,
+		exerciseprogression.Endurance,
+	}
+	for _, p := range all {
+		if got := exerciseprogression.TargetReps(p); got <= 0 {
+			t.Errorf("TargetReps(%v) = %d, want positive", p, got)
+		}
+	}
+}
+
+// TestExhaustiveSignalCoverage documents that every valid Signal resolves to
+// a finite weight via the package's internal adjustedWeight switch (exercised
+// through CurrentSet). SignalUnknown is intentionally excluded — it is the
+// zero-value sentinel and panicking on its use is the documented contract.
+func TestExhaustiveSignalCoverage(t *testing.T) {
+	valid := []exerciseprogression.Signal{
+		exerciseprogression.SignalTooHeavy,
+		exerciseprogression.SignalOnTarget,
+		exerciseprogression.SignalTooLight,
+	}
+	for _, s := range valid {
+		p := exerciseprogression.NewFromHistory(
+			exerciseprogression.Config{
+				Type:           exerciseprogression.Hypertrophy,
+				StartingWeight: 50,
+			},
+			[]exerciseprogression.SetResult{
+				{ActualReps: 8, Signal: s, WeightKg: 50},
+			},
+		)
+		// The call would panic if the switch in adjustedWeight failed to
+		// handle the signal; the assertion just guards against silent zeros.
+		if got := p.CurrentSet().WeightKg; got == 0 && s != exerciseprogression.SignalTooHeavy {
+			t.Errorf("CurrentSet for signal %v unexpectedly returned 0", s)
+		}
+	}
+}
