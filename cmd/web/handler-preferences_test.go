@@ -149,17 +149,22 @@ func Test_application_exportUserData(t *testing.T) {
 		t.Fatalf("Failed to register: %v", err)
 	}
 
-	// Set up a workout schedule (required before accessing the home page)
+	// Schedule both today and the next weekday so a midnight crossing between setting preferences
+	// and the server's notion of "today" still leaves today scheduled.
+	testStart := time.Now()
 	if doc, err = client.GetDoc(ctx, "/schedule"); err != nil {
 		t.Fatalf("Failed to get schedule page: %v", err)
 	}
-	scheduleForm := map[string]string{time.Now().Weekday().String(): "60"}
+	scheduleForm := map[string]string{
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
+	}
 	if _, err = client.SubmitForm(ctx, doc, "/schedule", scheduleForm); err != nil {
 		t.Fatalf("Failed to submit schedule form: %v", err)
 	}
 
 	// Start a workout to generate some data for the user
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	formData := map[string]string{}
 	if doc, err = client.GetDoc(ctx, "/"); err != nil {
 		t.Fatalf("Failed to get home page: %v", err)
@@ -243,34 +248,19 @@ func Test_application_exportUserData(t *testing.T) {
 		t.Errorf("Expected 1 user in export, got %d", userCount)
 	}
 
-	// Verify there's a single workout session
-	var sessionCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM workout_sessions").Scan(&sessionCount)
-	if err != nil {
-		t.Fatalf("Failed to query workout_sessions table: %v", err)
-	}
-	if sessionCount != 1 {
-		t.Errorf("Expected 1 workout session in export, got %d", sessionCount)
-	}
-
-	// Verify the session has the correct date (today)
-	var sessionDate string
-	err = db.QueryRow("SELECT workout_date FROM workout_sessions LIMIT 1").Scan(&sessionDate)
-	if err != nil {
-		t.Fatalf("Failed to query session date: %v", err)
-	}
-	if sessionDate != today {
-		t.Errorf("Expected session date %s, got %s", today, sessionDate)
-	}
-
-	// Verify the session is started (has started_at timestamp)
+	// Verify the export contains today's session, started. Other days from the
+	// scheduled week are expected to be present too — preferences enabled both
+	// today and tomorrow's weekday to survive a midnight crossing — so we look
+	// up today's row by date rather than asserting an exact session count.
 	var startedAt sql.NullString
-	err = db.QueryRow("SELECT started_at FROM workout_sessions LIMIT 1").Scan(&startedAt)
+	err = db.QueryRow(
+		"SELECT started_at FROM workout_sessions WHERE workout_date = ?", today,
+	).Scan(&startedAt)
 	if err != nil {
-		t.Fatalf("Failed to query session started_at: %v", err)
+		t.Fatalf("Failed to query today's session: %v", err)
 	}
 	if !startedAt.Valid || startedAt.String == "" {
-		t.Error("Expected session to be started (started_at should not be NULL or empty)")
+		t.Error("Expected today's session to be started (started_at should not be NULL or empty)")
 	}
 }
 

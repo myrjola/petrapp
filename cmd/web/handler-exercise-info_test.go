@@ -25,15 +25,23 @@ func Test_application_exerciseInfo(t *testing.T) {
 
 	client := server.Client()
 
+	// Capture testStart once and reuse it for both the scheduled weekday and the
+	// "today" URL across all subtests so a midnight crossing during the run
+	// cannot desync the two. Schedule the next weekday too so today stays a
+	// workout day on either side of the boundary.
+	testStart := time.Now()
+	today := testStart.Format("2006-01-02")
+
 	// First register to access pages
 	t.Run("Setup", func(t *testing.T) {
 		if _, err = client.Register(ctx); err != nil {
 			t.Fatalf("Failed to register: %v", err)
 		}
 
-		// Set workout preferences (enable today's weekday).
+		// Set workout preferences (enable today's weekday + the next).
 		formData := map[string]string{
-			time.Now().Weekday().String(): "60",
+			testStart.Weekday().String():                  "60",
+			testStart.AddDate(0, 0, 1).Weekday().String(): "60",
 		}
 		if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 			t.Fatalf("Failed to get preferences: %v", err)
@@ -43,7 +51,6 @@ func Test_application_exerciseInfo(t *testing.T) {
 		}
 
 		// Start a workout for today
-		today := time.Now().Format("2006-01-02")
 		if doc, err = client.GetDoc(ctx, "/"); err != nil {
 			t.Fatalf("Failed to get home page: %v", err)
 		}
@@ -56,7 +63,6 @@ func Test_application_exerciseInfo(t *testing.T) {
 
 	// Test viewing exercise info as a regular user
 	t.Run("View exercise info as regular user", func(t *testing.T) {
-		today := time.Now().Format("2006-01-02")
 		// First view the workout to find an exercise
 		if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
 			t.Fatalf("Failed to get workout page: %v", err)
@@ -111,7 +117,6 @@ func Test_application_exerciseInfo(t *testing.T) {
 			t.Fatalf("Failed to promote user to admin: %v", err)
 		}
 
-		today := time.Now().Format("2006-01-02")
 		// First view the workout to find an exercise
 		if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
 			t.Fatalf("Failed to get workout page: %v", err)
@@ -157,7 +162,6 @@ func Test_application_exerciseInfo(t *testing.T) {
 
 	// Test error handling with invalid input
 	t.Run("Invalid exercise ID", func(t *testing.T) {
-		today := time.Now().Format("2006-01-02")
 		var resp *http.Response
 		resp, err = client.Get(ctx, "/workouts/"+today+"/exercises/invalid/info")
 		if err != nil {

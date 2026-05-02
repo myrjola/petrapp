@@ -35,9 +35,12 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to register: %v", err)
 	}
 
-	// Set workout preferences (enable today's weekday).
+	// Schedule today and the next weekday so a midnight crossing during the test
+	// can't desync the saved weekday from the URL date computed below.
+	testStart := time.Now()
 	formData := map[string]string{
-		time.Now().Weekday().String(): "60",
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
 	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
@@ -47,7 +50,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Start a workout for today
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	// Find and submit the start workout form
 	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("Failed to submit start workout form: %v", err)
@@ -286,7 +289,11 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 		t.Fatalf("Register: %v", err)
 	}
 
-	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	testStart := time.Now()
+	formData := map[string]string{
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
+	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
@@ -294,7 +301,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("Start workout: %v", err)
 	}
@@ -408,7 +415,11 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	testStart := time.Now()
+	formData := map[string]string{
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
+	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
@@ -416,7 +427,7 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("Start workout: %v", err)
 	}
@@ -519,9 +530,12 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 		t.Fatalf("Failed to register: %v", err)
 	}
 
-	// Set workout preferences (enable today's weekday).
+	// Schedule today and the next weekday so a midnight crossing can't desync
+	// the saved weekday from the URL date.
+	testStart := time.Now()
 	formData := map[string]string{
-		time.Now().Weekday().String(): "60",
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
 	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
@@ -531,7 +545,7 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 	}
 
 	// Start a workout for today
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("Failed to submit start workout form: %v", err)
 	}
@@ -605,7 +619,11 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	testStart := time.Now()
+	formData := map[string]string{
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
+	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
@@ -613,7 +631,7 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("Start workout: %v", err)
 	}
@@ -765,15 +783,21 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Fatalf("register: %v", err)
 	}
 
-	// Set preferences and start a workout for today.
-	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	// Set preferences and start a workout for today. Schedule both today and the
+	// next weekday so a midnight crossing during the test still leaves today
+	// scheduled.
+	testStart := time.Now()
+	formData := map[string]string{
+		testStart.Weekday().String():                  "60",
+		testStart.AddDate(0, 0, 1).Weekday().String(): "60",
+	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
 	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
-	today := time.Now().Format("2006-01-02")
+	today := testStart.Format("2006-01-02")
 	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
 		t.Fatalf("start workout: %v", err)
 	}
