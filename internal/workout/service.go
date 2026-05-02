@@ -660,6 +660,101 @@ func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
 	return groups, nil
 }
 
+// PrimarySetWeight and SecondarySetWeight are the per-set contributions to a
+// muscle group's weekly load. The split reflects that secondary engagement
+// receives meaningfully less stimulus than primary engagement.
+const (
+	PrimarySetWeight   = 1.0
+	SecondarySetWeight = 0.5
+)
+
+// WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly load per muscle
+// group across the supplied sessions. One entry is returned for every known
+// muscle group, sorted alphabetically; groups with no contributions appear as
+// zero-load rows so the UI can render them without a separate query. Targets are
+// joined from muscle_group_weekly_targets; untracked groups carry TargetSets = 0.
+func (s *Service) WeeklyMuscleGroupVolume(
+	ctx context.Context,
+	sessions []Session,
+) ([]MuscleGroupVolume, error) {
+	groupNames, err := s.repo.exercises.ListMuscleGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list muscle groups: %w", err)
+	}
+
+	targets, err := s.repo.muscleTargets.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list muscle group targets: %w", err)
+	}
+	targetByName := make(map[string]int, len(targets))
+	for _, t := range targets {
+		targetByName[t.MuscleGroupName] = t.WeeklySetTarget
+	}
+
+	known := make(map[string]struct{}, len(groupNames))
+	for _, name := range groupNames {
+		known[name] = struct{}{}
+	}
+
+	planned := make(map[string]float64, len(groupNames))
+	completed := make(map[string]float64, len(groupNames))
+	aggregateMuscleGroupLoad(sessions, known, planned, completed)
+
+	result := make([]MuscleGroupVolume, 0, len(groupNames))
+	for _, name := range groupNames {
+		result = append(result, MuscleGroupVolume{
+			Name:          name,
+			CompletedLoad: completed[name],
+			PlannedLoad:   planned[name],
+			TargetSets:    targetByName[name],
+		})
+	}
+	// ListMuscleGroups orders by name, so result is already alphabetical.
+	return result, nil
+}
+
+// aggregateMuscleGroupLoad walks every set in the supplied sessions and totals the
+// weighted load for each muscle group, accumulating into the planned and completed
+// maps. Primary contributions count as PrimarySetWeight, secondary as
+// SecondarySetWeight. Muscle group names not present in known are silently skipped
+// — they cannot occur in production due to FK constraints, but the guard keeps
+// tests safe when synthetic exercises reference unknown groups.
+func aggregateMuscleGroupLoad(
+	sessions []Session,
+	known map[string]struct{},
+	planned, completed map[string]float64,
+) {
+	for _, sess := range sessions {
+		for _, ex := range sess.ExerciseSets {
+			for _, set := range ex.Sets {
+				done := set.CompletedAt != nil
+				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetWeight, done, known, planned, completed)
+				creditMuscleGroups(ex.Exercise.SecondaryMuscleGroups, SecondarySetWeight, done, known, planned, completed)
+			}
+		}
+	}
+}
+
+// creditMuscleGroups credits weight to each muscle group in names, both to planned
+// and (when done) to completed. Groups missing from known are ignored.
+func creditMuscleGroups(
+	names []string,
+	weight float64,
+	done bool,
+	known map[string]struct{},
+	planned, completed map[string]float64,
+) {
+	for _, mg := range names {
+		if _, ok := known[mg]; !ok {
+			continue
+		}
+		planned[mg] += weight
+		if done {
+			completed[mg] += weight
+		}
+	}
+}
+
 // GenerateExercise generates a new exercise based on a name.
 //
 // In case of errors, it persists a minimal exercise that the user can fill in later.

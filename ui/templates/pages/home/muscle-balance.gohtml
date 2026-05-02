@@ -1,0 +1,267 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
+
+{{ define "muscle-balance" }}
+    {{ if .MuscleBalance.Regions }}
+        <section class="muscle-balance" aria-labelledby="muscle-balance-heading">
+            <style {{ nonce }}>
+                @scope (.muscle-balance) {
+                    :scope {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-4);
+                        padding: var(--size-4);
+                        background: var(--gray-0);
+                        border: 1px solid var(--gray-3);
+                        border-radius: var(--radius-3);
+                    }
+
+                    h2 {
+                        font-size: var(--font-size-3);
+                        font-weight: var(--font-weight-6);
+                        margin: 0;
+                    }
+
+                    .region {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-2);
+                    }
+
+                    .region-heading {
+                        font-size: var(--font-size-0);
+                        font-weight: var(--font-weight-6);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        color: var(--gray-7);
+                        margin: 0;
+                    }
+
+                    .row {
+                        display: grid;
+                        grid-template-columns: 7rem 1fr 5rem;
+                        align-items: center;
+                        gap: var(--size-3);
+                    }
+
+                    .label {
+                        font-size: var(--font-size-1);
+                        color: var(--gray-9);
+                    }
+
+                    .bar {
+                        position: relative;
+                        height: 14px;
+                        background: var(--gray-2);
+                        border-radius: var(--radius-round);
+                    }
+
+                    .bar-planned,
+                    .bar-completed {
+                        position: absolute;
+                        inset-block: 0;
+                        inset-inline-start: 0;
+                        border-radius: var(--radius-round);
+                    }
+
+                    .bar-planned {
+                        border: 1px dashed var(--gray-6);
+                        background: transparent;
+                    }
+
+                    .target-mark {
+                        position: absolute;
+                        inset-block: -3px;
+                        width: 2px;
+                        background: var(--gray-9);
+                    }
+
+                    .row[data-status="under"] .bar-completed,
+                    .legend-swatch[data-status="under"] { background: var(--yellow-6); }
+                    .row[data-status="on-target"] .bar-completed,
+                    .legend-swatch[data-status="on-target"] { background: var(--lime-6); }
+                    .row[data-status="over"] .bar-completed,
+                    .legend-swatch[data-status="over"] { background: var(--red-6); }
+                    .row[data-status="no-target"] .bar-completed,
+                    .legend-swatch[data-status="no-target"] { background: var(--sky-6); }
+
+                    .legend {
+                        font-size: var(--font-size-0);
+                        color: var(--gray-9);
+                    }
+
+                    .legend > summary {
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: var(--size-1);
+                        padding: var(--size-1) var(--size-2);
+                        border-radius: var(--radius-2);
+                        color: var(--gray-7);
+                        font-weight: var(--font-weight-5);
+                    }
+
+                    .legend > summary:hover {
+                        background: var(--gray-2);
+                        color: var(--gray-9);
+                    }
+
+                    .legend-body {
+                        margin-block-start: var(--size-2);
+                        padding: var(--size-3);
+                        background: var(--gray-1);
+                        border-radius: var(--radius-2);
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-3);
+                    }
+
+                    .legend-body > p { margin: 0; }
+
+                    .legend-list {
+                        list-style: none;
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--size-1);
+                    }
+
+                    .legend-list > li {
+                        display: grid;
+                        grid-template-columns: 1.5rem 1fr;
+                        align-items: center;
+                        gap: var(--size-2);
+                    }
+
+                    .legend-swatch {
+                        display: inline-block;
+                        width: 1rem;
+                        height: 0.5rem;
+                        border-radius: var(--radius-round);
+                    }
+
+                    .legend-sample {
+                        position: relative;
+                        display: inline-block;
+                        width: 1.5rem;
+                        height: 14px;
+                        background: var(--gray-2);
+                        border-radius: var(--radius-round);
+                    }
+
+                    .legend-sample-completed {
+                        position: absolute;
+                        inset-block: 0;
+                        inset-inline-start: 0;
+                        width: 60%;
+                        background: var(--lime-6);
+                        border-radius: var(--radius-round);
+                    }
+
+                    .legend-sample-planned {
+                        position: absolute;
+                        inset-block: 0;
+                        inset-inline-start: 0;
+                        width: 100%;
+                        border: 1px dashed var(--gray-6);
+                        border-radius: var(--radius-round);
+                    }
+
+                    .legend-sample-target {
+                        position: absolute;
+                        inset-block: -3px;
+                        inset-inline-start: 75%;
+                        width: 2px;
+                        background: var(--gray-9);
+                    }
+
+                    .counts {
+                        font-size: var(--font-size-0);
+                        color: var(--gray-7);
+                        text-align: right;
+                        white-space: nowrap;
+                        line-height: 1.2;
+                    }
+
+                    .counts .target {
+                        display: block;
+                        font-size: var(--font-size-00);
+                        color: var(--gray-6);
+                    }
+
+                    {{ range .MuscleBalance.Regions }}
+                        {{ range .Groups }}
+                            .row[data-slug="{{ .Slug }}"] .bar-planned { width: {{ .PlannedPercent }}%; }
+                            .row[data-slug="{{ .Slug }}"] .bar-completed { width: {{ .FillPercent }}%; }
+                            {{ if .HasTarget }}
+                                .row[data-slug="{{ .Slug }}"] .target-mark { left: {{ .TargetPercent }}%; }
+                            {{ end }}
+                        {{ end }}
+                    {{ end }}
+                }
+            </style>
+
+            <h2 id="muscle-balance-heading">Weekly muscle balance</h2>
+
+            <details class="legend">
+                <summary>How to read this</summary>
+                <div class="legend-body">
+                    <p>Each bar shows the weighted set load for one muscle group across this week.
+                        Sets count fully (1.0) for primary muscle groups and half (0.5) for secondary.</p>
+                    <ul class="legend-list">
+                        <li>
+                            <span class="legend-sample" aria-hidden="true">
+                                <span class="legend-sample-planned"></span>
+                                <span class="legend-sample-completed"></span>
+                                <span class="legend-sample-target"></span>
+                            </span>
+                            <span>
+                                <strong>Solid fill</strong> = sets already completed.
+                                <strong>Dashed outline</strong> = the rest of the planned week.
+                                <strong>Vertical tick</strong> = your weekly target.
+                            </span>
+                        </li>
+                    </ul>
+                    <ul class="legend-list">
+                        <li>
+                            <span class="legend-swatch" data-status="under" aria-hidden="true"></span>
+                            <span><strong>Orange</strong> — below target; do more this week.</span>
+                        </li>
+                        <li>
+                            <span class="legend-swatch" data-status="on-target" aria-hidden="true"></span>
+                            <span><strong>Green</strong> — within target range (target up to 1.5×).</span>
+                        </li>
+                        <li>
+                            <span class="legend-swatch" data-status="over" aria-hidden="true"></span>
+                            <span><strong>Red</strong> — well above target (over 1.5×).</span>
+                        </li>
+                        <li>
+                            <span class="legend-swatch" data-status="no-target" aria-hidden="true"></span>
+                            <span><strong>Blue</strong> — no target set; informational only.</span>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
+            {{ range .MuscleBalance.Regions }}
+                <div class="region">
+                    <h3 class="region-heading">{{ .Name }}</h3>
+                    {{ range .Groups }}
+                        <div class="row" data-slug="{{ .Slug }}" data-status="{{ .Status }}">
+                            <div class="label">{{ .Name }}</div>
+                            <div class="bar" aria-hidden="true">
+                                <div class="bar-planned"></div>
+                                <div class="bar-completed"></div>
+                                {{ if .HasTarget }}<div class="target-mark"></div>{{ end }}
+                            </div>
+                            <div class="counts">
+                                {{ printf "%.1f / %.1f" .CompletedLoad .PlannedLoad }}
+                                {{ if .HasTarget }}<span class="target">target {{ .TargetSets }}</span>{{ end }}
+                            </div>
+                        </div>
+                    {{ end }}
+                </div>
+            {{ end }}
+        </section>
+    {{ end }}
+{{ end }}

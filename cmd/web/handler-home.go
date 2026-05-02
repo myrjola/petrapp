@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/workout"
@@ -49,6 +50,64 @@ type homeTemplateData struct {
 	BaseTemplateData
 	// Days contains the workout sessions for the current week
 	Days []dayView
+	// MuscleBalance summarises weekly volume per muscle group, grouped by region.
+	// Empty for unauthenticated users; Regions is empty when the week has no exercises.
+	MuscleBalance muscleBalanceView
+}
+
+// muscleBalanceView wraps the per-region groupings rendered below the weekly schedule.
+type muscleBalanceView struct {
+	Regions []muscleRegionView
+}
+
+// muscleRegionView is one anatomical group (e.g. "Upper Push") and the bars within it.
+type muscleRegionView struct {
+	Name   string
+	Groups []muscleGroupBarView
+}
+
+// muscleGroupBarView holds the per-row data needed to render one bar.
+// All percent fields are 0..100 relative to a shared scale so bars are visually comparable.
+type muscleGroupBarView struct {
+	Name           string
+	Slug           string
+	CompletedLoad  float64
+	PlannedLoad    float64
+	TargetSets     int
+	HasTarget      bool
+	FillPercent    int
+	PlannedPercent int
+	TargetPercent  int
+	Status         string
+}
+
+// Status values for a muscle group bar; these drive the fill colour in the template.
+const (
+	muscleStatusUnder    = "under"
+	muscleStatusOnTarget = "on-target"
+	muscleStatusOver     = "over"
+	muscleStatusNoTarget = "no-target"
+
+	// scaleHeadroom adds 10% headroom above the largest planned/target value so an
+	// on-target bar doesn't pin the right edge.
+	scaleHeadroom = 1.1
+	// minScale guarantees a non-zero divisor when the week is empty (all volumes 0).
+	minScale = 10.0
+	// overTargetMultiplier above this many times the target a bar is flagged as
+	// over-prescribed. Picked permissively because going somewhat above target is fine;
+	// far above suggests redundant programming.
+	overTargetMultiplier = 1.5
+)
+
+// regionOrder returns the display order for muscle group regions in the UI.
+func regionOrder() []workout.MuscleGroupRegion {
+	return []workout.MuscleGroupRegion{
+		workout.RegionUpperPush,
+		workout.RegionUpperPull,
+		workout.RegionLegs,
+		workout.RegionCore,
+		workout.RegionOther,
+	}
 }
 
 // dayView represents a single day's view data.
@@ -253,10 +312,87 @@ func toDays(sessions []workout.Session, preferences workout.Preferences) []dayVi
 	return days
 }
 
+// toMuscleBalance turns the workout service's flat volume list into a regional
+// view-model with pre-computed bar percentages. All bars share one scale so the
+// visualization is meaningful at a glance: the largest of (max planned load, max
+// target) sets the right edge, plus 10% headroom. Regions with no bars are omitted.
+func toMuscleBalance(volumes []workout.MuscleGroupVolume) muscleBalanceView {
+	if len(volumes) == 0 {
+		return muscleBalanceView{Regions: nil}
+	}
+
+	scale := minScale
+	for _, v := range volumes {
+		if v.PlannedLoad > scale {
+			scale = v.PlannedLoad
+		}
+		if t := float64(v.TargetSets); t > scale {
+			scale = t
+		}
+	}
+	scale *= scaleHeadroom
+
+	byRegion := make(map[workout.MuscleGroupRegion][]muscleGroupBarView)
+	for _, v := range volumes {
+		region := workout.RegionFor(v.Name)
+		byRegion[region] = append(byRegion[region], muscleGroupBarView{
+			Name:           v.Name,
+			Slug:           muscleGroupSlug(v.Name),
+			CompletedLoad:  v.CompletedLoad,
+			PlannedLoad:    v.PlannedLoad,
+			TargetSets:     v.TargetSets,
+			HasTarget:      v.TargetSets > 0,
+			FillPercent:    int(v.CompletedLoad / scale * percentMultiplier),
+			PlannedPercent: int(v.PlannedLoad / scale * percentMultiplier),
+			TargetPercent:  int(float64(v.TargetSets) / scale * percentMultiplier),
+			Status:         muscleStatus(v.PlannedLoad, v.TargetSets),
+		})
+	}
+
+	order := regionOrder()
+	regions := make([]muscleRegionView, 0, len(order))
+	for _, r := range order {
+		groups := byRegion[r]
+		if len(groups) == 0 {
+			continue
+		}
+		regions = append(regions, muscleRegionView{
+			Name:   string(r),
+			Groups: groups,
+		})
+	}
+	return muscleBalanceView{Regions: regions}
+}
+
+// muscleGroupSlug renders a muscle group name as a CSS-safe slug
+// (e.g. "Upper Back" → "upper-back") for use in attribute selectors.
+func muscleGroupSlug(name string) string {
+	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+}
+
+// muscleStatus classifies a muscle group's planned weekly load against its target.
+// Groups without a seeded target are reported as "no-target" so the UI can render
+// them informationally without making a value judgment.
+func muscleStatus(planned float64, target int) string {
+	if target <= 0 {
+		return muscleStatusNoTarget
+	}
+	t := float64(target)
+	switch {
+	case planned < t:
+		return muscleStatusUnder
+	case planned <= overTargetMultiplier*t:
+		return muscleStatusOnTarget
+	default:
+		return muscleStatusOver
+	}
+}
+
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	data := homeTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Days:             nil,
+		MuscleBalance:    muscleBalanceView{Regions: nil},
 	}
 
 	// Only fetch workout data for authenticated users
@@ -278,7 +414,14 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		volumes, err := app.workoutService.WeeklyMuscleGroupVolume(r.Context(), sessions)
+		if err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+
 		data.Days = toDays(sessions, preferences)
+		data.MuscleBalance = toMuscleBalance(volumes)
 	}
 
 	app.render(w, r, http.StatusOK, "home", data)
