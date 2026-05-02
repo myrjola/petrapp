@@ -284,15 +284,23 @@ func generateSingleWorkout(ctx context.Context, client *e2etest.Client, dateStr 
 		return errors.New("no exercises found on workout page")
 	}
 
-	// Complete sets for each exercise
+	// Complete sets for each exercise. Track failures so we can fail the whole
+	// workout if every exercise broke — otherwise the run reports "success"
+	// despite producing zero useful data.
+	var failures int
 	for _, exerciseID := range exerciseIDs {
 		if completeErr := completeExerciseSets(ctx, client, dateStr, exerciseID); completeErr != nil {
+			failures++
 			logger.LogAttrs(ctx, slog.LevelWarn, "Failed to complete exercise sets",
 				slog.String("date", dateStr),
 				slog.String("exercise_id", exerciseID),
 				slog.Any("error", completeErr))
 			continue // Continue with next exercise
 		}
+	}
+
+	if failures == len(exerciseIDs) {
+		return fmt.Errorf("all %d exercises failed to complete on %s", failures, dateStr)
 	}
 
 	return nil
