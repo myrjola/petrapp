@@ -28,6 +28,7 @@ func Test_application_reportingAPI(t *testing.T) {
 		expectedStatusCode int
 		shouldLog          bool
 		logContains        []string
+		logExcludes        []string
 	}{
 		{
 			name:   "Chrome array format CSP report",
@@ -42,6 +43,7 @@ func Test_application_reportingAPI(t *testing.T) {
 			shouldLog:          true,
 			logContains: []string{"Report received via Reporting API", "csp-violation",
 				"eval", "script-src"},
+			logExcludes: nil,
 		},
 		{
 			name:   "Legacy object format CSP report",
@@ -55,7 +57,27 @@ func Test_application_reportingAPI(t *testing.T) {
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
 			logContains: []string{"Report received via Reporting API", "script-src",
-				"https://evil.com/script.js", "https://example.com/page"},
+				"https://evil.com/script.js", "https://example.com/page",
+				redactedPlaceholder},
+			logExcludes: []string{"alert('hi')", "alert(\\u0027hi\\u0027)"},
+		},
+		{
+			name:   "Sensitive script sample and tokenised URL are redacted",
+			method: http.MethodPost,
+			body: `[{"age":0,"body":{"blockedURL":"https://cdn.example.com/x.js?token=secret123",` +
+				`"documentURL":"https://example.com/path?session=abc","effectiveDirective":"script-src",` +
+				`"sample":"window.password = 'secret'","statusCode":200},"type":"csp-violation",` +
+				`"url":"https://example.com/"}]`,
+			contentType:        "application/reports+json",
+			expectedStatusCode: http.StatusNoContent,
+			shouldLog:          true,
+			logContains: []string{"Report received via Reporting API", "csp-violation",
+				"script-src", "https://cdn.example.com/x.js", "https://example.com/path",
+				redactedPlaceholder},
+			logExcludes: []string{
+				"token=secret123", "session=abc",
+				"window.password", "secret'", "secret\\u0027",
+			},
 		},
 		{
 			name:               "Invalid JSON",
@@ -65,6 +87,7 @@ func Test_application_reportingAPI(t *testing.T) {
 			expectedStatusCode: http.StatusBadRequest,
 			shouldLog:          true,
 			logContains:        []string{"Failed to parse report"},
+			logExcludes:        nil,
 		},
 		{
 			name:               "Empty body",
@@ -74,6 +97,7 @@ func Test_application_reportingAPI(t *testing.T) {
 			expectedStatusCode: http.StatusBadRequest,
 			shouldLog:          true,
 			logContains:        []string{"Failed to parse report"},
+			logExcludes:        nil,
 		},
 		{
 			name:               "Minimal object format CSP report",
@@ -83,6 +107,7 @@ func Test_application_reportingAPI(t *testing.T) {
 			expectedStatusCode: http.StatusNoContent,
 			shouldLog:          true,
 			logContains:        []string{"Report received via Reporting API", "default-src"},
+			logExcludes:        nil,
 		},
 		{
 			name:   "Unexpected content type logs warning but processes request",
@@ -94,6 +119,7 @@ func Test_application_reportingAPI(t *testing.T) {
 			shouldLog:          true,
 			logContains: []string{"Report with unexpected content type",
 				"text/plain", "Report received via Reporting API"},
+			logExcludes: nil,
 		},
 	}
 
@@ -136,6 +162,11 @@ func Test_application_reportingAPI(t *testing.T) {
 				for _, expectedContent := range tt.logContains {
 					if !strings.Contains(logOutput, expectedContent) {
 						t.Errorf("Expected log to contain '%s', but log output was: %s", expectedContent, logOutput)
+					}
+				}
+				for _, forbidden := range tt.logExcludes {
+					if strings.Contains(logOutput, forbidden) {
+						t.Errorf("Expected log to NOT contain '%s', but log output was: %s", forbidden, logOutput)
 					}
 				}
 			}
