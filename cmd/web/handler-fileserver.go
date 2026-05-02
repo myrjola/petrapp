@@ -24,6 +24,13 @@ type notFoundInterceptor struct {
 func (i *notFoundInterceptor) WriteHeader(status int) {
 	if status == http.StatusNotFound {
 		i.is404 = true
+		// http.FileServer's 404 path goes through http.Error, which sets
+		// Content-Type: text/plain and X-Content-Type-Options: nosniff
+		// before WriteHeader. Remove them so the custom 404 template can
+		// be rendered as text/html.
+		h := i.Header()
+		h.Del("Content-Type")
+		h.Del("X-Content-Type-Options")
 		return
 	}
 	i.headerWritten = true

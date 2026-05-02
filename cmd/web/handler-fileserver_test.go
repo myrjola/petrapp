@@ -53,21 +53,15 @@ func Test_fileServer_missingFileReturnsCustom404(t *testing.T) {
 	if !strings.Contains(bodyStr, "Page Not Found") {
 		t.Errorf("Expected custom 404 body to contain 'Page Not Found', got: %s", bodyStr)
 	}
-}
-
-func Test_fileServer_directoryTraversalReturns404(t *testing.T) {
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
-	if err != nil {
-		t.Fatalf("Failed to start server: %v", err)
-	}
-
-	resp, err := server.Client().Get(t.Context(), "/../../../etc/passwd")
-	if err != nil {
-		t.Fatalf("Failed to GET traversal path: %v", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("Expected 404 or 400 for directory traversal, got %d", resp.StatusCode)
+	if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Errorf("Expected text/html Content-Type for custom 404 page, got %q", ct)
 	}
 }
+
+// Directory-traversal protection is defense-in-depth: (1) net/url client
+// normalizes "/../../etc/passwd" to "/etc/passwd" before the request is
+// sent, (2) http.ServeMux cleans paths server-side, (3) http.FileServer
+// further rejects ".." segments in the cleaned path. The first layer
+// alone makes traversal unobservable through the e2etest client, so an
+// HTTP-level test would either pass trivially (proving nothing) or
+// require a hand-crafted net.Conn to bypass URL normalization. Skipping.
