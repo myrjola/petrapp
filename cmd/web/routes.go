@@ -8,93 +8,66 @@ import (
 func (app *application) routes() (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
-	var (
-		withoutMaintenanceMode = func(next http.Handler) http.Handler {
-			return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
-				commonContext(app.timeout(next)))))
-		}
-		shared = func(next http.Handler) http.Handler {
-			return withoutMaintenanceMode(app.maintenanceMode(setInvalidationCookieOnPost(next)))
-		}
-		noAuth = func(next http.Handler) http.Handler {
-			return app.recoverPanic(withoutMaintenanceMode(next))
-		}
-		sessionShared = func(next http.Handler) http.Handler {
-			return app.sessionManager.LoadAndSave(
-				app.webAuthnHandler.AuthenticateMiddleware(shared(next)))
-		}
-		session = func(next http.Handler) http.Handler {
-			return app.recoverPanic(noCache(sessionShared(next)))
-		}
-		noStoreSession = func(next http.Handler) http.Handler {
-			return app.recoverPanic(noStore(sessionShared(next)))
-		}
-		mustSession = func(next http.Handler) http.Handler {
-			return session(app.mustAuthenticate(next))
-		}
-		mustAdmin = func(next http.Handler) http.Handler {
-			return mustSession(app.mustAdmin(next))
-		}
-	)
-
-	mux.Handle("GET /workouts/{date}", mustSession(http.HandlerFunc(app.workoutGET)))
-	mux.Handle("POST /workouts/{date}/start", mustSession(http.HandlerFunc(app.workoutStartPOST)))
-	mux.Handle("POST /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletePOST)))
-	mux.Handle("GET /workouts/{date}/complete", mustSession(http.HandlerFunc(app.workoutCompletionGET)))
+	mux.Handle("GET /workouts/{date}", app.mustSessionStack(http.HandlerFunc(app.workoutGET)))
+	mux.Handle("POST /workouts/{date}/start", app.mustSessionStack(http.HandlerFunc(app.workoutStartPOST)))
+	mux.Handle("POST /workouts/{date}/complete", app.mustSessionStack(http.HandlerFunc(app.workoutCompletePOST)))
+	mux.Handle("GET /workouts/{date}/complete", app.mustSessionStack(http.HandlerFunc(app.workoutCompletionGET)))
 
 	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}",
-		mustSession(http.HandlerFunc(app.exerciseSetGET)))
+		app.mustSessionStack(http.HandlerFunc(app.exerciseSetGET)))
 	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/sets/{setIndex}/update",
-		mustSession(http.HandlerFunc(app.exerciseSetUpdatePOST)))
+		app.mustSessionStack(http.HandlerFunc(app.exerciseSetUpdatePOST)))
 	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/warmup/complete",
-		mustSession(http.HandlerFunc(app.exerciseSetWarmupCompletePOST)))
+		app.mustSessionStack(http.HandlerFunc(app.exerciseSetWarmupCompletePOST)))
 	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}/info",
-		mustSession(http.HandlerFunc(app.exerciseInfoGET)))
+		app.mustSessionStack(http.HandlerFunc(app.exerciseInfoGET)))
 	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}/swap",
-		mustSession(http.HandlerFunc(app.workoutSwapExerciseGET)))
+		app.mustSessionStack(http.HandlerFunc(app.workoutSwapExerciseGET)))
 	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/swap",
-		mustSession(http.HandlerFunc(app.workoutSwapExercisePOST)))
+		app.mustSessionStack(http.HandlerFunc(app.workoutSwapExercisePOST)))
 	mux.Handle("GET /workouts/{date}/add-exercise",
-		mustSession(http.HandlerFunc(app.workoutAddExerciseGET)))
+		app.mustSessionStack(http.HandlerFunc(app.workoutAddExerciseGET)))
 	mux.Handle("POST /workouts/{date}/add-exercise",
-		mustSession(http.HandlerFunc(app.workoutAddExercisePOST)))
-	mux.Handle("POST /workouts/{date}/feedback/{difficulty}", mustSession(http.HandlerFunc(app.workoutFeedbackPOST)))
+		app.mustSessionStack(http.HandlerFunc(app.workoutAddExercisePOST)))
+	mux.Handle("POST /workouts/{date}/feedback/{difficulty}",
+		app.mustSessionStack(http.HandlerFunc(app.workoutFeedbackPOST)))
 
-	mux.Handle("GET /schedule", mustSession(http.HandlerFunc(app.scheduleGET)))
-	mux.Handle("POST /schedule", mustSession(http.HandlerFunc(app.schedulePOST)))
+	mux.Handle("GET /schedule", app.mustSessionStack(http.HandlerFunc(app.scheduleGET)))
+	mux.Handle("POST /schedule", app.mustSessionStack(http.HandlerFunc(app.schedulePOST)))
 
-	mux.Handle("GET /preferences", mustSession(http.HandlerFunc(app.preferencesGET)))
-	mux.Handle("POST /preferences", mustSession(http.HandlerFunc(app.preferencesPOST)))
-	mux.Handle("GET /preferences/export-data", mustSession(http.HandlerFunc(app.exportUserDataGET)))
-	mux.Handle("POST /preferences/delete-user", mustSession(http.HandlerFunc(app.deleteUserPOST)))
+	mux.Handle("GET /preferences", app.mustSessionStack(http.HandlerFunc(app.preferencesGET)))
+	mux.Handle("POST /preferences", app.mustSessionStack(http.HandlerFunc(app.preferencesPOST)))
+	mux.Handle("GET /preferences/export-data", app.mustSessionStack(http.HandlerFunc(app.exportUserDataGET)))
+	mux.Handle("POST /preferences/delete-user", app.mustSessionStack(http.HandlerFunc(app.deleteUserPOST)))
 
-	mux.Handle("POST /api/registration/start", noStoreSession(http.HandlerFunc(app.beginRegistration)))
-	mux.Handle("POST /api/registration/finish", noStoreSession(http.HandlerFunc(app.finishRegistration)))
-	mux.Handle("POST /api/login/start", noStoreSession(http.HandlerFunc(app.beginLogin)))
-	mux.Handle("POST /api/login/finish", noStoreSession(http.HandlerFunc(app.finishLogin)))
-	mux.Handle("POST /api/logout", noStoreSession(http.HandlerFunc(app.logout)))
+	mux.Handle("POST /api/registration/start", app.noStoreSessionStack(http.HandlerFunc(app.beginRegistration)))
+	mux.Handle("POST /api/registration/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishRegistration)))
+	mux.Handle("POST /api/login/start", app.noStoreSessionStack(http.HandlerFunc(app.beginLogin)))
+	mux.Handle("POST /api/login/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishLogin)))
+	mux.Handle("POST /api/logout", app.noStoreSessionStack(http.HandlerFunc(app.logout)))
 
-	mux.Handle("GET /api/healthy", session(http.HandlerFunc(app.healthy)))
-	mux.Handle("POST /api/reports", noAuth(http.HandlerFunc(app.reportingAPI)))
-	mux.Handle("GET /api/test/timeout", noAuth(http.HandlerFunc(app.testTimeout)))
+	mux.Handle("GET /api/healthy", app.sessionStack(http.HandlerFunc(app.healthy)))
+	mux.Handle("POST /api/reports", app.noAuthStack(http.HandlerFunc(app.reportingAPI)))
+	mux.Handle("GET /api/test/timeout", app.noAuthStack(http.HandlerFunc(app.testTimeout)))
 
-	mux.Handle("GET /admin/exercises", mustAdmin(http.HandlerFunc(app.adminExercisesGET)))
-	mux.Handle("GET /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseEditGET)))
-	mux.Handle("POST /admin/exercises/{id}", mustAdmin(http.HandlerFunc(app.adminExerciseUpdatePOST)))
-	mux.Handle("POST /admin/exercises/generate", mustAdmin(http.HandlerFunc(app.adminExerciseGeneratePOST)))
+	mux.Handle("GET /admin/exercises", app.mustAdminStack(http.HandlerFunc(app.adminExercisesGET)))
+	mux.Handle("GET /admin/exercises/{id}", app.mustAdminStack(http.HandlerFunc(app.adminExerciseEditGET)))
+	mux.Handle("POST /admin/exercises/{id}", app.mustAdminStack(http.HandlerFunc(app.adminExerciseUpdatePOST)))
+	mux.Handle("POST /admin/exercises/generate", app.mustAdminStack(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
-	mux.Handle("GET /admin/feature-flags", session(http.HandlerFunc(app.adminFeatureFlagsGET)))
-	mux.Handle("POST /admin/feature-flags/{name}/toggle", mustAdmin(http.HandlerFunc(app.adminFeatureFlagTogglePOST)))
+	mux.Handle("GET /admin/feature-flags", app.sessionStack(http.HandlerFunc(app.adminFeatureFlagsGET)))
+	mux.Handle("POST /admin/feature-flags/{name}/toggle",
+		app.mustAdminStack(http.HandlerFunc(app.adminFeatureFlagTogglePOST)))
 
 	// Privacy page
-	mux.Handle("GET /privacy", session(http.HandlerFunc(app.privacy)))
+	mux.Handle("GET /privacy", app.sessionStack(http.HandlerFunc(app.privacy)))
 
 	// Developer-only design-token reference. Gated inside the handler on app.devMode
 	// so prod returns 404; route is registered unconditionally to keep startup simple.
-	mux.Handle("GET /dev/styleguide", session(http.HandlerFunc(app.styleguideGET)))
+	mux.Handle("GET /dev/styleguide", app.sessionStack(http.HandlerFunc(app.styleguideGET)))
 
 	// Home route (most specific)
-	mux.Handle("GET /{$}", session(http.HandlerFunc(app.home)))
+	mux.Handle("GET /{$}", app.sessionStack(http.HandlerFunc(app.home)))
 
 	// File server with custom 404 handling
 	fileServerHandler, err := app.fileServerHandler()
