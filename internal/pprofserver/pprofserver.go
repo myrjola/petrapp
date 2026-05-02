@@ -32,15 +32,22 @@ func newServer(addr string) *http.Server {
 	}
 }
 
-func listenAndServe(addr string) (err error) {
+// shutdownTimeout bounds how long Shutdown waits for in-flight pprof requests
+// to finish (profiles can take a while). Long enough for a 30s CPU profile to
+// drain, short enough that process exit isn't blocked on a stuck client.
+const shutdownTimeout = 35 * time.Second
+
+func listenAndServe(ctx context.Context, addr string) error {
 	srv := newServer(addr)
-	defer func(srv *http.Server) {
-		shutdownErr := srv.Shutdown(context.Background())
-		if shutdownErr != nil {
-			err = fmt.Errorf("pprof server shutdown: %w", errors.Join(shutdownErr, err))
-		}
-	}(srv)
-	err = srv.ListenAndServe()
+	go func() {
+		<-ctx.Done()
+		// Detach from ctx (which is already done) so Shutdown actually has
+		// time to drain in-flight requests.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+	err := srv.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
@@ -53,7 +60,7 @@ func listenAndServe(addr string) (err error) {
 func Launch(ctx context.Context, addr string, logger *slog.Logger) {
 	go func() {
 		logger.LogAttrs(ctx, slog.LevelInfo, "starting pprof server", slog.String("addr", addr))
-		if err := listenAndServe(addr); err != nil {
+		if err := listenAndServe(ctx, addr); err != nil {
 			logger.LogAttrs(ctx, slog.LevelError, "failed starting pprof server", slog.Any("error", err))
 		}
 	}()
