@@ -341,8 +341,14 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	}()
 
 	var exerciseSets []exerciseSetAggregate
-	var current exerciseSetAggregate
-	current.ID = -1
+	// Nil pointer means "no group started yet" — preferred over an ID=-1 sentinel
+	// because it makes the empty case impossible to confuse with a real row.
+	var current *exerciseSetAggregate
+	flush := func() {
+		if current != nil {
+			exerciseSets = append(exerciseSets, *current)
+		}
+	}
 
 	for rows.Next() {
 		var row loadExerciseSetsRow
@@ -352,13 +358,13 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
 
-		if row.weID != current.ID {
-			if current.ID != -1 {
-				exerciseSets = append(exerciseSets, current)
+		if current == nil || row.weID != current.ID {
+			flush()
+			started, startErr := r.startAggregate(row)
+			if startErr != nil {
+				return nil, startErr
 			}
-			if current, err = r.startAggregate(row); err != nil {
-				return nil, err
-			}
+			current = &started
 		}
 
 		// LEFT JOIN can yield a workout_exercise row with no sets (set_number IS NULL).
@@ -372,10 +378,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		}
 		current.Sets = append(current.Sets, set)
 	}
-
-	if current.ID != -1 {
-		exerciseSets = append(exerciseSets, current)
-	}
+	flush()
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
