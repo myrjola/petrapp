@@ -141,12 +141,20 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	return app.configureAndStartServer(ctx, listener, actualAddr, routes)
 }
 
+const (
+	// sessionStoreCleanupInterval bounds how often expired sessions are
+	// pruned from sqlite3store. Daily is plenty given Lifetime below.
+	sessionStoreCleanupInterval = 24 * time.Hour
+
+	// sessionLifetime keeps users logged in across mid-workout sessions
+	// so a 7am passkey login doesn't expire before the evening's lift.
+	sessionLifetime = 7 * 24 * time.Hour
+)
+
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 	sessionManager := scs.New()
-	sessionManager.Store = sqlite3store.NewWithCleanupInterval(dbs.ReadWrite, 24*time.Hour) //nolint:mnd // day
-	// One week. Keeps users logged in across mid-workout sessions so a 7am
-	// passkey login doesn't expire before the evening's lift.
-	sessionManager.Lifetime = 7 * 24 * time.Hour //nolint:mnd // one week.
+	sessionManager.Store = sqlite3store.NewWithCleanupInterval(dbs.ReadWrite, sessionStoreCleanupInterval)
+	sessionManager.Lifetime = sessionLifetime
 	sessionManager.Cookie.Persist = true
 	sessionManager.Cookie.Secure = true
 	sessionManager.Cookie.HttpOnly = true

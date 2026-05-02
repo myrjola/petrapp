@@ -162,6 +162,10 @@ linters:
     inamedparam:
       skip-single-param: true
     mnd:
+      ignored-numbers:
+        - "6"   # days from Monday to Sunday
+        - "7"   # days in a week
+        - "24"  # hours in a day
       ignored-functions:
         - args.Error
         - flag.Arg

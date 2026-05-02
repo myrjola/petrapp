@@ -610,7 +610,7 @@ func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 // The ON DELETE CASCADE foreign keys clear related workout_exercise and exercise_sets rows.
 func (r *sqliteSessionRepository) DeleteWeek(ctx context.Context, monday time.Time) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
-	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
+	sunday := monday.AddDate(0, 0, 6)
 	if _, err := r.db.ReadWrite.ExecContext(ctx, `
 		DELETE FROM workout_sessions
 		WHERE user_id = ? AND workout_date >= ? AND workout_date <= ?`,

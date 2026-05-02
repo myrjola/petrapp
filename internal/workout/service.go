@@ -60,7 +60,7 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) er
 // sessions and regenerates automatically.
 func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 	monday := mondayOf(time.Now())
-	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
+	sunday := monday.AddDate(0, 0, 6)
 
 	existing, err := s.repo.sessions.List(ctx, monday)
 	if err != nil {
@@ -91,10 +91,10 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 	now := time.Now()
 	offset := int(time.Monday - now.Weekday())
 	if offset > 0 {
-		offset = -6 //nolint:mnd // If today is Sunday, adjust to get last Monday.
+		offset = -6
 	}
-	monday := now.AddDate(0, 0, offset).Truncate(24 * time.Hour) //nolint:mnd // 24 hours in a day.
-	sunday := monday.AddDate(0, 0, 6)                            //nolint:mnd // 6 days after Monday is Sunday.
+	monday := now.AddDate(0, 0, offset).Truncate(24 * time.Hour)
+	sunday := monday.AddDate(0, 0, 6)
 
 	// Check for existing sessions this week.
 	existing, err := s.repo.sessions.List(ctx, monday)
@@ -115,7 +115,7 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 	}
 
 	// Build 7-day schedule: sessions from DB for scheduled days, empty for rest days.
-	workouts := make([]Session, 7) //nolint:mnd // 7 days in a week.
+	workouts := make([]Session, 7)
 	for i := range 7 {
 		day := monday.AddDate(0, 0, i)
 		sessionAggr, getErr := s.repo.sessions.Get(ctx, day)
@@ -267,9 +267,9 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 func mondayOf(date time.Time) time.Time {
 	offset := int(time.Monday - date.Weekday())
 	if offset > 0 {
-		offset = -6 //nolint:mnd // If date is Sunday, step back to the preceding Monday.
+		offset = -6
 	}
-	return date.AddDate(0, 0, offset).Truncate(24 * time.Hour) //nolint:mnd // 24 hours in a day.
+	return date.AddDate(0, 0, offset).Truncate(24 * time.Hour)
 }
 
 // StartSession starts a new workout session.
@@ -280,7 +280,7 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	if listErr != nil {
 		return fmt.Errorf("list sessions for week of %s: %w", formatDate(date), listErr)
 	}
-	sunday := monday.AddDate(0, 0, 6) //nolint:mnd // 6 days after Monday is Sunday.
+	sunday := monday.AddDate(0, 0, 6)
 	weekCount := 0
 	for _, sess := range existing {
 		if !sess.Date.After(sunday) {
