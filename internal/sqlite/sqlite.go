@@ -27,6 +27,13 @@ type Database struct {
 	ReadOnly  *sql.DB
 	logger    *slog.Logger
 	once      sync.Once
+
+	// cancelOptimizer stops the background optimizer goroutine started by
+	// NewDatabase. optimizerDone is closed when that goroutine returns so Close
+	// can wait for it before tearing down the connections (and, in tests, before
+	// the *testing.T logger sink is closed by t.Cleanup).
+	cancelOptimizer context.CancelFunc
+	optimizerDone   chan struct{}
 }
 
 // NewDatabase connects to a database, migrates the schema, and applies fixtures.
@@ -54,7 +61,13 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 		return nil, fmt.Errorf("apply fixtures: %w", err)
 	}
 
-	go db.startDatabaseOptimizer(ctx)
+	optimizerCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored on db, invoked in Close.
+	db.cancelOptimizer = cancel
+	db.optimizerDone = make(chan struct{})
+	go func() {
+		defer close(db.optimizerDone)
+		db.startDatabaseOptimizer(optimizerCtx)
+	}()
 
 	return db, nil
 }
@@ -163,17 +176,28 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 	readDB.SetConnMaxIdleTime(time.Hour)
 
 	return &Database{
-		ReadWrite: readWriteDB,
-		ReadOnly:  readDB,
-		logger:    logger,
-		once:      sync.Once{},
+		ReadWrite:       readWriteDB,
+		ReadOnly:        readDB,
+		logger:          logger,
+		once:            sync.Once{},
+		cancelOptimizer: nil,
+		optimizerDone:   nil,
 	}, nil
 }
 
 // Close closes the database connections.
+//
+// If NewDatabase started the background optimizer goroutine, Close cancels it
+// and waits for it to return before closing the underlying *sql.DB handles. The
+// connect helper does not start that goroutine, so direct callers in package
+// tests still close cleanly.
 func (db *Database) Close() error {
 	var err error
 	db.once.Do(func() {
+		if db.cancelOptimizer != nil {
+			db.cancelOptimizer()
+			<-db.optimizerDone
+		}
 		err = errors.Join(db.ReadOnly.Close(), db.ReadWrite.Close())
 	})
 	return err
