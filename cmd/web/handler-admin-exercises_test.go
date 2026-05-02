@@ -147,6 +147,51 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 	})
 
+	// User input errors must surface as a 200 with a flash message, not a 500.
+	t.Run("Empty name shows validation error instead of 500", func(t *testing.T) {
+		if doc, err = client.GetDoc(ctx, "/admin/exercises"); err != nil {
+			t.Fatalf("Failed to get admin exercises page: %v", err)
+		}
+
+		var editURL string
+		doc.Find("tr:contains('Updated Test Squat') td a:contains('Edit')").Each(
+			func(_ int, s *goquery.Selection) {
+				if href, exists := s.Attr("href"); exists {
+					editURL = href
+				}
+			})
+		if editURL == "" {
+			t.Fatalf("Edit link for Updated Test Squat not found")
+		}
+
+		if doc, err = client.GetDoc(ctx, editURL); err != nil {
+			t.Fatalf("Failed to get exercise edit page: %v", err)
+		}
+
+		formData := map[string]string{
+			"Name":        "",
+			"Category":    "lower",
+			"Type":        "weighted",
+			"Primary":     "Quads,Glutes",
+			"Secondary":   "",
+			"Description": "",
+		}
+		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
+			t.Fatalf("Failed to submit empty-name update: %v", err)
+		}
+
+		// Should land back on the edit page with an alert, not a 500 page.
+		if doc.Find("h1:contains('Edit Exercise')").Length() == 0 {
+			t.Errorf("Expected to land back on the edit page after validation error")
+		}
+		if doc.Find("[role=alert]").Length() == 0 {
+			t.Errorf("Expected validation alert on the edit page")
+		}
+		if !strings.Contains(doc.Find("[role=alert]").Text(), "Name is required") {
+			t.Errorf("Expected 'Name is required' in alert, got: %s", doc.Find("[role=alert]").Text())
+		}
+	})
+
 	// Verifies the form size limit (largeMaxFormSize) is large enough to
 	// accept descriptions up to the schema's 20KB cap with headroom for
 	// other fields and form encoding overhead.

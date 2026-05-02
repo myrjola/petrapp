@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -30,6 +29,7 @@ type exerciseEditTemplateData struct {
 	Exercise               workout.Exercise
 	PrimaryMuscleOptions   []MuscleGroupOption
 	SecondaryMuscleOptions []MuscleGroupOption
+	ValidationError        string
 }
 
 // adminExercisesGET handles GET requests to the exercise admin page.
@@ -104,6 +104,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		Exercise:               exercise,
 		PrimaryMuscleOptions:   primaryMuscleOptions,
 		SecondaryMuscleOptions: secondaryMuscleOptions,
+		ValidationError:        app.popFlashError(r.Context()),
 	}
 
 	app.render(w, r, http.StatusOK, "admin-exercise-edit", data)
@@ -134,26 +135,32 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	primaryMuscles := r.PostForm["primary_muscles"]
 	secondaryMuscles := r.PostForm["secondary_muscles"]
 
-	// Validate form data
+	// Validate form data. These are user input errors, not server errors —
+	// surface them via the flash + redirect pattern instead of a 500.
+	editPath := fmt.Sprintf("/admin/exercises/%d", id)
 	if name == "" {
-		app.serverError(w, r, errors.New("name is required"))
+		app.putFlashError(r.Context(), "Name is required.")
+		redirect(w, r, editPath)
 		return
 	}
 
 	if category != workout.CategoryFullBody && category != workout.CategoryUpper && category != workout.CategoryLower {
-		app.serverError(w, r, errors.New("invalid category"))
+		app.putFlashError(r.Context(), "Category must be one of full body, upper, or lower.")
+		redirect(w, r, editPath)
 		return
 	}
 
 	if exerciseType != workout.ExerciseTypeWeighted &&
 		exerciseType != workout.ExerciseTypeBodyweight &&
 		exerciseType != workout.ExerciseTypeAssisted {
-		app.serverError(w, r, errors.New("invalid exercise type"))
+		app.putFlashError(r.Context(), "Exercise type must be weighted, bodyweight, or assisted.")
+		redirect(w, r, editPath)
 		return
 	}
 
 	if len(primaryMuscles) == 0 {
-		app.serverError(w, r, errors.New("primary muscle groups are required"))
+		app.putFlashError(r.Context(), "At least one primary muscle group is required.")
+		redirect(w, r, editPath)
 		return
 	}
 

@@ -2,6 +2,7 @@
 {{ define "page" }}
     <main>
         <h1>Edit Exercise: {{ .Exercise.Name }}</h1>
+        {{ if .ValidationError }}<p role="alert">{{ .ValidationError }}</p>{{ end }}
         <form method="post" action="/admin/exercises/{{ .Exercise.ID }}">
             <div>
                 <label for="name">Name:</label>
