@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -212,6 +213,15 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		}
 		compatibleExercises = append(compatibleExercises, exercise)
 	}
+
+	sort.SliceStable(compatibleExercises, func(i, j int) bool {
+		si := workout.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[i])
+		sj := workout.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[j])
+		if si != sj {
+			return si > sj
+		}
+		return compatibleExercises[i].Name < compatibleExercises[j].Name
+	})
 
 	data := exerciseSwapTemplateData{
 		BaseTemplateData:    newBaseTemplateData(r),

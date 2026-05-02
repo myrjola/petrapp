@@ -1,8 +1,10 @@
 package main
 
 import (
+	"database/sql"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/workout"
 )
 
 func Test_application_exerciseSet(t *testing.T) {
@@ -577,6 +580,171 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 	backButtons := doc.Find("button:contains('Go Back')")
 	if backButtons.Length() == 0 {
 		t.Error("Expected custom 404 page to contain 'Go Back' button")
+	}
+}
+
+// Test_application_workoutSwapExercise_sorts_by_similarity verifies that the
+// swap page renders compatible exercises in descending order of
+// SwapSimilarityScore against the current slot's exercise, with alphabetical
+// tie-breaks. Reads muscle-group data from the test DB so the assertion
+// tracks fixture changes automatically.
+func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("Submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("Start workout: %v", err)
+	}
+
+	var slotURL string
+	doc.Find("a.exercise").Each(func(i int, s *goquery.Selection) {
+		if i == 0 {
+			if href, exists := s.Attr("href"); exists {
+				slotURL = href
+			}
+		}
+	})
+	if slotURL == "" {
+		t.Fatal("No exercise found on workout page")
+	}
+
+	if doc, err = client.GetDoc(ctx, slotURL+"/swap"); err != nil {
+		t.Fatalf("Get swap page: %v", err)
+	}
+
+	// Recover the current exercise's name from the rendered Current Exercise
+	// section so we can identify it in the DB load below.
+	currentName := strings.TrimSpace(doc.Find(".current-exercise .name").Text())
+	if currentName == "" {
+		t.Fatal("Could not locate current exercise name on swap page")
+	}
+
+	// Load every exercise plus its muscle groups directly from the test
+	// database. We build minimal workout.Exercise values populated with just
+	// the fields SwapSimilarityScore reads (Category, PrimaryMuscleGroups,
+	// SecondaryMuscleGroups, plus ID/Name for lookup and tie-breaks).
+	db := server.DB()
+	rows, err := db.QueryContext(ctx, `
+		SELECT e.id, e.name, e.category, emg.muscle_group_name, emg.is_primary
+		FROM exercises e
+		LEFT JOIN exercise_muscle_groups emg ON emg.exercise_id = e.id
+		ORDER BY e.id`)
+	if err != nil {
+		t.Fatalf("Query exercises: %v", err)
+	}
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			t.Errorf("Close rows: %v", cerr)
+		}
+	}()
+	byID := make(map[int]workout.Exercise)
+	byName := make(map[string]workout.Exercise)
+	for rows.Next() {
+		var (
+			id        int
+			name      string
+			category  string
+			muscle    sql.NullString
+			isPrimary sql.NullBool
+		)
+		if err = rows.Scan(&id, &name, &category, &muscle, &isPrimary); err != nil {
+			t.Fatalf("Scan exercise row: %v", err)
+		}
+		ex, ok := byID[id]
+		if !ok {
+			ex = workout.Exercise{
+				ID:                    id,
+				Name:                  name,
+				Category:              workout.Category(category),
+				ExerciseType:          "",
+				DescriptionMarkdown:   "",
+				PrimaryMuscleGroups:   nil,
+				SecondaryMuscleGroups: nil,
+			}
+		}
+		if muscle.Valid {
+			if isPrimary.Valid && isPrimary.Bool {
+				ex.PrimaryMuscleGroups = append(ex.PrimaryMuscleGroups, muscle.String)
+			} else {
+				ex.SecondaryMuscleGroups = append(ex.SecondaryMuscleGroups, muscle.String)
+			}
+		}
+		byID[id] = ex
+		byName[name] = ex
+	}
+	if err = rows.Err(); err != nil {
+		t.Fatalf("Iterate exercise rows: %v", err)
+	}
+	current, ok := byName[currentName]
+	if !ok {
+		t.Fatalf("Current exercise %q not found in DB", currentName)
+	}
+
+	// Walk rendered options in DOM order, capturing (id, name).
+	type rendered struct {
+		id   int
+		name string
+	}
+	var renderedOpts []rendered
+	doc.Find(".exercise-option").Each(func(_ int, s *goquery.Selection) {
+		idStr, _ := s.Find("input[name='new_exercise_id']").Attr("value")
+		id, convErr := strconv.Atoi(idStr)
+		if convErr != nil {
+			return
+		}
+		name := strings.TrimSpace(s.Find(".exercise-name").Text())
+		renderedOpts = append(renderedOpts, rendered{id: id, name: name})
+	})
+	if len(renderedOpts) < 2 {
+		t.Fatalf("Need at least 2 rendered options to assert ordering, got %d", len(renderedOpts))
+	}
+
+	// Build expected order: same set of ids, sorted by score desc then name asc.
+	expected := make([]rendered, len(renderedOpts))
+	copy(expected, renderedOpts)
+	sort.SliceStable(expected, func(i, j int) bool {
+		si := workout.SwapSimilarityScore(current, byID[expected[i].id])
+		sj := workout.SwapSimilarityScore(current, byID[expected[j].id])
+		if si != sj {
+			return si > sj
+		}
+		return expected[i].name < expected[j].name
+	})
+
+	for i := range renderedOpts {
+		if renderedOpts[i].id != expected[i].id {
+			gotNames := make([]string, len(renderedOpts))
+			wantNames := make([]string, len(expected))
+			for k := range renderedOpts {
+				gotNames[k] = renderedOpts[k].name
+				wantNames[k] = expected[k].name
+			}
+			t.Errorf("Rendered order does not match score-sorted order.\n got: %v\nwant: %v",
+				gotNames, wantNames)
+			return
+		}
 	}
 }
 
