@@ -55,6 +55,13 @@ When you need a premigration:
 See git history for `internal/sqlite/premigrate.go` (workout_exercise stable-id migration,
 PR #75) for a worked example.
 
+### Fixtures and conflict handling
+
+`fixtures.sql` is re-applied on every boot (`sqlite.go` ExecContext). Production may hold rows
+the fixture doesn't know about — manually backfilled data — and the seed must coexist with them.
+When making changes to fixtures, consider using fly-ops skill to fetch a production snapshot to verify
+that you won't destroy existing data.
+
 ## Table Design Patterns
 
 ### STRICT Mode and Constraints

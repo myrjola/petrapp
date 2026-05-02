@@ -102,7 +102,7 @@ endif
 	@TS=$$(date -u +%Y%m%dT%H%M%SZ) ; \
 	  REMOTE=/tmp/petrapp-write-$$TS.sql ; \
 	  echo "→ uploading $(SCRIPT) → $$REMOTE on $(FLY_APP)" ; \
-	  printf 'put %s %s\n' "$(SCRIPT)" "$$REMOTE" | fly ssh sftp shell --app $(FLY_APP) ; \
+	  printf 'put %s %s\n' "$(SCRIPT)" "$$REMOTE" | fly ssh sftp shell --app $(FLY_APP) --user petrapp ; \
 	  echo "→ executing on $(FLY_APP)..." ; \
 	  fly ssh console --app $(FLY_APP) --user petrapp \
 	    -C "/bin/sh -c '/usr/bin/sqlite3 $(FLY_DB_PATH) < $$REMOTE && rm -f $$REMOTE'"

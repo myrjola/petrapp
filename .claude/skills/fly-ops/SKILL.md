@@ -23,6 +23,8 @@ allowed-tools:
   - Bash(fly logs*)
   - Bash(fly proxy*)
   - Bash(fly releases*)
+  - Bash(fly ssh console*)
+  - Bash(fly ssh sftp*)
   - Bash(go tool pprof*)
 ---
 
@@ -173,6 +175,43 @@ fly ssh console --app petra --user petrapp \
 
 Pause and confirm with the user before any restore — it overwrites the live DB.
 
+### 5. Recover deleted/overwritten data via Litestream point-in-time restore
+
+When you need data that's no longer in the live DB but is still within Litestream's retention
+window (`litestream.yml`: 168h / 7 days for daily snapshots, 24h for hourly, 1h for 5-min
+levels), restore a snapshot to a *scratch path*, query it read-only, then clean up. The make
+targets don't cover this — raw `fly ssh console` is the right tool here.
+
+```bash
+# Wake first; the litestream binary needs the machine running.
+make fly-wake FLY_APP=petra
+
+# Restore the DB as it was at a chosen UTC timestamp to /tmp/recovery.sqlite3.
+# Never restore over /data/petrapp.sqlite3 — always to a scratch path under /tmp.
+fly ssh console --app petra --user petrapp -C \
+  "/dist/litestream restore -config /etc/litestream.yml \
+     -timestamp 2026-05-01T11:00:00Z \
+     -o /tmp/recovery.sqlite3 \
+     /data/petrapp.sqlite3"
+
+# Query the scratch DB read-only. Upload an extract script via sftp if needed.
+fly ssh console --app petra --user petrapp -C \
+  "/usr/bin/sqlite3 -readonly /tmp/recovery.sqlite3 'SELECT ...'"
+
+# Clean up. The restored DB is petrapp-owned (since litestream ran as petrapp),
+# so the cleanup command uses --user petrapp too.
+fly ssh console --app petra --user petrapp -C "/bin/sh -c 'rm -f /tmp/recovery.sqlite3'"
+```
+
+Litestream binary lives at `/dist/litestream`; config at `/etc/litestream.yml` (set in the
+Dockerfile). The available subcommands are `databases | info | list | ltx | register | replicate
+| reset | restore | start | status | stop | sync | unregister | version` — there is no
+`snapshots` subcommand; use `ltx` to list available LTX files for the live DB.
+
+Pick the `-timestamp` carefully: it must be ISO 8601 UTC, and it must be inside Litestream's
+retention window (older data is gone). Restore is non-destructive when `-o` points to a scratch
+path, so you can iterate freely.
+
 ## Don't
 
 - Don't run `fly deploy`. Deployment is CI-driven (push to `main` → staging → prod; PR → review
@@ -181,7 +220,14 @@ Pause and confirm with the user before any restore — it overwrites the live DB
   silently target the wrong app if `FLY_APP` happens to be exported).
 - Don't use `make fly-sqlite3` from this skill — it's an interactive REPL meant for humans. Use
   `fly-sql-readonly` or `fly-sql-write` instead.
-- Don't re-implement the make targets with raw `fly ssh console` invocations. The targets handle
-  waking, backup, and cleanup; reproducing those by hand is error-prone.
+- Don't re-implement the make targets with raw `fly ssh console` for ops the targets already
+  cover (`fly-sql-readonly`, `fly-sql-write`, `fly-backup`, `fly-logs`, `fly-pprof-*`). The
+  targets handle waking, backup, and cleanup; reproducing those by hand is error-prone.
+  Raw `fly ssh console` *is* the right tool for ops the targets don't cover (litestream, file
+  inspection, ad-hoc shell) — but always prefix with `make fly-wake FLY_APP=$FLY_APP &&` so
+  the command doesn't time out against a cold machine.
+- Don't forget `--user petrapp` on `fly ssh console` and `fly ssh sftp shell` — the default is
+  root, and files written by root can't be cleaned up by the petrapp user later. The Makefile
+  passes `--user petrapp` for both; if you're invoking `fly ssh` by hand, do the same.
 - Don't paste the user's database contents into chat without confirmation — query results may
   contain PII.

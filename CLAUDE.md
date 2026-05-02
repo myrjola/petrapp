@@ -20,6 +20,14 @@ If a change is scoped to one or two layers (e.g. a UI-only tweak or a handler-on
 - Templates (`ui/templates/`) and static assets (`ui/static/`) are loaded from the filesystem at runtime (`os.DirFS`, not `//go:embed`). Editing a template and refreshing the browser is the whole dev loop — no rebuild needed.
 - In the Docker image, `main.css` and `main.js` are fingerprinted with an md5 hash at build time and `base.gohtml` is rewritten to reference the hashed names (see `Dockerfile`). Other static files (`webauthn.js`, icons) are served under their original names.
 
+## One-shot scripts and post-mortems
+
+Recovery SQL, one-shot prod migrations, and post-incident write-ups go in `docs/` named
+`YYYY-MM-DD-<slug>.{md,sql}`. Keep them checked in — they're the only durable record of
+manual prod surgery, and the `make migratetest` flow runs them only via the deploy migration
+path, not from `docs/`. Examples: `docs/2026-05-02-code-review-cleanup.md`,
+`docs/2026-05-02-recover-incline-dumbbell-bench-press.sql`.
+
 ## Build & Run Commands
 
 ```bash
