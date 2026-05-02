@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strings"
+	"regexp"
 )
 
 const usersTableName = "users"
@@ -383,11 +383,17 @@ func (db *Database) copyTableSchema(ctx context.Context, tx *sql.Tx, tableName s
 		return fmt.Errorf("get schema for table %s: %w", tableName, err)
 	}
 
-	// Replace the table name with export.tableName to create it in the export database
-	skipUntilLeftParens := strings.Index(createSQL, "(")
-	exportSQL := fmt.Sprintf("CREATE TABLE export.%s%s", tableName, createSQL[skipUntilLeftParens:])
-	_, err = tx.ExecContext(ctx, exportSQL)
+	// Rewrite "CREATE TABLE <name>" → "CREATE TABLE export.<name>" using a
+	// regex anchored to the table name. The previous string.Index(createSQL, "(")
+	// approach would silently produce malformed SQL if anyone ever introduced
+	// whitespace or comments between the table name and the column list, since
+	// sqlite_master.sql does not normalise the original DDL.
+	re, err := regexp.Compile(`(?i)CREATE\s+TABLE\s+"?` + regexp.QuoteMeta(tableName) + `"?`)
 	if err != nil {
+		return fmt.Errorf("compile rename regex for %s: %w", tableName, err)
+	}
+	exportSQL := re.ReplaceAllString(createSQL, "CREATE TABLE export."+tableName)
+	if _, err = tx.ExecContext(ctx, exportSQL); err != nil {
 		return fmt.Errorf("create table schema in export db: %w", err)
 	}
 
