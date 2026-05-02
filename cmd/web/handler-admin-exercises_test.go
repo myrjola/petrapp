@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
@@ -143,6 +144,56 @@ func Test_application_adminExercises(t *testing.T) {
 		// Check that our exercise was updated
 		if doc.Find("td:contains('Updated Test Squat')").Length() == 0 {
 			t.Error("Expected to find the updated exercise name in the table")
+		}
+	})
+
+	// Verifies the form size limit (largeMaxFormSize) is large enough to
+	// accept descriptions up to the schema's 20KB cap with headroom for
+	// other fields and form encoding overhead.
+	t.Run("Edit exercise with 15KB description", func(t *testing.T) {
+		if doc, err = client.GetDoc(ctx, "/admin/exercises"); err != nil {
+			t.Fatalf("Failed to get admin exercises page: %v", err)
+		}
+
+		var editURL string
+		doc.Find("tr:contains('Updated Test Squat') td a:contains('Edit')").Each(
+			func(_ int, s *goquery.Selection) {
+				if href, exists := s.Attr("href"); exists {
+					editURL = href
+				}
+			})
+		if editURL == "" {
+			t.Fatalf("Edit link for Updated Test Squat not found")
+		}
+
+		if doc, err = client.GetDoc(ctx, editURL); err != nil {
+			t.Fatalf("Failed to get exercise edit page: %v", err)
+		}
+
+		const descriptionSize = 15 * 1024
+		largeDescription := strings.Repeat("a", descriptionSize)
+		formData := map[string]string{
+			"Name":        "Updated Test Squat",
+			"Category":    "lower",
+			"Type":        "weighted",
+			"Primary":     "Quads,Glutes",
+			"Secondary":   "Hamstrings,Calves,Abs,Lower Back",
+			"Description": largeDescription,
+		}
+		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
+			t.Fatalf("Failed to submit exercise update with large description: %v", err)
+		}
+		if doc.Find("h1").Text() != "Exercise Administration" {
+			t.Error("Expected to be redirected back to 'Exercise Administration' page")
+		}
+
+		// Round-trip: re-open the edit page and assert the description survived.
+		if doc, err = client.GetDoc(ctx, editURL); err != nil {
+			t.Fatalf("Failed to re-open exercise edit page: %v", err)
+		}
+		got := doc.Find("textarea[name='description']").Text()
+		if len(got) != descriptionSize {
+			t.Errorf("expected description length %d, got %d", descriptionSize, len(got))
 		}
 	})
 }

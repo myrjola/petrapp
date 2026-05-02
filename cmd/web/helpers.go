@@ -22,8 +22,11 @@ func (app *application) notFound(w http.ResponseWriter, r *http.Request) {
 // You can use it as follows before calling r.ParseForm(): r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize).
 const defaultMaxFormSize = 1024
 
-// largeMaxFormSize is a larger maximum size for form data when there's more content to be expected.
-const largeMaxFormSize = 1024 * 10
+// largeMaxFormSize is a larger maximum size for form data when there's more
+// content to be expected. Sized to accommodate the schema's 20KB exercise
+// description cap (internal/sqlite/schema.sql) plus headroom for other form
+// fields and form encoding overhead. Schema check stays as defense-in-depth.
+const largeMaxFormSize = 1024 * 32
 
 // redirect detects if the request is originating from a fetch API call or a top-level navigation and points the user
 // to the correct URL.
