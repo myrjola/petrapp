@@ -144,7 +144,9 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 	sessionManager := scs.New()
 	sessionManager.Store = sqlite3store.NewWithCleanupInterval(dbs.ReadWrite, 24*time.Hour) //nolint:mnd // day
-	sessionManager.Lifetime = 12 * time.Hour                                                //nolint:mnd // half a day
+	// One week. Keeps users logged in across mid-workout sessions so a 7am
+	// passkey login doesn't expire before the evening's lift.
+	sessionManager.Lifetime = 7 * 24 * time.Hour //nolint:mnd // one week.
 	sessionManager.Cookie.Persist = true
 	sessionManager.Cookie.Secure = true
 	sessionManager.Cookie.HttpOnly = true
