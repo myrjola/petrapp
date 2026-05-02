@@ -563,7 +563,7 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		  AND we.workout_date < ?
 		  AND es.completed_reps IS NOT NULL
 		  AND es.weight_kg IS NOT NULL
-		  AND es.signal IN ('on_target', 'too_light')
+		  AND es.signal IN ('on_target', 'too_light') -- NULL signals are excluded intentionally.
 		ORDER BY we.workout_date DESC, es.set_number DESC
 		LIMIT 1`,
 		userID, exerciseID, beforeDateStr).Scan(&weightKg, &periodType)

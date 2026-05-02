@@ -798,6 +798,42 @@ func Test_GetStartingWeight(t *testing.T) {
 	if got != 100.0 {
 		t.Errorf("today ignored: want 100.0, got %v", got)
 	}
+
+	// Insert a more recent strength session 3 days ago where every set was
+	// too_heavy. GetStartingWeight must skip it and fall back to the 7-days-ago
+	// session's latest successful set (100kg).
+	failDateStr := today.AddDate(0, 0, -3).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
+		userID, failDateStr)
+	if err != nil {
+		t.Fatalf("insert fail session: %v", err)
+	}
+	var weFailID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, failDateStr, exerciseID).Scan(&weFailID)
+	if err != nil {
+		t.Fatalf("insert fail workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps, signal)
+		 VALUES (?, 1, 110.0, 5, 5, 3, 'too_heavy'),
+		        (?, 2, 110.0, 5, 5, 2, 'too_heavy')`,
+		weFailID, weFailID)
+	if err != nil {
+		t.Fatalf("insert fail sets: %v", err)
+	}
+
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	if err != nil {
+		t.Fatalf("GetStartingWeight fallback: %v", err)
+	}
+	if got != 100.0 {
+		t.Errorf("fallback past too_heavy session: want 100.0, got %v", got)
+	}
 }
 
 func Test_RecordSetCompletion(t *testing.T) {
