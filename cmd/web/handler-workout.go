@@ -289,6 +289,7 @@ type exerciseAddTemplateData struct {
 	BaseTemplateData
 	Date      time.Time
 	Exercises []workout.Exercise
+	Query     string
 }
 
 // workoutAddExerciseGET handles GET requests to show available exercises for adding.
@@ -298,6 +299,8 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
+
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
 	// Get the current workout session to see which exercises are already included
 	session, err := app.workoutService.GetSession(r.Context(), date)
@@ -319,12 +322,16 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Filter out exercises that are already in the workout
+	queryLower := strings.ToLower(query)
 	var availableExercises []workout.Exercise
 	for _, exercise := range allExercises {
-		if !existingExerciseIDs[exercise.ID] {
-			availableExercises = append(availableExercises, exercise)
+		if existingExerciseIDs[exercise.ID] {
+			continue
 		}
+		if queryLower != "" && !strings.Contains(strings.ToLower(exercise.Name), queryLower) {
+			continue
+		}
+		availableExercises = append(availableExercises, exercise)
 	}
 
 	// Prepare template data
@@ -332,6 +339,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
 		Exercises:        availableExercises, // Use filtered exercises instead of all exercises
+		Query:            query,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-add", data)
