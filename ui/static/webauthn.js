@@ -21,7 +21,15 @@ function bufferDecode(base64String) {
  * @returns {string}
  */
 function bufferEncode(value) {
-  return btoa(String.fromCharCode.apply(null, new Uint8Array(value)))
+  // Iterate instead of String.fromCharCode.apply because Function.apply has a
+  // ~65k argument-count limit on Safari. WebAuthn payloads are small today,
+  // but this is a future trap with attestation/extension blobs.
+  const bytes = new Uint8Array(value)
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=/g, "")
