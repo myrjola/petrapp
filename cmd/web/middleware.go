@@ -224,6 +224,15 @@ func (app *application) crossOriginProtection(next http.Handler) http.Handler {
 	return protection.Handler(next)
 }
 
+// Per-request timeout budget. The handler timeout is shorter than the write
+// deadline so TimeoutHandler can format the 503 body and flush before the
+// connection-level deadline fires.
+const (
+	regularWriteMargin = 200 * time.Millisecond
+	adminWriteDeadline = 30 * time.Second // admins call slow external services.
+	adminWriteMargin   = 1 * time.Second
+)
+
 // timeout times out the request and cancels the context using http.TimeoutHandler.
 // Admins get a longer timeout so that they can call external services. Both
 // branches set a write deadline on the underlying connection so the per-request
@@ -231,14 +240,11 @@ func (app *application) crossOriginProtection(next http.Handler) http.Handler {
 func (app *application) timeout(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := http.NewResponseController(w)
-		// Writing the response takes time, so reserve a margin for it before
-		// the connection-level write deadline fires.
-		const writeMargin = 200 * time.Millisecond
 		writeDeadline := defaultTimeout
-		handlerTimeout := defaultTimeout - writeMargin
+		handlerTimeout := defaultTimeout - regularWriteMargin
 		if contexthelpers.IsAdmin(r.Context()) {
-			writeDeadline = 30 * time.Second //nolint:mnd // slow external services.
-			handlerTimeout = writeDeadline - 1*time.Second
+			writeDeadline = adminWriteDeadline
+			handlerTimeout = adminWriteDeadline - adminWriteMargin
 		}
 		if err := rc.SetWriteDeadline(time.Now().Add(writeDeadline)); err != nil {
 			app.serverError(w, r, err)
