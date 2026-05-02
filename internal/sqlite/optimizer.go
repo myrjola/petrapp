@@ -8,15 +8,27 @@ import (
 )
 
 // startDatabaseOptimizer runs optimize once per hour. See https://www.sqlite.org/pragma.html#pragma_optimize.
+//
+// Logging is skipped after ctx is cancelled. Otherwise a fast-finishing test can race
+// the goroutine: t.Context() is cancelled just before t.Cleanup runs, ExecContext returns
+// a cancellation error, and the goroutine writes to the logger after the testwriter sink
+// has been torn down.
 func (db *Database) startDatabaseOptimizer(ctx context.Context) {
 	// Recommended performance enhancement for long-lived connections.
-	if _, err := db.ReadWrite.ExecContext(ctx, "PRAGMA optimize = 0x10002;"); err != nil {
+	if _, err := db.ReadWrite.ExecContext(ctx, "PRAGMA optimize = 0x10002;"); err != nil && ctx.Err() == nil {
 		err = fmt.Errorf("init optimize database: %w", err)
 		db.logger.LogAttrs(ctx, slog.LevelError, "failed to optimize database", slog.Any("error", err))
 	}
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		start := time.Now()
-		if _, err := db.ReadWrite.ExecContext(ctx, "PRAGMA optimize;"); err != nil {
+		_, err := db.ReadWrite.ExecContext(ctx, "PRAGMA optimize;")
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
 			err = fmt.Errorf("optimize database: %w", err)
 			db.logger.LogAttrs(ctx, slog.LevelError, "failed to optimize database", slog.Any("error", err))
 		} else {
