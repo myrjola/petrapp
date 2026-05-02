@@ -140,28 +140,36 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "exerciseset", data)
 }
 
+// exerciseSetParams bundles the URL params for exercise set operations.
+// WorkoutExerciseID is the stable slot identifier (workout_exercise.id) in the URL.
+type exerciseSetParams struct {
+	Date              time.Time
+	WorkoutExerciseID int
+	SetIndex          int
+}
+
 // parseExerciseSetURLParams extracts and validates URL parameters for exercise set operations.
-// The returned int is the workout_exercise.id (the stable slot identifier in the URL).
-func (app *application) parseExerciseSetURLParams(r *http.Request) (time.Time, int, int, string, error) {
-	dateStr := r.PathValue("date")
-	date, err := time.Parse("2006-01-02", dateStr)
+func (app *application) parseExerciseSetURLParams(r *http.Request) (exerciseSetParams, error) {
+	date, err := time.Parse("2006-01-02", r.PathValue("date"))
 	if err != nil {
-		return time.Time{}, 0, 0, "", fmt.Errorf("parse date: %w", err)
+		return exerciseSetParams{}, fmt.Errorf("parse date: %w", err)
 	}
 
-	workoutExerciseIDStr := r.PathValue("workoutExerciseID")
-	workoutExerciseID, err := strconv.Atoi(workoutExerciseIDStr)
+	workoutExerciseID, err := strconv.Atoi(r.PathValue("workoutExerciseID"))
 	if err != nil {
-		return time.Time{}, 0, 0, "", fmt.Errorf("parse workout exercise ID: %w", err)
+		return exerciseSetParams{}, fmt.Errorf("parse workout exercise ID: %w", err)
 	}
 
-	setIndexStr := r.PathValue("setIndex")
-	setIndex, err := strconv.Atoi(setIndexStr)
+	setIndex, err := strconv.Atoi(r.PathValue("setIndex"))
 	if err != nil {
-		return time.Time{}, 0, 0, "", fmt.Errorf("parse set index: %w", err)
+		return exerciseSetParams{}, fmt.Errorf("parse set index: %w", err)
 	}
 
-	return date, workoutExerciseID, setIndex, dateStr, nil
+	return exerciseSetParams{
+		Date:              date,
+		WorkoutExerciseID: workoutExerciseID,
+		SetIndex:          setIndex,
+	}, nil
 }
 
 // findExerciseSetInSession returns the workout slot identified by its stable ID.
@@ -208,7 +216,7 @@ func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exe
 // recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
 func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
-	date time.Time, workoutExerciseID, setIndex int, dateStr string,
+	params exerciseSetParams,
 	exercise workout.Exercise,
 ) bool {
 	weightStr := strings.Replace(r.PostForm.Get("weight"), ",", ".", 1)
@@ -231,16 +239,17 @@ func (app *application) recordSetCompletionWithWeight(
 		return false
 	}
 
-	err = app.workoutService.RecordSetCompletion(r.Context(), date, workoutExerciseID, setIndex, signal, weight, reps)
+	err = app.workoutService.RecordSetCompletion(
+		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, weight, reps)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("record set completion: %w", err))
 		return false
 	}
 
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded set completion",
-		slog.String("date", dateStr),
-		slog.Int("workout_exercise_id", workoutExerciseID),
-		slog.Int("set_index", setIndex),
+		slog.String("date", params.Date.Format("2006-01-02")),
+		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
+		slog.Int("set_index", params.SetIndex),
 		slog.String("signal", string(signal)),
 		slog.Float64("weight", weight),
 		slog.Int("reps", reps))
@@ -248,7 +257,7 @@ func (app *application) recordSetCompletionWithWeight(
 }
 
 func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Request) {
-	date, workoutExerciseID, setIndex, dateStr, err := app.parseExerciseSetURLParams(r)
+	params, err := app.parseExerciseSetURLParams(r)
 	if err != nil {
 		app.notFound(w, r)
 		return
@@ -260,13 +269,13 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	session, err := app.workoutService.GetSession(r.Context(), date)
+	session, err := app.workoutService.GetSession(r.Context(), params.Date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	exerciseSet, found := findExerciseSetInSession(&session, workoutExerciseID)
+	exerciseSet, found := findExerciseSetInSession(&session, params.WorkoutExerciseID)
 	if !found {
 		app.notFound(w, r)
 		return
@@ -275,7 +284,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 
 	if exercise.ExerciseType == workout.ExerciseTypeWeighted ||
 		exercise.ExerciseType == workout.ExerciseTypeAssisted {
-		if !app.recordSetCompletionWithWeight(w, r, date, workoutExerciseID, setIndex, dateStr, exercise) {
+		if !app.recordSetCompletionWithWeight(w, r, params, exercise) {
 			return
 		}
 	} else {
@@ -285,13 +294,14 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if err = app.workoutService.UpdateCompletedReps(
-			r.Context(), date, workoutExerciseID, setIndex, reps); err != nil {
+			r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, reps); err != nil {
 			app.serverError(w, r, fmt.Errorf("update completed reps: %w", err))
 			return
 		}
 	}
 
-	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), workoutExerciseID))
+	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d",
+		params.Date.Format("2006-01-02"), params.WorkoutExerciseID))
 }
 
 func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
