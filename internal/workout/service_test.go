@@ -716,7 +716,9 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("no history: want 0, got %v", got)
 	}
 
-	// Insert a completed strength session 7 days ago with set 1 weight = 100kg x5.
+	// Insert a completed strength session 7 days ago. Set 1 ramps up from 95kg
+	// (too_light), set 2 lands on 100kg (on_target), set 3 fails at 105kg
+	// (too_heavy). The latest *successful* set is set 2 at 100kg.
 	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
@@ -734,14 +736,17 @@ func Test_GetStartingWeight(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps)
-		 VALUES (?, 1, 100.0, 5, 5, 5)`,
-		weHistID)
+		 weight_kg, min_reps, max_reps, completed_reps, signal)
+		 VALUES (?, 1, 95.0, 5, 5, 5, 'too_light'),
+		        (?, 2, 100.0, 5, 5, 5, 'on_target'),
+		        (?, 3, 105.0, 5, 5, 3, 'too_heavy')`,
+		weHistID, weHistID, weHistID)
 	if err != nil {
-		t.Fatalf("insert set: %v", err)
+		t.Fatalf("insert sets: %v", err)
 	}
 
-	// Same periodization (strength → strength): weight carries over unchanged.
+	// Same periodization (strength → strength): the latest successful set (set 2 at
+	// 100kg) carries over unchanged, ignoring the failed set 3.
 	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
@@ -760,8 +765,8 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("strength → hypertrophy: want 92.0, got %v", got)
 	}
 
-	// Insert today's session with a different set 1 weight. The starting weight
-	// must remain anchored to the historical session, regardless of today's sets.
+	// Insert today's session with different set weights. The starting weight must
+	// remain anchored to the historical session, regardless of today's sets.
 	todayStr := today.Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
 		"INSERT INTO workout_sessions (user_id, workout_date, started_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
@@ -1000,7 +1005,7 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 		t.Fatalf("get exercise id: %v", err)
 	}
 
-	// Prior strength session 7 days ago: completed first set 100 kg x 5.
+	// Prior strength session 7 days ago: completed first set 100 kg x 5 on target.
 	prevStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
@@ -1018,8 +1023,8 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps)
-		 VALUES (?, 1, 100.0, 5, 5, 5)`,
+		 weight_kg, min_reps, max_reps, completed_reps, signal)
+		 VALUES (?, 1, 100.0, 5, 5, 5, 'on_target')`,
 		wePrevID)
 	if err != nil {
 		t.Fatalf("insert prev set: %v", err)

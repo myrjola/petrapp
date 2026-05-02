@@ -70,10 +70,10 @@ type sessionRepository interface {
 	Update(ctx context.Context, date time.Time, updateFn func(sess *sessionAggregate) (bool, error)) error
 	// ListSetsForExerciseSince retrieves all sets for a given exercise since a date, one aggregate per session.
 	ListSetsForExerciseSince(ctx context.Context, exerciseID int, sinceDate time.Time) ([]datedExerciseSetAggregate, error)
-	// GetLatestStartingWeightBefore returns the weight of the first completed set
-	// from the most recent session strictly before beforeDate, along with that
-	// session's periodization type. Returns a zero-value struct when no completed
-	// history exists.
+	// GetLatestStartingWeightBefore returns the weight of the latest successful set
+	// (completed and not signaled too heavy) from the most recent qualifying session
+	// strictly before beforeDate, along with that session's periodization type.
+	// Returns a zero-value struct when no successful history exists.
 	GetLatestStartingWeightBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (LatestStartingSet, error)
 	// CountCompleted returns the count of sessions with completed_at IS NOT NULL.
 	CountCompleted(ctx context.Context) (int, error)

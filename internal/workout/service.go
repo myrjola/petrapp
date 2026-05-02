@@ -545,12 +545,13 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 }
 
 // GetStartingWeight returns the weight to seed a new session for the given exercise.
-// It pulls the first completed set from the most recent session strictly before
-// beforeDate, then converts the load via Epley 1RM-equivalence when that session's
-// periodization differs from targetType so the relative intensity carries across
-// rep schemes (e.g. 100 kg x5 strength → ~92 kg x8 hypertrophy). Using a cutoff
-// keeps the starting weight stable when earlier sets of beforeDate's session are
-// edited. Returns 0 if no completed history exists.
+// It pulls the latest successful set (completed and not signaled too heavy) from
+// the most recent qualifying session strictly before beforeDate, then converts the
+// load via Epley 1RM-equivalence when that session's periodization differs from
+// targetType so the relative intensity carries across rep schemes (e.g. 100 kg x5
+// strength → ~92 kg x8 hypertrophy). Using a cutoff keeps the starting weight
+// stable when earlier sets of beforeDate's session are edited. Returns 0 if no
+// successful history exists.
 func (s *Service) GetStartingWeight(
 	ctx context.Context,
 	exerciseID int,

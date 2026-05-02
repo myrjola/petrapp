@@ -534,10 +534,11 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	return result, nil
 }
 
-// GetLatestStartingWeightBefore returns the weight of the first completed set
-// from the most recent session strictly before beforeDate, along with that
-// session's periodization type. Returns a zero-value struct when no completed
-// history exists.
+// GetLatestStartingWeightBefore returns the weight of the latest successful set
+// from the most recent session strictly before beforeDate that has one, along
+// with that session's periodization type. A set is "successful" when it was
+// completed and the user did not signal it as too heavy. Returns a zero-value
+// struct when no successful history exists.
 func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 	ctx context.Context,
 	exerciseID int,
@@ -562,7 +563,8 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		  AND we.workout_date < ?
 		  AND es.completed_reps IS NOT NULL
 		  AND es.weight_kg IS NOT NULL
-		ORDER BY we.workout_date DESC, es.set_number ASC
+		  AND es.signal IN ('on_target', 'too_light')
+		ORDER BY we.workout_date DESC, es.set_number DESC
 		LIMIT 1`,
 		userID, exerciseID, beforeDateStr).Scan(&weightKg, &periodType)
 	if err != nil {
