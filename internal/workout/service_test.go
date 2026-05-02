@@ -658,6 +658,98 @@ func Test_AddExercise(t *testing.T) {
 	})
 }
 
+// Test_AddExercise_UsesMostRecentHistoricalWeight verifies findHistoricalSets
+// returns the most recent prior session's sets, not the oldest match.
+func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create test database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("history-user"), "History User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	svc := workout.NewService(db, logger, "")
+
+	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
+		if err = tryInsertMuscleGroup(ctx, t, db, group); err != nil {
+			t.Fatalf("insert muscle group: %v", err)
+		}
+	}
+	exerciseID, err := createTestExercise(ctx, t, db, "Squat", "lower")
+	if err != nil {
+		t.Fatalf("create exercise: %v", err)
+	}
+
+	today := time.Now()
+	insertHistoricalSession := func(daysAgo int, weight float64) {
+		t.Helper()
+		dateStr := today.AddDate(0, 0, -daysAgo).Format("2006-01-02")
+		if _, err = db.ReadWrite.ExecContext(ctx,
+			"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+			userID, dateStr); err != nil {
+			t.Fatalf("insert session %d days ago: %v", daysAgo, err)
+		}
+		var weID int
+		if err = db.ReadWrite.QueryRowContext(ctx,
+			`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
+			 VALUES (?, ?, ?) RETURNING id`,
+			userID, dateStr, exerciseID).Scan(&weID); err != nil {
+			t.Fatalf("insert workout_exercise %d days ago: %v", daysAgo, err)
+		}
+		if _, err = db.ReadWrite.ExecContext(ctx,
+			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
+			 VALUES (?, 1, ?, 8, 12)`,
+			weID, weight); err != nil {
+			t.Fatalf("insert exercise_set %d days ago: %v", daysAgo, err)
+		}
+	}
+
+	// Older session at 60kg, newer session at 80kg.
+	insertHistoricalSession(56, 60.0)
+	insertHistoricalSession(7, 80.0)
+
+	// Create today's workout session (empty — AddExercise requires it to exist).
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+		userID, today.Format("2006-01-02")); err != nil {
+		t.Fatalf("insert today's session: %v", err)
+	}
+
+	if err = svc.AddExercise(ctx, today, exerciseID); err != nil {
+		t.Fatalf("AddExercise: %v", err)
+	}
+
+	session, err := svc.GetSession(ctx, today)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+
+	var seededWeight *float64
+	for _, es := range session.ExerciseSets {
+		if es.Exercise.ID == exerciseID && len(es.Sets) > 0 {
+			seededWeight = es.Sets[0].WeightKg
+			break
+		}
+	}
+	if seededWeight == nil {
+		t.Fatalf("expected exercise %d to be seeded with weight, got nil", exerciseID)
+	}
+	if *seededWeight != 80.0 {
+		t.Errorf("expected most recent historical weight 80kg, got %v", *seededWeight)
+	}
+}
+
 // Helper function to create a test exercise.
 func createTestExercise(ctx context.Context, t *testing.T, db *sqlite.Database, name, category string) (int, error) {
 	t.Helper()

@@ -850,9 +850,9 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 		return nil, fmt.Errorf("get workout history: %w", err)
 	}
 
-	// Look for the most recent usage of the exercise
-	for i := len(history) - 1; i >= 0; i-- {
-		session := history[i]
+	// Look for the most recent usage of the exercise. List orders sessions
+	// by workout_date DESC, so iterating forward visits newest first.
+	for _, session := range history {
 		// Skip the current date's session
 		if session.Date.Equal(date) {
 			continue
