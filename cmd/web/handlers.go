@@ -20,16 +20,16 @@ func formatFloat(f float64) string {
 	return strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
-// baseTemplateFuncs returns the base template.FuncMap with placeholder implementations.
-// Context-dependent functions (nonce, mdToHTML) must be overridden with actual implementations.
+// baseTemplateFuncs returns the base template.FuncMap with safe zero-value
+// implementations for context-dependent functions. Real implementations are
+// bound per-request in contextTemplateFuncs and override these defaults via
+// (*template.Template).Funcs. The signatures must match the real ones so
+// templates parsed with the base set can also be executed with it (a panic
+// here would surface as a 500 in any code path that forgets to rebind).
 func (app *application) baseTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"nonce": func() string {
-			panic("not implemented")
-		},
-		"mdToHTML": func() string {
-			panic("not implemented")
-		},
+		"nonce":       func() template.HTMLAttr { return "" },
+		"mdToHTML":    func(_ string) template.HTML { return "" },
 		"formatFloat": formatFloat,
 	}
 }
