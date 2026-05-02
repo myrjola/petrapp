@@ -97,10 +97,8 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 	// For parallel tests, we need to use a different database file for each test to avoid sharing data.
 	// See https://www.sqlite.org/inmemorydb.html.
 	isInMemory := strings.Contains(url, ":memory:")
-	inMemoryConfig := ""
 	if isInMemory {
 		url = rand.Text()
-		inMemoryConfig = "mode=memory&cache=shared"
 	}
 	commonConfig := strings.Join([]string{
 		// Uses current time.Location for timestamps.
@@ -120,8 +118,21 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 	// The options without leading underscore are SQLite URI parameters documented at https://www.sqlite.org/uri.html.
 	// The options prefixed with underscore '_' are documented at
 	// https://pkg.go.dev/github.com/mattn/go-sqlite3#SQLiteDriver.Open.
-	readConfig := fmt.Sprintf("file:%s?mode=ro&_txlock=deferred&_query_only=true&%s&%s", url, commonConfig, inMemoryConfig)
-	readWriteConfig := fmt.Sprintf("file:%s?mode=rwc&_txlock=immediate&%s&%s", url, commonConfig, inMemoryConfig)
+	//
+	// Pick exactly one mode= per URL. SQLite's URI parser silently keeps the last
+	// duplicate, so mixing mode=ro/rwc with mode=memory would override our intent.
+	// For in-memory we rely on cache=shared + _query_only=true to enforce the
+	// read-only handle at the connection level.
+	var readMode, readWriteMode string
+	if isInMemory {
+		readMode = "mode=memory&cache=shared"
+		readWriteMode = "mode=memory&cache=shared"
+	} else {
+		readMode = "mode=ro"
+		readWriteMode = "mode=rwc"
+	}
+	readConfig := fmt.Sprintf("file:%s?%s&_txlock=deferred&_query_only=true&%s", url, readMode, commonConfig)
+	readWriteConfig := fmt.Sprintf("file:%s?%s&_txlock=immediate&%s", url, readWriteMode, commonConfig)
 
 	once.Do(registerOptimizedDriver)
 
