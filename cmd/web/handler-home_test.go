@@ -74,6 +74,76 @@ func Test_application_home(t *testing.T) {
 		checkButtonPresence(t, doc, "Sign in", 0)
 		checkButtonPresence(t, doc, "Register", 0)
 	})
+
+	t.Run("Muscle balance section renders after login", func(t *testing.T) {
+		// Schedule preferences so a weekly plan gets generated; without this the
+		// home handler redirects to /schedule and never renders the section.
+		doc, err = client.GetDoc(ctx, "/preferences")
+		if err != nil {
+			t.Fatalf("get preferences page: %v", err)
+		}
+		if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+			"Monday":    "60",
+			"Wednesday": "60",
+			"Friday":    "60",
+		}); err != nil {
+			t.Fatalf("submit preferences: %v", err)
+		}
+
+		doc, err = client.GetDoc(ctx, "/")
+		if err != nil {
+			t.Fatalf("get home: %v", err)
+		}
+
+		section := doc.Find("section.muscle-balance")
+		if section.Length() != 1 {
+			t.Fatalf("want exactly one .muscle-balance section, got %d", section.Length())
+		}
+
+		// Section must render after the weekly schedule, not before, so the visual
+		// reading order is "this week's days, then how the load is distributed".
+		main := doc.Find("main").First()
+		schedule := main.Find(".weekly-schedule").First()
+		if schedule.Length() == 0 {
+			t.Fatal("weekly-schedule must exist on home page")
+		}
+		schedulePos := -1
+		balancePos := -1
+		main.Children().Each(func(i int, s *goquery.Selection) {
+			if s.HasClass("weekly-schedule") {
+				schedulePos = i
+			}
+			if s.HasClass("muscle-balance") {
+				balancePos = i
+			}
+		})
+		if schedulePos < 0 || balancePos < 0 || balancePos < schedulePos {
+			t.Errorf("want muscle-balance after weekly-schedule, got positions schedule=%d balance=%d",
+				schedulePos, balancePos)
+		}
+
+		// One row per known muscle group (17 from fixtures.sql).
+		const wantMuscleGroups = 17
+		if rows := section.Find(".row").Length(); rows != wantMuscleGroups {
+			t.Errorf("want %d muscle group rows, got %d", wantMuscleGroups, rows)
+		}
+
+		// Targeted groups must show their target text; untargeted ones must not.
+		chestRow := section.Find(`.row[data-slug="chest"]`).First()
+		if chestRow.Length() == 0 {
+			t.Fatal("chest row missing")
+		}
+		if !strings.Contains(chestRow.Text(), "target 10") {
+			t.Errorf("chest row must show seeded target of 10, got: %q", chestRow.Text())
+		}
+		calvesRow := section.Find(`.row[data-slug="calves"]`).First()
+		if calvesRow.Length() == 0 {
+			t.Fatal("calves row missing")
+		}
+		if calvesRow.Find(".target-mark").Length() != 0 {
+			t.Error("calves has no seeded target; must not render a target mark")
+		}
+	})
 }
 
 func checkButtonPresence(t *testing.T, doc *goquery.Document, buttonText string, expectedCount int) {
