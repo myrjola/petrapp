@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,5 +120,38 @@ func TestService_CooldownPreventsCapture(t *testing.T) {
 
 	if len(entries) > 1 {
 		t.Error("expected cooldown to prevent rapid successive captures")
+	}
+}
+
+// TestService_CapturesIntoNewlyCreatedDirectory ensures the directory created
+// by New() is writable so subsequent trace files can actually be written.
+func TestService_CapturesIntoNewlyCreatedDirectory(t *testing.T) {
+	traceDir := filepath.Join(t.TempDir(), "traces")
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	service, err := flightrecorder.New(flightrecorder.Config{
+		Logger:          logger,
+		MinAge:          0,
+		MaxBytes:        0,
+		TracesDirectory: traceDir,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	if err = service.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer service.Stop(ctx)
+
+	service.CaptureTimeoutTrace(ctx)
+
+	entries, err := os.ReadDir(traceDir)
+	if err != nil {
+		t.Fatalf("read created trace directory: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected a trace file in the newly created directory")
 	}
 }

@@ -52,7 +52,7 @@ func New(cfg Config) (*Service, error) {
 
 	if stat, err := os.Stat(cfg.TracesDirectory); err != nil {
 		// Create the directory if it doesn't exist
-		if err = os.MkdirAll(cfg.TracesDirectory, 0500); err != nil {
+		if err = os.MkdirAll(cfg.TracesDirectory, 0o700); err != nil {
 			return nil, fmt.Errorf("create traces directory: %w", err)
 		}
 	} else if !stat.IsDir() {
