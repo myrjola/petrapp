@@ -88,12 +88,7 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 // If no sessions exist for the week, it generates all scheduled days at once using
 // the weekly planner and persists them in a single transaction.
 func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) {
-	now := time.Now()
-	offset := int(time.Monday - now.Weekday())
-	if offset > 0 {
-		offset = -6
-	}
-	monday := now.AddDate(0, 0, offset).Truncate(24 * time.Hour)
+	monday := mondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6)
 
 	// Check for existing sessions this week.
@@ -263,13 +258,20 @@ func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessio
 	return session, nil
 }
 
-// mondayOf returns the Monday of the week containing date, truncated to midnight.
+// mondayOf returns the Monday of the week containing date as midnight UTC. The
+// calendar date is taken from date's location so the user's local week boundary
+// is preserved, but the result is anchored to UTC so it compares cleanly against
+// session dates loaded from the database (which time.Parse always returns in
+// UTC). Time.Truncate is unsafe here because it rounds to UTC-midnight
+// boundaries from an absolute instant, which can roll local-timezone times back
+// into the previous calendar day.
 func mondayOf(date time.Time) time.Time {
+	y, m, d := date.Date()
 	offset := int(time.Monday - date.Weekday())
 	if offset > 0 {
 		offset = -6
 	}
-	return date.AddDate(0, 0, offset).Truncate(24 * time.Hour)
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, offset)
 }
 
 // StartSession starts a new workout session.
