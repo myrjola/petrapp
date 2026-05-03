@@ -40,6 +40,21 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 	http.Redirect(w, r, path, http.StatusSeeOther)
 }
 
+// redirectReplace works like redirect, but signals to the stack navigator
+// that the current history entry should be replaced. Use this for form
+// pages whose existence should be erased on submit (e.g. /add-exercise).
+// Non-stacknav callers fall through to a plain 303, identical to redirect.
+func redirectReplace(w http.ResponseWriter, r *http.Request, path string) {
+	if r.Header.Get("X-Requested-With") == "stacknav" {
+		w.Header().Set("X-Location", path)
+		w.Header().Set("X-Replace-URL", "true")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	http.Redirect(w, r, path, http.StatusSeeOther)
+}
+
 const flashErrorKey = "flash_error"
 
 // putFlashError stores a flash error message in the session to be displayed on the next page load.
