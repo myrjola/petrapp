@@ -324,23 +324,25 @@ func Test_playwright_smoketest(t *testing.T) {
 }
 
 // Test_playwright_stacknav verifies that the stack navigator behaves like a native
-// mobile app for the five core flows defined in
-// docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md.
+// mobile app for the six core flows defined in
+// docs/superpowers/specs/2026-05-03-stack-navigator-push-default-design.md
+// (which supersedes 2026-04-25-stack-navigator-redesign-design.md).
 //
 // The flows:
 //
-//  1. Same-URL replace (set update): submit on DETAIL → land at DETAIL, back goes
-//     to parent (workout day overview), not the same DETAIL page.
-//  2. Cross-URL replace (swap): submit on SWAP redirecting to a different DETAIL
-//     → land at DETAIL', back goes to the previous DETAIL (acceptable per spec),
-//     second back goes to workout overview.
-//  3. Pop-or-replace (schedule): submit /schedule when / is in history → cursor
-//     traverses to /, page reloads (bfcache marker bust), back exits the app rather
-//     than returning to /schedule.
+//  1. Same-URL replace (set update): submit on DETAIL → client auto-detects
+//     same-URL and replaces in place, so back goes to the workout overview.
+//  2. Cross-URL submit, target present (swap): swap redirects to the same
+//     workoutExerciseID slot, so popOrPushTo traverses to the original DETAIL.
+//  3. Pop-or-push, traverse branch (schedule): submit /schedule when / is in
+//     history → traverse to /; back exits the app, forward returns to /schedule.
 //  4. Hierarchical back-link (data-back-button on swap page): click an in-page
 //     "back to detail" link → traverse to existing detail entry rather than push.
-//  5. Validation error: submit empty schedule → URL stays at /schedule, alert role
-//     visible, no new history entry pushed.
+//  5. Validation error: submit empty schedule → flash + redirect-to-form is
+//     same-URL, client auto-replaces, alert visible, no history entry pushed.
+//  6. Add-exercise replace: submit add-exercise → server sends X-Replace-URL,
+//     client replaces /add-exercise with the new exercise's DETAIL, back goes
+//     to the workout overview.
 func Test_playwright_stacknav(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping slow playwright stacknav test")
