@@ -66,17 +66,17 @@ func Test_application_addWorkout(t *testing.T) {
 		t.Error("Expected to find 'Add Exercise' heading")
 	}
 
-	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/add-exercise", nil); err != nil {
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/add-exercise", nil); err != nil {
 		t.Fatalf("Failed to submit add exercise form: %v", err)
 	}
 
-	// Verify we're back on the workout page
-	if doc.Find("a.exercise").Length() <= initialExerciseCount {
-		t.Errorf("Expected more exercises after adding one, got %d (was %d)",
-			doc.Find("a.exercise").Length(), initialExerciseCount)
+	// The POST redirects to the new exercise's detail page (not the
+	// workout overview). Re-fetch the overview to verify the exercise was
+	// persisted by checking the count.
+	if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
+		t.Fatalf("Failed to re-fetch workout overview: %v", err)
 	}
 
-	// Verify the exercise was added (by checking the count increased)
 	newExerciseCount := doc.Find("a.exercise").Length()
 	if newExerciseCount != initialExerciseCount+1 {
 		t.Errorf("Expected exercise count to increase by 1, got %d (was %d)",
