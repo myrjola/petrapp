@@ -111,12 +111,16 @@ if fieldValue == "" {
 
 ## Redirects and Navigation
 
-### Using redirect() Helper
+### Using redirect() and redirectReplace()
 
-- Use `redirect(w, r, "/path")` for all redirects (POST results, GET-handler bounces, auth gates, validation re-renders via flash + redirect-to-form).
-- The helper negotiates the stack navigator wire protocol: requests carrying `X-Requested-With: stacknav` (set by the JS shim's POST fetch) get HTTP 200 + `X-Location: /path` and an empty body; everything else gets a standard 303 See Other. Non-POST callers transparently fall through to 303 because they don't carry the header.
-- The client treats every successful 200 as pop-or-replace: walks history backward looking for a URL match, traverses if found, otherwise replaces the current entry. There is no server-side history-action discriminator.
-- See `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md` for the full protocol and the per-flow behavior.
+Two helpers cover all redirect needs. Both negotiate the stack-navigator wire protocol when the request carries `X-Requested-With: stacknav` (set by the JS shim's POST fetch), and fall through to a plain 303 See Other otherwise. Non-POST callers transparently use the 303 path because they don't carry the header.
+
+- **`redirect(w, r, "/path")`** — default. Use for almost all redirects: POST results, GET-handler bounces, auth gates, validation re-renders via flash + redirect-to-form. The client behavior is "pop-or-push": traverse to the URL if it's already in the backward history stack, otherwise push a new entry. Same-URL submits (target equals the current URL — set updates, warmup completion, validation errors that re-render the form) are auto-detected by the client and become a replace; the helper itself stays simple.
+- **`redirectReplace(w, r, "/path")`** — opt-in. Use when the originating page should be erased from history on submit. Today's only call site is `workoutAddExercisePOST`, which redirects to the new exercise's detail page and replaces `/add-exercise`. Reach for this when the form page only exists to submit (a picker, an editor that disappears on save) and you don't want it left behind in the back-button stack.
+
+The client treats every 200 response with `X-Location` as a navigation; an additional `X-Replace-URL: true` header (set by `redirectReplace`) flips the strategy from pop-or-push to replace.
+
+See `docs/superpowers/specs/2026-05-03-stack-navigator-push-default-design.md` for the wire protocol, per-flow behavior, and rationale.
 
 ## Testing with e2etest
 
