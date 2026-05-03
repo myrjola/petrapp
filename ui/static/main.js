@@ -9,30 +9,34 @@
  *
  * Wire protocol
  * -------------
- *   Request:  X-Requested-With: stacknav (set by the JS shim's fetch)
- *   Response: 200 + X-Location: <url> (where to navigate; body empty)
+ *   Request:  X-Requested-With: stacknav  (set by the JS shim's fetch)
+ *   Response: 200 + X-Location: <url>     (where to navigate; body empty)
+ *   Response: X-Replace-URL: true         (optional; replace current entry)
  *
  * Without the X-Requested-With header, the server returns a plain 303 See
  * Other and the browser follows. That is the no-JS / no-Navigation-API path.
  *
- * Navigation strategy: pop-or-replace
- * -----------------------------------
- * One strategy covers every flow: walk back through history looking for an
- * entry whose URL matches the target; traverse to it if found, otherwise
- * replace the current entry. This collapses correctly across all real cases:
+ * Navigation strategy: pop-or-push (with explicit replace mode)
+ * -------------------------------------------------------------
+ * Two modes, decided per-response:
  *
- *   1. Same-URL submit (e.g., set update on DETAIL → DETAIL): no older
- *      DETAIL entry behind us, so we fall through to replace. Back goes to
- *      the parent rather than the form-submit page.
- *   2. Cross-URL submit, target present (e.g. schedule → home): traverse
- *      back to the existing home entry instead of pushing a duplicate.
- *   3. Cross-URL submit, target absent: fall through to replace. The
- *      form page leaves no trace in history.
+ *   1. Replace mode — server set X-Replace-URL: true, OR the target URL
+ *      equals the current entry's URL (same-URL submit). The current entry
+ *      is replaced. We do not walk the history stack: replace is about
+ *      erasing the current entry, not jumping to an existing one.
+ *
+ *   2. Pop-or-push mode — default. Walk back through history looking for
+ *      an entry whose URL matches the target; traverse to it if found,
+ *      otherwise push a new entry on top. Pop collapses cross-URL submits
+ *      whose target is already in the backward stack (e.g. schedule → home,
+ *      swap → original DETAIL via same slot URL); push handles cross-URL
+ *      submits whose target is brand-new (e.g. start workout → workout day).
  *
  * Validation errors use putFlashError + redirect-to-form on the server, so
- * they arrive as a plain 200 + X-Location pointing back at the form. The
- * CSP (require-trusted-types-for 'script') blocks any in-place HTML render,
- * so we keep the wire shape uniform across success and failure.
+ * they arrive as 200 + X-Location pointing back at the form URL — same-URL
+ * auto-replace handles them. The CSP (require-trusted-types-for 'script')
+ * blocks any in-place HTML render, so we keep the wire shape uniform across
+ * success and failure.
  *
  * Hierarchical backlink (data-back-button)
  * -----------------------------------------
@@ -112,7 +116,8 @@ async function submitForm(e) {
             location.reload()
             return
         }
-        await popOrReplaceTo(target)
+        const replace = res.headers.get('X-Replace-URL') === 'true'
+        await popOrPushTo(target, {replace})
         return
     }
 
@@ -121,8 +126,20 @@ async function submitForm(e) {
     location.reload()
 }
 
-async function popOrReplaceTo(target) {
+async function popOrPushTo(target, {replace = false} = {}) {
     const targetUrl = new URL(target, location.origin)
+
+    // Replace mode: server-flagged via X-Replace-URL, or same-URL submit
+    // (auto-detected so backend doesn't have to think about it). We
+    // deliberately do not walk back looking for a traverse target —
+    // replace is about erasing the current entry, not jumping elsewhere.
+    if (replace || sameUrl(new URL(navigation.currentEntry.url), targetUrl)) {
+        navigation.navigate(target, {history: 'replace'})
+        return
+    }
+
+    // Genuine cross-URL navigation. Traverse to a backward match if
+    // present, otherwise push a new entry.
     const entries = navigation.entries()
     for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
         if (sameUrl(new URL(entries[i].url), targetUrl)) {
@@ -130,7 +147,7 @@ async function popOrReplaceTo(target) {
             return
         }
     }
-    navigation.navigate(target, {history: 'replace'})
+    navigation.navigate(target, {history: 'push'})
 }
 
 window.addEventListener('pagereveal', (e) => {
