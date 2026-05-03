@@ -373,12 +373,16 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Add exercise to the workout
-	if _, err = app.workoutService.AddExercise(r.Context(), date, exerciseID); err != nil {
+	// Add exercise to the workout and capture the new slot ID so we can
+	// land the user straight on the new exercise's detail page.
+	newWorkoutExerciseID, err := app.workoutService.AddExercise(r.Context(), date, exerciseID)
+	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Redirect to the workout page
-	redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
+	// Replace /add-exercise with the new exercise's detail page so back
+	// goes to the workout overview rather than the picker.
+	redirectReplace(w, r, fmt.Sprintf("/workouts/%s/exercises/%d",
+		date.Format("2006-01-02"), newWorkoutExerciseID))
 }
