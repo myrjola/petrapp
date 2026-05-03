@@ -11,7 +11,7 @@
  * -------------
  *   Request:  X-Requested-With: stacknav  (set by the JS shim's fetch)
  *   Response: 200 + X-Location: <url>     (where to navigate; body empty)
- *   Response: X-Replace-URL: true         (optional; replace current entry)
+ *   Response: X-Replace-Url: true         (optional; replace current entry)
  *
  * Without the X-Requested-With header, the server returns a plain 303 See
  * Other and the browser follows. That is the no-JS / no-Navigation-API path.
@@ -20,7 +20,7 @@
  * -------------------------------------------------------------
  * Two modes, decided per-response:
  *
- *   1. Replace mode — server set X-Replace-URL: true, OR the target URL
+ *   1. Replace mode — server set X-Replace-Url: true, OR the target URL
  *      equals the current entry's URL (same-URL submit). The current entry
  *      is replaced. We do not walk the history stack: replace is about
  *      erasing the current entry, not jumping to an existing one.
@@ -116,7 +116,7 @@ async function submitForm(e) {
             location.reload()
             return
         }
-        const replace = res.headers.get('X-Replace-URL') === 'true'
+        const replace = res.headers.get('X-Replace-Url') === 'true'
         await popOrPushTo(target, {replace})
         return
     }
@@ -129,7 +129,7 @@ async function submitForm(e) {
 async function popOrPushTo(target, {replace = false} = {}) {
     const targetUrl = new URL(target, location.origin)
 
-    // Replace mode: server-flagged via X-Replace-URL, or same-URL submit
+    // Replace mode: server-flagged via X-Replace-Url, or same-URL submit
     // (auto-detected so backend doesn't have to think about it). We
     // deliberately do not walk back looking for a traverse target —
     // replace is about erasing the current entry, not jumping elsewhere.

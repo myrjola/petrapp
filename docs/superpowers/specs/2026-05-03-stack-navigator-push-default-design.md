@@ -35,7 +35,7 @@ Three small pieces. The wire protocol gains one optional response header; the cl
 |---|---|---|---|---|
 | Request | `X-Requested-With` | `stacknav` | yes (set by JS shim) | This POST is from the JS shim. |
 | Response | `X-Location` | URL path | yes (when 200) | Where the client should navigate. |
-| Response | `X-Replace-URL` | `true` | optional | Replace the current entry rather than push (form page is disposable). |
+| Response | `X-Replace-Url` | `true` | optional | Replace the current entry rather than push (form page is disposable). |
 
 Status codes are unchanged: `200` with `X-Location` for both successes and validation errors (validation continues to use flash + redirect-to-form; the form's GET handler pops the flash on re-render); anything else triggers `location.reload()`.
 
@@ -76,7 +76,7 @@ The caller in `submitForm` reads the optional response header:
 if (res.status === 200) {
     const target = res.headers.get('X-Location')
     if (!target) { location.reload(); return }
-    const replace = res.headers.get('X-Replace-URL') === 'true'
+    const replace = res.headers.get('X-Replace-Url') === 'true'
     await popOrPushTo(target, {replace})
     return
 }
@@ -84,7 +84,7 @@ if (res.status === 200) {
 
 Same-URL detection lives entirely on the client. The server never has to think about whether a redirect target equals the request URL.
 
-The header doc-comment at the top of `main.js` is rewritten to describe the new strategy and the wire protocol's optional `X-Replace-URL` header.
+The header doc-comment at the top of `main.js` is rewritten to describe the new strategy and the wire protocol's optional `X-Replace-Url` header.
 
 ### Server (`cmd/web/helpers.go`)
 
@@ -111,7 +111,7 @@ A new helper covers the opt-in replace case:
 func redirectReplace(w http.ResponseWriter, r *http.Request, path string) {
     if r.Header.Get("X-Requested-With") == "stacknav" {
         w.Header().Set("X-Location", path)
-        w.Header().Set("X-Replace-URL", "true")
+        w.Header().Set("X-Replace-Url", "true")
         w.WriteHeader(http.StatusOK)
         return
     }
@@ -190,7 +190,7 @@ Assertions:
 `cmd/web/CLAUDE.md` "Redirects and Navigation" section is rewritten:
 
 - Document both `redirect` and `redirectReplace` helpers, with guidance on when each applies.
-- Update the client-behavior summary: traverse if backward match, replace if same-URL or `X-Replace-URL: true`, otherwise push.
+- Update the client-behavior summary: traverse if backward match, replace if same-URL or `X-Replace-Url: true`, otherwise push.
 - Update the spec link to point at this document.
 
 The prior spec (`2026-04-25-stack-navigator-redesign-design.md`) stays in place as historical context. Its "Per-flow behavior" and client-implementation sections are superseded by this document.
@@ -206,6 +206,6 @@ Single coherent change. The protocol header, client function rename, server help
 ## References
 
 - Prior spec: `docs/superpowers/specs/2026-04-25-stack-navigator-redesign-design.md`.
-- HTMX precedent for similar headers: `HX-Push-Url` / `HX-Replace-Url`. We deliberately use a simpler boolean-only `X-Replace-URL` since the navigation target is already conveyed by `X-Location`.
+- HTMX precedent for similar headers: `HX-Push-Url` / `HX-Replace-Url`. We deliberately use a simpler boolean-only `X-Replace-Url` since the navigation target is already conveyed by `X-Location`.
 - WebKit bug [293952](https://bugs.webkit.org/show_bug.cgi?id=293952) — iOS Safari precommit handler support; reason we use `preventDefault()` instead of `e.intercept()`.
 - MDN: [Navigation API](https://developer.mozilla.org/en-US/docs/Web/API/Navigation_API).

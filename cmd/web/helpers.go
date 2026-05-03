@@ -47,7 +47,7 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 func redirectReplace(w http.ResponseWriter, r *http.Request, path string) {
 	if r.Header.Get("X-Requested-With") == "stacknav" {
 		w.Header().Set("X-Location", path)
-		w.Header().Set("X-Replace-URL", "true")
+		w.Header().Set("X-Replace-Url", "true")
 		w.WriteHeader(http.StatusOK)
 		return
 	}

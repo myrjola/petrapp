@@ -57,8 +57,8 @@ func Test_redirectReplace_StackNavRequest_SetsXLocationAndXReplaceURL(t *testing
 	if got := w.Header().Get("X-Location"); got != "/target" {
 		t.Errorf("X-Location = %q, want %q", got, "/target")
 	}
-	if got := w.Header().Get("X-Replace-URL"); got != "true" {
-		t.Errorf("X-Replace-URL = %q, want %q", got, "true")
+	if got := w.Header().Get("X-Replace-Url"); got != "true" {
+		t.Errorf("X-Replace-Url = %q, want %q", got, "true")
 	}
 	if got := w.Header().Get("Location"); got != "" {
 		t.Errorf("Location should not be set for stacknav request, got %q", got)
@@ -80,8 +80,8 @@ func Test_redirectReplace_PlainRequest_Returns303SeeOtherWithoutXReplace(t *test
 	if got := w.Header().Get("Location"); got != "/target" {
 		t.Errorf("Location = %q, want %q", got, "/target")
 	}
-	if got := w.Header().Get("X-Replace-URL"); got != "" {
-		t.Errorf("X-Replace-URL should not be set for plain request, got %q", got)
+	if got := w.Header().Get("X-Replace-Url"); got != "" {
+		t.Errorf("X-Replace-Url should not be set for plain request, got %q", got)
 	}
 	if got := w.Header().Get("X-Location"); got != "" {
 		t.Errorf("X-Location should not be set for plain request, got %q", got)

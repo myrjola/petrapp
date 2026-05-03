@@ -225,8 +225,9 @@ func Test_playwright_smoketest(t *testing.T) {
 
 		// Snapshot the completed-set count before submitting so we can wait for the
 		// post-submit reload to commit. WaitForURL is unreliable here: each submit
-		// goes through popOrReplaceTo with the same target URL, so the URL never
-		// changes and the wait can return before the new DOM has rendered.
+		// goes through popOrPushTo with the same target URL (auto-replaced by the
+		// client), so the URL never changes and the wait can return before the new
+		// DOM has rendered.
 		var completedBefore int
 		if completedBefore, err = completedSets.Count(); err != nil {
 			t.Fatalf("count completed sets: %v", err)
@@ -442,7 +443,9 @@ func Test_playwright_stacknav(t *testing.T) {
 	// === Flow 1, 2, 4 require navigating into a workout day. Today's workout
 	// has not been started yet, so the home page shows a "Start Workout" form
 	// button (not a plain link). Click it — the navigation API intercepts the
-	// POST and calls replaceTo(/workouts/{date}), landing us on the workout page.
+	// POST and calls popOrPushTo(/workouts/{date}); since the target is brand-new
+	// in history this pushes (the bug fix this redesign delivered). Back will
+	// return to / from the workout page.
 	startWorkoutBtn := page.GetByRole("button",
 		playwright.PageGetByRoleOptions{Name: "Start Workout"})
 	if err = startWorkoutBtn.WaitFor(); err != nil {
@@ -453,7 +456,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	}
 	// Wait for the final workout page URL (/workouts/YYYY-MM-DD, not /start).
 	// The navigate API commits the form's destination URL (/start) first, then
-	// replaceTo() fires and the URL settles at the workout overview page.
+	// popOrPushTo fires and the URL settles at the workout overview page.
 	if err = page.WaitForURL(func(u string) bool {
 		return strings.Contains(u, "/workouts/") &&
 			!strings.Contains(u, "/start") &&
@@ -505,7 +508,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = warmupBtn.Click(); err != nil {
 		t.Fatalf("click warmup button: %v", err)
 	}
-	// Wait for the reload triggered by replaceTo(same-URL) to fully settle.
+	// Wait for the reload triggered by the same-URL auto-replace to fully settle.
 	if err = page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateLoad}); err != nil {
 		t.Fatalf("expect load after warmup complete: %v", err)
 	}

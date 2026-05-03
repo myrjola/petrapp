@@ -118,7 +118,7 @@ Two helpers cover all redirect needs. Both negotiate the stack-navigator wire pr
 - **`redirect(w, r, "/path")`** — default. Use for almost all redirects: POST results, GET-handler bounces, auth gates, validation re-renders via flash + redirect-to-form. The client behavior is "pop-or-push": traverse to the URL if it's already in the backward history stack, otherwise push a new entry. Same-URL submits (target equals the current URL — set updates, warmup completion, validation errors that re-render the form) are auto-detected by the client and become a replace; the helper itself stays simple.
 - **`redirectReplace(w, r, "/path")`** — opt-in. Use when the originating page should be erased from history on submit. Today's only call site is `workoutAddExercisePOST`, which redirects to the new exercise's detail page and replaces `/add-exercise`. Reach for this when the form page only exists to submit (a picker, an editor that disappears on save) and you don't want it left behind in the back-button stack.
 
-The client treats every 200 response with `X-Location` as a navigation; an additional `X-Replace-URL: true` header (set by `redirectReplace`) flips the strategy from pop-or-push to replace.
+The client treats every 200 response with `X-Location` as a navigation; an additional `X-Replace-Url: true` header (set by `redirectReplace`) flips the strategy from pop-or-push to replace.
 
 See `docs/superpowers/specs/2026-05-03-stack-navigator-push-default-design.md` for the wire protocol, per-flow behavior, and rationale.
 
