@@ -374,7 +374,7 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 	}
 
 	// Add exercise to the workout
-	if err = app.workoutService.AddExercise(r.Context(), date, exerciseID); err != nil {
+	if _, err = app.workoutService.AddExercise(r.Context(), date, exerciseID); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

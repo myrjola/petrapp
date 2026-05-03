@@ -585,10 +585,16 @@ func Test_AddExercise(t *testing.T) {
 			t.Fatalf("Failed to count exercise sets before update: %v", errCount)
 		}
 
-		// Add exercise 2 to the workout
-		err = svc.AddExercise(ctx, today, exercise2ID)
+		// Add exercise 2 to the workout. AddExercise returns the
+		// workout_exercise.id of the new slot so handlers can redirect
+		// straight to the new exercise's detail page.
+		var newSlotID int
+		newSlotID, err = svc.AddExercise(ctx, today, exercise2ID)
 		if err != nil {
 			t.Fatalf("Failed to add exercise to workout: %v", err)
+		}
+		if newSlotID == 0 {
+			t.Errorf("expected non-zero new slot ID, got 0")
 		}
 
 		// Count exercise sets after adding
@@ -614,12 +620,32 @@ func Test_AddExercise(t *testing.T) {
 		if !exists {
 			t.Error("Exercise was not added to the workout")
 		}
+
+		// Verify the returned slot ID belongs to the slot we just added —
+		// same workout_exercise.id, mapped to exercise 2.
+		got, errGet := svc.GetSession(ctx, today)
+		if errGet != nil {
+			t.Fatalf("GetSession after add: %v", errGet)
+		}
+		var foundSlot bool
+		for _, es := range got.ExerciseSets {
+			if es.ID == newSlotID {
+				if es.Exercise.ID != exercise2ID {
+					t.Errorf("slot %d has exercise %d, want %d", newSlotID, es.Exercise.ID, exercise2ID)
+				}
+				foundSlot = true
+				break
+			}
+		}
+		if !foundSlot {
+			t.Errorf("returned slot ID %d not present in session", newSlotID)
+		}
 	})
 
 	// Test adding an exercise that's already in the workout
 	t.Run("Add duplicate exercise to workout", func(t *testing.T) {
 		// Try to add exercise 1 which is already in the workout
-		err = svc.AddExercise(ctx, today, exercise1ID)
+		_, err = svc.AddExercise(ctx, today, exercise1ID)
 		if err == nil {
 			t.Error("Expected error when adding duplicate exercise, but got nil")
 		}
@@ -642,7 +668,7 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Add exercise to the non-existent workout - should fail
-		err = svc.AddExercise(ctx, futureDate, exercise1ID)
+		_, err = svc.AddExercise(ctx, futureDate, exercise1ID)
 		if err == nil {
 			t.Error("Expected error when adding exercise to non-existent workout, but got nil")
 		}
@@ -726,7 +752,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 		t.Fatalf("insert today's session: %v", err)
 	}
 
-	if err = svc.AddExercise(ctx, today, exerciseID); err != nil {
+	if _, err = svc.AddExercise(ctx, today, exerciseID); err != nil {
 		t.Fatalf("AddExercise: %v", err)
 	}
 

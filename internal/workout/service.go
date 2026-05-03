@@ -969,26 +969,28 @@ const (
 )
 
 // AddExercise adds a new exercise to an existing workout session.
-// It will retrieve historical weight data if available.
-func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID int) error {
+// It will retrieve historical weight data if available. Returns the
+// workout_exercise.id assigned to the new slot, so callers can build URLs
+// that point at the new exercise's detail page.
+func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID int) (int, error) {
 	// 1. Validate the exercise exists
 	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
 	if err != nil {
-		return fmt.Errorf("get exercise: %w", err)
+		return 0, fmt.Errorf("get exercise: %w", err)
 	}
 
 	// 2. Find historical data for the exercise
 	historicalSets, err := s.findHistoricalSets(ctx, date, exerciseID)
 	if err != nil {
-		return fmt.Errorf("find historical sets: %w", err)
+		return 0, fmt.Errorf("find historical sets: %w", err)
 	}
 
 	// 3. Check if the workout session exists
 	_, err = s.repo.sessions.Get(ctx, date)
 	if errors.Is(err, ErrNotFound) {
-		return fmt.Errorf("workout session for date %s does not exist", formatDate(date))
+		return 0, fmt.Errorf("workout session for date %s does not exist", formatDate(date))
 	} else if err != nil {
-		return fmt.Errorf("check session existence: %w", err)
+		return 0, fmt.Errorf("check session existence: %w", err)
 	}
 
 	// 4. Update the session to add the new exercise
@@ -1035,10 +1037,23 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	})
 
 	if err != nil {
-		return fmt.Errorf("update session with new exercise: %w", err)
+		return 0, fmt.Errorf("update session with new exercise: %w", err)
 	}
 
-	return nil
+	// 5. Fetch the session back to learn the slot ID assigned by the
+	// repository on insert. The slot is unique by ExerciseID within a
+	// session (enforced by the duplicate check above), so locating it is
+	// unambiguous.
+	updated, err := s.repo.sessions.Get(ctx, date)
+	if err != nil {
+		return 0, fmt.Errorf("re-fetch session after add: %w", err)
+	}
+	for _, es := range updated.ExerciseSets {
+		if es.ExerciseID == exerciseID {
+			return es.ID, nil
+		}
+	}
+	return 0, fmt.Errorf("added exercise %d not found in session %s", exerciseID, formatDate(date))
 }
 
 // GetFeatureFlag retrieves a feature flag by name.
