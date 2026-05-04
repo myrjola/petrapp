@@ -51,7 +51,13 @@ const (
 	repsHypertrophy = 8
 	repsEndurance   = 15
 
-	weightIncrementKg     = 2.5
+	// dumbbellThresholdKg is the boundary below which loads progress in 1kg
+	// steps (matching real-world fixed-weight dumbbell sets) and at/above
+	// which they revert to the standard 2.5kg plate increment.
+	dumbbellThresholdKg = 10.0
+
+	weightIncrementKgLow  = 1.0
+	weightIncrementKgHigh = 2.5
 	weightDecrementFactor = 0.10
 	halfKg                = 0.5
 )
@@ -113,10 +119,11 @@ func TargetReps(t PeriodizationType) int {
 func adjustedWeight(last SetResult) float64 {
 	switch last.Signal {
 	case SignalTooLight:
-		return last.WeightKg + weightIncrementKg
+		return last.WeightKg + incrementFor(last.WeightKg)
 	case SignalTooHeavy:
-		decrement := math.Max(weightIncrementKg, math.Abs(last.WeightKg)*weightDecrementFactor)
-		return roundToHalf(last.WeightKg - decrement)
+		increment := incrementFor(last.WeightKg)
+		decrement := math.Max(increment, math.Abs(last.WeightKg)*weightDecrementFactor)
+		return snapWeight(last.WeightKg - decrement)
 	case SignalOnTarget:
 		return last.WeightKg
 	case SignalUnknown:
@@ -125,6 +132,20 @@ func adjustedWeight(last SetResult) float64 {
 	panic(fmt.Sprintf("exerciseprogression: unhandled Signal %d", last.Signal))
 }
 
-func roundToHalf(kg float64) float64 {
+// incrementFor returns the load step appropriate for the given weight: 1kg
+// inside the dumbbell range (|w| < 10kg), 2.5kg otherwise.
+func incrementFor(weight float64) float64 {
+	if math.Abs(weight) < dumbbellThresholdKg {
+		return weightIncrementKgLow
+	}
+	return weightIncrementKgHigh
+}
+
+// snapWeight rounds to the nearest realisable load: 1kg in the dumbbell
+// range, 0.5kg above.
+func snapWeight(kg float64) float64 {
+	if math.Abs(kg) < dumbbellThresholdKg {
+		return math.Round(kg)
+	}
 	return math.Round(kg/halfKg) * halfKg
 }

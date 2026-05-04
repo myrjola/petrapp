@@ -1238,14 +1238,14 @@ func Test_BuildProgression(t *testing.T) {
 		t.Fatalf("RecordSetCompletion: %v", err)
 	}
 
-	// Rebuild: next set should be 0 + 2.5 = 2.5 kg.
+	// Rebuild: next set should be 0 + 1 = 1 kg (1kg increment in dumbbell range).
 	prog, err = svc.BuildProgression(ctx, date, exerciseID)
 	if err != nil {
 		t.Fatalf("BuildProgression after set 1: %v", err)
 	}
 	target = prog.CurrentSet()
-	if target.WeightKg != 2.5 {
-		t.Errorf("second set weight: want 2.5, got %v", target.WeightKg)
+	if target.WeightKg != 1.0 {
+		t.Errorf("second set weight: want 1.0, got %v", target.WeightKg)
 	}
 }
 

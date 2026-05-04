@@ -252,7 +252,7 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 			name:       "zero TooHeavy goes negative (zero boundary fixed)",
 			lastWeight: 0.0,
 			signal:     exerciseprogression.SignalTooHeavy,
-			wantWeight: -2.5,
+			wantWeight: -1.0,
 		},
 		{
 			name:       "negative TooLight goes less negative (less assistance)",
@@ -267,10 +267,10 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 			wantWeight: -20.0,
 		},
 		{
-			name:       "low positive TooHeavy uses 2.5kg minimum decrement",
+			name:       "threshold weight TooHeavy uses 2.5kg increment and snaps to whole kg",
 			lastWeight: 10.0,
 			signal:     exerciseprogression.SignalTooHeavy,
-			wantWeight: 7.5,
+			wantWeight: 8.0, // 10 - max(2.5, 1.0) = 7.5; below threshold, snaps to 8.
 		},
 		{
 			name:       "high positive TooHeavy uses percentage (regression)",
@@ -283,6 +283,42 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 			lastWeight: 50.0,
 			signal:     exerciseprogression.SignalTooHeavy,
 			wantWeight: 45.0,
+		},
+		{
+			name:       "dumbbell-range TooLight increases by 1kg",
+			lastWeight: 5.0,
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: 6.0,
+		},
+		{
+			name:       "dumbbell-range TooLight at 9kg lands on 10kg threshold",
+			lastWeight: 9.0,
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: 10.0,
+		},
+		{
+			name:       "zero TooLight increases by 1kg",
+			lastWeight: 0.0,
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: 1.0,
+		},
+		{
+			name:       "dumbbell-range TooHeavy decreases by 1kg",
+			lastWeight: 5.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: 4.0,
+		},
+		{
+			name:       "dumbbell-range TooHeavy at 1kg lands on 0kg",
+			lastWeight: 1.0,
+			signal:     exerciseprogression.SignalTooHeavy,
+			wantWeight: 0.0,
+		},
+		{
+			name:       "threshold TooLight crosses into 2.5kg increment",
+			lastWeight: 10.0,
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: 12.5,
 		},
 	}
 
