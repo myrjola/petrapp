@@ -71,11 +71,32 @@ func TestConvertWeight(t *testing.T) {
 			want:     0.0,
 		},
 		{
-			name:     "negative weight returned unchanged",
+			name:     "assisted strength -50kg x5 to hypertrophy 8 reps adds assistance",
+			weight:   -50.0,
+			fromReps: 5,
+			toReps:   8,
+			want:     -54.5, // -50 * (1 + 8/30) / (1 + 5/30) ≈ -54.29 → snaps to -54.5.
+		},
+		{
+			name:     "assisted hypertrophy -50kg x8 to strength 5 reps removes assistance",
+			weight:   -50.0,
+			fromReps: 8,
+			toReps:   5,
+			want:     -46.0, // -50 * (1 + 5/30) / (1 + 8/30) ≈ -46.05 → snaps to -46.0.
+		},
+		{
+			name:     "assisted strength -50kg x5 to endurance 15 reps adds more assistance",
+			weight:   -50.0,
+			fromReps: 5,
+			toReps:   15,
+			want:     -64.5, // -50 * (1 + 15/30) / (1 + 5/30) ≈ -64.29 → snaps to -64.5.
+		},
+		{
+			name:     "assisted dumbbell-range -5kg x5 to 8 reps snaps to whole kg",
 			weight:   -5.0,
 			fromReps: 5,
 			toReps:   8,
-			want:     -5.0,
+			want:     -5.0, // -5 * 38/35 ≈ -5.43 → snaps to -5.
 		},
 		{
 			name:     "zero fromReps returned unchanged",
