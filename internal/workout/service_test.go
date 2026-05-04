@@ -1075,6 +1075,93 @@ func Test_GetStartingWeight(t *testing.T) {
 	}
 }
 
+// Test_GetStartingWeight_Assisted covers the assisted-exercise (negative weight)
+// flow across periodization changes: an on-target -50 kg x5 strength set must
+// translate into a more negative weight when the next session is hypertrophy
+// (8 reps), since more reps require more machine assistance for the same
+// relative intensity.
+func Test_GetStartingWeight_Assisted(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("sw-assisted-user"), "SW Assisted User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
+		"Assisted Test Exercise", "upper", "desc")
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx,
+		"SELECT id FROM exercises WHERE name = 'Assisted Test Exercise'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+
+	today := time.Now()
+
+	// Insert a completed strength session 7 days ago at -50 kg x5, on target.
+	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
+		userID, dateStr)
+	if err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	var weHistID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, dateStr, exerciseID).Scan(&weHistID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		 weight_kg, min_reps, max_reps, completed_reps, signal)
+		 VALUES (?, 1, -50.0, 5, 5, 5, 'on_target')`,
+		weHistID)
+	if err != nil {
+		t.Fatalf("insert sets: %v", err)
+	}
+
+	// Same periodization: -50 kg carries over unchanged.
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	if err != nil {
+		t.Fatalf("GetStartingWeight strength→strength: %v", err)
+	}
+	if got != -50.0 {
+		t.Errorf("assisted strength → strength: want -50.0, got %v", got)
+	}
+
+	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): more reps
+	// require more assistance, so the recommendation must be more negative.
+	// -50 * (1 + 8/30) / (1 + 5/30) ≈ -54.29 → snaps to -54.5.
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationHypertrophy)
+	if err != nil {
+		t.Fatalf("GetStartingWeight strength→hypertrophy: %v", err)
+	}
+	if got != -54.5 {
+		t.Errorf("assisted strength → hypertrophy: want -54.5, got %v", got)
+	}
+}
+
 func Test_RecordSetCompletion(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
