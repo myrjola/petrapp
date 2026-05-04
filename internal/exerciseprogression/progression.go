@@ -59,7 +59,6 @@ const (
 	weightIncrementKgLow  = 1.0
 	weightIncrementKgHigh = 2.5
 	weightDecrementFactor = 0.10
-	halfKg                = 0.5
 )
 
 // Progression manages set-to-set weight progression for one exercise execution.
@@ -119,7 +118,7 @@ func TargetReps(t PeriodizationType) int {
 func adjustedWeight(last SetResult) float64 {
 	switch last.Signal {
 	case SignalTooLight:
-		return last.WeightKg + incrementFor(last.WeightKg)
+		return snapWeight(last.WeightKg + incrementFor(last.WeightKg))
 	case SignalTooHeavy:
 		increment := incrementFor(last.WeightKg)
 		decrement := math.Max(increment, math.Abs(last.WeightKg)*weightDecrementFactor)
@@ -142,10 +141,12 @@ func incrementFor(weight float64) float64 {
 }
 
 // snapWeight rounds to the nearest realisable load: 1kg in the dumbbell
-// range, 0.5kg above.
+// range, 0.5kg above. User overrides may sit off-grid, so each adjustment
+// is snapped before being recommended.
 func snapWeight(kg float64) float64 {
 	if math.Abs(kg) < dumbbellThresholdKg {
 		return math.Round(kg)
 	}
+	const halfKg = 0.5
 	return math.Round(kg/halfKg) * halfKg
 }

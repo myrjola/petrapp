@@ -320,6 +320,12 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 			signal:     exerciseprogression.SignalTooLight,
 			wantWeight: 12.5,
 		},
+		{
+			name:       "off-grid override TooLight snaps to whole kg",
+			lastWeight: 7.5, // user override; not a real fixed dumbbell.
+			signal:     exerciseprogression.SignalTooLight,
+			wantWeight: 9.0, // 7.5 + 1 = 8.5 → snaps to 9.
+		},
 	}
 
 	for _, tt := range tests {
