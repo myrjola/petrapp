@@ -50,11 +50,18 @@ func TestConvertWeight(t *testing.T) {
 			want:     77.0,
 		},
 		{
-			name:     "result is rounded to nearest 0.5 kg",
+			name:     "above threshold result is snapped to 0.5 kg",
 			weight:   42.5,
 			fromReps: 5,
 			toReps:   8,
 			want:     39.0,
+		},
+		{
+			name:     "dumbbell-range hypertrophy to strength snaps to whole kg",
+			weight:   8.0,
+			fromReps: 8,
+			toReps:   5,
+			want:     9.0, // 8 * (1 + 8/30) / (1 + 5/30) ≈ 8.69 → snaps to 9.
 		},
 		{
 			name:     "zero weight returned unchanged",
