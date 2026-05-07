@@ -122,7 +122,9 @@ func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseT
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", *set.CompletedValue))
 			}
 		case workout.ExerciseTypeTime:
-			// populated in Task 7
+			if set.CompletedValue != nil {
+				setDescriptions = append(setDescriptions, fmt.Sprintf("%ds", *set.CompletedValue))
+			}
 		}
 	}
 
