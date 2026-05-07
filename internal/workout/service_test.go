@@ -1160,6 +1160,108 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	}
 }
 
+func Test_GetStartingSeconds(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	if err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("ts-user"), "TS User").Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	// Insert a time_based exercise with default 30s.
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
+		VALUES (?, ?, ?, ?, ?)`,
+		"Test Plank", "upper", "time_based", 30, ""); err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	if err = db.ReadOnly.QueryRowContext(ctx,
+		"SELECT id FROM exercises WHERE name = 'Test Plank'").Scan(&exerciseID); err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+	today := time.Now()
+
+	// Case 1: no history → fallback to default_starting_seconds.
+	got, err := svc.GetStartingSeconds(ctx, exerciseID, today)
+	if err != nil {
+		t.Fatalf("no history: %v", err)
+	}
+	if got != 30 {
+		t.Errorf("no history: want 30, got %d", got)
+	}
+
+	// Case 2: seed a successful session 2 days ago.
+	twoDaysAgo := today.AddDate(0, 0, -2).Format("2006-01-02")
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO workout_sessions (user_id, workout_date, periodization_type)
+		VALUES (?, ?, 'strength')`, userID, twoDaysAgo); err != nil {
+		t.Fatalf("insert session 1: %v", err)
+	}
+	var weID1 int
+	if err = db.ReadWrite.QueryRowContext(ctx, `
+		INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
+		VALUES (?, ?, ?) RETURNING id`,
+		userID, twoDaysAgo, exerciseID).Scan(&weID1); err != nil {
+		t.Fatalf("insert workout_exercise 1: %v", err)
+	}
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO exercise_sets
+			(workout_exercise_id, set_number, target_value, completed_value, completed_at, signal)
+		VALUES (?, 1, 40, 40, '2026-05-05T12:00:00.000Z', 'on_target')`, weID1); err != nil {
+		t.Fatalf("insert set 1: %v", err)
+	}
+
+	got, err = svc.GetStartingSeconds(ctx, exerciseID, today)
+	if err != nil {
+		t.Fatalf("with history: %v", err)
+	}
+	if got != 40 {
+		t.Errorf("with history: want 40, got %d", got)
+	}
+
+	// Case 3: more recent too_heavy session should be skipped.
+	oneDayAgo := today.AddDate(0, 0, -1).Format("2006-01-02")
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO workout_sessions (user_id, workout_date, periodization_type)
+		VALUES (?, ?, 'strength')`, userID, oneDayAgo); err != nil {
+		t.Fatalf("insert session 2: %v", err)
+	}
+	var weID2 int
+	if err = db.ReadWrite.QueryRowContext(ctx, `
+		INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
+		VALUES (?, ?, ?) RETURNING id`,
+		userID, oneDayAgo, exerciseID).Scan(&weID2); err != nil {
+		t.Fatalf("insert workout_exercise 2: %v", err)
+	}
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO exercise_sets
+			(workout_exercise_id, set_number, target_value, completed_value, completed_at, signal)
+		VALUES (?, 1, 50, 50, '2026-05-06T12:00:00.000Z', 'too_heavy')`, weID2); err != nil {
+		t.Fatalf("insert set 2: %v", err)
+	}
+
+	got, err = svc.GetStartingSeconds(ctx, exerciseID, today)
+	if err != nil {
+		t.Fatalf("skip too_heavy: %v", err)
+	}
+	if got != 40 {
+		t.Errorf("skip too_heavy: want 40 (older successful), got %d", got)
+	}
+}
+
 func Test_RecordSetCompletion(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

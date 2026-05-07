@@ -571,6 +571,38 @@ func (s *Service) GetStartingWeight(
 	return exerciseprogression.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
 }
 
+// GetStartingSeconds returns the seconds target to seed a new session for
+// the given time-based exercise. Pulls the latest successful set's
+// completed_value from sessions strictly before beforeDate; falls back to
+// the exercise's DefaultStartingSeconds when no successful history exists.
+// Returns an error if the exercise is not time_based, if the lookup fails,
+// or if a time_based exercise has no DefaultStartingSeconds (which is a
+// fixture/data invariant violation since the schema CHECK requires it).
+func (s *Service) GetStartingSeconds(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+) (int, error) {
+	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	if err != nil {
+		return 0, fmt.Errorf("get exercise: %w", err)
+	}
+	if !exercise.IsTimed() {
+		return 0, fmt.Errorf("exercise %d is not time_based", exerciseID)
+	}
+	seconds, err := s.repo.sessions.GetLatestSuccessfulSecondsBefore(ctx, exerciseID, beforeDate)
+	if err != nil {
+		return 0, fmt.Errorf("get latest successful seconds: %w", err)
+	}
+	if seconds > 0 {
+		return seconds, nil
+	}
+	if exercise.DefaultStartingSeconds == nil {
+		return 0, fmt.Errorf("time_based exercise %d has no default_starting_seconds", exerciseID)
+	}
+	return *exercise.DefaultStartingSeconds, nil
+}
+
 // periodizationToProgression maps a workout periodization to its exerciseprogression
 // counterpart. Unknown values default to Strength.
 func periodizationToProgression(p PeriodizationType) exerciseprogression.PeriodizationType {

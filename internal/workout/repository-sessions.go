@@ -581,6 +581,39 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 	}, nil
 }
 
+// GetLatestSuccessfulSecondsBefore returns the completed_value of the latest
+// successful set for the given time-based exercise from a session strictly
+// before beforeDate. A set is "successful" when completed_value IS NOT NULL
+// and signal is 'on_target' or 'too_light'. Returns 0 when no successful
+// history exists.
+func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+) (int, error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	var seconds int
+	err := r.db.ReadOnly.QueryRowContext(ctx, `
+		SELECT es.completed_value
+		FROM exercise_sets es
+		JOIN workout_exercise we ON we.id = es.workout_exercise_id
+		WHERE we.workout_user_id = ?
+		  AND we.exercise_id = ?
+		  AND we.workout_date < ?
+		  AND es.completed_value IS NOT NULL
+		  AND es.signal IN ('on_target', 'too_light')
+		ORDER BY we.workout_date DESC, es.set_number DESC
+		LIMIT 1`,
+		userID, exerciseID, formatDate(beforeDate)).Scan(&seconds)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("query latest successful seconds: %w", err)
+	}
+	return seconds, nil
+}
+
 // scanExerciseSetWithDate scans one row from the ListSetsForExerciseSince query.
 func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 	rows *sql.Rows,

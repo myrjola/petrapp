@@ -75,6 +75,12 @@ type sessionRepository interface {
 	// strictly before beforeDate, along with that session's periodization type.
 	// Returns a zero-value struct when no successful history exists.
 	GetLatestStartingWeightBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (LatestStartingSet, error)
+	// GetLatestSuccessfulSecondsBefore returns the completed_value of the latest
+	// successful set for the given time-based exercise from a session strictly
+	// before beforeDate. A set is "successful" when completed_value IS NOT NULL
+	// and signal is 'on_target' or 'too_light'. Returns 0 when no successful
+	// history exists.
+	GetLatestSuccessfulSecondsBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (int, error)
 	// CountCompleted returns the count of sessions with completed_at IS NOT NULL.
 	CountCompleted(ctx context.Context) (int, error)
 	// CreateBatch creates multiple sessions atomically in a single transaction.
