@@ -1262,6 +1262,95 @@ func Test_GetStartingSeconds(t *testing.T) {
 	}
 }
 
+func Test_BuildTimedProgression(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	if err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("btp-user"), "BTP User").Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
+		VALUES (?, ?, ?, ?, ?)`,
+		"Test Plank BTP", "upper", "time_based", 30, ""); err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	if err = db.ReadOnly.QueryRowContext(ctx,
+		"SELECT id FROM exercises WHERE name = 'Test Plank BTP'").Scan(&exerciseID); err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+
+	today := time.Now().Format("2006-01-02")
+	todayTime, _ := time.Parse("2006-01-02", today)
+
+	// Seed today's session with the exercise but no completed sets yet.
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		INSERT INTO workout_sessions (user_id, workout_date, periodization_type)
+		VALUES (?, ?, 'strength')`, userID, today); err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	var weID int
+	if err = db.ReadWrite.QueryRowContext(ctx, `
+		INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
+		VALUES (?, ?, ?) RETURNING id`,
+		userID, today, exerciseID).Scan(&weID); err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+	// Seed three planned sets with target_value=30, no completion yet.
+	for i := 1; i <= 3; i++ {
+		if _, err = db.ReadWrite.ExecContext(ctx, `
+			INSERT INTO exercise_sets (workout_exercise_id, set_number, target_value)
+			VALUES (?, ?, 30)`, weID, i); err != nil {
+			t.Fatalf("insert set %d: %v", i, err)
+		}
+	}
+
+	// Case 1: no completed sets in this session → first set returns starting seconds (default 30).
+	progression, err := svc.BuildTimedProgression(ctx, todayTime, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildTimedProgression no completion: %v", err)
+	}
+	if got := progression.CurrentSet().TargetSeconds; got != 30 {
+		t.Errorf("first set: got %d, want 30 (default)", got)
+	}
+	if got := progression.SetsCompleted(); got != 0 {
+		t.Errorf("first set: SetsCompleted = %d, want 0", got)
+	}
+
+	// Case 2: complete set 1 with too_light → second set should be 35s.
+	if _, err = db.ReadWrite.ExecContext(ctx, `
+		UPDATE exercise_sets
+		SET completed_value = 30, signal = 'too_light'
+		WHERE workout_exercise_id = ? AND set_number = 1`, weID); err != nil {
+		t.Fatalf("update set 1: %v", err)
+	}
+
+	progression, err = svc.BuildTimedProgression(ctx, todayTime, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildTimedProgression after set 1: %v", err)
+	}
+	if got := progression.CurrentSet().TargetSeconds; got != 35 {
+		t.Errorf("after too_light: got %d, want 35", got)
+	}
+	if got := progression.SetsCompleted(); got != 1 {
+		t.Errorf("after set 1: SetsCompleted = %d, want 1", got)
+	}
+}
+
 func Test_RecordSetCompletion(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

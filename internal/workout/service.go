@@ -674,6 +674,57 @@ func (s *Service) BuildProgression(
 	return exerciseprogression.NewFromHistory(config, completed), nil
 }
 
+// BuildTimedProgression constructs an exerciseprogression.TimedProgression
+// for the given time-based exercise in the given session, ready to call
+// CurrentSet() for the next hold's recommendation. Returns an error if the
+// exercise is not time_based or if the lookup fails.
+func (s *Service) BuildTimedProgression(
+	ctx context.Context,
+	date time.Time,
+	exerciseID int,
+) (*exerciseprogression.TimedProgression, error) {
+	starting, err := s.GetStartingSeconds(ctx, exerciseID, date)
+	if err != nil {
+		return nil, fmt.Errorf("get starting seconds: %w", err)
+	}
+
+	sess, err := s.repo.sessions.Get(ctx, date)
+	if err != nil {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+
+	var completed []exerciseprogression.TimedSetResult
+	for _, es := range sess.ExerciseSets {
+		if es.ExerciseID != exerciseID {
+			continue
+		}
+		for _, set := range es.Sets {
+			if set.CompletedValue == nil || set.Signal == nil {
+				continue
+			}
+			var sig exerciseprogression.Signal
+			switch *set.Signal {
+			case SignalTooHeavy:
+				sig = exerciseprogression.SignalTooHeavy
+			case SignalOnTarget:
+				sig = exerciseprogression.SignalOnTarget
+			case SignalTooLight:
+				sig = exerciseprogression.SignalTooLight
+			}
+			completed = append(completed, exerciseprogression.TimedSetResult{
+				ActualSeconds: *set.CompletedValue,
+				Signal:        sig,
+			})
+		}
+		break
+	}
+
+	return exerciseprogression.NewTimedFromHistory(
+		exerciseprogression.TimedConfig{StartingSeconds: starting},
+		completed,
+	), nil
+}
+
 // UpdateExercise updates an existing exercise.
 func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
 	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {
