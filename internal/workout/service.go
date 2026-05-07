@@ -195,9 +195,8 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		for j, pes := range ps.ExerciseSets {
 			sets := make([]Set, len(pes.Sets))
 			for k, planSet := range pes.Sets {
-				sets[k] = Set{ //nolint:exhaustruct // WeightKg, CompletedReps, CompletedAt, Signal start nil.
-					MinReps: planSet.MinReps,
-					MaxReps: planSet.MaxReps,
+				sets[k] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
+					TargetValue: planSet.TargetValue,
 				}
 			}
 			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
@@ -358,13 +357,13 @@ func (s *Service) UpdateSetWeight(
 	return nil
 }
 
-// UpdateCompletedReps updates a previously completed set with new rep count.
-func (s *Service) UpdateCompletedReps(
+// UpdateCompletedValue updates a previously completed set with new value (reps or seconds).
+func (s *Service) UpdateCompletedValue(
 	ctx context.Context,
 	date time.Time,
 	workoutExerciseID int,
 	setIndex int,
-	completedReps int,
+	completedValue int,
 ) error {
 	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
 		for _, ex := range sess.ExerciseSets {
@@ -373,7 +372,7 @@ func (s *Service) UpdateCompletedReps(
 					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
 				}
 				now := time.Now().UTC()
-				ex.Sets[setIndex].CompletedReps = &completedReps
+				ex.Sets[setIndex].CompletedValue = &completedValue
 				ex.Sets[setIndex].CompletedAt = &now
 				return true, nil
 			}
@@ -405,7 +404,7 @@ func (s *Service) RecordSetCompletion(
 				now := time.Now().UTC()
 				sess.ExerciseSets[i].Sets[setIndex].Signal = &signal
 				sess.ExerciseSets[i].Sets[setIndex].WeightKg = &weightKg
-				sess.ExerciseSets[i].Sets[setIndex].CompletedReps = &reps
+				sess.ExerciseSets[i].Sets[setIndex].CompletedValue = &reps
 				sess.ExerciseSets[i].Sets[setIndex].CompletedAt = &now
 				return true, nil
 			}
@@ -528,7 +527,7 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 		// Collect only completed sets; skip entries with none.
 		var completedSets []Set
 		for _, set := range agg.Sets {
-			if set.CompletedReps != nil {
+			if set.CompletedValue != nil {
 				completedSets = append(completedSets, set)
 			}
 		}
@@ -615,7 +614,7 @@ func (s *Service) BuildProgression(
 			continue
 		}
 		for _, set := range es.Sets {
-			if set.CompletedReps == nil || set.Signal == nil {
+			if set.CompletedValue == nil || set.Signal == nil {
 				continue
 			}
 			var sig exerciseprogression.Signal
@@ -632,7 +631,7 @@ func (s *Service) BuildProgression(
 				kg = *set.WeightKg
 			}
 			completed = append(completed, exerciseprogression.SetResult{
-				ActualReps: *set.CompletedReps,
+				ActualReps: *set.CompletedValue,
 				Signal:     sig,
 				WeightKg:   kg,
 			})
@@ -804,7 +803,7 @@ func (s *Service) generateExerciseContent(ctx context.Context, name string) Exer
 
 // createMinimalExercise returns a basic exercise with just the essential fields populated.
 func createMinimalExercise(name string) Exercise {
-	return Exercise{
+	return Exercise{ //nolint:exhaustruct // DefaultStartingSeconds is nil for non-time_based exercises.
 		ID:                    -1,
 		Name:                  name,
 		Category:              CategoryFullBody,
@@ -873,17 +872,16 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 	return nil, nil
 }
 
-// copySetsWithoutCompletion creates a copy of sets with completed reps reset to nil.
+// copySetsWithoutCompletion creates a copy of sets with completion reset to nil.
 func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 	result := make([]Set, len(sets))
 	for i, set := range sets {
 		result[i] = Set{
-			WeightKg:      set.WeightKg,
-			MinReps:       set.MinReps,
-			MaxReps:       set.MaxReps,
-			CompletedReps: nil, // Reset completion status
-			CompletedAt:   nil,
-			Signal:        nil,
+			WeightKg:       set.WeightKg,
+			TargetValue:    set.TargetValue,
+			CompletedValue: nil, // Reset completion status.
+			CompletedAt:    nil,
+			Signal:         nil,
 		}
 	}
 	return result
@@ -895,15 +893,14 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 	for i, set := range templateSets {
 		var weight *float64
 		if set.WeightKg != nil {
-			weight = new(float64) // Empty weight for weighted exercises
+			weight = new(float64) // Empty weight for weighted exercises.
 		}
 		result[i] = Set{
-			WeightKg:      weight,
-			MinReps:       set.MinReps,
-			MaxReps:       set.MaxReps,
-			CompletedReps: nil,
-			CompletedAt:   nil,
-			Signal:        nil,
+			WeightKg:       weight,
+			TargetValue:    set.TargetValue,
+			CompletedValue: nil,
+			CompletedAt:    nil,
+			Signal:         nil,
 		}
 	}
 	return result
@@ -962,11 +959,8 @@ func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) (
 	return otherExercises, nil
 }
 
-// Default rep ranges.
-const (
-	defaultMinReps = 8
-	defaultMaxReps = 12
-)
+// defaultTargetValue is the fallback target value (reps) when no history is available.
+const defaultTargetValue = 8
 
 // AddExercise adds a new exercise to an existing workout session.
 // It will retrieve historical weight data if available. Returns the
@@ -1014,12 +1008,11 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			newSets = make([]Set, defaultSetCount)
 			for i := range newSets {
 				newSets[i] = Set{
-					WeightKg:      new(float64),
-					MinReps:       defaultMinReps,
-					MaxReps:       defaultMaxReps,
-					CompletedReps: nil,
-					CompletedAt:   nil,
-					Signal:        nil,
+					WeightKg:       new(float64),
+					TargetValue:    defaultTargetValue,
+					CompletedValue: nil,
+					CompletedAt:    nil,
+					Signal:         nil,
 				}
 			}
 		}

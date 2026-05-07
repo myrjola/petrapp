@@ -35,11 +35,9 @@ const (
 )
 
 const (
-	setsPerExercise    = 3
-	minRepsStrength    = 5
-	maxRepsStrength    = 5
-	minRepsHypertrophy = 6
-	maxRepsHypertrophy = 10
+	setsPerExercise = 3
+	repsStrength    = 5
+	repsHypertrophy = 8
 )
 
 const (
@@ -136,10 +134,10 @@ type PlannedExerciseSet struct {
 	Sets       []PlannedSet
 }
 
-// PlannedSet holds rep targets only; WeightKg is always nil at plan time.
+// PlannedSet holds the target value only; WeightKg is always nil at plan time.
+// The unit (reps or seconds) is derived from the parent exercise type.
 type PlannedSet struct {
-	MinReps int
-	MaxReps int
+	TargetValue int
 }
 
 // WeeklyPlanner holds the static inputs needed to plan a full week of workouts.
@@ -293,12 +291,12 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 	return result
 }
 
-// setsForPeriodization returns MinReps/MaxReps for a PlannedSet based on periodization type.
-func setsForPeriodization(pt PeriodizationType) (int, int) {
+// setsForPeriodization returns the target value for a PlannedSet based on periodization type.
+func setsForPeriodization(pt PeriodizationType) int {
 	if pt == PeriodizationStrength {
-		return minRepsStrength, maxRepsStrength
+		return repsStrength
 	}
-	return minRepsHypertrophy, maxRepsHypertrophy
+	return repsHypertrophy
 }
 
 // primaryMuscleGroupsOverlap returns true if any of the exercise's primary muscle groups
@@ -418,10 +416,10 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 	}
 
 	// Build PlannedExerciseSets.
-	minR, maxR := setsForPeriodization(pt)
+	targetValue := setsForPeriodization(pt)
 	sets := make([]PlannedSet, setsPerExercise)
 	for i := range sets {
-		sets[i] = PlannedSet{MinReps: minR, MaxReps: maxR}
+		sets[i] = PlannedSet{TargetValue: targetValue}
 	}
 
 	result := make([]PlannedExerciseSet, len(selected))

@@ -303,17 +303,17 @@
 
         {{ range $index, $setDisplay := .SetsDisplay }}
             {{ $set := $setDisplay.Set }}
-            {{ $isActive := and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedReps) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
-            <div class="exercise-set{{ if $set.CompletedReps }} completed{{ end }}{{ if $isActive }} active{{ end }}"
+            {{ $isActive := and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedValue) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
+            <div class="exercise-set{{ if $set.CompletedValue }} completed{{ end }}{{ if $isActive }} active{{ end }}"
                  role="group"
                  {{ if $isActive }}aria-current="step"{{ end }}
-                 aria-label="{{ if $set.CompletedReps }}Completed set{{ else if $isActive }}Current set{{ else }}Upcoming set{{ end }}">
+                 aria-label="{{ if $set.CompletedValue }}Completed set{{ else if $isActive }}Current set{{ else }}Upcoming set{{ end }}">
                 <div class="set-info">
                     {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
-                        {{ if $set.CompletedReps }}
+                        {{ if $set.CompletedValue }}
                             <span class="status-icon" aria-hidden="true">✓</span>
                             <span class="weight" aria-label="Weight">{{ formatFloat $set.WeightKg }} kg</span>
-                            <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
+                            <span class="reps" aria-label="Completed reps">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
                             {{ if $set.Signal }}
                                 <span class="signal-badge" aria-label="Signal">{{ $set.Signal }}</span>
                             {{ end }}
@@ -326,12 +326,12 @@
                             <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
                         {{ end }}
                     {{ else }}
-                        {{ if $set.CompletedReps }}
+                        {{ if $set.CompletedValue }}
                             <span class="status-icon" aria-hidden="true">✓</span>
-                            <span class="reps" aria-label="Completed reps">{{ $set.CompletedReps }} reps</span>
+                            <span class="reps" aria-label="Completed value">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else }}
-                            <span class="reps" aria-label="Target reps">{{ $setDisplay.RepStr }} reps</span>
+                            <span class="reps" aria-label="Target value">{{ $setDisplay.TargetStr }} {{ $setDisplay.Unit }}</span>
                         {{ end }}
                     {{ end }}
                 </div>
@@ -407,16 +407,16 @@
                               class="set-form bodyweight-form"
                               aria-label="Complete current set">
                             <div class="input-field">
-                                <label for="reps-{{ $index }}">Reps</label>
+                                <label for="completed-value-{{ $index }}">{{ $setDisplay.Unit }}</label>
                                 <input
-                                        id="reps-{{ $index }}"
+                                        id="completed-value-{{ $index }}"
                                         inputmode="numeric"
                                         pattern="[0-9]*"
-                                        name="reps"
-                                        placeholder="{{ $setDisplay.RepStr }}"
-                                        {{ if $set.CompletedReps }}value="{{ $set.CompletedReps }}"{{ end }}
+                                        name="completed_value"
+                                        placeholder="{{ $setDisplay.TargetStr }}"
+                                        {{ if $set.CompletedValue }}value="{{ $setDisplay.CompletedStr }}"{{ end }}
                                         required
-                                        {{ if $set.CompletedReps }}disabled{{ end }}
+                                        {{ if $set.CompletedValue }}disabled{{ end }}
                                         class="reps-input"
                                 >
                             </div>

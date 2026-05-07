@@ -109,18 +109,20 @@ func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseT
 	var setDescriptions []string
 
 	for _, set := range entry.Sets {
-		reps := *set.CompletedReps // service guarantees CompletedReps != nil
-
 		switch typ {
 		// Weighted and assisted share the same metric: signed weight.
 		// `-20 → -10 → 0 → +5` describes a continuous progression.
 		case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
-			if set.WeightKg != nil {
+			if set.WeightKg != nil && set.CompletedValue != nil {
 				weight := *set.WeightKg
-				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", reps, weight))
+				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", *set.CompletedValue, weight))
 			}
 		case workout.ExerciseTypeBodyweight:
-			setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", reps))
+			if set.CompletedValue != nil {
+				setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", *set.CompletedValue))
+			}
+		case workout.ExerciseTypeTime:
+			// populated in Task 7
 		}
 	}
 

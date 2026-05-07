@@ -164,8 +164,8 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Create exercise object
-	exercise := workout.Exercise{
+	// Create exercise object.
+	exercise := workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds is not managed by this form (Task 9).
 		ID:                    id,
 		Name:                  name,
 		Category:              category,

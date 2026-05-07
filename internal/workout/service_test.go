@@ -230,14 +230,12 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 	}
 
 	completed := time.Now().UTC()
-	completedSet := workout.Set{ //nolint:exhaustruct // Reps and weight are not relevant for volume.
-		MinReps:     8,
-		MaxReps:     12,
+	completedSet := workout.Set{ //nolint:exhaustruct // Value and weight are not relevant for volume.
+		TargetValue: 12,
 		CompletedAt: &completed,
 	}
 	plannedSet := workout.Set{ //nolint:exhaustruct // CompletedAt nil → planned but not completed.
-		MinReps: 8,
-		MaxReps: 12,
+		TargetValue: 12,
 	}
 
 	benchSet := workout.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
@@ -423,9 +421,9 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets
-		(workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
-		VALUES (?, ?, ?, ?, ?)`,
-		weID, 1, 50.0, 8, 12)
+		(workout_exercise_id, set_number, weight_kg, target_value)
+		VALUES (?, ?, ?, ?)`,
+		weID, 1, 50.0, 12)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise set: %v", err)
 	}
@@ -443,7 +441,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	updatedExercise := workout.Exercise{
+	updatedExercise := workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds not needed for this test.
 		ID:                    exerciseID,
 		Name:                  "Updated Test Exercise",
 		Category:              workout.CategoryLower,
@@ -564,9 +562,9 @@ func Test_AddExercise(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets
-		(workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
-		VALUES (?, ?, ?, ?, ?)`,
-		weID1, 1, 50.0, 8, 12)
+		(workout_exercise_id, set_number, weight_kg, target_value)
+		VALUES (?, ?, ?, ?)`,
+		weID1, 1, 50.0, 12)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise set: %v", err)
 	}
@@ -734,8 +732,8 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 			t.Fatalf("insert workout_exercise %d days ago: %v", daysAgo, err)
 		}
 		if _, err = db.ReadWrite.ExecContext(ctx,
-			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
-			 VALUES (?, 1, ?, 8, 12)`,
+			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+			 VALUES (?, 1, ?, 12)`,
 			weID, weight); err != nil {
 			t.Fatalf("insert exercise_set %d days ago: %v", daysAgo, err)
 		}
@@ -975,10 +973,10 @@ func Test_GetStartingWeight(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps, signal)
-		 VALUES (?, 1, 95.0, 5, 5, 5, 'too_light'),
-		        (?, 2, 100.0, 5, 5, 5, 'on_target'),
-		        (?, 3, 105.0, 5, 5, 3, 'too_heavy')`,
+		 weight_kg, target_value, completed_value, signal)
+		 VALUES (?, 1, 95.0, 5, 5, 'too_light'),
+		        (?, 2, 100.0, 5, 5, 'on_target'),
+		        (?, 3, 105.0, 5, 3, 'too_heavy')`,
 		weHistID, weHistID, weHistID)
 	if err != nil {
 		t.Fatalf("insert sets: %v", err)
@@ -1022,9 +1020,9 @@ func Test_GetStartingWeight(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps, signal)
-		 VALUES (?, 1, 75.0, 5, 5, 5, 'too_light'),
-		        (?, 2, 80.0, 5, 5, 5, 'on_target')`,
+		 weight_kg, target_value, completed_value, signal)
+		 VALUES (?, 1, 75.0, 5, 5, 'too_light'),
+		        (?, 2, 80.0, 5, 5, 'on_target')`,
 		weTodayID, weTodayID)
 	if err != nil {
 		t.Fatalf("insert today's sets: %v", err)
@@ -1058,9 +1056,9 @@ func Test_GetStartingWeight(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps, signal)
-		 VALUES (?, 1, 110.0, 5, 5, 3, 'too_heavy'),
-		        (?, 2, 110.0, 5, 5, 2, 'too_heavy')`,
+		 weight_kg, target_value, completed_value, signal)
+		 VALUES (?, 1, 110.0, 5, 3, 'too_heavy'),
+		        (?, 2, 110.0, 5, 2, 'too_heavy')`,
 		weFailID, weFailID)
 	if err != nil {
 		t.Fatalf("insert fail sets: %v", err)
@@ -1134,8 +1132,8 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps, signal)
-		 VALUES (?, 1, -50.0, 5, 5, 5, 'on_target')`,
+		 weight_kg, target_value, completed_value, signal)
+		 VALUES (?, 1, -50.0, 5, 5, 'on_target')`,
 		weHistID)
 	if err != nil {
 		t.Fatalf("insert sets: %v", err)
@@ -1204,8 +1202,8 @@ func Test_RecordSetCompletion(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps)
-		 VALUES (?, 1, 100.0, 5, 5)`,
+		 weight_kg, target_value)
+		 VALUES (?, 1, 100.0, 5)`,
 		weID)
 	if err != nil {
 		t.Fatalf("insert set: %v", err)
@@ -1241,8 +1239,8 @@ func Test_RecordSetCompletion(t *testing.T) {
 	if set.WeightKg == nil || *set.WeightKg != 102.5 {
 		t.Errorf("weight: want 102.5, got %v", set.WeightKg)
 	}
-	if set.CompletedReps == nil || *set.CompletedReps != 5 {
-		t.Errorf("reps: want 5, got %v", set.CompletedReps)
+	if set.CompletedValue == nil || *set.CompletedValue != 5 {
+		t.Errorf("completed value: want 5, got %v", set.CompletedValue)
 	}
 	if set.CompletedAt == nil {
 		t.Error("completed_at: want non-nil")
@@ -1297,8 +1295,8 @@ func Test_BuildProgression(t *testing.T) {
 		t.Fatalf("insert workout_exercise: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, min_reps, max_reps)
-		 VALUES (?, 1, 40.0, 8, 8), (?, 2, 40.0, 8, 8), (?, 3, 40.0, 8, 8)`,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+		 VALUES (?, 1, 40.0, 8), (?, 2, 40.0, 8), (?, 3, 40.0, 8)`,
 		weID, weID, weID)
 	if err != nil {
 		t.Fatalf("insert sets: %v", err)
@@ -1385,8 +1383,8 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-		 weight_kg, min_reps, max_reps, completed_reps, signal)
-		 VALUES (?, 1, 100.0, 5, 5, 5, 'on_target')`,
+		 weight_kg, target_value, completed_value, signal)
+		 VALUES (?, 1, 100.0, 5, 5, 'on_target')`,
 		wePrevID)
 	if err != nil {
 		t.Fatalf("insert prev set: %v", err)

@@ -281,12 +281,11 @@ func TestSelectExercisesForDay(t *testing.T) {
 		}
 	})
 
-	t.Run("strength periodization sets correct rep range", func(t *testing.T) {
+	t.Run("strength periodization sets correct target value", func(t *testing.T) {
 		sets := wp.selectExercisesForDay(CategoryUpper, nil, 1)
 		for _, s := range sets[0].Sets {
-			if s.MinReps != minRepsStrength || s.MaxReps != maxRepsStrength {
-				t.Errorf("strength set: want min=%d max=%d, got min=%d max=%d",
-					minRepsStrength, maxRepsStrength, s.MinReps, s.MaxReps)
+			if s.TargetValue != repsStrength {
+				t.Errorf("strength set: want TargetValue=%d, got %d", repsStrength, s.TargetValue)
 			}
 		}
 	})

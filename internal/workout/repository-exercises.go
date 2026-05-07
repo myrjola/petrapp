@@ -24,9 +24,10 @@ func newSQLiteExerciseRepository(db *sqlite.Database) *sqliteExerciseRepository 
 // Get retrieves a single exercise by ID.
 func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, error) {
 	var exercise Exercise
+	var defaultStartingSeconds sql.NullInt64
 
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown
+		SELECT id, name, category, exercise_type, description_markdown, default_starting_seconds
 		FROM exercises
 		WHERE id = ?`, id).Scan(
 		&exercise.ID,
@@ -34,9 +35,14 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 		&exercise.Category,
 		&exercise.ExerciseType,
 		&exercise.DescriptionMarkdown,
+		&defaultStartingSeconds,
 	)
 	if err != nil {
 		return Exercise{}, fmt.Errorf("query exercise: %w", err)
+	}
+	if defaultStartingSeconds.Valid {
+		v := int(defaultStartingSeconds.Int64)
+		exercise.DefaultStartingSeconds = &v
 	}
 
 	// Fetch muscle groups
@@ -53,9 +59,9 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 
 // ListExercises returns all available exercises with their muscle groups.
 func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err error) {
-	// First, get all exercises
+	// First, get all exercises.
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown
+		SELECT id, name, category, exercise_type, description_markdown, default_starting_seconds
 		FROM exercises
 		ORDER BY id`)
 	if err != nil {
@@ -70,10 +76,16 @@ func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err 
 	var exercises []Exercise
 	for rows.Next() {
 		var exercise Exercise
+		var defaultStartingSeconds sql.NullInt64
 		if err = rows.Scan(
-			&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType, &exercise.DescriptionMarkdown,
+			&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType,
+			&exercise.DescriptionMarkdown, &defaultStartingSeconds,
 		); err != nil {
 			return nil, fmt.Errorf("scan exercise: %w", err)
+		}
+		if defaultStartingSeconds.Valid {
+			v := int(defaultStartingSeconds.Int64)
+			exercise.DefaultStartingSeconds = &v
 		}
 		exercises = append(exercises, exercise)
 	}

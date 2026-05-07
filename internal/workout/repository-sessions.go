@@ -304,9 +304,8 @@ type loadExerciseSetsRow struct {
 	warmupCompletedAtStr sql.NullString
 	setNumber            sql.NullInt32
 	weightKg             sql.NullFloat64
-	minReps              sql.NullInt32
-	maxReps              sql.NullInt32
-	completedReps        sql.NullInt32
+	targetValue          sql.NullInt32
+	completedValue       sql.NullInt32
 	completedAtStr       sql.NullString
 	signalStr            sql.NullString
 }
@@ -324,8 +323,8 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 
 	rows, err := q.QueryContext(ctx, `
 		SELECT we.id, we.exercise_id, we.warmup_completed_at,
-		       es.set_number, es.weight_kg, es.min_reps, es.max_reps,
-		       es.completed_reps, es.completed_at, es.signal
+		       es.set_number, es.weight_kg, es.target_value,
+		       es.completed_value, es.completed_at, es.signal
 		FROM workout_exercise we
 		LEFT JOIN exercise_sets es ON es.workout_exercise_id = we.id
 		WHERE we.workout_user_id = ? AND we.workout_date = ?
@@ -353,8 +352,8 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	for rows.Next() {
 		var row loadExerciseSetsRow
 		if err = rows.Scan(&row.weID, &row.exerciseID, &row.warmupCompletedAtStr,
-			&row.setNumber, &row.weightKg, &row.minReps, &row.maxReps,
-			&row.completedReps, &row.completedAtStr, &row.signalStr); err != nil {
+			&row.setNumber, &row.weightKg, &row.targetValue,
+			&row.completedValue, &row.completedAtStr, &row.signalStr); err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
 
@@ -404,17 +403,16 @@ func (r *sqliteSessionRepository) startAggregate(row loadExerciseSetsRow) (exerc
 
 // buildSet materialises a Set from a row that has set_number populated.
 func (r *sqliteSessionRepository) buildSet(row loadExerciseSetsRow) (Set, error) {
-	set := Set{ //nolint:exhaustruct // CompletedReps, CompletedAt, Signal are populated below.
-		MinReps: int(row.minReps.Int32),
-		MaxReps: int(row.maxReps.Int32),
+	set := Set{ //nolint:exhaustruct // CompletedValue, CompletedAt, Signal are populated below.
+		TargetValue: int(row.targetValue.Int32),
 	}
 	if row.weightKg.Valid {
 		w := row.weightKg.Float64
 		set.WeightKg = &w
 	}
-	if row.completedReps.Valid {
-		c := int(row.completedReps.Int32)
-		set.CompletedReps = &c
+	if row.completedValue.Valid {
+		c := int(row.completedValue.Int32)
+		set.CompletedValue = &c
 	}
 	if err := r.parseCompletedAtTimestamp(row.completedAtStr, &set); err != nil {
 		return Set{}, err
@@ -470,8 +468,8 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	sinceDateStr := formatDate(sinceDate)
 
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT we.workout_date, es.weight_kg, es.min_reps, es.max_reps,
-		       es.completed_reps, es.completed_at, we.warmup_completed_at, es.signal
+		SELECT we.workout_date, es.weight_kg, es.target_value,
+		       es.completed_value, es.completed_at, we.warmup_completed_at, es.signal
 		FROM workout_exercise we
 		JOIN exercise_sets es ON es.workout_exercise_id = we.id
 		WHERE we.workout_user_id = ? AND we.exercise_id = ? AND we.workout_date >= ?
@@ -564,7 +562,7 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		WHERE we.workout_user_id = ?
 		  AND we.exercise_id = ?
 		  AND we.workout_date < ?
-		  AND es.completed_reps IS NOT NULL
+		  AND es.completed_value IS NOT NULL
 		  AND es.weight_kg IS NOT NULL
 		  AND es.signal IN ('on_target', 'too_light') -- NULL signals are excluded intentionally.
 		ORDER BY we.workout_date DESC, es.set_number DESC
@@ -594,8 +592,8 @@ func (r *sqliteSessionRepository) scanExerciseSetWithDate(
 		warmupCompletedAtStr sql.NullString
 		signalStr            sql.NullString
 	)
-	if err := rows.Scan(&workoutDateStr, &set.WeightKg, &set.MinReps, &set.MaxReps,
-		&set.CompletedReps, &completedAtStr, &warmupCompletedAtStr, &signalStr); err != nil {
+	if err := rows.Scan(&workoutDateStr, &set.WeightKg, &set.TargetValue,
+		&set.CompletedValue, &completedAtStr, &warmupCompletedAtStr, &signalStr); err != nil {
 		return "", Set{}, sql.NullString{}, fmt.Errorf("scan exercise set row: %w", err)
 	}
 	if err := r.parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
@@ -721,10 +719,10 @@ func (r *sqliteSessionRepository) saveExerciseSets(
 			if _, err = tx.ExecContext(ctx, `
 				INSERT INTO exercise_sets (
 					workout_exercise_id, set_number,
-					weight_kg, min_reps, max_reps, completed_reps, completed_at, signal
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+					weight_kg, target_value, completed_value, completed_at, signal
+				) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 				weID, i+1,
-				set.WeightKg, set.MinReps, set.MaxReps, set.CompletedReps, completedAtStr, signalValue); err != nil {
+				set.WeightKg, set.TargetValue, set.CompletedValue, completedAtStr, signalValue); err != nil {
 				return fmt.Errorf("insert exercise set: %w", err)
 			}
 		}

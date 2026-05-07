@@ -80,11 +80,14 @@ CREATE TABLE workout_preferences
 
 CREATE TABLE exercises
 (
-    id                   INTEGER PRIMARY KEY,
-    name                 TEXT NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
-    category             TEXT NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
-    exercise_type        TEXT NOT NULL DEFAULT 'weighted' CHECK (exercise_type IN ('weighted', 'bodyweight', 'assisted')),
-    description_markdown TEXT NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000)
+    id                       INTEGER PRIMARY KEY,
+    name                     TEXT    NOT NULL UNIQUE CHECK (LENGTH(name) < 124),
+    category                 TEXT    NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
+    exercise_type            TEXT    NOT NULL DEFAULT 'weighted'
+                             CHECK (exercise_type IN ('weighted', 'bodyweight', 'assisted', 'time_based')),
+    description_markdown     TEXT    NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000),
+    default_starting_seconds INTEGER CHECK (default_starting_seconds IS NULL OR default_starting_seconds > 0),
+    CHECK (exercise_type <> 'time_based' OR default_starting_seconds IS NOT NULL)
 ) STRICT;
 
 CREATE TABLE workout_sessions
@@ -123,10 +126,10 @@ CREATE TABLE exercise_sets
     workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercise (id) ON DELETE CASCADE,
     set_number          INTEGER NOT NULL CHECK (set_number > 0),
     weight_kg           REAL,
-    min_reps            INTEGER NOT NULL CHECK (min_reps > 0),
-    max_reps            INTEGER NOT NULL CHECK (max_reps >= min_reps),
-    completed_reps      INTEGER CHECK (completed_reps IS NULL OR completed_reps >= 0),
-    completed_at        TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    target_value        INTEGER NOT NULL CHECK (target_value > 0),
+    completed_value     INTEGER CHECK (completed_value IS NULL OR completed_value >= 0),
+    completed_at        TEXT CHECK (completed_at IS NULL OR
+                                    STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
     signal              TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
 
     PRIMARY KEY (workout_exercise_id, set_number)
