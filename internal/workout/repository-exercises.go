@@ -200,6 +200,11 @@ func (r *sqliteExerciseRepository) Update(
 
 // set creates or updates an exercise with optional upsert.
 func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert bool) (_ Exercise, err error) {
+	// time_based exercises currently cannot be created or updated through this
+	// path: default_starting_seconds is not written, so the schema CHECK
+	// (exercise_type <> 'time_based' OR default_starting_seconds IS NOT NULL)
+	// fails. Task 9 (admin form support) will add the column to both INSERTs.
+
 	// Begin transaction
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {

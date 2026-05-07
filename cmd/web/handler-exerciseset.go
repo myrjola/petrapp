@@ -21,6 +21,9 @@ func formatTarget(exercise workout.Exercise, session workout.Session, target int
 	if exercise.IsTimed() {
 		return fmt.Sprintf("%ds", target)
 	}
+	// Hypertrophy display preserves the legacy 6-10 rep range UX. TargetValue
+	// is the single integer the planner emits (8); progression and storage use
+	// that, while the user sees the range.
 	if session.PeriodizationType == workout.PeriodizationHypertrophy {
 		return "6-10"
 	}

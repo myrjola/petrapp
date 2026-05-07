@@ -24,13 +24,14 @@ Guidelines for working with domain models, business logic, and data access patte
 
 ```go
 type Exercise struct {
-    ID                    int
-    Name                  string
-    Category              Category     // full_body, upper, lower
-    ExerciseType          ExerciseType // weighted, bodyweight
-    DescriptionMarkdown   string
-    PrimaryMuscleGroups   []string
-    SecondaryMuscleGroups []string
+    ID                     int
+    Name                   string
+    Category               Category     // full_body, upper, lower
+    ExerciseType           ExerciseType // weighted, bodyweight, assisted, time_based
+    DescriptionMarkdown    string
+    PrimaryMuscleGroups    []string
+    SecondaryMuscleGroups  []string
+    DefaultStartingSeconds *int         // Non-nil for time_based exercises; nil otherwise.
 }
 
 type Session struct {
@@ -48,11 +49,11 @@ type ExerciseSet struct {
 }
 
 type Set struct {
-    WeightKg      *float64   // Nullable for bodyweight exercises
-    MinReps       int
-    MaxReps       int
-    CompletedReps *int       // Actual reps completed
-    CompletedAt   *time.Time // When set was completed
+    WeightKg       *float64   // Nullable for bodyweight and time_based exercises.
+    TargetValue    int        // Reps if rep-based, seconds if time_based — unit derived from parent Exercise.
+    CompletedValue *int       // Same unit as TargetValue.
+    CompletedAt    *time.Time
+    Signal         *Signal
 }
 ```
 
