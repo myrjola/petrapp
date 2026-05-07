@@ -162,11 +162,12 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 	wpExercises := make([]weekplanner.Exercise, len(exercises))
 	for i, ex := range exercises {
 		wpExercises[i] = weekplanner.Exercise{
-			ID:                    ex.ID,
-			Category:              weekplanner.Category(ex.Category),
-			ExerciseType:          weekplanner.ExerciseType(ex.ExerciseType),
-			PrimaryMuscleGroups:   ex.PrimaryMuscleGroups,
-			SecondaryMuscleGroups: ex.SecondaryMuscleGroups,
+			ID:                     ex.ID,
+			Category:               weekplanner.Category(ex.Category),
+			ExerciseType:           weekplanner.ExerciseType(ex.ExerciseType),
+			PrimaryMuscleGroups:    ex.PrimaryMuscleGroups,
+			SecondaryMuscleGroups:  ex.SecondaryMuscleGroups,
+			DefaultStartingSeconds: ex.DefaultStartingSeconds,
 		}
 	}
 

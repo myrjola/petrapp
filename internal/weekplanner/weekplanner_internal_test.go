@@ -146,21 +146,29 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 func minimalExercises() []Exercise {
 	return []Exercise{
 		{ID: 1, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Quads", "Glutes"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Quads", "Glutes"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 2, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Hamstrings"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Hamstrings"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Chest", "Triceps", "Shoulders"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Chest", "Triceps", "Shoulders"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Lats", "Upper Back"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Lats", "Upper Back"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 5, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Biceps"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Biceps"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 6, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 7, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 		{ID: 8, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups: []string{"Quads"}, SecondaryMuscleGroups: nil},
+			PrimaryMuscleGroups: []string{"Quads"}, SecondaryMuscleGroups: nil,
+			DefaultStartingSeconds: nil},
 	}
 }
 
@@ -296,13 +304,17 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 		// Exercise pool: multiple exercises that could target overlapping muscles.
 		exercises := []Exercise{
 			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Triceps"}},
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Triceps"},
+				DefaultStartingSeconds: nil},
 			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Shoulders"}},
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Shoulders"},
+				DefaultStartingSeconds: nil},
 			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Shoulders", "Triceps"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Shoulders", "Triceps"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 			{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 		}
 
 		p := prefs(time.Tuesday) // 3 exercises
@@ -340,11 +352,14 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 		// Exercise pool: all Chest exercises have overlapping primary muscles.
 		exercises := []Exercise{
 			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest", "Triceps"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Chest", "Triceps"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest", "Shoulders"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Chest", "Shoulders"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 		}
 
 		p := prefs(time.Tuesday) // 3 exercises
@@ -386,11 +401,14 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 	t.Run("exercise used earlier in week is skipped", func(t *testing.T) {
 		exercises := []Exercise{
 			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 		}
 
 		p := prefs(time.Tuesday)
@@ -457,9 +475,11 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 		// Exercise pool: only 2 non-overlapping exercises available.
 		exercises := []Exercise{
 			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil},
+				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
+				DefaultStartingSeconds: nil},
 		}
 
 		p := prefs(time.Tuesday) // Requests 3 exercises
@@ -492,6 +512,58 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
+	t.Parallel()
+
+	starting := 30
+	plank := Exercise{
+		ID:                     21,
+		Category:               CategoryUpper,
+		ExerciseType:           ExerciseTypeTime,
+		PrimaryMuscleGroups:    []string{"Abs"},
+		SecondaryMuscleGroups:  nil,
+		DefaultStartingSeconds: &starting,
+	}
+
+	wp := &WeeklyPlanner{
+		Prefs: Preferences{
+			MondayMinutes:    60,
+			TuesdayMinutes:   0,
+			WednesdayMinutes: 0,
+			ThursdayMinutes:  0,
+			FridayMinutes:    0,
+			SaturdayMinutes:  0,
+			SundayMinutes:    0,
+		},
+		Exercises: []Exercise{plank},
+		Targets:   []MuscleGroupTarget{{Name: "Abs", WeeklySetTarget: 8}},
+		rng:       nil,
+	}
+
+	sets := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper,
+		[]string{"Abs"},
+		1,
+		PeriodizationStrength,
+		map[int]bool{},
+	)
+
+	if len(sets) != 1 {
+		t.Fatalf("got %d PlannedExerciseSets, want 1", len(sets))
+	}
+	if sets[0].ExerciseID != plank.ID {
+		t.Fatalf("got exerciseID %d, want %d", sets[0].ExerciseID, plank.ID)
+	}
+	if len(sets[0].Sets) != setsPerExercise {
+		t.Fatalf("got %d sets, want %d", len(sets[0].Sets), setsPerExercise)
+	}
+	for i, s := range sets[0].Sets {
+		if s.TargetValue != 30 {
+			t.Errorf("set %d: TargetValue = %d, want 30 (DefaultStartingSeconds)", i, s.TargetValue)
+		}
+	}
 }
 
 func findExercise(exercises []Exercise, id int) Exercise {
