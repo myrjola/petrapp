@@ -674,7 +674,7 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 		}
 		ex, ok := byID[id]
 		if !ok {
-			ex = workout.Exercise{
+			ex = workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds intentionally omitted in test helper.
 				ID:                    id,
 				Name:                  name,
 				Category:              workout.Category(category),
@@ -803,8 +803,8 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 	for setNum := 1; setNum <= 4; setNum++ {
 		if _, err = db.ExecContext(ctx,
 			`INSERT INTO exercise_sets (workout_exercise_id, set_number,
-                weight_kg, min_reps, max_reps)
-             VALUES (?, ?, 0.0, 5, 5)`, slotID, setNum); err != nil {
+                weight_kg, target_value)
+             VALUES (?, ?, 0.0, 5)`, slotID, setNum); err != nil {
 			t.Fatalf("insert placeholder set %d: %v", setNum, err)
 		}
 	}

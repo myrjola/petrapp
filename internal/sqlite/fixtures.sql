@@ -362,6 +362,14 @@ UPDATE SET category = excluded.category,
     exercise_type = excluded.exercise_type,
     description_markdown = excluded.description_markdown;
 
+-- Plank is a time-based hold; the main INSERT above leaves it as 'bodyweight'
+-- so the schema CHECK doesn't reject the row (time_based requires a non-null
+-- default_starting_seconds). This atomic UPDATE flips both columns at once.
+UPDATE exercises
+SET exercise_type            = 'time_based',
+    default_starting_seconds = 30
+WHERE name = 'Plank';
+
 INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
 VALUES (1, 'Forearms', 0),
        (1, 'Glutes', 1),

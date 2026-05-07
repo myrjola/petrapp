@@ -14,39 +14,66 @@ import (
 	"github.com/myrjola/petrapp/internal/workout"
 )
 
+// formatTarget returns the display string for a set target.
+// For timed exercises it appends "s" (e.g. "30s").
+// For rep-based exercises it returns a plain integer or the hypertrophy range "6-10".
+func formatTarget(exercise workout.Exercise, session workout.Session, target int) string {
+	if exercise.IsTimed() {
+		return fmt.Sprintf("%ds", target)
+	}
+	// Hypertrophy display preserves the legacy 6-10 rep range UX. TargetValue
+	// is the single integer the planner emits (8); progression and storage use
+	// that, while the user sees the range.
+	if session.PeriodizationType == workout.PeriodizationHypertrophy {
+		return "6-10"
+	}
+	return strconv.Itoa(target)
+}
+
 type setDisplay struct {
-	Set    workout.Set
-	RepStr string // Formatted rep string (e.g. "8" or "6-8")
-	Number int    // 1-based set number for display.
+	Set          workout.Set
+	TargetStr    string // Pre-formatted target string (e.g. "5", "6-10", "30s").
+	CompletedStr string // Pre-formatted completed string, same unit as TargetStr.
+	Unit         string // "reps" or "seconds" — for input labels.
+	Number       int    // 1-based set number for display.
 }
 
 type exerciseSetTemplateData struct {
 	BaseTemplateData
-	Date                 time.Time
-	ExerciseSet          workout.ExerciseSet
-	SetsDisplay          []setDisplay // Enhanced set data with formatted rep strings
-	FirstIncompleteIndex int
-	EditingIndex         int                           // Index of the set being edited
-	IsEditing            bool                          // Whether we're in edit mode
-	LastCompletedAt      *time.Time                    // Timestamp of most recently completed set
-	CurrentSetTarget     exerciseprogression.SetTarget // Recommended weight and reps from progression
-	AbsCurrentWeight     float64                       // |CurrentSetTarget.WeightKg|, for assisted form input
+	Date                  time.Time
+	ExerciseSet           workout.ExerciseSet
+	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
+	FirstIncompleteIndex  int
+	EditingIndex          int                           // Index of the set being edited
+	IsEditing             bool                          // Whether we're in edit mode
+	LastCompletedAt       *time.Time                    // Timestamp of most recently completed set
+	CurrentSetTarget      exerciseprogression.SetTarget // Recommended weight and reps from progression
+	CurrentSetTimedTarget int                           // Recommended seconds for time_based exercises; 0 for others.
+	AbsCurrentWeight      float64                       // |CurrentSetTarget.WeightKg|, for assisted form input
 }
 
-func formatRepRange(minReps, maxReps int) string {
-	if minReps == maxReps {
-		return strconv.Itoa(minReps)
+func prepareSetsDisplay(exercise workout.Exercise, session workout.Session, sets []workout.Set) []setDisplay {
+	unit := "reps"
+	if exercise.IsTimed() {
+		unit = "seconds"
 	}
-	return fmt.Sprintf("%d-%d", minReps, maxReps)
-}
-
-func prepareSetsDisplay(sets []workout.Set) []setDisplay {
 	displays := make([]setDisplay, len(sets))
 	for i, set := range sets {
+		targetStr := formatTarget(exercise, session, set.TargetValue)
+		completedStr := ""
+		if set.CompletedValue != nil {
+			if exercise.IsTimed() {
+				completedStr = fmt.Sprintf("%ds", *set.CompletedValue)
+			} else {
+				completedStr = strconv.Itoa(*set.CompletedValue)
+			}
+		}
 		displays[i] = setDisplay{
-			Set:    set,
-			RepStr: formatRepRange(set.MinReps, set.MaxReps),
-			Number: i + 1,
+			Set:          set,
+			TargetStr:    targetStr,
+			CompletedStr: completedStr,
+			Unit:         unit,
+			Number:       i + 1,
 		}
 	}
 	return displays
@@ -54,7 +81,7 @@ func prepareSetsDisplay(sets []workout.Set) []setDisplay {
 
 func getFirstIncompleteIndex(sets []workout.Set) int {
 	for i, set := range sets {
-		if set.CompletedReps == nil {
+		if set.CompletedValue == nil {
 			return i
 		}
 	}
@@ -112,29 +139,40 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var currentSetTarget exerciseprogression.SetTarget
-	if exerciseSet.Exercise.ExerciseType == workout.ExerciseTypeWeighted ||
-		exerciseSet.Exercise.ExerciseType == workout.ExerciseTypeAssisted {
+	var currentSetTimedTarget int
+	switch exerciseSet.Exercise.ExerciseType {
+	case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
 		progression, progressionErr := app.workoutService.BuildProgression(r.Context(), date, exerciseSet.Exercise.ID)
 		if progressionErr != nil {
 			app.serverError(w, r, progressionErr)
 			return
 		}
 		currentSetTarget = progression.CurrentSet()
+	case workout.ExerciseTypeTime:
+		progression, progressionErr := app.workoutService.BuildTimedProgression(r.Context(), date, exerciseSet.Exercise.ID)
+		if progressionErr != nil {
+			app.serverError(w, r, progressionErr)
+			return
+		}
+		currentSetTimedTarget = progression.CurrentSet().TargetSeconds
+	case workout.ExerciseTypeBodyweight:
+		// No progression engine for bodyweight — uses the stored target as-is.
 	}
 
 	absCurrentWeight := math.Abs(currentSetTarget.WeightKg)
 
 	data := exerciseSetTemplateData{
-		BaseTemplateData:     newBaseTemplateData(r),
-		Date:                 date,
-		ExerciseSet:          exerciseSet,
-		SetsDisplay:          prepareSetsDisplay(exerciseSet.Sets),
-		FirstIncompleteIndex: getFirstIncompleteIndex(exerciseSet.Sets),
-		EditingIndex:         editingIndex,
-		IsEditing:            isEditing,
-		LastCompletedAt:      getLastCompletedAt(exerciseSet.Sets),
-		CurrentSetTarget:     currentSetTarget,
-		AbsCurrentWeight:     absCurrentWeight,
+		BaseTemplateData:      newBaseTemplateData(r),
+		Date:                  date,
+		ExerciseSet:           exerciseSet,
+		SetsDisplay:           prepareSetsDisplay(exerciseSet.Exercise, session, exerciseSet.Sets),
+		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSet.Sets),
+		EditingIndex:          editingIndex,
+		IsEditing:             isEditing,
+		LastCompletedAt:       getLastCompletedAt(exerciseSet.Sets),
+		CurrentSetTarget:      currentSetTarget,
+		CurrentSetTimedTarget: currentSetTimedTarget,
+		AbsCurrentWeight:      absCurrentWeight,
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)
@@ -182,37 +220,6 @@ func findExerciseSetInSession(session *workout.Session, workoutExerciseID int) (
 	return workout.ExerciseSet{}, false //nolint:exhaustruct // zero value signals "not found".
 }
 
-// parseWeightAndReps extracts weight and reps from form data based on exercise type.
-func (app *application) parseWeightAndReps(r *http.Request, exercise workout.Exercise) (float64, int, error) {
-	var weight float64
-	if exercise.ExerciseType == workout.ExerciseTypeWeighted {
-		weightStr := r.PostForm.Get("weight")
-		if weightStr == "" {
-			return 0, 0, errors.New("weight not provided for weighted exercise")
-		}
-		// Replace comma with dot for decimal numbers.
-		weightStr = strings.Replace(weightStr, ",", ".", 1)
-
-		var err error
-		weight, err = strconv.ParseFloat(weightStr, 64)
-		if err != nil {
-			return 0, 0, fmt.Errorf("parse weight: %w", err)
-		}
-	}
-
-	repsStr := r.PostForm.Get("reps")
-	if repsStr == "" {
-		return 0, 0, errors.New("reps not provided")
-	}
-
-	reps, err := strconv.Atoi(repsStr)
-	if err != nil {
-		return 0, 0, fmt.Errorf("parse reps: %w", err)
-	}
-
-	return weight, reps, nil
-}
-
 // recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
 func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
@@ -256,6 +263,64 @@ func (app *application) recordSetCompletionWithWeight(
 	return true
 }
 
+// recordBodyweightSetCompletion handles parsing and persisting a bodyweight set
+// completion from form data. Time-based sets go through recordTimedSetCompletion.
+func (app *application) recordBodyweightSetCompletion(
+	w http.ResponseWriter, r *http.Request,
+	params exerciseSetParams,
+) bool {
+	completedValueStr := r.PostForm.Get("completed_value")
+	if completedValueStr == "" {
+		app.serverError(w, r, errors.New("completed_value not provided"))
+		return false
+	}
+	completedValue, err := strconv.Atoi(completedValueStr)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("parse completed_value: %w", err))
+		return false
+	}
+	if err = app.workoutService.UpdateCompletedValue(
+		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, completedValue); err != nil {
+		app.serverError(w, r, fmt.Errorf("update completed value: %w", err))
+		return false
+	}
+	return true
+}
+
+// recordTimedSetCompletion handles parsing and persisting a time-based set
+// completion: completed_seconds + signal.
+func (app *application) recordTimedSetCompletion(
+	w http.ResponseWriter, r *http.Request,
+	params exerciseSetParams,
+) bool {
+	completedValueStr := r.PostForm.Get("completed_value")
+	if completedValueStr == "" {
+		app.serverError(w, r, errors.New("completed_value not provided"))
+		return false
+	}
+	completedSeconds, err := strconv.Atoi(completedValueStr)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("parse completed_value: %w", err))
+		return false
+	}
+
+	signal := workout.Signal(r.PostForm.Get("signal"))
+
+	if err = app.workoutService.RecordTimedSetCompletion(
+		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, completedSeconds); err != nil {
+		app.serverError(w, r, fmt.Errorf("record timed set completion: %w", err))
+		return false
+	}
+
+	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded timed set completion",
+		slog.String("date", params.Date.Format("2006-01-02")),
+		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
+		slog.Int("set_index", params.SetIndex),
+		slog.String("signal", string(signal)),
+		slog.Int("completed_seconds", completedSeconds))
+	return true
+}
+
 func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Request) {
 	params, err := app.parseExerciseSetURLParams(r)
 	if err != nil {
@@ -282,20 +347,17 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	}
 	exercise := exerciseSet.Exercise
 
-	if exercise.ExerciseType == workout.ExerciseTypeWeighted ||
-		exercise.ExerciseType == workout.ExerciseTypeAssisted {
+	switch exercise.ExerciseType {
+	case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
 		if !app.recordSetCompletionWithWeight(w, r, params, exercise) {
 			return
 		}
-	} else {
-		_, reps, parseErr := app.parseWeightAndReps(r, exercise)
-		if parseErr != nil {
-			app.serverError(w, r, parseErr)
+	case workout.ExerciseTypeTime:
+		if !app.recordTimedSetCompletion(w, r, params) {
 			return
 		}
-		if err = app.workoutService.UpdateCompletedReps(
-			r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, reps); err != nil {
-			app.serverError(w, r, fmt.Errorf("update completed reps: %w", err))
+	case workout.ExerciseTypeBodyweight:
+		if !app.recordBodyweightSetCompletion(w, r, params) {
 			return
 		}
 	}

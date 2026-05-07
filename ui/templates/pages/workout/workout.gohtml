@@ -184,7 +184,7 @@
                 {{ $allSetsCompleted := true }}
                 {{ $hasSomeCompleted := false }}
                 {{ range .Sets }}
-                    {{ if eq .CompletedReps nil }}
+                    {{ if eq .CompletedValue nil }}
                         {{ $allSetsCompleted = false }}
                     {{ else }}
                         {{ $hasSomeCompleted = true }}

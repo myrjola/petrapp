@@ -26,10 +26,11 @@ type MuscleGroupOption struct {
 // exerciseEditTemplateData contains data for the exercise edit template.
 type exerciseEditTemplateData struct {
 	BaseTemplateData
-	Exercise               workout.Exercise
-	PrimaryMuscleOptions   []MuscleGroupOption
-	SecondaryMuscleOptions []MuscleGroupOption
-	ValidationError        string
+	Exercise                    workout.Exercise
+	PrimaryMuscleOptions        []MuscleGroupOption
+	SecondaryMuscleOptions      []MuscleGroupOption
+	ValidationError             string
+	DefaultStartingSecondsValue string
 }
 
 // adminExercisesGET handles GET requests to the exercise admin page.
@@ -99,12 +100,18 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	defaultSecondsValue := ""
+	if exercise.DefaultStartingSeconds != nil {
+		defaultSecondsValue = strconv.Itoa(*exercise.DefaultStartingSeconds)
+	}
+
 	data := exerciseEditTemplateData{
-		BaseTemplateData:       newBaseTemplateData(r),
-		Exercise:               exercise,
-		PrimaryMuscleOptions:   primaryMuscleOptions,
-		SecondaryMuscleOptions: secondaryMuscleOptions,
-		ValidationError:        app.popFlashError(r.Context()),
+		BaseTemplateData:            newBaseTemplateData(r),
+		Exercise:                    exercise,
+		PrimaryMuscleOptions:        primaryMuscleOptions,
+		SecondaryMuscleOptions:      secondaryMuscleOptions,
+		ValidationError:             app.popFlashError(r.Context()),
+		DefaultStartingSecondsValue: defaultSecondsValue,
 	}
 
 	app.render(w, r, http.StatusOK, "admin-exercise-edit", data)
@@ -152,10 +159,23 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 
 	if exerciseType != workout.ExerciseTypeWeighted &&
 		exerciseType != workout.ExerciseTypeBodyweight &&
-		exerciseType != workout.ExerciseTypeAssisted {
-		app.putFlashError(r.Context(), "Exercise type must be weighted, bodyweight, or assisted.")
+		exerciseType != workout.ExerciseTypeAssisted &&
+		exerciseType != workout.ExerciseTypeTime {
+		app.putFlashError(r.Context(), "Exercise type must be weighted, bodyweight, assisted, or time_based.")
 		redirect(w, r, editPath)
 		return
+	}
+
+	var defaultStartingSeconds *int
+	if exerciseType == workout.ExerciseTypeTime {
+		raw := r.PostForm.Get("default_starting_seconds")
+		n, atoiErr := strconv.Atoi(raw)
+		if atoiErr != nil || n <= 0 {
+			app.putFlashError(r.Context(), "Default starting seconds must be a positive integer for time-based exercises.")
+			redirect(w, r, editPath)
+			return
+		}
+		defaultStartingSeconds = &n
 	}
 
 	if len(primaryMuscles) == 0 {
@@ -164,15 +184,16 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Create exercise object
+	// Create exercise object.
 	exercise := workout.Exercise{
-		ID:                    id,
-		Name:                  name,
-		Category:              category,
-		ExerciseType:          exerciseType,
-		DescriptionMarkdown:   description,
-		PrimaryMuscleGroups:   primaryMuscles,
-		SecondaryMuscleGroups: secondaryMuscles,
+		ID:                     id,
+		Name:                   name,
+		Category:               category,
+		ExerciseType:           exerciseType,
+		DescriptionMarkdown:    description,
+		PrimaryMuscleGroups:    primaryMuscles,
+		SecondaryMuscleGroups:  secondaryMuscles,
+		DefaultStartingSeconds: defaultStartingSeconds,
 	}
 
 	// Update exercise

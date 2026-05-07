@@ -17,13 +17,14 @@ const (
 	CategoryLower    Category = "lower"
 )
 
-// ExerciseType distinguishes weighted, bodyweight, and assisted exercises.
+// ExerciseType distinguishes weighted, bodyweight, assisted, and time-based exercises.
 type ExerciseType string
 
 const (
 	ExerciseTypeWeighted   ExerciseType = "weighted"
 	ExerciseTypeBodyweight ExerciseType = "bodyweight"
 	ExerciseTypeAssisted   ExerciseType = "assisted"
+	ExerciseTypeTime       ExerciseType = "time_based"
 )
 
 // PeriodizationType controls rep targets for the session.
@@ -35,11 +36,9 @@ const (
 )
 
 const (
-	setsPerExercise    = 3
-	minRepsStrength    = 5
-	maxRepsStrength    = 5
-	minRepsHypertrophy = 6
-	maxRepsHypertrophy = 10
+	setsPerExercise = 3
+	repsStrength    = 5
+	repsHypertrophy = 8
 )
 
 const (
@@ -109,11 +108,12 @@ func (p Preferences) ExercisesPerSession(weekday time.Weekday) int {
 // Exercise is a dependency-free representation of an exercise for planning.
 // StartingWeightKg is intentionally absent — resolved lazily by exerciseprogression.
 type Exercise struct {
-	ID                    int
-	Category              Category
-	ExerciseType          ExerciseType
-	PrimaryMuscleGroups   []string
-	SecondaryMuscleGroups []string
+	ID                     int
+	Category               Category
+	ExerciseType           ExerciseType
+	PrimaryMuscleGroups    []string
+	SecondaryMuscleGroups  []string
+	DefaultStartingSeconds *int
 }
 
 // MuscleGroupTarget holds the minimum weekly set target for a tracked muscle group.
@@ -136,10 +136,10 @@ type PlannedExerciseSet struct {
 	Sets       []PlannedSet
 }
 
-// PlannedSet holds rep targets only; WeightKg is always nil at plan time.
+// PlannedSet holds the target value only; WeightKg is always nil at plan time.
+// The unit (reps or seconds) is derived from the parent exercise type.
 type PlannedSet struct {
-	MinReps int
-	MaxReps int
+	TargetValue int
 }
 
 // WeeklyPlanner holds the static inputs needed to plan a full week of workouts.
@@ -293,12 +293,12 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 	return result
 }
 
-// setsForPeriodization returns MinReps/MaxReps for a PlannedSet based on periodization type.
-func setsForPeriodization(pt PeriodizationType) (int, int) {
+// setsForPeriodization returns the target value for a PlannedSet based on periodization type.
+func setsForPeriodization(pt PeriodizationType) int {
 	if pt == PeriodizationStrength {
-		return minRepsStrength, maxRepsStrength
+		return repsStrength
 	}
-	return minRepsHypertrophy, maxRepsHypertrophy
+	return repsHypertrophy
 }
 
 // primaryMuscleGroupsOverlap returns true if any of the exercise's primary muscle groups
@@ -417,21 +417,34 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 		selected = append(selected, ex)
 	}
 
-	// Build PlannedExerciseSets.
-	minR, maxR := setsForPeriodization(pt)
-	sets := make([]PlannedSet, setsPerExercise)
-	for i := range sets {
-		sets[i] = PlannedSet{MinReps: minR, MaxReps: maxR}
-	}
-
+	// Build PlannedExerciseSets. Time-based exercises use their own
+	// DefaultStartingSeconds; rep-based exercises use the periodization target.
+	repTarget := setsForPeriodization(pt)
 	result := make([]PlannedExerciseSet, len(selected))
 	for i, ex := range selected {
-		result[i] = PlannedExerciseSet{
-			ExerciseID: ex.ID,
-			Sets:       slices.Clone(sets),
-		}
+		result[i] = buildPlannedExerciseSet(ex, repTarget)
 	}
 	return result
+}
+
+// buildPlannedExerciseSet creates a PlannedExerciseSet for one exercise.
+// Time-based exercises use DefaultStartingSeconds as target; rep-based use repTarget.
+func buildPlannedExerciseSet(ex Exercise, repTarget int) PlannedExerciseSet {
+	target := repTarget
+	if ex.ExerciseType == ExerciseTypeTime {
+		if ex.DefaultStartingSeconds == nil {
+			panic(fmt.Sprintf("time_based exercise %d missing DefaultStartingSeconds (fixture invariant violation)", ex.ID))
+		}
+		target = *ex.DefaultStartingSeconds
+	}
+	sets := make([]PlannedSet, setsPerExercise)
+	for j := range sets {
+		sets[j] = PlannedSet{TargetValue: target}
+	}
+	return PlannedExerciseSet{
+		ExerciseID: ex.ID,
+		Sets:       sets,
+	}
 }
 
 // hasExercisesForCategory reports whether the exercise pool contains at least one
