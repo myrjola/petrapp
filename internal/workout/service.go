@@ -417,6 +417,37 @@ func (s *Service) RecordSetCompletion(
 	return nil
 }
 
+// RecordTimedSetCompletion atomically persists the signal, completed seconds,
+// and timestamp for a time-based set. Mirrors RecordSetCompletion but omits
+// weight (time-based exercises have no weight).
+func (s *Service) RecordTimedSetCompletion(
+	ctx context.Context,
+	date time.Time,
+	workoutExerciseID int,
+	setIndex int,
+	signal Signal,
+	completedSeconds int,
+) error {
+	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
+		for i := range sess.ExerciseSets {
+			if sess.ExerciseSets[i].ID == workoutExerciseID {
+				if setIndex >= len(sess.ExerciseSets[i].Sets) {
+					return false, fmt.Errorf("set index %d out of bounds", setIndex)
+				}
+				now := time.Now().UTC()
+				sess.ExerciseSets[i].Sets[setIndex].Signal = &signal
+				sess.ExerciseSets[i].Sets[setIndex].CompletedValue = &completedSeconds
+				sess.ExerciseSets[i].Sets[setIndex].CompletedAt = &now
+				return true, nil
+			}
+		}
+		return false, errors.New("workout exercise not found")
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+	}
+	return nil
+}
+
 // MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
 func (s *Service) MarkWarmupComplete(
 	ctx context.Context,

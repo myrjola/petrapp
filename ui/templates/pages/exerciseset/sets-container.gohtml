@@ -330,6 +330,8 @@
                             <span class="status-icon" aria-hidden="true">✓</span>
                             <span class="reps" aria-label="Completed value">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
+                        {{ else if and (eq $.ExerciseSet.Exercise.ExerciseType "time_based") $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
+                            <span class="reps" aria-label="Recommended target">{{ $.CurrentSetTimedTarget }}s</span>
                         {{ else }}
                             <span class="reps" aria-label="Target value">{{ $setDisplay.TargetStr }} {{ $setDisplay.Unit }}</span>
                         {{ end }}
@@ -397,6 +399,39 @@
                                     <button type="submit" name="signal" value="too_light"
                                             class="signal-btn too-light-btn"
                                             aria-label="Could have done more reps">Could do more</button>
+                                </div>
+                            </fieldset>
+                        </form>
+                    {{ else if eq $.ExerciseSet.Exercise.ExerciseType "time_based" }}
+                        <form method="post"
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
+                              id="form-{{ $index }}"
+                              class="set-form timed-form"
+                              aria-label="Complete current hold">
+                            <div class="input-field">
+                                <label for="completed-value-{{ $index }}">Seconds held</label>
+                                <input
+                                        id="completed-value-{{ $index }}"
+                                        inputmode="numeric"
+                                        pattern="[0-9]*"
+                                        name="completed_value"
+                                        value="{{ $.CurrentSetTimedTarget }}"
+                                        required
+                                        class="reps-input"
+                                >
+                            </div>
+                            <fieldset class="signal-group">
+                                <legend>Did you reach {{ $.CurrentSetTimedTarget }}s?</legend>
+                                <div class="signal-buttons">
+                                    <button type="submit" name="signal" value="too_heavy"
+                                            class="signal-btn too-heavy-btn"
+                                            aria-label="No, I failed to reach the target hold">No</button>
+                                    <button type="submit" name="signal" value="on_target"
+                                            class="signal-btn on-target-btn"
+                                            aria-label="Barely reached target hold">Barely</button>
+                                    <button type="submit" name="signal" value="too_light"
+                                            class="signal-btn too-light-btn"
+                                            aria-label="Could have held longer">Could do more</button>
                                 </div>
                             </fieldset>
                         </form>
