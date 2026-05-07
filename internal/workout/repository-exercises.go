@@ -200,11 +200,6 @@ func (r *sqliteExerciseRepository) Update(
 
 // set creates or updates an exercise with optional upsert.
 func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert bool) (_ Exercise, err error) {
-	// time_based exercises currently cannot be created or updated through this
-	// path: default_starting_seconds is not written, so the schema CHECK
-	// (exercise_type <> 'time_based' OR default_starting_seconds IS NOT NULL)
-	// fails. Task 9 (admin form support) will add the column to both INSERTs.
-
 	// Begin transaction
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
@@ -232,15 +227,15 @@ func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert 
 	if upsert {
 		// When upserting, use the existing ID
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (id, name, category, exercise_type, description_markdown)
-			VALUES (?, ?, ?, ?, ?)`,
-			ex.ID, ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown)
+			INSERT INTO exercises (id, name, category, exercise_type, description_markdown, default_starting_seconds)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+			ex.ID, ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown, ex.DefaultStartingSeconds)
 	} else {
 		// When creating new, let SQLite assign the ID
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (name, category, exercise_type, description_markdown)
-			VALUES (?, ?, ?, ?)`,
-			ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown)
+			INSERT INTO exercises (name, category, exercise_type, description_markdown, default_starting_seconds)
+			VALUES (?, ?, ?, ?, ?)`,
+			ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown, ex.DefaultStartingSeconds)
 	}
 
 	if err != nil {
