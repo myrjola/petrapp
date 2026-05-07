@@ -263,8 +263,8 @@ func (app *application) recordSetCompletionWithWeight(
 	return true
 }
 
-// recordBodyweightSetCompletion handles parsing and persisting a bodyweight or time-based set
-// completion from form data.
+// recordBodyweightSetCompletion handles parsing and persisting a bodyweight set
+// completion from form data. Time-based sets go through recordTimedSetCompletion.
 func (app *application) recordBodyweightSetCompletion(
 	w http.ResponseWriter, r *http.Request,
 	params exerciseSetParams,
