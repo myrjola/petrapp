@@ -24,10 +24,11 @@ func newSQLiteExerciseRepository(db *sqlite.Database) *sqliteExerciseRepository 
 // Get retrieves a single exercise by ID.
 func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, error) {
 	var exercise Exercise
-	var defaultStartingSeconds sql.NullInt64
+	var defaultStartingSeconds, repMin, repMax sql.NullInt64
 
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown, default_starting_seconds
+		SELECT id, name, category, exercise_type, description_markdown,
+		       default_starting_seconds, rep_min, rep_max
 		FROM exercises
 		WHERE id = ?`, id).Scan(
 		&exercise.ID,
@@ -36,6 +37,8 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 		&exercise.ExerciseType,
 		&exercise.DescriptionMarkdown,
 		&defaultStartingSeconds,
+		&repMin,
+		&repMax,
 	)
 	if err != nil {
 		return Exercise{}, fmt.Errorf("query exercise: %w", err)
@@ -43,6 +46,14 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 	if defaultStartingSeconds.Valid {
 		v := int(defaultStartingSeconds.Int64)
 		exercise.DefaultStartingSeconds = &v
+	}
+	if repMin.Valid {
+		v := int(repMin.Int64)
+		exercise.RepMin = &v
+	}
+	if repMax.Valid {
+		v := int(repMax.Int64)
+		exercise.RepMax = &v
 	}
 
 	// Fetch muscle groups
@@ -61,7 +72,8 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (Exercise, e
 func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err error) {
 	// First, get all exercises.
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown, default_starting_seconds
+		SELECT id, name, category, exercise_type, description_markdown,
+		       default_starting_seconds, rep_min, rep_max
 		FROM exercises
 		ORDER BY id`)
 	if err != nil {
@@ -76,16 +88,24 @@ func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []Exercise, err 
 	var exercises []Exercise
 	for rows.Next() {
 		var exercise Exercise
-		var defaultStartingSeconds sql.NullInt64
+		var defaultStartingSeconds, repMin, repMax sql.NullInt64
 		if err = rows.Scan(
 			&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType,
-			&exercise.DescriptionMarkdown, &defaultStartingSeconds,
+			&exercise.DescriptionMarkdown, &defaultStartingSeconds, &repMin, &repMax,
 		); err != nil {
 			return nil, fmt.Errorf("scan exercise: %w", err)
 		}
 		if defaultStartingSeconds.Valid {
 			v := int(defaultStartingSeconds.Int64)
 			exercise.DefaultStartingSeconds = &v
+		}
+		if repMin.Valid {
+			v := int(repMin.Int64)
+			exercise.RepMin = &v
+		}
+		if repMax.Valid {
+			v := int(repMax.Int64)
+			exercise.RepMax = &v
 		}
 		exercises = append(exercises, exercise)
 	}
@@ -227,15 +247,19 @@ func (r *sqliteExerciseRepository) set(ctx context.Context, ex Exercise, upsert 
 	if upsert {
 		// When upserting, use the existing ID
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (id, name, category, exercise_type, description_markdown, default_starting_seconds)
-			VALUES (?, ?, ?, ?, ?, ?)`,
-			ex.ID, ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown, ex.DefaultStartingSeconds)
+			INSERT INTO exercises (id, name, category, exercise_type, description_markdown,
+			                       default_starting_seconds, rep_min, rep_max)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			ex.ID, ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown,
+			ex.DefaultStartingSeconds, ex.RepMin, ex.RepMax)
 	} else {
 		// When creating new, let SQLite assign the ID
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (name, category, exercise_type, description_markdown, default_starting_seconds)
-			VALUES (?, ?, ?, ?, ?)`,
-			ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown, ex.DefaultStartingSeconds)
+			INSERT INTO exercises (name, category, exercise_type, description_markdown,
+			                       default_starting_seconds, rep_min, rep_max)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown,
+			ex.DefaultStartingSeconds, ex.RepMin, ex.RepMax)
 	}
 
 	if err != nil {

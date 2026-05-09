@@ -371,8 +371,8 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 
 	// 1. Create a test exercise directly in the database
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Test Exercise", "lower", "Test description")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Test Exercise", "lower", "Test description", 5, 10)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise: %v", err)
 	}
@@ -441,6 +441,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
+	repMin, repMax := 5, 10
 	updatedExercise := workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds not needed for this test.
 		ID:                    exerciseID,
 		Name:                  "Updated Test Exercise",
@@ -449,6 +450,8 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		DescriptionMarkdown:   "Updated test description",
 		PrimaryMuscleGroups:   []string{"Quads", "Glutes"},
 		SecondaryMuscleGroups: []string{"Hamstrings", "Core"},
+		RepMin:                &repMin,
+		RepMax:                &repMax,
 	}
 
 	err = svc.UpdateExercise(ctx, updatedExercise)
@@ -994,8 +997,8 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 func createTestExercise(ctx context.Context, t *testing.T, db *sqlite.Database, name, category string) (int, error) {
 	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		name, category, "Test description")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		name, category, "Test description", 5, 10)
 	if err != nil {
 		return 0, err
 	}
@@ -1145,8 +1148,8 @@ func Test_GetStartingWeight(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Squat", "lower", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Squat", "lower", "desc", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1314,8 +1317,8 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Assisted Test Exercise", "upper", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Assisted Test Exercise", "upper", "desc", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1674,8 +1677,8 @@ func Test_BuildProgression(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"OHP", "upper", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"OHP", "upper", "desc", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1761,8 +1764,8 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Squat", "lower", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Squat", "lower", "desc", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1828,5 +1831,337 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	}
 	if target.TargetReps != 8 {
 		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
+	}
+}
+
+// Test_AddExercise_DerivesTargetValueFromPeriodization is a regression test for
+// PR #89: AddExercise used to produce target_value=8 (the old repsHypertrophy
+// constant) for every new exercise regardless of the session's periodization and
+// the exercise's per-exercise rep window.
+//
+// For Deadlift (rep_min=3, rep_max=6):
+//   - Hypertrophy → DeriveScheme(3, 6, Hypertrophy).TargetReps == 6, TargetSets == 3
+//   - Strength    → DeriveScheme(3, 6, Strength).TargetReps    == 3, TargetSets == 4
+func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("derive-user"), "Derive User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	svc := workout.NewService(db, logger, "")
+
+	// Deadlift-like exercise: rep_min=3, rep_max=6.
+	var deadliftID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
+		 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+		"Test Deadlift Derive").Scan(&deadliftID)
+	if err != nil {
+		t.Fatalf("insert deadlift: %v", err)
+	}
+
+	today := time.Now()
+	dateStr := today.Format("2006-01-02")
+
+	tests := []struct {
+		name            string
+		periodization   string
+		wantTargetValue int
+		wantSetCount    int
+	}{
+		{"hypertrophy", "hypertrophy", 6, 3},
+		{"strength", "strength", 3, 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a fresh dated session for each sub-test using distinct dates.
+			sessionDate := today.AddDate(0, 0, 0)
+			sessionDateStr := dateStr
+			if tt.periodization == "strength" {
+				sessionDate = today.AddDate(0, 0, 1)
+				sessionDateStr = sessionDate.Format("2006-01-02")
+			}
+
+			if _, err = db.ReadWrite.ExecContext(ctx,
+				"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, ?)",
+				userID, sessionDateStr, tt.periodization); err != nil {
+				t.Fatalf("insert session: %v", err)
+			}
+
+			if _, err = svc.AddExercise(ctx, sessionDate, deadliftID); err != nil {
+				t.Fatalf("AddExercise: %v", err)
+			}
+
+			session, errGet := svc.GetSession(ctx, sessionDate)
+			if errGet != nil {
+				t.Fatalf("GetSession: %v", errGet)
+			}
+
+			var sets []workout.Set
+			for _, es := range session.ExerciseSets {
+				if es.Exercise.ID == deadliftID {
+					sets = es.Sets
+					break
+				}
+			}
+			if len(sets) != tt.wantSetCount {
+				t.Errorf("%s: want %d sets, got %d", tt.name, tt.wantSetCount, len(sets))
+			}
+			for i, s := range sets {
+				if s.TargetValue != tt.wantTargetValue {
+					t.Errorf("%s set[%d] TargetValue: want %d, got %d",
+						tt.name, i, tt.wantTargetValue, s.TargetValue)
+				}
+			}
+		})
+	}
+}
+
+// Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization is a regression
+// test for PR #89: SwapExercise used to copy TargetValue verbatim from the most
+// recent historical session, which spread the wrong rep count across periodization
+// boundaries (e.g. a Calf Raise swapped in on a Strength week kept 20 reps from
+// a Hypertrophy-week history instead of getting the correct 10 reps).
+//
+// For Deadlift (rep_min=3, rep_max=6):
+//   - Hypertrophy swap → TargetValue == 6, TargetSets == 3
+//   - Historical weight (80kg) is preserved; periodization-wrong TargetValue (3) is overridden.
+func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("swap-derive-user"), "Swap Derive User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	svc := workout.NewService(db, logger, "")
+
+	if err = tryInsertMuscleGroup(ctx, t, db, "Quads"); err != nil {
+		t.Fatalf("insert muscle group: %v", err)
+	}
+
+	// Squat occupies today's slot.
+	squatID, err := createTestExercise(ctx, t, db, "Squat Swap Derive", "lower")
+	if err != nil {
+		t.Fatalf("create squat: %v", err)
+	}
+
+	// Deadlift-like exercise: rep_min=3, rep_max=6.
+	var deadliftID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
+		 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+		"Test Deadlift Swap Derive").Scan(&deadliftID)
+	if err != nil {
+		t.Fatalf("insert deadlift: %v", err)
+	}
+
+	today := time.Now()
+	dateStr := today.Format("2006-01-02")
+
+	// Historical strength session 7 days ago: deadlift with 3 reps at 80kg.
+	// After the swap onto a hypertrophy session, the weight (80kg) should be
+	// preserved but TargetValue should become 6 (hypertrophy target), not 3.
+	histDateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, 'strength')",
+		userID, histDateStr); err != nil {
+		t.Fatalf("insert hist session: %v", err)
+	}
+	var weHistID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, histDateStr, deadliftID).Scan(&weHistID)
+	if err != nil {
+		t.Fatalf("insert hist workout_exercise: %v", err)
+	}
+	for i := 1; i <= 4; i++ {
+		if _, err = db.ReadWrite.ExecContext(ctx,
+			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+			 VALUES (?, ?, 80.0, 3)`,
+			weHistID, i); err != nil {
+			t.Fatalf("insert hist set %d: %v", i, err)
+		}
+	}
+
+	// Today's hypertrophy session with squat in slot.
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, 'hypertrophy')",
+		userID, dateStr); err != nil {
+		t.Fatalf("insert today's session: %v", err)
+	}
+	var squatSlotID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, dateStr, squatID).Scan(&squatSlotID)
+	if err != nil {
+		t.Fatalf("insert squat slot: %v", err)
+	}
+	for i := 1; i <= 3; i++ {
+		if _, err = db.ReadWrite.ExecContext(ctx,
+			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+			 VALUES (?, ?, 60.0, 10)`,
+			squatSlotID, i); err != nil {
+			t.Fatalf("insert squat set %d: %v", i, err)
+		}
+	}
+
+	// Swap squat → deadlift on the hypertrophy session.
+	if err = svc.SwapExercise(ctx, today, squatSlotID, deadliftID); err != nil {
+		t.Fatalf("SwapExercise: %v", err)
+	}
+
+	session, err := svc.GetSession(ctx, today)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+
+	var sets []workout.Set
+	for _, es := range session.ExerciseSets {
+		if es.ID == squatSlotID {
+			if es.Exercise.ID != deadliftID {
+				t.Fatalf("slot still maps to exercise %d, want deadlift %d", es.Exercise.ID, deadliftID)
+			}
+			sets = es.Sets
+			break
+		}
+	}
+
+	// Hypertrophy: DeriveScheme(3, 6, Hypertrophy) → 6 reps, 3 sets.
+	const wantTargetValue = 6
+	const wantSetCount = 3
+	if len(sets) != wantSetCount {
+		t.Errorf("want %d sets, got %d", wantSetCount, len(sets))
+	}
+	for i, s := range sets {
+		if s.TargetValue != wantTargetValue {
+			t.Errorf("set[%d] TargetValue: want %d (hypertrophy), got %d", i, wantTargetValue, s.TargetValue)
+		}
+		// Historical weight (80kg from the strength session) must be preserved.
+		if s.WeightKg == nil || *s.WeightKg != 80.0 {
+			var w float64
+			if s.WeightKg != nil {
+				w = *s.WeightKg
+			}
+			t.Errorf("set[%d] WeightKg: want 80.0 (from strength history), got %v", i, w)
+		}
+	}
+}
+
+// Test_BuildProgression_CurrentSetUsesDeriveScheme is a regression test for the bug
+// where Progression.CurrentSet() returned TargetReps from the legacy TargetReps()
+// function (hardcoded 5/8/15) rather than from DeriveScheme on the exercise's
+// per-session rep window. A Deadlift (rep_min=3, rep_max=6) on a hypertrophy
+// session must produce CurrentSet().TargetReps == 6 (repMax), not 8 (the old
+// hypertrophy constant). Before this fix the workout UI displayed "8 reps" even
+// though the planner had persisted target_value=6.
+func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("ds-user"), "DS User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	// Deadlift-like exercise: rep_min=3, rep_max=6.
+	var exerciseID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
+		 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+		"Test Deadlift DS").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+
+	svc := workout.NewService(db, logger, "")
+
+	today := time.Now().Format("2006-01-02")
+
+	// Hypertrophy session today.
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
+		userID, today)
+	if err != nil {
+		t.Fatalf("insert hypertrophy session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
+		userID, today, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+
+	date, _ := time.Parse("2006-01-02", today)
+
+	// Hypertrophy: DeriveScheme(3, 6, Hypertrophy).TargetReps == 6 (repMax).
+	// Before the fix this returned 8 (the legacy TargetReps hypertrophy constant).
+	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression hypertrophy: %v", err)
+	}
+	if got := prog.CurrentSet().TargetReps; got != 6 {
+		t.Errorf("hypertrophy CurrentSet().TargetReps: want 6, got %d (legacy bug returned 8)", got)
+	}
+
+	// Strength session: DeriveScheme(3, 6, Strength).TargetReps == 3 (repMin).
+	strengthDay := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
+		userID, strengthDay)
+	if err != nil {
+		t.Fatalf("insert strength session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)",
+		userID, strengthDay, exerciseID)
+	if err != nil {
+		t.Fatalf("insert strength workout_exercise: %v", err)
+	}
+
+	strengthDate, _ := time.Parse("2006-01-02", strengthDay)
+	prog, err = svc.BuildProgression(ctx, strengthDate, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression strength: %v", err)
+	}
+	if got := prog.CurrentSet().TargetReps; got != 3 {
+		t.Errorf("strength CurrentSet().TargetReps: want 3, got %d", got)
 	}
 }

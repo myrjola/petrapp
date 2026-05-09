@@ -87,7 +87,11 @@ CREATE TABLE exercises
                              CHECK (exercise_type IN ('weighted', 'bodyweight', 'assisted', 'time_based')),
     description_markdown     TEXT    NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000),
     default_starting_seconds INTEGER CHECK (default_starting_seconds IS NULL OR default_starting_seconds > 0),
-    CHECK (exercise_type <> 'time_based' OR default_starting_seconds IS NOT NULL)
+    rep_min                  INTEGER CHECK (rep_min IS NULL OR (rep_min >= 1 AND rep_min <= 50)),
+    rep_max                  INTEGER CHECK (rep_max IS NULL OR (rep_max >= 1 AND rep_max <= 50)),
+    CHECK (exercise_type <> 'time_based' OR default_starting_seconds IS NOT NULL),
+    CHECK (exercise_type =  'time_based' OR (rep_min IS NOT NULL AND rep_max IS NOT NULL)),
+    CHECK (rep_min IS NULL OR rep_max IS NULL OR rep_min <= rep_max)
 ) STRICT;
 
 CREATE TABLE workout_sessions

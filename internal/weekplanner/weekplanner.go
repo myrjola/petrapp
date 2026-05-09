@@ -6,6 +6,8 @@ import (
 	"math/rand/v2"
 	"slices"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/exerciseprogression"
 )
 
 // Category is the workout focus for a session.
@@ -36,9 +38,10 @@ const (
 )
 
 const (
-	setsPerExercise = 3
-	repsStrength    = 5
-	repsHypertrophy = 8
+	// timeBasedSets is the fixed set count for time-based exercises (e.g.
+	// planks). Rep-based exercises derive their set count via
+	// exerciseprogression.DeriveScheme.
+	timeBasedSets = 3
 )
 
 const (
@@ -107,6 +110,8 @@ func (p Preferences) ExercisesPerSession(weekday time.Weekday) int {
 
 // Exercise is a dependency-free representation of an exercise for planning.
 // StartingWeightKg is intentionally absent — resolved lazily by exerciseprogression.
+// RepMin/RepMax are nil for time_based exercises (which use DefaultStartingSeconds);
+// non-nil for everything else, enforced at the DB layer by a CHECK constraint.
 type Exercise struct {
 	ID                     int
 	Category               Category
@@ -114,6 +119,8 @@ type Exercise struct {
 	PrimaryMuscleGroups    []string
 	SecondaryMuscleGroups  []string
 	DefaultStartingSeconds *int
+	RepMin                 *int
+	RepMax                 *int
 }
 
 // MuscleGroupTarget holds the minimum weekly set target for a tracked muscle group.
@@ -136,10 +143,11 @@ type PlannedExerciseSet struct {
 	Sets       []PlannedSet
 }
 
-// PlannedSet holds the target value only; WeightKg is always nil at plan time.
-// The unit (reps or seconds) is derived from the parent exercise type.
+// PlannedSet holds the target value and rest. WeightKg is always nil at plan time.
+// TargetValue's unit (reps or seconds) is derived from the parent exercise type.
 type PlannedSet struct {
 	TargetValue int
+	RestSeconds int
 }
 
 // WeeklyPlanner holds the static inputs needed to plan a full week of workouts.
@@ -293,14 +301,6 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 	return result
 }
 
-// setsForPeriodization returns the target value for a PlannedSet based on periodization type.
-func setsForPeriodization(pt PeriodizationType) int {
-	if pt == PeriodizationStrength {
-		return repsStrength
-	}
-	return repsHypertrophy
-}
-
 // primaryMuscleGroupsOverlap returns true if any of the exercise's primary muscle groups
 // are already in the selectedPrimaryMuscles set.
 func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]bool) bool {
@@ -418,32 +418,56 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 	}
 
 	// Build PlannedExerciseSets. Time-based exercises use their own
-	// DefaultStartingSeconds; rep-based exercises use the periodization target.
-	repTarget := setsForPeriodization(pt)
+	// DefaultStartingSeconds with a fixed set count; rep-based exercises
+	// derive their full prescription from the per-exercise window via
+	// exerciseprogression.DeriveScheme.
 	result := make([]PlannedExerciseSet, len(selected))
 	for i, ex := range selected {
-		result[i] = buildPlannedExerciseSet(ex, repTarget)
+		result[i] = buildPlannedExerciseSet(ex, pt)
 	}
 	return result
 }
 
 // buildPlannedExerciseSet creates a PlannedExerciseSet for one exercise.
-// Time-based exercises use DefaultStartingSeconds as target; rep-based use repTarget.
-func buildPlannedExerciseSet(ex Exercise, repTarget int) PlannedExerciseSet {
-	target := repTarget
+// For time_based exercises, sets count is fixed at timeBasedSets and target
+// is DefaultStartingSeconds. For rep-based exercises, all three (reps, sets,
+// rest) come from DeriveScheme.
+func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType) PlannedExerciseSet {
 	if ex.ExerciseType == ExerciseTypeTime {
 		if ex.DefaultStartingSeconds == nil {
 			panic(fmt.Sprintf("time_based exercise %d missing DefaultStartingSeconds (fixture invariant violation)", ex.ID))
 		}
-		target = *ex.DefaultStartingSeconds
+		sets := make([]PlannedSet, timeBasedSets)
+		for j := range sets {
+			sets[j] = PlannedSet{TargetValue: *ex.DefaultStartingSeconds, RestSeconds: 0}
+		}
+		return PlannedExerciseSet{ExerciseID: ex.ID, Sets: sets}
 	}
-	sets := make([]PlannedSet, setsPerExercise)
+
+	if ex.RepMin == nil || ex.RepMax == nil {
+		panic(fmt.Sprintf("non-time_based exercise %d missing RepMin/RepMax (fixture invariant violation)", ex.ID))
+	}
+	scheme := exerciseprogression.DeriveScheme(*ex.RepMin, *ex.RepMax, toProgressionPeriodization(pt))
+	sets := make([]PlannedSet, scheme.TargetSets)
 	for j := range sets {
-		sets[j] = PlannedSet{TargetValue: target}
+		sets[j] = PlannedSet{TargetValue: scheme.TargetReps, RestSeconds: scheme.RestSeconds}
 	}
-	return PlannedExerciseSet{
-		ExerciseID: ex.ID,
-		Sets:       sets,
+	return PlannedExerciseSet{ExerciseID: ex.ID, Sets: sets}
+}
+
+// toProgressionPeriodization maps the planner's PeriodizationType enum to the
+// equivalent value in the exerciseprogression package. The two enums are kept
+// independent because the packages don't depend on each other; an explicit
+// switch (rather than a numeric cast) ensures any future divergence is caught
+// at the point of use rather than producing silently wrong derivations.
+func toProgressionPeriodization(pt PeriodizationType) exerciseprogression.PeriodizationType {
+	switch pt {
+	case PeriodizationStrength:
+		return exerciseprogression.Strength
+	case PeriodizationHypertrophy:
+		return exerciseprogression.Hypertrophy
+	default:
+		panic(fmt.Sprintf("weekplanner: unknown PeriodizationType %d", pt))
 	}
 }
 

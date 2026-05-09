@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -118,6 +119,8 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 }
 
 // adminExerciseUpdatePOST handles POST requests to update an exercise.
+//
+//nolint:funlen // linear form-validation work; splitting would harm readability for a 1-stmt threshold miss
 func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.Request) {
 	// Get exercise ID from URL
 	idStr := r.PathValue("id")
@@ -184,6 +187,12 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	repMin, repMax, err := app.preserveRepWindow(r.Context(), id, exerciseType)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
 	// Create exercise object.
 	exercise := workout.Exercise{
 		ID:                     id,
@@ -194,6 +203,8 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		PrimaryMuscleGroups:    primaryMuscles,
 		SecondaryMuscleGroups:  secondaryMuscles,
 		DefaultStartingSeconds: defaultStartingSeconds,
+		RepMin:                 repMin,
+		RepMax:                 repMax,
 	}
 
 	// Update exercise
@@ -235,4 +246,21 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 
 	// Redirect to the newly created exercise.
 	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
+}
+
+// preserveRepWindow returns the rep_min / rep_max for an existing exercise so
+// that an admin update doesn't NULL them out. The admin edit form does not
+// surface these fields yet, so preservation is the only path. Returns
+// (nil, nil, nil) for time-based exercises, which don't carry a rep window.
+func (app *application) preserveRepWindow(
+	ctx context.Context, id int, exerciseType workout.ExerciseType,
+) (*int, *int, error) {
+	if exerciseType == workout.ExerciseTypeTime {
+		return nil, nil, nil
+	}
+	existing, err := app.workoutService.GetExercise(ctx, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get exercise for rep window: %w", err)
+	}
+	return existing.RepMin, existing.RepMax, nil
 }
