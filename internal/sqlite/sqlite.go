@@ -52,10 +52,6 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
-	if err = db.preMigrateRepWindows(ctx); err != nil {
-		return nil, fmt.Errorf("preMigrateRepWindows: %w", err)
-	}
-
 	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
 		return nil, fmt.Errorf("migrateTo: %w", err)
 	}
