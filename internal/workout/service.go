@@ -168,6 +168,8 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 			PrimaryMuscleGroups:    ex.PrimaryMuscleGroups,
 			SecondaryMuscleGroups:  ex.SecondaryMuscleGroups,
 			DefaultStartingSeconds: ex.DefaultStartingSeconds,
+			RepMin:                 ex.RepMin,
+			RepMax:                 ex.RepMax,
 		}
 	}
 
