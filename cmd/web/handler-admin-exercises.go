@@ -119,6 +119,8 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 }
 
 // adminExerciseUpdatePOST handles POST requests to update an exercise.
+//
+//nolint:funlen // linear form-validation work; splitting would harm readability for a 1-stmt threshold miss
 func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.Request) {
 	// Get exercise ID from URL
 	idStr := r.PathValue("id")
@@ -167,9 +169,16 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	defaultStartingSeconds, err := app.buildDefaultStartingSeconds(r.Context(), exerciseType, r, editPath, w)
-	if err != nil {
-		return
+	var defaultStartingSeconds *int
+	if exerciseType == workout.ExerciseTypeTime {
+		raw := r.PostForm.Get("default_starting_seconds")
+		n, atoiErr := strconv.Atoi(raw)
+		if atoiErr != nil || n <= 0 {
+			app.putFlashError(r.Context(), "Default starting seconds must be a positive integer for time-based exercises.")
+			redirect(w, r, editPath)
+			return
+		}
+		defaultStartingSeconds = &n
 	}
 
 	if len(primaryMuscles) == 0 {
@@ -237,26 +246,6 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 
 	// Redirect to the newly created exercise.
 	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
-}
-
-// buildDefaultStartingSeconds validates and returns the default starting seconds
-// for time-based exercises. Handles validation errors by flashing and
-// redirecting, so the caller must return immediately on error.
-func (app *application) buildDefaultStartingSeconds(
-	ctx context.Context, exerciseType workout.ExerciseType, r *http.Request,
-	editPath string, w http.ResponseWriter,
-) (*int, error) {
-	if exerciseType != workout.ExerciseTypeTime {
-		return nil, nil //nolint:nilnil // no-op when not time-based
-	}
-	raw := r.PostForm.Get("default_starting_seconds")
-	n, atoiErr := strconv.Atoi(raw)
-	if atoiErr != nil || n <= 0 {
-		app.putFlashError(ctx, "Default starting seconds must be a positive integer for time-based exercises.")
-		redirect(w, r, editPath)
-		return nil, fmt.Errorf("invalid default starting seconds") //nolint:perfsprint // validation error
-	}
-	return &n, nil
 }
 
 // preserveRepWindow returns the rep_min / rep_max for an existing exercise so
