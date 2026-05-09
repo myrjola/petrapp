@@ -602,8 +602,24 @@ func (s *Service) GetStartingWeight(
 	if prev.PeriodizationType == "" || prev.PeriodizationType == targetType {
 		return prev.WeightKg, nil
 	}
-	fromReps := exerciseprogression.TargetReps(periodizationToProgression(prev.PeriodizationType))
-	toReps := exerciseprogression.TargetReps(periodizationToProgression(targetType))
+	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	if err != nil {
+		return 0, fmt.Errorf("get exercise for rep window: %w", err)
+	}
+	if exercise.RepMin == nil || exercise.RepMax == nil {
+		// time-based exercises don't carry a rep window and shouldn't reach
+		// this path (their starting value is seconds via GetStartingSeconds);
+		// defensive return preserves the historical weight unchanged.
+		return prev.WeightKg, nil
+	}
+	fromReps := exerciseprogression.DeriveScheme(
+		*exercise.RepMin, *exercise.RepMax,
+		periodizationToProgression(prev.PeriodizationType),
+	).TargetReps
+	toReps := exerciseprogression.DeriveScheme(
+		*exercise.RepMin, *exercise.RepMax,
+		periodizationToProgression(targetType),
+	).TargetReps
 	return exerciseprogression.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
 }
 
@@ -664,6 +680,14 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
+	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	if err != nil {
+		return nil, fmt.Errorf("get exercise: %w", err)
+	}
+	if exercise.RepMin == nil || exercise.RepMax == nil {
+		return nil, fmt.Errorf("exercise %d has no rep window (use BuildTimedProgression for time_based)", exerciseID)
+	}
+
 	startingWeight, err := s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
 	if err != nil {
 		return nil, fmt.Errorf("get starting weight: %w", err)
@@ -673,6 +697,8 @@ func (s *Service) BuildProgression(
 
 	config := exerciseprogression.Config{
 		Type:           epType,
+		RepMin:         *exercise.RepMin,
+		RepMax:         *exercise.RepMax,
 		StartingWeight: startingWeight,
 	}
 

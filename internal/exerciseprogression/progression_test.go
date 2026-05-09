@@ -10,6 +10,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 	tests := []struct {
 		name           string
 		periodization  exerciseprogression.PeriodizationType
+		repMin         int
+		repMax         int
 		startingWeight float64
 		wantReps       int
 		wantWeight     float64
@@ -17,6 +19,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		{
 			name:           "strength returns 5 reps",
 			periodization:  exerciseprogression.Strength,
+			repMin:         5,
+			repMax:         10,
 			startingWeight: 80.0,
 			wantReps:       5,
 			wantWeight:     80.0,
@@ -24,6 +28,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		{
 			name:           "hypertrophy returns 8 reps",
 			periodization:  exerciseprogression.Hypertrophy,
+			repMin:         5,
+			repMax:         8,
 			startingWeight: 60.0,
 			wantReps:       8,
 			wantWeight:     60.0,
@@ -31,6 +37,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		{
 			name:           "endurance returns 15 reps",
 			periodization:  exerciseprogression.Endurance,
+			repMin:         10,
+			repMax:         15,
 			startingWeight: 40.0,
 			wantReps:       15,
 			wantWeight:     40.0,
@@ -38,6 +46,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		{
 			name:           "zero starting weight is returned as-is",
 			periodization:  exerciseprogression.Hypertrophy,
+			repMin:         5,
+			repMax:         8,
 			startingWeight: 0.0,
 			wantReps:       8,
 			wantWeight:     0.0,
@@ -48,6 +58,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := exerciseprogression.New(exerciseprogression.Config{
 				Type:           tt.periodization,
+				RepMin:         tt.repMin,
+				RepMax:         tt.repMax,
 				StartingWeight: tt.startingWeight,
 			})
 			got := p.CurrentSet()
@@ -90,6 +102,8 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := exerciseprogression.New(exerciseprogression.Config{
 				Type:           exerciseprogression.Hypertrophy,
+				RepMin:         5,
+				RepMax:         8,
 				StartingWeight: startWeight,
 			})
 			p.RecordCompletion(exerciseprogression.SetResult{
@@ -109,6 +123,8 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 	// 23kg: |w|*0.10 = 2.3, below the 2.5kg minimum step → 23 - 2.5 = 20.5
 	p := exerciseprogression.New(exerciseprogression.Config{
 		Type:           exerciseprogression.Hypertrophy,
+		RepMin:         5,
+		RepMax:         8,
 		StartingWeight: 23.0,
 	})
 	p.RecordCompletion(exerciseprogression.SetResult{
@@ -127,6 +143,8 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 	// Set 2 recommendation must be 95kg (from actual), not 100kg.
 	p := exerciseprogression.New(exerciseprogression.Config{
 		Type:           exerciseprogression.Hypertrophy,
+		RepMin:         5,
+		RepMax:         8,
 		StartingWeight: 100.0,
 	})
 	p.RecordCompletion(exerciseprogression.SetResult{
@@ -145,6 +163,8 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 	// Set 3 must be 90 + 2.5 = 92.5kg.
 	p := exerciseprogression.New(exerciseprogression.Config{
 		Type:           exerciseprogression.Hypertrophy,
+		RepMin:         5,
+		RepMax:         8,
 		StartingWeight: 100.0,
 	})
 	p.RecordCompletion(exerciseprogression.SetResult{
@@ -166,6 +186,8 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 func TestNewFromHistory_MatchesReplay(t *testing.T) {
 	config := exerciseprogression.Config{
 		Type:           exerciseprogression.Hypertrophy,
+		RepMin:         5,
+		RepMax:         8,
 		StartingWeight: 80.0,
 	}
 	results := []exerciseprogression.SetResult{
@@ -196,6 +218,8 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 	config := exerciseprogression.Config{
 		Type:           exerciseprogression.Strength,
+		RepMin:         5,
+		RepMax:         10,
 		StartingWeight: 60.0,
 	}
 	fresh := exerciseprogression.New(config)
@@ -209,6 +233,8 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 func TestSetsCompleted(t *testing.T) {
 	p := exerciseprogression.New(exerciseprogression.Config{
 		Type:           exerciseprogression.Hypertrophy,
+		RepMin:         5,
+		RepMax:         8,
 		StartingWeight: 60.0,
 	})
 
@@ -333,6 +359,8 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 			p := exerciseprogression.NewFromHistory(
 				exerciseprogression.Config{
 					Type:           exerciseprogression.Strength,
+					RepMin:         5,
+					RepMax:         10,
 					StartingWeight: 0,
 				},
 				[]exerciseprogression.SetResult{
@@ -348,18 +376,20 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 }
 
 // TestExhaustivePeriodizationCoverage documents that every PeriodizationType
-// resolves to a non-zero rep count via TargetReps. Adding a new variant without
-// updating the switch in TargetReps will both fail this test and trip the
+// resolves to a non-zero rep count via DeriveScheme. Adding a new variant without
+// updating the switch in DeriveScheme will both fail this test and trip the
 // `exhaustive` linter on the package's internal switches.
 func TestExhaustivePeriodizationCoverage(t *testing.T) {
+	// Use a wide window so repMin/repMax don't mask any periodization branch.
+	const repMin, repMax = 5, 15
 	all := []exerciseprogression.PeriodizationType{
 		exerciseprogression.Strength,
 		exerciseprogression.Hypertrophy,
 		exerciseprogression.Endurance,
 	}
 	for _, p := range all {
-		if got := exerciseprogression.TargetReps(p); got <= 0 {
-			t.Errorf("TargetReps(%v) = %d, want positive", p, got)
+		if got := exerciseprogression.DeriveScheme(repMin, repMax, p).TargetReps; got <= 0 {
+			t.Errorf("DeriveScheme(%d,%d,%v).TargetReps = %d, want positive", repMin, repMax, p, got)
 		}
 	}
 }
@@ -378,6 +408,8 @@ func TestExhaustiveSignalCoverage(t *testing.T) {
 		p := exerciseprogression.NewFromHistory(
 			exerciseprogression.Config{
 				Type:           exerciseprogression.Hypertrophy,
+				RepMin:         5,
+				RepMax:         8,
 				StartingWeight: 50,
 			},
 			[]exerciseprogression.SetResult{

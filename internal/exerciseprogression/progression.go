@@ -28,8 +28,13 @@ const (
 )
 
 // Config is provided once when starting an exercise execution.
+// RepMin/RepMax describe the exercise's per-session rep window — the
+// progression uses DeriveScheme on each CurrentSet() call to know what reps
+// to recommend for the next set under the session's periodization.
 type Config struct {
 	Type           PeriodizationType
+	RepMin         int
+	RepMax         int
 	StartingWeight float64 // kg; caller-derived from history, may be user-overridden
 }
 
@@ -47,10 +52,6 @@ type SetResult struct {
 }
 
 const (
-	repsStrength    = 5
-	repsHypertrophy = 8
-	repsEndurance   = 15
-
 	// dumbbellThresholdKg is the boundary below which loads progress in 1kg
 	// steps (matching real-world fixed-weight dumbbell sets) and at/above
 	// which they revert to the standard 2.5kg plate increment.
@@ -82,7 +83,7 @@ func NewFromHistory(config Config, completed []SetResult) *Progression {
 
 // CurrentSet returns the recommended target for the next set.
 func (p *Progression) CurrentSet() SetTarget {
-	reps := TargetReps(p.config.Type)
+	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type).TargetReps
 	if len(p.completed) == 0 {
 		return SetTarget{WeightKg: p.config.StartingWeight, TargetReps: reps}
 	}
@@ -99,20 +100,6 @@ func (p *Progression) RecordCompletion(result SetResult) {
 // SetsCompleted returns the number of sets recorded so far.
 func (p *Progression) SetsCompleted() int {
 	return len(p.completed)
-}
-
-// TargetReps returns the canonical target rep count for a periodization.
-func TargetReps(t PeriodizationType) int {
-	switch t {
-	case Strength:
-		return repsStrength
-	case Hypertrophy:
-		return repsHypertrophy
-	case Endurance:
-		return repsEndurance
-	default:
-		panic(fmt.Sprintf("exerciseprogression: unknown PeriodizationType %d", t))
-	}
 }
 
 func adjustedWeight(last SetResult) float64 {

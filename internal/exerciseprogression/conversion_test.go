@@ -124,23 +124,3 @@ func TestConvertWeight(t *testing.T) {
 		})
 	}
 }
-
-func TestTargetReps(t *testing.T) {
-	tests := []struct {
-		name string
-		p    exerciseprogression.PeriodizationType
-		want int
-	}{
-		{"strength", exerciseprogression.Strength, 5},
-		{"hypertrophy", exerciseprogression.Hypertrophy, 8},
-		{"endurance", exerciseprogression.Endurance, 15},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := exerciseprogression.TargetReps(tt.p)
-			if got != tt.want {
-				t.Errorf("TargetReps(%v) = %d; want %d", tt.p, got, tt.want)
-			}
-		})
-	}
-}
