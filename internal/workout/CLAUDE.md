@@ -32,6 +32,8 @@ type Exercise struct {
     PrimaryMuscleGroups    []string
     SecondaryMuscleGroups  []string
     DefaultStartingSeconds *int         // Non-nil for time_based exercises; nil otherwise.
+    RepMin                 *int         // Per-exercise low end of the rep window; nil for time_based.
+    RepMax                 *int         // Per-exercise high end of the rep window; nil for time_based.
 }
 
 type Session struct {

@@ -198,6 +198,8 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		for j, pes := range ps.ExerciseSets {
 			sets := make([]Set, len(pes.Sets))
 			for k, planSet := range pes.Sets {
+				// RestSeconds is computed by DeriveScheme and carried in PlannedSet but not yet
+				// persisted on Set — rest UI is out of scope for the rep-scheme spec.
 				sets[k] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
 					TargetValue: planSet.TargetValue,
 				}
@@ -915,6 +917,14 @@ func (s *Service) generateExerciseContent(ctx context.Context, name string) Exer
 		return createMinimalExercise(name)
 	}
 
+	// Defensive default: the AI prompt does not carry rep_min/rep_max, and
+	// the DB CHECK requires them for non-time-based exercises. Mirror the
+	// values used by createMinimalExercise so the Create downstream succeeds.
+	if generated.ExerciseType != ExerciseTypeTime && (generated.RepMin == nil || generated.RepMax == nil) {
+		repMin, repMax := 5, 10
+		generated.RepMin = &repMin
+		generated.RepMax = &repMax
+	}
 	return generated
 }
 
