@@ -1008,6 +1008,9 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 }
 
 // copySetsWithoutCompletion creates a copy of sets with completion reset to nil.
+// Note: callers in the AddExercise/swap paths route the result through
+// buildSetsForAdd, which overrides TargetValue from the session's periodization.
+// This function preserves all fields verbatim including TargetValue.
 func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 	result := make([]Set, len(sets))
 	for i, set := range sets {
@@ -1022,12 +1025,42 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 	return result
 }
 
-// createDefaultSets returns n empty sets seeded with type-appropriate defaults
-// for the target exercise: DefaultStartingSeconds (TargetValue) and nil weight
-// for time_based, defaultTargetValue and nil weight for bodyweight, and
-// defaultTargetValue with a zero-weight pointer for weighted/assisted.
-func (s *Service) createDefaultSets(ex Exercise, n int) []Set {
-	target := defaultTargetValueFor(ex)
+// defaultTimedSets is the fixed set count for time-based exercises, matching the
+// planner's timeBasedSets constant in weekplanner.
+const defaultTimedSets = 3
+
+// deriveSchemeForExercise returns the per-set target reps and total set count
+// for an exercise within a session of the given periodization. For time-based
+// exercises, uses DefaultStartingSeconds and a fixed set count of defaultTimedSets
+// (mirrors the planner's timeBasedSets). For rep-based exercises, returns DeriveScheme
+// values. The weight component is intentionally not addressed here — callers
+// that have historical weight should preserve it; otherwise they pass a nil
+// weight pointer matching the planner's PlannedSet shape.
+func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
+	if ex.IsTimed() {
+		if ex.DefaultStartingSeconds != nil {
+			return *ex.DefaultStartingSeconds, defaultTimedSets
+		}
+		// Defensive: time_based exercises must have DefaultStartingSeconds per the
+		// schema CHECK, but fall back gracefully rather than panicking.
+		return defaultTargetValue, defaultTimedSets
+	}
+	if ex.RepMin == nil || ex.RepMax == nil {
+		// Defensive: non-time_based exercises must have rep_min/rep_max per the
+		// schema CHECK; fall back to old defaults if a fixture invariant is violated.
+		return defaultTargetValue, defaultTimedSets
+	}
+	scheme := exerciseprogression.DeriveScheme(*ex.RepMin, *ex.RepMax, periodizationToProgression(pt))
+	return scheme.TargetReps, scheme.TargetSets
+}
+
+// createDefaultSets returns N empty sets seeded with the prescription appropriate
+// for this exercise within a session of the given periodization. N is determined
+// by deriveSchemeForExercise (same set count the planner would use). Weight is
+// nil for time_based and bodyweight; zero pointer for weighted/assisted (matches
+// the planner's lazy weight resolution).
+func (s *Service) createDefaultSets(ex Exercise, pt PeriodizationType) []Set {
+	targetValue, n := deriveSchemeForExercise(ex, pt)
 	result := make([]Set, n)
 	for i := range result {
 		var weight *float64
@@ -1036,7 +1069,7 @@ func (s *Service) createDefaultSets(ex Exercise, n int) []Set {
 		}
 		result[i] = Set{
 			WeightKg:       weight,
-			TargetValue:    target,
+			TargetValue:    targetValue,
 			CompletedValue: nil,
 			CompletedAt:    nil,
 			Signal:         nil,
@@ -1045,13 +1078,40 @@ func (s *Service) createDefaultSets(ex Exercise, n int) []Set {
 	return result
 }
 
-// defaultTargetValueFor returns the default TargetValue for a fresh set on this
-// exercise — DefaultStartingSeconds for time_based, defaultTargetValue otherwise.
-func defaultTargetValueFor(ex Exercise) int {
-	if ex.IsTimed() && ex.DefaultStartingSeconds != nil {
-		return *ex.DefaultStartingSeconds
+// buildSetsForAdd produces the Set slice for an exercise being added to or
+// swapping into an existing session. The session's periodization always
+// dictates TargetValue and TargetSets (so a Deadlift added in a Strength
+// week gets 3 reps × 4 sets, not whatever the historical session had).
+//
+// When historicalSets is non-nil and contains weight data, the most recent
+// completed weight is preserved as the starting weight for every new set —
+// the user's progression isn't lost just because the prescription changed.
+// Completion fields are always reset.
+func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalSets []Set) []Set {
+	sets := s.createDefaultSets(ex, pt)
+	if len(historicalSets) == 0 {
+		return sets
 	}
-	return defaultTargetValue
+	// Pull the latest completed weight from history; fall back to the first
+	// historical set's WeightKg if no completion is present.
+	var seedWeight *float64
+	for i := len(historicalSets) - 1; i >= 0; i-- {
+		if historicalSets[i].WeightKg != nil {
+			seedWeight = historicalSets[i].WeightKg
+			break
+		}
+	}
+	if seedWeight == nil {
+		return sets
+	}
+	for i := range sets {
+		// Only carry weight for exercise types that take weight (mirror createDefaultSets).
+		if !ex.IsTimed() && ex.ExerciseType != ExerciseTypeBodyweight {
+			w := *seedWeight
+			sets[i].WeightKg = &w
+		}
+	}
+	return sets
 }
 
 // replaceExerciseInSession swaps the exercise occupying a workout slot, keeping
@@ -1072,11 +1132,7 @@ func (s *Service) replaceExerciseInSession(
 			}
 			sess.ExerciseSets[i].ExerciseID = newExercise.ID
 			sess.ExerciseSets[i].WarmupCompletedAt = nil
-			if historicalSets != nil {
-				sess.ExerciseSets[i].Sets = historicalSets
-			} else {
-				sess.ExerciseSets[i].Sets = s.createDefaultSets(newExercise, len(exerciseSet.Sets))
-			}
+			sess.ExerciseSets[i].Sets = s.buildSetsForAdd(newExercise, sess.PeriodizationType, historicalSets)
 			return true, nil
 		}
 		return false, fmt.Errorf("workout exercise %d not found in workout for date %s",
@@ -1145,16 +1201,8 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			}
 		}
 
-		// Create sets for the exercise
-		var newSets []Set
-		if historicalSets != nil {
-			// Use historical sets if available
-			newSets = historicalSets
-		} else {
-			// Create type-appropriate default sets if no historical data exists
-			const defaultSetCount = 3
-			newSets = s.createDefaultSets(exercise, defaultSetCount)
-		}
+		// Create sets for the exercise — periodization comes from the session.
+		newSets := s.buildSetsForAdd(exercise, sess.PeriodizationType, historicalSets)
 
 		// Add the new exercise to the session. ID stays 0 so the repository
 		// assigns a fresh workout_exercise.id on insert.
