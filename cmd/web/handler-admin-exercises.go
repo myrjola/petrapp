@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -166,35 +167,20 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var defaultStartingSeconds *int
-	if exerciseType == workout.ExerciseTypeTime {
-		raw := r.PostForm.Get("default_starting_seconds")
-		n, atoiErr := strconv.Atoi(raw)
-		if atoiErr != nil || n <= 0 {
-			app.putFlashError(r.Context(), "Default starting seconds must be a positive integer for time-based exercises.")
-			redirect(w, r, editPath)
-			return
-		}
-		defaultStartingSeconds = &n
-	}
-
-	// Non-time-based exercises must carry non-NULL rep_min / rep_max. The admin
-	// edit form does not surface these fields yet, so preserve the existing
-	// values across the update.
-	var repMin, repMax *int
-	if exerciseType != workout.ExerciseTypeTime {
-		existing, getErr := app.workoutService.GetExercise(r.Context(), id)
-		if getErr != nil {
-			app.serverError(w, r, fmt.Errorf("get exercise for rep window: %w", getErr))
-			return
-		}
-		repMin = existing.RepMin
-		repMax = existing.RepMax
+	defaultStartingSeconds, err := app.buildDefaultStartingSeconds(r.Context(), exerciseType, r, editPath, w)
+	if err != nil {
+		return
 	}
 
 	if len(primaryMuscles) == 0 {
 		app.putFlashError(r.Context(), "At least one primary muscle group is required.")
 		redirect(w, r, editPath)
+		return
+	}
+
+	repMin, repMax, err := app.preserveRepWindow(r.Context(), id, exerciseType)
+	if err != nil {
+		app.serverError(w, r, err)
 		return
 	}
 
@@ -251,4 +237,41 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 
 	// Redirect to the newly created exercise.
 	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
+}
+
+// buildDefaultStartingSeconds validates and returns the default starting seconds
+// for time-based exercises. Handles validation errors by flashing and
+// redirecting, so the caller must return immediately on error.
+func (app *application) buildDefaultStartingSeconds(
+	ctx context.Context, exerciseType workout.ExerciseType, r *http.Request,
+	editPath string, w http.ResponseWriter,
+) (*int, error) {
+	if exerciseType != workout.ExerciseTypeTime {
+		return nil, nil //nolint:nilnil // no-op when not time-based
+	}
+	raw := r.PostForm.Get("default_starting_seconds")
+	n, atoiErr := strconv.Atoi(raw)
+	if atoiErr != nil || n <= 0 {
+		app.putFlashError(ctx, "Default starting seconds must be a positive integer for time-based exercises.")
+		redirect(w, r, editPath)
+		return nil, fmt.Errorf("invalid default starting seconds") //nolint:perfsprint // validation error
+	}
+	return &n, nil
+}
+
+// preserveRepWindow returns the rep_min / rep_max for an existing exercise so
+// that an admin update doesn't NULL them out. The admin edit form does not
+// surface these fields yet, so preservation is the only path. Returns
+// (nil, nil, nil) for time-based exercises, which don't carry a rep window.
+func (app *application) preserveRepWindow(
+	ctx context.Context, id int, exerciseType workout.ExerciseType,
+) (*int, *int, error) {
+	if exerciseType == workout.ExerciseTypeTime {
+		return nil, nil, nil
+	}
+	existing, err := app.workoutService.GetExercise(ctx, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get exercise for rep window: %w", err)
+	}
+	return existing.RepMin, existing.RepMax, nil
 }
