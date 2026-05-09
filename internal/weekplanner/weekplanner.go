@@ -447,12 +447,28 @@ func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType) PlannedExerciseS
 	if ex.RepMin == nil || ex.RepMax == nil {
 		panic(fmt.Sprintf("non-time_based exercise %d missing RepMin/RepMax (fixture invariant violation)", ex.ID))
 	}
-	scheme := exerciseprogression.DeriveScheme(*ex.RepMin, *ex.RepMax, exerciseprogression.PeriodizationType(pt))
+	scheme := exerciseprogression.DeriveScheme(*ex.RepMin, *ex.RepMax, toProgressionPeriodization(pt))
 	sets := make([]PlannedSet, scheme.TargetSets)
 	for j := range sets {
 		sets[j] = PlannedSet{TargetValue: scheme.TargetReps, RestSeconds: scheme.RestSeconds}
 	}
 	return PlannedExerciseSet{ExerciseID: ex.ID, Sets: sets}
+}
+
+// toProgressionPeriodization maps the planner's PeriodizationType enum to the
+// equivalent value in the exerciseprogression package. The two enums are kept
+// independent because the packages don't depend on each other; an explicit
+// switch (rather than a numeric cast) ensures any future divergence is caught
+// at the point of use rather than producing silently wrong derivations.
+func toProgressionPeriodization(pt PeriodizationType) exerciseprogression.PeriodizationType {
+	switch pt {
+	case PeriodizationStrength:
+		return exerciseprogression.Strength
+	case PeriodizationHypertrophy:
+		return exerciseprogression.Hypertrophy
+	default:
+		panic(fmt.Sprintf("weekplanner: unknown PeriodizationType %d", pt))
+	}
 }
 
 // hasExercisesForCategory reports whether the exercise pool contains at least one

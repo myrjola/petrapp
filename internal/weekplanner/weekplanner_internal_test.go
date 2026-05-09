@@ -289,7 +289,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 		}
 	})
 
-	t.Run("each exercise set has setsPerExercise sets", func(t *testing.T) {
+	t.Run("rep-based exercise set count comes from DeriveScheme", func(t *testing.T) {
 		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest"}, 1)
 		if len(sets) != 1 {
 			t.Fatalf("want 1 exercise set, got %d", len(sets))
