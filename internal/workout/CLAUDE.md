@@ -241,6 +241,12 @@ func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercis
 - Don't bypass service layer from handlers
 - Don't mix domain and repository aggregate types
 
+### Display derivations belong on domain types
+
+Any value that depends on multiple domain attributes, or that encodes a business rule, lives as a method on the domain type that owns the rule (`Exercise.IsTimed()` is the canonical example). Handlers may format primitives (`%d`, `%.1fkg`, `time.Format`) and shape data into per-page template structs, but they may not branch on multiple domain fields to compute a value.
+
+**Test:** if changing the rule would force edits in two or more files outside `internal/workout/`, it is a domain method. The 2026-05-09 hypertrophy-window incident traces back to `formatTarget` in `cmd/web/` reimplementing a rule that already lived (correctly) in the planner.
+
 ## Error Handling Strategies
 
 ### Business Rule Violations
