@@ -957,7 +957,8 @@ func (s *Service) SwapExercise(
 	workoutExerciseID int,
 	newExerciseID int,
 ) error {
-	if _, err := s.repo.exercises.Get(ctx, newExerciseID); err != nil {
+	newExercise, err := s.repo.exercises.Get(ctx, newExerciseID)
+	if err != nil {
 		return fmt.Errorf("get new exercise: %w", err)
 	}
 
@@ -966,7 +967,7 @@ func (s *Service) SwapExercise(
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
-	if err = s.replaceExerciseInSession(ctx, date, workoutExerciseID, newExerciseID, historicalSets); err != nil {
+	if err = s.replaceExerciseInSession(ctx, date, workoutExerciseID, newExercise, historicalSets); err != nil {
 		return err
 	}
 
@@ -974,6 +975,9 @@ func (s *Service) SwapExercise(
 }
 
 // findHistoricalSets retrieves set data from the most recent usage of an exercise.
+// Aggregates with no sets are skipped — they exist for exercises whose historical
+// exercise_sets rows were dropped by the time-based premigration but whose
+// workout_exercise slot survived. Returns nil when no usable history is found.
 func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]Set, error) {
 	// Get workout history (past 3 months)
 	threeMonthsAgo := date.AddDate(0, -3, 0)
@@ -991,10 +995,11 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 		}
 
 		for _, exerciseSet := range session.ExerciseSets {
-			if exerciseSet.ExerciseID == exerciseID {
-				// Copy sets and reset completion status
-				return s.copySetsWithoutCompletion(exerciseSet.Sets), nil
+			if exerciseSet.ExerciseID != exerciseID || len(exerciseSet.Sets) == 0 {
+				continue
 			}
+			// Copy sets and reset completion status
+			return s.copySetsWithoutCompletion(exerciseSet.Sets), nil
 		}
 	}
 
@@ -1017,17 +1022,21 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 	return result
 }
 
-// createEmptySets creates new sets with zero weight based on the structure of template sets.
-func (s *Service) createEmptySets(templateSets []Set) []Set {
-	result := make([]Set, len(templateSets))
-	for i, set := range templateSets {
+// createDefaultSets returns n empty sets seeded with type-appropriate defaults
+// for the target exercise: DefaultStartingSeconds (TargetValue) and nil weight
+// for time_based, defaultTargetValue and nil weight for bodyweight, and
+// defaultTargetValue with a zero-weight pointer for weighted/assisted.
+func (s *Service) createDefaultSets(ex Exercise, n int) []Set {
+	target := defaultTargetValueFor(ex)
+	result := make([]Set, n)
+	for i := range result {
 		var weight *float64
-		if set.WeightKg != nil {
-			weight = new(float64) // Empty weight for weighted exercises.
+		if !ex.IsTimed() && ex.ExerciseType != ExerciseTypeBodyweight {
+			weight = new(float64)
 		}
 		result[i] = Set{
 			WeightKg:       weight,
-			TargetValue:    set.TargetValue,
+			TargetValue:    target,
 			CompletedValue: nil,
 			CompletedAt:    nil,
 			Signal:         nil,
@@ -1036,15 +1045,24 @@ func (s *Service) createEmptySets(templateSets []Set) []Set {
 	return result
 }
 
+// defaultTargetValueFor returns the default TargetValue for a fresh set on this
+// exercise — DefaultStartingSeconds for time_based, defaultTargetValue otherwise.
+func defaultTargetValueFor(ex Exercise) int {
+	if ex.IsTimed() && ex.DefaultStartingSeconds != nil {
+		return *ex.DefaultStartingSeconds
+	}
+	return defaultTargetValue
+}
+
 // replaceExerciseInSession swaps the exercise occupying a workout slot, keeping
 // the slot's stable ID intact. Any previously recorded sets on the slot are
 // dropped — historicalSets seeds the replacement when present, otherwise we
-// generate empty placeholders matching the old set count.
+// generate type-appropriate placeholders matching the old set count.
 func (s *Service) replaceExerciseInSession(
 	ctx context.Context,
 	date time.Time,
 	workoutExerciseID int,
-	newExerciseID int,
+	newExercise Exercise,
 	historicalSets []Set,
 ) error {
 	err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
@@ -1052,12 +1070,12 @@ func (s *Service) replaceExerciseInSession(
 			if exerciseSet.ID != workoutExerciseID {
 				continue
 			}
-			sess.ExerciseSets[i].ExerciseID = newExerciseID
+			sess.ExerciseSets[i].ExerciseID = newExercise.ID
 			sess.ExerciseSets[i].WarmupCompletedAt = nil
 			if historicalSets != nil {
 				sess.ExerciseSets[i].Sets = historicalSets
 			} else {
-				sess.ExerciseSets[i].Sets = s.createEmptySets(exerciseSet.Sets)
+				sess.ExerciseSets[i].Sets = s.createDefaultSets(newExercise, len(exerciseSet.Sets))
 			}
 			return true, nil
 		}
@@ -1133,18 +1151,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			// Use historical sets if available
 			newSets = historicalSets
 		} else {
-			// Create default sets if no historical data exists
+			// Create type-appropriate default sets if no historical data exists
 			const defaultSetCount = 3
-			newSets = make([]Set, defaultSetCount)
-			for i := range newSets {
-				newSets[i] = Set{
-					WeightKg:       new(float64),
-					TargetValue:    defaultTargetValue,
-					CompletedValue: nil,
-					CompletedAt:    nil,
-					Signal:         nil,
-				}
-			}
+			newSets = s.createDefaultSets(exercise, defaultSetCount)
 		}
 
 		// Add the new exercise to the session. ID stays 0 so the repository

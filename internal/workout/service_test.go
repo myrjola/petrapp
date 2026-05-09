@@ -777,6 +777,222 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 	}
 }
 
+// Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds verifies
+// that adding a time-based exercise with no usable history produces three
+// sets pre-seeded with the exercise's DefaultStartingSeconds rather than
+// the rep-based defaultTargetValue or zero sets.
+//
+// Regression: the time_based premigration in PR #87 dropped historical
+// exercise_sets rows for plank but kept the workout_exercise slots. The
+// resulting empty (but non-nil) history slice slipped past the
+// `historicalSets != nil` check and persisted zero sets, so the user saw
+// a blank exercise page when adding or swapping to plank.
+func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create test database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("plank-user"), "Plank User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	svc := workout.NewService(db, logger, "")
+
+	if err = tryInsertMuscleGroup(ctx, t, db, "Core"); err != nil {
+		t.Fatalf("insert muscle group: %v", err)
+	}
+
+	const startingSeconds = 30
+	var plankID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
+		 VALUES (?, 'full_body', 'time_based', ?, '') RETURNING id`,
+		"TestPlankAdd", startingSeconds).Scan(&plankID)
+	if err != nil {
+		t.Fatalf("insert plank exercise: %v", err)
+	}
+
+	today := time.Now()
+	dateStr := today.Format("2006-01-02")
+
+	// Simulate the post-premigration state: a historical workout_exercise slot
+	// for plank exists but its exercise_sets rows were dropped.
+	historicalDate := today.AddDate(0, 0, -7).Format("2006-01-02")
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+		userID, historicalDate); err != nil {
+		t.Fatalf("insert historical session: %v", err)
+	}
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)`,
+		userID, historicalDate, plankID); err != nil {
+		t.Fatalf("insert orphaned workout_exercise: %v", err)
+	}
+
+	// Today's empty session.
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+		userID, dateStr); err != nil {
+		t.Fatalf("insert today's session: %v", err)
+	}
+
+	if _, err = svc.AddExercise(ctx, today, plankID); err != nil {
+		t.Fatalf("AddExercise: %v", err)
+	}
+
+	session, err := svc.GetSession(ctx, today)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+
+	var plankSets []workout.Set
+	for _, es := range session.ExerciseSets {
+		if es.Exercise.ID == plankID {
+			plankSets = es.Sets
+			break
+		}
+	}
+	if len(plankSets) != 3 {
+		t.Fatalf("expected 3 plank sets seeded, got %d", len(plankSets))
+	}
+	for i, set := range plankSets {
+		if set.TargetValue != startingSeconds {
+			t.Errorf("set %d TargetValue: want %d, got %d", i, startingSeconds, set.TargetValue)
+		}
+		if set.WeightKg != nil {
+			t.Errorf("set %d WeightKg: want nil for time_based, got %v", i, *set.WeightKg)
+		}
+	}
+}
+
+// Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds verifies
+// that swapping into a time-based exercise (e.g. plank) without usable
+// history produces sets pre-seeded with DefaultStartingSeconds, not the
+// previous exercise's rep target. Regression for the same orphaned-history
+// case as Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds.
+func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create test database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("swap-user"), "Swap User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	svc := workout.NewService(db, logger, "")
+
+	for _, group := range []string{"Core", "Quads"} {
+		if err = tryInsertMuscleGroup(ctx, t, db, group); err != nil {
+			t.Fatalf("insert muscle group: %v", err)
+		}
+	}
+
+	squatID, err := createTestExercise(ctx, t, db, "Squat", "lower")
+	if err != nil {
+		t.Fatalf("create squat: %v", err)
+	}
+
+	const startingSeconds = 30
+	var plankID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
+		 VALUES (?, 'full_body', 'time_based', ?, '') RETURNING id`,
+		"TestPlankSwap", startingSeconds).Scan(&plankID)
+	if err != nil {
+		t.Fatalf("insert plank: %v", err)
+	}
+
+	today := time.Now()
+	dateStr := today.Format("2006-01-02")
+
+	// Simulate orphaned historical plank row from the premigration.
+	historicalDate := today.AddDate(0, 0, -7).Format("2006-01-02")
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+		userID, historicalDate); err != nil {
+		t.Fatalf("insert historical session: %v", err)
+	}
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)`,
+		userID, historicalDate, plankID); err != nil {
+		t.Fatalf("insert orphaned workout_exercise: %v", err)
+	}
+
+	// Today's session with squat occupying a slot.
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+		userID, dateStr); err != nil {
+		t.Fatalf("insert today's session: %v", err)
+	}
+	var squatSlotID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
+		 VALUES (?, ?, ?) RETURNING id`,
+		userID, dateStr, squatID).Scan(&squatSlotID)
+	if err != nil {
+		t.Fatalf("insert squat slot: %v", err)
+	}
+	for i := 1; i <= 3; i++ {
+		if _, err = db.ReadWrite.ExecContext(ctx,
+			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+			 VALUES (?, ?, ?, ?)`,
+			squatSlotID, i, 60.0, 5); err != nil {
+			t.Fatalf("insert squat set: %v", err)
+		}
+	}
+
+	if err = svc.SwapExercise(ctx, today, squatSlotID, plankID); err != nil {
+		t.Fatalf("SwapExercise: %v", err)
+	}
+
+	session, err := svc.GetSession(ctx, today)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+
+	var plankSets []workout.Set
+	for _, es := range session.ExerciseSets {
+		if es.ID == squatSlotID {
+			if es.Exercise.ID != plankID {
+				t.Fatalf("slot %d still maps to exercise %d, want %d", es.ID, es.Exercise.ID, plankID)
+			}
+			plankSets = es.Sets
+			break
+		}
+	}
+	if len(plankSets) != 3 {
+		t.Fatalf("expected 3 plank sets, got %d", len(plankSets))
+	}
+	for i, set := range plankSets {
+		if set.TargetValue != startingSeconds {
+			t.Errorf("set %d TargetValue: want %d, got %d", i, startingSeconds, set.TargetValue)
+		}
+		if set.WeightKg != nil {
+			t.Errorf("set %d WeightKg: want nil for time_based, got %v", i, *set.WeightKg)
+		}
+	}
+}
+
 // Helper function to create a test exercise.
 func createTestExercise(ctx context.Context, t *testing.T, db *sqlite.Database, name, category string) (int, error) {
 	t.Helper()
