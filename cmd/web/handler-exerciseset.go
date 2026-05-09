@@ -16,23 +16,17 @@ import (
 
 // formatTarget returns the display string for a set target.
 // For timed exercises it appends "s" (e.g. "30s").
-// For rep-based exercises it returns a plain integer or the hypertrophy range "6-10".
-func formatTarget(exercise workout.Exercise, session workout.Session, target int) string {
+// For rep-based exercises it returns the planner's target integer.
+func formatTarget(exercise workout.Exercise, target int) string {
 	if exercise.IsTimed() {
 		return fmt.Sprintf("%ds", target)
-	}
-	// Hypertrophy display preserves the legacy 6-10 rep range UX. TargetValue
-	// is the single integer the planner emits (8); progression and storage use
-	// that, while the user sees the range.
-	if session.PeriodizationType == workout.PeriodizationHypertrophy {
-		return "6-10"
 	}
 	return strconv.Itoa(target)
 }
 
 type setDisplay struct {
 	Set          workout.Set
-	TargetStr    string // Pre-formatted target string (e.g. "5", "6-10", "30s").
+	TargetStr    string // Pre-formatted target string (e.g. "5", "30s").
 	CompletedStr string // Pre-formatted completed string, same unit as TargetStr.
 	Unit         string // "reps" or "seconds" — for input labels.
 	Number       int    // 1-based set number for display.
@@ -52,14 +46,14 @@ type exerciseSetTemplateData struct {
 	AbsCurrentWeight      float64                       // |CurrentSetTarget.WeightKg|, for assisted form input
 }
 
-func prepareSetsDisplay(exercise workout.Exercise, session workout.Session, sets []workout.Set) []setDisplay {
+func prepareSetsDisplay(exercise workout.Exercise, sets []workout.Set) []setDisplay {
 	unit := "reps"
 	if exercise.IsTimed() {
 		unit = "seconds"
 	}
 	displays := make([]setDisplay, len(sets))
 	for i, set := range sets {
-		targetStr := formatTarget(exercise, session, set.TargetValue)
+		targetStr := formatTarget(exercise, set.TargetValue)
 		completedStr := ""
 		if set.CompletedValue != nil {
 			if exercise.IsTimed() {
@@ -165,7 +159,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData:      newBaseTemplateData(r),
 		Date:                  date,
 		ExerciseSet:           exerciseSet,
-		SetsDisplay:           prepareSetsDisplay(exerciseSet.Exercise, session, exerciseSet.Sets),
+		SetsDisplay:           prepareSetsDisplay(exerciseSet.Exercise, exerciseSet.Sets),
 		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSet.Sets),
 		EditingIndex:          editingIndex,
 		IsEditing:             isEditing,
