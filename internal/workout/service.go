@@ -918,6 +918,7 @@ func (s *Service) generateExerciseContent(ctx context.Context, name string) Exer
 
 // createMinimalExercise returns a basic exercise with just the essential fields populated.
 func createMinimalExercise(name string) Exercise {
+	repMin, repMax := 5, 10
 	return Exercise{ //nolint:exhaustruct // DefaultStartingSeconds is nil for non-time_based exercises.
 		ID:                    -1,
 		Name:                  name,
@@ -926,6 +927,8 @@ func createMinimalExercise(name string) Exercise {
 		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
 		PrimaryMuscleGroups:   []string{},
 		SecondaryMuscleGroups: []string{},
+		RepMin:                &repMin,
+		RepMax:                &repMax,
 	}
 }
 

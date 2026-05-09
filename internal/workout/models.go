@@ -52,6 +52,8 @@ type Exercise struct {
 	PrimaryMuscleGroups    []string     `json:"primary_muscle_groups"`
 	SecondaryMuscleGroups  []string     `json:"secondary_muscle_groups"`
 	DefaultStartingSeconds *int         `json:"default_starting_seconds,omitempty"`
+	RepMin                 *int         `json:"rep_min,omitempty"`
+	RepMax                 *int         `json:"rep_max,omitempty"`
 }
 
 // IsTimed returns true if this exercise uses duration targets instead of rep counts.

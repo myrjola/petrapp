@@ -178,6 +178,29 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		defaultStartingSeconds = &n
 	}
 
+	// Parse optional rep_min / rep_max; preserve existing values when the form
+	// fields are absent (non-time-based exercises must carry non-NULL values).
+	var repMin, repMax *int
+	if exerciseType != workout.ExerciseTypeTime {
+		existing, getErr := app.workoutService.GetExercise(r.Context(), id)
+		if getErr != nil {
+			app.serverError(w, r, fmt.Errorf("get exercise for rep window: %w", getErr))
+			return
+		}
+		repMin = existing.RepMin
+		repMax = existing.RepMax
+		if rawMin := r.PostForm.Get("rep_min"); rawMin != "" {
+			if n, atoiErr := strconv.Atoi(rawMin); atoiErr == nil && n >= 1 {
+				repMin = &n
+			}
+		}
+		if rawMax := r.PostForm.Get("rep_max"); rawMax != "" {
+			if n, atoiErr := strconv.Atoi(rawMax); atoiErr == nil && n >= 1 {
+				repMax = &n
+			}
+		}
+	}
+
 	if len(primaryMuscles) == 0 {
 		app.putFlashError(r.Context(), "At least one primary muscle group is required.")
 		redirect(w, r, editPath)
@@ -194,6 +217,8 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		PrimaryMuscleGroups:    primaryMuscles,
 		SecondaryMuscleGroups:  secondaryMuscles,
 		DefaultStartingSeconds: defaultStartingSeconds,
+		RepMin:                 repMin,
+		RepMax:                 repMax,
 	}
 
 	// Update exercise

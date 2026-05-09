@@ -371,8 +371,8 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 
 	// 1. Create a test exercise directly in the database
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Test Exercise", "lower", "Test description")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Test Exercise", "lower", "Test description", 5, 10)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise: %v", err)
 	}
@@ -441,6 +441,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
+	repMin, repMax := 5, 10
 	updatedExercise := workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds not needed for this test.
 		ID:                    exerciseID,
 		Name:                  "Updated Test Exercise",
@@ -449,6 +450,8 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		DescriptionMarkdown:   "Updated test description",
 		PrimaryMuscleGroups:   []string{"Quads", "Glutes"},
 		SecondaryMuscleGroups: []string{"Hamstrings", "Core"},
+		RepMin:                &repMin,
+		RepMax:                &repMax,
 	}
 
 	err = svc.UpdateExercise(ctx, updatedExercise)
@@ -778,8 +781,8 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 func createTestExercise(ctx context.Context, t *testing.T, db *sqlite.Database, name, category string) (int, error) {
 	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		name, category, "Test description")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		name, category, "Test description", 5, 10)
 	if err != nil {
 		return 0, err
 	}
@@ -929,8 +932,8 @@ func Test_GetStartingWeight(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Squat", "lower", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Squat", "lower", "desc", 5, 10)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1098,8 +1101,8 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Assisted Test Exercise", "upper", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Assisted Test Exercise", "upper", "desc", 5, 10)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1458,8 +1461,8 @@ func Test_BuildProgression(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"OHP", "upper", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"OHP", "upper", "desc", 5, 10)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -1545,8 +1548,8 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown) VALUES (?, ?, ?)",
-		"Squat", "lower", "desc")
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Squat", "lower", "desc", 5, 10)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
