@@ -178,8 +178,9 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		defaultStartingSeconds = &n
 	}
 
-	// Parse optional rep_min / rep_max; preserve existing values when the form
-	// fields are absent (non-time-based exercises must carry non-NULL values).
+	// Non-time-based exercises must carry non-NULL rep_min / rep_max. The admin
+	// edit form does not surface these fields yet, so preserve the existing
+	// values across the update.
 	var repMin, repMax *int
 	if exerciseType != workout.ExerciseTypeTime {
 		existing, getErr := app.workoutService.GetExercise(r.Context(), id)
@@ -189,16 +190,6 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		}
 		repMin = existing.RepMin
 		repMax = existing.RepMax
-		if rawMin := r.PostForm.Get("rep_min"); rawMin != "" {
-			if n, atoiErr := strconv.Atoi(rawMin); atoiErr == nil && n >= 1 {
-				repMin = &n
-			}
-		}
-		if rawMax := r.PostForm.Get("rep_max"); rawMax != "" {
-			if n, atoiErr := strconv.Atoi(rawMax); atoiErr == nil && n >= 1 {
-				repMax = &n
-			}
-		}
 	}
 
 	if len(primaryMuscles) == 0 {
