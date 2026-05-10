@@ -58,11 +58,6 @@ dev:
 	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
 	bash scripts/dev.sh
 
-dev-tailnet:
-	@echo "Running dev server bound to tailnet IP..."
-	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
-	bash scripts/dev-tailnet.sh
-
 .PHONY: dev-tailscale-https
 dev-tailscale-https: build  ## Build and run with Tailscale HTTPS (for iOS WebAuthn)
 	bash scripts/dev-tailscale-https.sh
