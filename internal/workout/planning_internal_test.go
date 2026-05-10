@@ -15,7 +15,7 @@ func Test_buildPlannedSets(t *testing.T) {
 		wantSetCount  int
 	}{
 		{
-			name: "weighted Strength: low end of window, 4 sets",
+			name: "weighted Strength: low end of window, 4 sets, nil weight (allocated by buildSetsForAdd)",
 			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeWeighted,
 				RepMin:       intPtr(5),
@@ -26,7 +26,7 @@ func Test_buildPlannedSets(t *testing.T) {
 			wantSetCount:  4, // reps <= 5 → 4 sets
 		},
 		{
-			name: "weighted Hypertrophy: high end, 3 sets",
+			name: "weighted Hypertrophy: high end, 3 sets, nil weight (allocated by buildSetsForAdd)",
 			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeWeighted,
 				RepMin:       intPtr(5),
@@ -37,7 +37,7 @@ func Test_buildPlannedSets(t *testing.T) {
 			wantSetCount:  3, // 6-10 → 3 sets
 		},
 		{
-			name: "weighted Hypertrophy: high-rep window, 3 sets",
+			name: "weighted Hypertrophy: high-rep window, 3 sets, nil weight (allocated by buildSetsForAdd)",
 			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeWeighted,
 				RepMin:       intPtr(8),

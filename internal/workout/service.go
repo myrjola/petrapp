@@ -1055,10 +1055,8 @@ const defaultTimedSets = 3
 // deriveSchemeForExercise returns the per-set target reps and total set count
 // for an exercise within a session of the given periodization. For time-based
 // exercises, uses DefaultStartingSeconds and a fixed set count of defaultTimedSets
-// (mirrors the planner's timeBasedSets). For rep-based exercises, returns DeriveScheme
-// values. The weight component is intentionally not addressed here — callers
-// that have historical weight should preserve it; otherwise they pass a nil
-// weight pointer matching the planner's PlannedSet shape.
+// (mirrors the planner's timeBasedSets). For rep-based exercises, returns
+// DeriveScheme values.
 func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 	if ex.IsTimed() {
 		if ex.DefaultStartingSeconds != nil {
