@@ -40,6 +40,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 			"name",
 			"category",
 			"exercise_type",
+			"default_starting_seconds",
 			"description_markdown",
 			"primary_muscle_groups",
 			"secondary_muscle_groups",
@@ -64,8 +65,8 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 				"enum":        []string{"weighted", "bodyweight", "assisted", "time_based"},
 			},
 			"default_starting_seconds": map[string]any{
-				"type":        "integer",
-				"description": "Default starting seconds for time_based exercises; omit for other types",
+				"type":        []string{"integer", "null"},
+				"description": "Default starting seconds for time_based exercises; null for other types",
 			},
 			"description_markdown": map[string]any{
 				"type":        "string",
