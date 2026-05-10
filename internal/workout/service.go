@@ -1088,6 +1088,15 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 // Completion fields are always reset.
 func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalSets []Set) []Set {
 	sets := buildPlannedSets(ex, pt)
+	// Allocate empty weight pointers for weighted/assisted exercises. The
+	// form input on the per-set page binds to *float64; nil would render
+	// as "no weight" instead of an empty editable input. Bodyweight and
+	// time-based stay nil.
+	if !ex.IsTimed() && ex.ExerciseType != ExerciseTypeBodyweight {
+		for i := range sets {
+			sets[i].WeightKg = new(float64)
+		}
+	}
 	if len(historicalSets) == 0 {
 		return sets
 	}

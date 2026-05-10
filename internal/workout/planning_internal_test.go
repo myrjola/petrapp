@@ -13,10 +13,9 @@ func Test_buildPlannedSets(t *testing.T) {
 		periodization PeriodizationType
 		wantTargetVal int
 		wantSetCount  int
-		wantWeightNil bool // true means WeightKg should be nil; false means non-nil empty pointer
 	}{
 		{
-			name: "weighted Strength: low end of window, 4 sets, weight pointer present",
+			name: "weighted Strength: low end of window, 4 sets",
 			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeWeighted,
 				RepMin:       intPtr(5),
@@ -25,7 +24,6 @@ func Test_buildPlannedSets(t *testing.T) {
 			periodization: PeriodizationStrength,
 			wantTargetVal: 5,
 			wantSetCount:  4, // reps <= 5 → 4 sets
-			wantWeightNil: false,
 		},
 		{
 			name: "weighted Hypertrophy: high end, 3 sets",
@@ -37,7 +35,6 @@ func Test_buildPlannedSets(t *testing.T) {
 			periodization: PeriodizationHypertrophy,
 			wantTargetVal: 10,
 			wantSetCount:  3, // 6-10 → 3 sets
-			wantWeightNil: false,
 		},
 		{
 			name: "weighted Hypertrophy: high-rep window, 3 sets",
@@ -49,10 +46,9 @@ func Test_buildPlannedSets(t *testing.T) {
 			periodization: PeriodizationHypertrophy,
 			wantTargetVal: 12,
 			wantSetCount:  3, // >= 11 → 3 sets
-			wantWeightNil: false,
 		},
 		{
-			name: "assisted exercise: weight pointer present",
+			name: "assisted exercise: nil weight pointer (allocated by buildSetsForAdd)",
 			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeAssisted,
 				RepMin:       intPtr(5),
@@ -61,7 +57,6 @@ func Test_buildPlannedSets(t *testing.T) {
 			periodization: PeriodizationStrength,
 			wantTargetVal: 5,
 			wantSetCount:  4,
-			wantWeightNil: false,
 		},
 		{
 			name: "bodyweight exercise: nil weight",
@@ -73,7 +68,6 @@ func Test_buildPlannedSets(t *testing.T) {
 			periodization: PeriodizationStrength,
 			wantTargetVal: 8,
 			wantSetCount:  3, // 6-10 → 3 sets
-			wantWeightNil: true,
 		},
 		{
 			name: "time_based exercise: nil weight, defaultTimedSets count",
@@ -84,7 +78,6 @@ func Test_buildPlannedSets(t *testing.T) {
 			periodization: PeriodizationStrength,
 			wantTargetVal: 45,
 			wantSetCount:  defaultTimedSets,
-			wantWeightNil: true,
 		},
 	}
 
@@ -98,11 +91,8 @@ func Test_buildPlannedSets(t *testing.T) {
 				if s.TargetValue != tc.wantTargetVal {
 					t.Errorf("set[%d].TargetValue = %d, want %d", i, s.TargetValue, tc.wantTargetVal)
 				}
-				if tc.wantWeightNil && s.WeightKg != nil {
-					t.Errorf("set[%d].WeightKg = %v, want nil", i, *s.WeightKg)
-				}
-				if !tc.wantWeightNil && s.WeightKg == nil {
-					t.Errorf("set[%d].WeightKg = nil, want non-nil pointer", i)
+				if s.WeightKg != nil {
+					t.Errorf("set[%d].WeightKg = %v, want nil (allocation moved to buildSetsForAdd)", i, *s.WeightKg)
 				}
 				if s.CompletedValue != nil {
 					t.Errorf("set[%d].CompletedValue = %v, want nil", i, *s.CompletedValue)
