@@ -88,6 +88,26 @@ func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
 	return ErrSlotNotFound
 }
 
+// UpdateCompletedValue records the actual reps (or seconds for time-based)
+// achieved on a set, and stamps the completion time. Returns
+// ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
+func (s *Session) UpdateCompletedValue(slotID, setIndex, value int, now time.Time) error {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID != slotID {
+			continue
+		}
+		if setIndex < 0 || setIndex >= len(s.ExerciseSets[i].Sets) {
+			return ErrSetIndexOutOfBounds
+		}
+		v := value
+		s.ExerciseSets[i].Sets[setIndex].CompletedValue = &v
+		t := now
+		s.ExerciseSets[i].Sets[setIndex].CompletedAt = &t
+		return nil
+	}
+	return ErrSlotNotFound
+}
+
 // UpdateSetWeight overwrites the weight on a single set within a slot.
 // Returns ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
 func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error {

@@ -184,3 +184,49 @@ func Test_Session_UpdateSetWeight_OutOfBoundsIndex(t *testing.T) {
 		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
 	}
 }
+
+func Test_Session_UpdateCompletedValue_Sets(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only ID is read.
+				Sets: []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+
+	if err := sess.UpdateCompletedValue(11, 0, 6, now); err != nil {
+		t.Fatalf("UpdateCompletedValue: %v", err)
+	}
+	got := sess.ExerciseSets[0].Sets[0]
+	if got.CompletedValue == nil || *got.CompletedValue != 6 {
+		t.Errorf("CompletedValue = %v, want 6", got.CompletedValue)
+	}
+	if got.CompletedAt == nil || !got.CompletedAt.Equal(now) {
+		t.Errorf("CompletedAt = %v, want %v", got.CompletedAt, now)
+	}
+}
+
+func Test_Session_UpdateCompletedValue_UnknownSlot(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{} //nolint:exhaustruct // Empty session.
+	if err := sess.UpdateCompletedValue(99, 0, 6, now); !errors.Is(err, domain.ErrSlotNotFound) {
+		t.Fatalf("got %v, want ErrSlotNotFound", err)
+	}
+}
+
+func Test_Session_UpdateCompletedValue_OutOfBoundsIndex(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only ID is read.
+				Sets: []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+	if err := sess.UpdateCompletedValue(11, 5, 6, now); !errors.Is(err, domain.ErrSetIndexOutOfBounds) {
+		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
+	}
+}
