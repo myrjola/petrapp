@@ -8,7 +8,6 @@ package workout
 
 import (
 	"log/slog"
-	"time"
 
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -25,16 +24,4 @@ type Service = service.Service
 // service.NewService.
 func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
 	return service.NewService(db, logger, openaiAPIKey)
-}
-
-// mondayOf is a transitional duplicate of internal/service.mondayOf, kept
-// alive only for service_internal_test.go which still resides here. Both
-// helpers go away together when Task 4 relocates the test.
-func mondayOf(date time.Time) time.Time {
-	y, m, d := date.Date()
-	offset := int(time.Monday - date.Weekday())
-	if offset > 0 {
-		offset = -6
-	}
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, offset)
 }
