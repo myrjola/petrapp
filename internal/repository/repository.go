@@ -30,7 +30,9 @@ type Repositories struct {
 // ExerciseSet.Exercise inside a single read.
 func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
 	_ = logger // reserved for future per-repo logging; unused today.
-	return &Repositories{ //nolint:exhaustruct // Fields wired by per-repo tasks.
+	prefs := newSQLitePreferencesRepository(db)
+	return &Repositories{ //nolint:exhaustruct // Other fields wired in later tasks.
+		Preferences: prefs,
 	}
 }
 
