@@ -12,7 +12,7 @@ Guidelines for working with database schema, migrations, and data access pattern
 ### Schema Evolution Process
 
 1. **Update `schema.sql`** with your changes (new columns, tables, constraints, etc.)
-2. **Update Go models** in both domain (`internal/workout/models.go`) and repository layer
+2. **Update Go models** in both domain (`internal/domain/`) and repository layer (`internal/repository/`)
 3. **Update repository SQL queries** (SELECT, INSERT, UPDATE) to include new fields
 4. **Update service layer** conversion functions between domain and repository types
 5. **Test with `make test`** to ensure migrations and queries work correctly

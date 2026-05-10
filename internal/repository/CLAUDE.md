@@ -26,9 +26,9 @@ template logic, no business orchestration.
 - HTTP handlers, template shaping, response serialisation — `cmd/web`.
 - Service orchestration, AI exercise generation, GDPR export, anything
   that combines multiple aggregates or external systems —
-  `internal/workout` (Phase 3 will move this to `internal/service/`).
+  `internal/service`.
 - Tests of business behaviour — those belong in `internal/domain` (pure
-  unit) or `internal/workout` (orchestration/e2e). Repository tests
+  unit) or `internal/service` (orchestration/e2e). Repository tests
   cover repository-shape contracts: round-trip persistence, error
   translation, slot-ID stability across `Update`.
 

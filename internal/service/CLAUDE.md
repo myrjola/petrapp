@@ -7,15 +7,13 @@ of the lower layers (OpenAI exercise generation, GDPR export).
 
 It depends on `internal/domain`, `internal/repository`, `internal/sqlite`
 (only for the `*sqlite.Database` handle that GDPR export passes through),
-and `internal/contexthelpers`. It does NOT depend on `cmd/web`,
-`ui/templates`, or `internal/workout`.
+and `internal/contexthelpers`. It does NOT depend on `cmd/web` or
+`ui/templates`.
 
 ## What lives here
 
 - **`Service` struct + `NewService` constructor.** One monolithic struct
-  that handlers reference as `*service.Service`. Phase 4 will rename the
-  field on the web app from `workoutService` to `service` and drop the
-  `internal/workout` shim.
+  that the web app references as `app.service` (`*service.Service`).
 - **Session orchestration** (`sessions.go`): start/complete/feedback,
   weekly plan generation, schedule resolution, the `mondayOf` helper.
 - **Set mutations** (`sets.go`): all `Session.Update`-via-aggregate

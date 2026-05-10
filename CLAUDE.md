@@ -8,10 +8,12 @@ When a feature spans multiple layers, work outwards from the data model:
 
 1. **Database First** - Start with schema changes in `internal/sqlite/` (
    see [Database Guidelines](internal/sqlite/CLAUDE.md))
-2. **Domain Models** - Update business logic in `internal/workout/` (
-   see [Domain Guidelines](internal/workout/CLAUDE.md))
-3. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
-4. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
+2. **Domain Models** - Update pure domain logic in `internal/domain/` (
+   see [Domain Guidelines](internal/domain/CLAUDE.md))
+3. **Service Layer** - Add orchestration / cross-aggregate logic in `internal/service/` (
+   see [Service Guidelines](internal/service/CLAUDE.md))
+4. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
+5. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
 
 If a change is scoped to one or two layers (e.g. a UI-only tweak or a handler-only bug fix), start at the lowest relevant layer — you don't have to touch the ones above.
 

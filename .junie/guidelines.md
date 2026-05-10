@@ -107,7 +107,9 @@ func TestRef(t *testing.T) {
     - `cmd/migratetest/`: Database migration test utility
     - `cmd/smoketest/`: Smoke test utility
 - `internal/`: Internal packages not meant for external use
-    - `internal/workout/`: Workout-related functionality
+    - `internal/domain/`: Pure domain types, value objects, and aggregate methods
+    - `internal/repository/`: Persistence layer (SQL access via `sqlite.Database`)
+    - `internal/service/`: Orchestration layer (cross-aggregate flows, AI exercise generation, GDPR export)
     - `internal/sqlite/`: Database access and migration
     - `internal/contexthelpers/`: Context-related utilities
     - `internal/webauthnhandler/`: WebAuthn authentication
