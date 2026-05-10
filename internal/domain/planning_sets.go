@@ -35,8 +35,10 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 // target value and set count does this exercise get when first added to a
 // session".
 //
-// WeightKg is left nil. Callers that need to seed a starting weight (e.g.
-// AddExercise / SwapExercise paths in service) post-process the slice.
+// WeightKg is left nil. The planner persists sets in this shape so that an
+// untouched set is distinguishable from one with a recorded weight of zero —
+// downstream code (notably BuildSetsForAdd's seed-weight lookup) relies on
+// `WeightKg == nil` meaning "never recorded".
 func BuildPlannedSets(exercise Exercise, periodization PeriodizationType) []Set {
 	targetValue, n := deriveSchemeForExercise(exercise, periodization)
 	sets := make([]Set, n)
@@ -44,6 +46,35 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType) []Set 
 		sets[i] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
 			TargetValue: targetValue,
 		}
+	}
+	return sets
+}
+
+// BuildSetsForAdd produces the Set slice for an exercise being added to or
+// swapping into an existing session. The session's periodization always
+// dictates TargetValue and TargetSets — a Deadlift added in a Strength week
+// gets 3 reps × 4 sets, not whatever the historical session had.
+//
+// HasWeight exercises always get an allocated WeightKg pointer so the per-set
+// form has a non-nil binding target. When historicalSets contains a non-nil
+// WeightKg, the most recent one seeds every new set so the user's progression
+// isn't lost just because the prescription changed; otherwise the seed is 0.
+// Bodyweight and time-based exercises stay nil.
+func BuildSetsForAdd(exercise Exercise, periodization PeriodizationType, historicalSets []Set) []Set {
+	sets := BuildPlannedSets(exercise, periodization)
+	if !exercise.HasWeight() {
+		return sets
+	}
+	var seedWeight float64
+	for i := len(historicalSets) - 1; i >= 0; i-- {
+		if historicalSets[i].WeightKg != nil {
+			seedWeight = *historicalSets[i].WeightKg
+			break
+		}
+	}
+	for i := range sets {
+		w := seedWeight
+		sets[i].WeightKg = &w
 	}
 	return sets
 }

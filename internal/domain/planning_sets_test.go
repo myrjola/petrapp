@@ -17,7 +17,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 		wantSetCount  int
 	}{
 		{
-			name: "weighted Strength: low end of window, 4 sets, nil weight (allocated by buildSetsForAdd)",
+			name: "weighted Strength: low end of window, 4 sets, nil weight (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeWeighted,
 				RepMin:       intPtr(5),
@@ -28,7 +28,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 			wantSetCount:  4, // reps <= 5 → 4 sets
 		},
 		{
-			name: "weighted Hypertrophy: high end, 3 sets, nil weight (allocated by buildSetsForAdd)",
+			name: "weighted Hypertrophy: high end, 3 sets, nil weight (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeWeighted,
 				RepMin:       intPtr(5),
@@ -39,7 +39,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 			wantSetCount:  3, // 6-10 → 3 sets
 		},
 		{
-			name: "weighted Hypertrophy: high-rep window, 3 sets, nil weight (allocated by buildSetsForAdd)",
+			name: "weighted Hypertrophy: high-rep window, 3 sets, nil weight (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeWeighted,
 				RepMin:       intPtr(8),
@@ -50,7 +50,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 			wantSetCount:  3, // >= 11 → 3 sets
 		},
 		{
-			name: "assisted exercise: nil weight pointer (allocated by buildSetsForAdd)",
+			name: "assisted exercise: nil weight pointer (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeAssisted,
 				RepMin:       intPtr(5),
@@ -108,4 +108,120 @@ func Test_BuildPlannedSets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_BuildSetsForAdd(t *testing.T) {
+	intPtr := func(i int) *int { return &i }
+	weightPtr := func(w float64) *float64 { return &w }
+
+	weighted := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       intPtr(5),
+		RepMax:       intPtr(10),
+	}
+	assisted := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
+		ExerciseType: domain.ExerciseTypeAssisted,
+		RepMin:       intPtr(5),
+		RepMax:       intPtr(10),
+	}
+	bodyweight := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
+		ExerciseType: domain.ExerciseTypeBodyweight,
+		RepMin:       intPtr(8),
+		RepMax:       intPtr(12),
+	}
+	timeBased := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
+		ExerciseType:           domain.ExerciseTypeTime,
+		DefaultStartingSeconds: intPtr(45),
+	}
+
+	t.Run("weighted with no history allocates zero-valued weight pointer", func(t *testing.T) {
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, nil)
+		if len(sets) != 4 {
+			t.Fatalf("len = %d, want 4", len(sets))
+		}
+		for i, s := range sets {
+			if s.WeightKg == nil {
+				t.Errorf("set[%d].WeightKg = nil, want allocated", i)
+			} else if *s.WeightKg != 0 {
+				t.Errorf("set[%d].WeightKg = %v, want 0", i, *s.WeightKg)
+			}
+		}
+	})
+
+	t.Run("weighted seeds from most recent non-nil historical weight", func(t *testing.T) {
+		history := []domain.Set{
+			{WeightKg: weightPtr(60), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+			{WeightKg: weightPtr(62.5), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil}, // never recorded
+		}
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationHypertrophy, history)
+		for i, s := range sets {
+			if s.WeightKg == nil || *s.WeightKg != 62.5 {
+				t.Errorf("set[%d].WeightKg = %v, want 62.5", i, s.WeightKg)
+			}
+		}
+	})
+
+	t.Run("weighted with history of all-nil weights allocates zero", func(t *testing.T) {
+		history := []domain.Set{
+			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+		}
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, history)
+		for i, s := range sets {
+			if s.WeightKg == nil || *s.WeightKg != 0 {
+				t.Errorf("set[%d].WeightKg = %v, want 0", i, s.WeightKg)
+			}
+		}
+	})
+
+	t.Run("assisted preserves negative seed weight", func(t *testing.T) {
+		history := []domain.Set{
+			{WeightKg: weightPtr(-20), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+		}
+		sets := domain.BuildSetsForAdd(assisted, domain.PeriodizationStrength, history)
+		for i, s := range sets {
+			if s.WeightKg == nil || *s.WeightKg != -20 {
+				t.Errorf("set[%d].WeightKg = %v, want -20", i, s.WeightKg)
+			}
+		}
+	})
+
+	t.Run("bodyweight leaves WeightKg nil regardless of history", func(t *testing.T) {
+		history := []domain.Set{
+			{WeightKg: weightPtr(100), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+		}
+		sets := domain.BuildSetsForAdd(bodyweight, domain.PeriodizationStrength, history)
+		for i, s := range sets {
+			if s.WeightKg != nil {
+				t.Errorf("set[%d].WeightKg = %v, want nil", i, *s.WeightKg)
+			}
+		}
+	})
+
+	t.Run("time-based leaves WeightKg nil regardless of history", func(t *testing.T) {
+		history := []domain.Set{
+			{WeightKg: weightPtr(100), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+		}
+		sets := domain.BuildSetsForAdd(timeBased, domain.PeriodizationStrength, history)
+		for i, s := range sets {
+			if s.WeightKg != nil {
+				t.Errorf("set[%d].WeightKg = %v, want nil", i, *s.WeightKg)
+			}
+		}
+	})
+
+	t.Run("each set gets independent weight pointer", func(t *testing.T) {
+		history := []domain.Set{
+			{WeightKg: weightPtr(80), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
+		}
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, history)
+		if len(sets) < 2 {
+			t.Fatalf("need at least 2 sets to verify pointer independence, got %d", len(sets))
+		}
+		*sets[0].WeightKg = 999
+		if *sets[1].WeightKg != 80 {
+			t.Errorf("mutating set[0].WeightKg leaked into set[1]: got %v, want 80", *sets[1].WeightKg)
+		}
+	})
 }

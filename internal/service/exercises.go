@@ -71,7 +71,7 @@ func (s *Service) SwapExercise(
 	}
 
 	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		newSets := s.buildSetsForAdd(newExercise, sess.PeriodizationType, historicalSets)
+		newSets := domain.BuildSetsForAdd(newExercise, sess.PeriodizationType, historicalSets)
 		return sess.SwapExerciseInSlot(workoutExerciseID, newExercise, newSets)
 	})
 	if err != nil {
@@ -84,6 +84,7 @@ func (s *Service) SwapExercise(
 // Aggregates with no sets are skipped — they exist for exercises whose historical
 // exercise_sets rows were dropped by the time-based premigration but whose
 // workout_exercise slot survived. Returns nil when no usable history is found.
+// Sets are returned as-is; domain.BuildSetsForAdd reads only WeightKg from them.
 func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]domain.Set, error) {
 	threeMonthsAgo := date.AddDate(0, -3, 0)
 	history, err := s.repos.Sessions.List(ctx, threeMonthsAgo)
@@ -100,75 +101,11 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 			if exerciseSet.Exercise.ID != exerciseID || len(exerciseSet.Sets) == 0 {
 				continue
 			}
-			return s.copySetsWithoutCompletion(exerciseSet.Sets), nil
+			return exerciseSet.Sets, nil
 		}
 	}
 
 	return nil, nil
-}
-
-// copySetsWithoutCompletion creates a copy of sets with completion reset to nil.
-// Note: callers in the AddExercise/swap paths route the result through
-// buildSetsForAdd, which overrides TargetValue from the session's periodization.
-// This function preserves all fields verbatim including TargetValue.
-func (s *Service) copySetsWithoutCompletion(sets []domain.Set) []domain.Set {
-	result := make([]domain.Set, len(sets))
-	for i, set := range sets {
-		result[i] = domain.Set{
-			WeightKg:       set.WeightKg,
-			TargetValue:    set.TargetValue,
-			CompletedValue: nil,
-			CompletedAt:    nil,
-			Signal:         nil,
-		}
-	}
-	return result
-}
-
-// buildSetsForAdd produces the Set slice for an exercise being added to or
-// swapping into an existing session. The session's periodization always
-// dictates TargetValue and TargetSets (so a Deadlift added in a Strength
-// week gets 3 reps × 4 sets, not whatever the historical session had).
-//
-// When historicalSets is non-nil and contains weight data, the most recent
-// completed weight is preserved as the starting weight for every new set —
-// the user's progression isn't lost just because the prescription changed.
-// Completion fields are always reset.
-func (s *Service) buildSetsForAdd(
-	ex domain.Exercise,
-	pt domain.PeriodizationType,
-	historicalSets []domain.Set,
-) []domain.Set {
-	sets := domain.BuildPlannedSets(ex, pt)
-	// Allocate empty weight pointers for weighted/assisted exercises. The
-	// form input on the per-set page binds to *float64; nil would render
-	// as "no weight" instead of an empty editable input. Bodyweight and
-	// time-based stay nil.
-	if !ex.IsTimed() && ex.ExerciseType != domain.ExerciseTypeBodyweight {
-		for i := range sets {
-			sets[i].WeightKg = new(float64)
-		}
-	}
-	if len(historicalSets) == 0 {
-		return sets
-	}
-	var seedWeight *float64
-	for i := len(historicalSets) - 1; i >= 0; i-- {
-		if historicalSets[i].WeightKg != nil {
-			seedWeight = historicalSets[i].WeightKg
-			break
-		}
-	}
-	if seedWeight == nil {
-		return sets
-	}
-	for i := range sets {
-		if !ex.IsTimed() && ex.ExerciseType != domain.ExerciseTypeBodyweight {
-			w := *seedWeight
-			sets[i].WeightKg = &w
-		}
-	}
-	return sets
 }
 
 // FindCompatibleExercises returns all exercises except the specified one.
@@ -210,7 +147,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	}
 
 	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		newSets := s.buildSetsForAdd(exercise, sess.PeriodizationType, historicalSets)
+		newSets := domain.BuildSetsForAdd(exercise, sess.PeriodizationType, historicalSets)
 		_, addErr := sess.AddExercise(exercise, newSets)
 		if addErr != nil {
 			return fmt.Errorf("add exercise to session: %w", addErr)

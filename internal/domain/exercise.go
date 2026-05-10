@@ -54,6 +54,15 @@ type Exercise struct {
 // IsTimed returns true if this exercise uses duration targets instead of rep counts.
 func (e Exercise) IsTimed() bool { return e.ExerciseType == ExerciseTypeTime }
 
+// HasWeight reports whether sets of this exercise carry a weight value.
+// True for weighted and assisted exercises; false for bodyweight and
+// time-based. Planning, set seeding, and the per-set form all branch on
+// this — keeping the rule on the type prevents drift when a new
+// ExerciseType is added.
+func (e Exercise) HasWeight() bool {
+	return e.ExerciseType == ExerciseTypeWeighted || e.ExerciseType == ExerciseTypeAssisted
+}
+
 // FormatSetValue returns the user-visible string for a set's target or
 // completed value. Reps render as "%d"; seconds render as "%ds". The unit
 // choice is driven by ExerciseType — display layers must call this rather

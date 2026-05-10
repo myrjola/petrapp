@@ -36,6 +36,35 @@ func Test_Exercise_FormatSetValue(t *testing.T) {
 	}
 }
 
+func Test_Exercise_HasWeight(t *testing.T) {
+	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
+		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
+			ExerciseType: typ,
+		}
+	}
+
+	cases := []struct {
+		name     string
+		exercise domain.Exercise
+		want     bool
+	}{
+		{"weighted has weight", mkExercise(domain.ExerciseTypeWeighted), true},
+		{"assisted has weight", mkExercise(domain.ExerciseTypeAssisted), true},
+		{"bodyweight has no weight", mkExercise(domain.ExerciseTypeBodyweight), false},
+		{"time_based has no weight", mkExercise(domain.ExerciseTypeTime), false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.exercise.HasWeight()
+			if got != tc.want {
+				t.Errorf("Exercise{%s}.HasWeight() = %v, want %v",
+					tc.exercise.ExerciseType, got, tc.want)
+			}
+		})
+	}
+}
+
 func Test_Exercise_SetValueUnit(t *testing.T) {
 	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
