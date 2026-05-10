@@ -108,7 +108,8 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		fqdn = cfg.FlyAppName + ".fly.dev"
 	}
 	var webAuthnHandler *webauthnhandler.WebAuthnHandler
-	if webAuthnHandler, err = webauthnhandler.New(actualAddr, fqdn, cfg.TLSCert != "", logger, sessionManager, db); err != nil {
+	tlsEnabled := cfg.TLSCert != ""
+	if webAuthnHandler, err = webauthnhandler.New(actualAddr, fqdn, tlsEnabled, logger, sessionManager, db); err != nil {
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 

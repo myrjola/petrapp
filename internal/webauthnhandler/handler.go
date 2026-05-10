@@ -60,18 +60,19 @@ func New(
 	})
 
 	var rpOrigins []string
-	if fqdn == "localhost" {
+	switch {
+	case fqdn == "localhost":
 		//goland:noinspection HttpUrlsUsage // This is a local server.
-		rpOrigins = []string{fmt.Sprintf("http://%s", addr)}
-	} else if tlsEnabled {
+		rpOrigins = []string{"http://" + addr}
+	case tlsEnabled:
 		_, port, _ := net.SplitHostPort(addr)
 		if port != "" && port != "443" {
-			rpOrigins = []string{fmt.Sprintf("https://%s:%s", fqdn, port)}
+			rpOrigins = []string{"https://" + net.JoinHostPort(fqdn, port)}
 		} else {
-			rpOrigins = []string{fmt.Sprintf("https://%s", fqdn)}
+			rpOrigins = []string{"https://" + fqdn}
 		}
-	} else {
-		rpOrigins = []string{fmt.Sprintf("https://%s", fqdn)}
+	default:
+		rpOrigins = []string{"https://" + fqdn}
 	}
 
 	var webauthnConfig = &webauthn.Config{
