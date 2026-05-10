@@ -318,3 +318,92 @@ func Test_Session_RecordSet_OutOfBoundsIndex(t *testing.T) {
 		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
 	}
 }
+
+func Test_Session_AddExercise_Append(t *testing.T) {
+	bench := domain.Exercise{ID: 1, Name: "Bench"} //nolint:exhaustruct // Only ID and Name read.
+	squat := domain.Exercise{ID: 2, Name: "Squat"} //nolint:exhaustruct // Only ID and Name read.
+	sess := domain.Session{                        //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ID: 11, Exercise: bench, Sets: nil, WarmupCompletedAt: nil},
+		},
+	}
+
+	slotID, err := sess.AddExercise(squat, []domain.Set{{TargetValue: 5}}) //nolint:exhaustruct // Other Set fields nil.
+	if err != nil {
+		t.Fatalf("AddExercise: %v", err)
+	}
+	if slotID != 0 {
+		t.Errorf("slotID = %d, want 0 (repo will assign on insert)", slotID)
+	}
+	if len(sess.ExerciseSets) != 2 {
+		t.Fatalf("ExerciseSets length = %d, want 2", len(sess.ExerciseSets))
+	}
+	added := sess.ExerciseSets[1]
+	if added.Exercise.ID != squat.ID {
+		t.Errorf("Exercise.ID = %d, want %d", added.Exercise.ID, squat.ID)
+	}
+	if added.ID != 0 {
+		t.Errorf("ID = %d, want 0", added.ID)
+	}
+	if len(added.Sets) != 1 || added.Sets[0].TargetValue != 5 {
+		t.Errorf("Sets = %+v, want one set with TargetValue 5", added.Sets)
+	}
+}
+
+func Test_Session_AddExercise_DuplicateExerciseID_ReturnsErr(t *testing.T) {
+	bench := domain.Exercise{ID: 1, Name: "Bench"} //nolint:exhaustruct // Only ID read.
+	sess := domain.Session{                        //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ID: 11, Exercise: bench, Sets: nil, WarmupCompletedAt: nil},
+		},
+	}
+
+	_, err := sess.AddExercise(bench, nil)
+	if !errors.Is(err, domain.ErrExerciseAlreadyInSession) {
+		t.Fatalf("got %v, want ErrExerciseAlreadyInSession", err)
+	}
+	if len(sess.ExerciseSets) != 1 {
+		t.Errorf("ExerciseSets length = %d, want 1 (no append on error)", len(sess.ExerciseSets))
+	}
+}
+
+func Test_Session_SwapExerciseInSlot_PreservesSlotID(t *testing.T) {
+	bench := domain.Exercise{ID: 1, Name: "Bench"} //nolint:exhaustruct // Only ID read.
+	dip := domain.Exercise{ID: 2, Name: "Dip"}     //nolint:exhaustruct // Only ID read.
+	warmupAt := time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{
+				ID: 11, Exercise: bench,
+				Sets:              []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other Set fields nil.
+				WarmupCompletedAt: &warmupAt,
+			},
+		},
+	}
+
+	newSets := []domain.Set{{TargetValue: 8}, {TargetValue: 8}} //nolint:exhaustruct // Other Set fields nil.
+	if err := sess.SwapExerciseInSlot(11, dip, newSets); err != nil {
+		t.Fatalf("SwapExerciseInSlot: %v", err)
+	}
+	got := sess.ExerciseSets[0]
+	if got.ID != 11 {
+		t.Errorf("ID = %d, want 11 (preserved)", got.ID)
+	}
+	if got.Exercise.ID != dip.ID {
+		t.Errorf("Exercise.ID = %d, want %d", got.Exercise.ID, dip.ID)
+	}
+	if len(got.Sets) != 2 {
+		t.Errorf("Sets length = %d, want 2", len(got.Sets))
+	}
+	if got.WarmupCompletedAt != nil {
+		t.Errorf("WarmupCompletedAt = %v, want nil (reset on swap)", got.WarmupCompletedAt)
+	}
+}
+
+func Test_Session_SwapExerciseInSlot_UnknownSlot(t *testing.T) {
+	sess := domain.Session{}                                        //nolint:exhaustruct // Empty session.
+	err := sess.SwapExerciseInSlot(99, domain.Exercise{ID: 2}, nil) //nolint:exhaustruct // Only ID read.
+	if !errors.Is(err, domain.ErrSlotNotFound) {
+		t.Fatalf("got %v, want ErrSlotNotFound", err)
+	}
+}

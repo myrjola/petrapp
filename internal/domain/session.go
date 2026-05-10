@@ -142,6 +142,48 @@ func (s *Session) UpdateCompletedValue(slotID, setIndex, value int, now time.Tim
 	return ErrSlotNotFound
 }
 
+// AddExercise appends a new exercise slot to the session. The slot's stable
+// ID is left as 0 — the repository assigns it at insert time, then mirrors
+// the assigned ID back to the caller. Returns ErrExerciseAlreadyInSession
+// when an existing slot already references the same Exercise.ID.
+//
+// The returned slotID is always 0 from the aggregate's POV; the actual
+// workout_exercise.id is determined by SQLite. Service code reads the new
+// ID by re-fetching the session after the Update closure commits.
+func (s *Session) AddExercise(ex Exercise, sets []Set) (int, error) {
+	for _, existing := range s.ExerciseSets {
+		if existing.Exercise.ID == ex.ID {
+			return 0, ErrExerciseAlreadyInSession
+		}
+	}
+	s.ExerciseSets = append(s.ExerciseSets, ExerciseSet{ //nolint:exhaustruct // ID set by repo; WarmupCompletedAt nil.
+		ID:       0,
+		Exercise: ex,
+		Sets:     sets,
+	})
+	return 0, nil
+}
+
+// SwapExerciseInSlot replaces the exercise occupying the slot identified by
+// slotID with newExercise. The slot's stable ID is preserved (so URLs
+// continue to resolve). The new sets slice replaces the slot's existing
+// sets entirely; any prior recorded data is dropped. The warmup-completion
+// flag is reset to nil because the warmup performed for the old exercise
+// does not apply to the new one. Returns ErrSlotNotFound when no slot
+// matches.
+func (s *Session) SwapExerciseInSlot(slotID int, newExercise Exercise, sets []Set) error {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID != slotID {
+			continue
+		}
+		s.ExerciseSets[i].Exercise = newExercise
+		s.ExerciseSets[i].Sets = sets
+		s.ExerciseSets[i].WarmupCompletedAt = nil
+		return nil
+	}
+	return ErrSlotNotFound
+}
+
 // UpdateSetWeight overwrites the weight on a single set within a slot.
 // Returns ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
 func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error {
