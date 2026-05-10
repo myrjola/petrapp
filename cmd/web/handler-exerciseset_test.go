@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"github.com/myrjola/petrapp/internal/workout"
 )
 
 func Test_application_exerciseSet(t *testing.T) {
@@ -659,8 +659,8 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 			t.Errorf("Close rows: %v", cerr)
 		}
 	}()
-	byID := make(map[int]workout.Exercise)
-	byName := make(map[string]workout.Exercise)
+	byID := make(map[int]domain.Exercise)
+	byName := make(map[string]domain.Exercise)
 	for rows.Next() {
 		var (
 			id        int
@@ -674,10 +674,10 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 		}
 		ex, ok := byID[id]
 		if !ok {
-			ex = workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds intentionally omitted in test helper.
+			ex = domain.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds intentionally omitted in test helper.
 				ID:                    id,
 				Name:                  name,
-				Category:              workout.Category(category),
+				Category:              domain.Category(category),
 				ExerciseType:          "",
 				DescriptionMarkdown:   "",
 				PrimaryMuscleGroups:   nil,
@@ -725,8 +725,8 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 	expected := make([]rendered, len(renderedOpts))
 	copy(expected, renderedOpts)
 	sort.SliceStable(expected, func(i, j int) bool {
-		si := workout.SwapSimilarityScore(current, byID[expected[i].id])
-		sj := workout.SwapSimilarityScore(current, byID[expected[j].id])
+		si := domain.SwapSimilarityScore(current, byID[expected[i].id])
+		sj := domain.SwapSimilarityScore(current, byID[expected[j].id])
 		if si != sj {
 			return si > sj
 		}

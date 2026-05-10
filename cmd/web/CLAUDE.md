@@ -36,7 +36,7 @@ Example:
 type workoutTemplateData struct {
   BaseTemplateData
   Date    time.Time
-  Session workout.Session
+  Session domain.Session
 }
 ```
 
@@ -106,7 +106,7 @@ if fieldValue == "" {
 
 ### Service Layer Error Handling
 
-- Check for specific business errors using `errors.Is(err, workout.ErrNotFound)`
+- Check for specific business errors using `errors.Is(err, domain.ErrNotFound)`
 - Handle business errors with appropriate user-facing responses
 - Let service layer handle business validation, handlers handle HTTP concerns
 

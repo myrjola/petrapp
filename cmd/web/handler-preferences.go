@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 const (
@@ -45,7 +45,7 @@ func getWorkoutDurationOptions() []workoutDurationOption {
 	}
 }
 
-func preferencesToWeekdays(prefs workout.Preferences) []weekdayPreference {
+func preferencesToWeekdays(prefs domain.Preferences) []weekdayPreference {
 	return []weekdayPreference{
 		{ID: "monday", Name: "Monday", Minutes: prefs.MondayMinutes},
 		{ID: "tuesday", Name: "Tuesday", Minutes: prefs.TuesdayMinutes},
@@ -71,8 +71,8 @@ func parseMinutes(value string) int {
 	}
 }
 
-func weekdaysToPreferences(r *http.Request) workout.Preferences {
-	return workout.Preferences{
+func weekdaysToPreferences(r *http.Request) domain.Preferences {
+	return domain.Preferences{
 		MondayMinutes:    parseMinutes(r.Form.Get("monday_minutes")),
 		TuesdayMinutes:   parseMinutes(r.Form.Get("tuesday_minutes")),
 		WednesdayMinutes: parseMinutes(r.Form.Get("wednesday_minutes")),

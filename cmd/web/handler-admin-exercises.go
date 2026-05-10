@@ -8,13 +8,13 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 // exerciseAdminTemplateData contains data for the exercise admin template.
 type exerciseAdminTemplateData struct {
 	BaseTemplateData
-	Exercises    []workout.Exercise
+	Exercises    []domain.Exercise
 	MuscleGroups []string
 }
 
@@ -27,7 +27,7 @@ type MuscleGroupOption struct {
 // exerciseEditTemplateData contains data for the exercise edit template.
 type exerciseEditTemplateData struct {
 	BaseTemplateData
-	Exercise                    workout.Exercise
+	Exercise                    domain.Exercise
 	PrimaryMuscleOptions        []MuscleGroupOption
 	SecondaryMuscleOptions      []MuscleGroupOption
 	ValidationError             string
@@ -139,8 +139,8 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 
 	// Extract form data
 	name := r.PostForm.Get("name")
-	category := workout.Category(r.PostForm.Get("category"))
-	exerciseType := workout.ExerciseType(r.PostForm.Get("exercise_type"))
+	category := domain.Category(r.PostForm.Get("category"))
+	exerciseType := domain.ExerciseType(r.PostForm.Get("exercise_type"))
 	description := r.PostForm.Get("description")
 	primaryMuscles := r.PostForm["primary_muscles"]
 	secondaryMuscles := r.PostForm["secondary_muscles"]
@@ -154,23 +154,23 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if category != workout.CategoryFullBody && category != workout.CategoryUpper && category != workout.CategoryLower {
+	if category != domain.CategoryFullBody && category != domain.CategoryUpper && category != domain.CategoryLower {
 		app.putFlashError(r.Context(), "Category must be one of full body, upper, or lower.")
 		redirect(w, r, editPath)
 		return
 	}
 
-	if exerciseType != workout.ExerciseTypeWeighted &&
-		exerciseType != workout.ExerciseTypeBodyweight &&
-		exerciseType != workout.ExerciseTypeAssisted &&
-		exerciseType != workout.ExerciseTypeTime {
+	if exerciseType != domain.ExerciseTypeWeighted &&
+		exerciseType != domain.ExerciseTypeBodyweight &&
+		exerciseType != domain.ExerciseTypeAssisted &&
+		exerciseType != domain.ExerciseTypeTime {
 		app.putFlashError(r.Context(), "Exercise type must be weighted, bodyweight, assisted, or time_based.")
 		redirect(w, r, editPath)
 		return
 	}
 
 	var defaultStartingSeconds *int
-	if exerciseType == workout.ExerciseTypeTime {
+	if exerciseType == domain.ExerciseTypeTime {
 		raw := r.PostForm.Get("default_starting_seconds")
 		n, atoiErr := strconv.Atoi(raw)
 		if atoiErr != nil || n <= 0 {
@@ -194,7 +194,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	}
 
 	// Create exercise object.
-	exercise := workout.Exercise{
+	exercise := domain.Exercise{
 		ID:                     id,
 		Name:                   name,
 		Category:               category,
@@ -253,9 +253,9 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 // surface these fields yet, so preservation is the only path. Returns
 // (nil, nil, nil) for time-based exercises, which don't carry a rep window.
 func (app *application) preserveRepWindow(
-	ctx context.Context, id int, exerciseType workout.ExerciseType,
+	ctx context.Context, id int, exerciseType domain.ExerciseType,
 ) (*int, *int, error) {
-	if exerciseType == workout.ExerciseTypeTime {
+	if exerciseType == domain.ExerciseTypeTime {
 		return nil, nil, nil
 	}
 	existing, err := app.workoutService.GetExercise(ctx, id)

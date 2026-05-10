@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/yuin/goldmark"
 )
 
@@ -21,7 +21,7 @@ type exerciseInfoTemplateData struct {
 	BaseTemplateData
 	Date              time.Time
 	WorkoutExerciseID int
-	Exercise          workout.Exercise
+	Exercise          domain.Exercise
 	IsAdmin           bool
 	ProgressPoints    []ExerciseProgressDataPoint
 }
@@ -45,7 +45,7 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	// Resolve the slot to its current exercise via the workout session.
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
-		if errors.Is(err, workout.ErrNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			app.notFound(w, r)
 			return
 		}
@@ -105,23 +105,23 @@ type ExerciseProgressDataPoint struct {
 }
 
 // processEntryData extracts chart metrics from a single exercise progress entry.
-func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseType) ExerciseProgressDataPoint {
+func processEntryData(entry domain.ExerciseProgressEntry, typ domain.ExerciseType) ExerciseProgressDataPoint {
 	var setDescriptions []string
 
 	for _, set := range entry.Sets {
 		switch typ {
 		// Weighted and assisted share the same metric: signed weight.
 		// `-20 → -10 → 0 → +5` describes a continuous progression.
-		case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
+		case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
 			if set.WeightKg != nil && set.CompletedValue != nil {
 				weight := *set.WeightKg
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", *set.CompletedValue, weight))
 			}
-		case workout.ExerciseTypeBodyweight:
+		case domain.ExerciseTypeBodyweight:
 			if set.CompletedValue != nil {
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", *set.CompletedValue))
 			}
-		case workout.ExerciseTypeTime:
+		case domain.ExerciseTypeTime:
 			if set.CompletedValue != nil {
 				setDescriptions = append(setDescriptions, fmt.Sprintf("%ds", *set.CompletedValue))
 			}
@@ -136,7 +136,7 @@ func processEntryData(entry workout.ExerciseProgressEntry, typ workout.ExerciseT
 
 // generateExerciseProgressData creates a chart dataset for exercise progress tracking.
 func (app *application) generateExerciseProgressData(
-	ctx context.Context, currentDate time.Time, exercise workout.Exercise) ([]ExerciseProgressDataPoint, error) {
+	ctx context.Context, currentDate time.Time, exercise domain.Exercise) ([]ExerciseProgressDataPoint, error) {
 	// Get historical data for the past 5 years.
 	fiveYearsAgo := currentDate.AddDate(-5, 0, 0)
 	progress, err := app.workoutService.GetExerciseSetsForExerciseSince(ctx, exercise.ID, fiveYearsAgo)

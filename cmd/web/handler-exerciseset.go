@@ -11,11 +11,10 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/workout"
 )
 
 type setDisplay struct {
-	Set          workout.Set
+	Set          domain.Set
 	TargetStr    string // Pre-formatted target string (e.g. "5", "30s").
 	CompletedStr string // Pre-formatted completed string, same unit as TargetStr.
 	Unit         string // "reps" or "seconds" — for input labels.
@@ -25,7 +24,7 @@ type setDisplay struct {
 type exerciseSetTemplateData struct {
 	BaseTemplateData
 	Date                  time.Time
-	ExerciseSet           workout.ExerciseSet
+	ExerciseSet           domain.ExerciseSet
 	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex  int
 	EditingIndex          int              // Index of the set being edited
@@ -36,7 +35,7 @@ type exerciseSetTemplateData struct {
 	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
 }
 
-func prepareSetsDisplay(exercise workout.Exercise, sets []workout.Set) []setDisplay {
+func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDisplay {
 	unit := exercise.SetValueUnit()
 	displays := make([]setDisplay, len(sets))
 	for i, set := range sets {
@@ -55,7 +54,7 @@ func prepareSetsDisplay(exercise workout.Exercise, sets []workout.Set) []setDisp
 	return displays
 }
 
-func getFirstIncompleteIndex(sets []workout.Set) int {
+func getFirstIncompleteIndex(sets []domain.Set) int {
 	for i, set := range sets {
 		if set.CompletedValue == nil {
 			return i
@@ -64,7 +63,7 @@ func getFirstIncompleteIndex(sets []workout.Set) int {
 	return len(sets)
 }
 
-func getLastCompletedAt(sets []workout.Set) *time.Time {
+func getLastCompletedAt(sets []domain.Set) *time.Time {
 	var latest *time.Time
 	for _, set := range sets {
 		if set.CompletedAt != nil {
@@ -117,21 +116,21 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	var currentSetTarget domain.SetTarget
 	var currentSetTimedTarget int
 	switch exerciseSet.Exercise.ExerciseType {
-	case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
+	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
 		progression, progressionErr := app.workoutService.BuildProgression(r.Context(), date, exerciseSet.Exercise.ID)
 		if progressionErr != nil {
 			app.serverError(w, r, progressionErr)
 			return
 		}
 		currentSetTarget = progression.CurrentSet()
-	case workout.ExerciseTypeTime:
+	case domain.ExerciseTypeTime:
 		progression, progressionErr := app.workoutService.BuildTimedProgression(r.Context(), date, exerciseSet.Exercise.ID)
 		if progressionErr != nil {
 			app.serverError(w, r, progressionErr)
 			return
 		}
 		currentSetTimedTarget = progression.CurrentSet().TargetSeconds
-	case workout.ExerciseTypeBodyweight:
+	case domain.ExerciseTypeBodyweight:
 		// No progression engine for bodyweight — uses the stored target as-is.
 	}
 
@@ -187,20 +186,20 @@ func (app *application) parseExerciseSetURLParams(r *http.Request) (exerciseSetP
 }
 
 // findExerciseSetInSession returns the workout slot identified by its stable ID.
-func findExerciseSetInSession(session *workout.Session, workoutExerciseID int) (workout.ExerciseSet, bool) {
+func findExerciseSetInSession(session *domain.Session, workoutExerciseID int) (domain.ExerciseSet, bool) {
 	for _, es := range session.ExerciseSets {
 		if es.ID == workoutExerciseID {
 			return es, true
 		}
 	}
-	return workout.ExerciseSet{}, false //nolint:exhaustruct // zero value signals "not found".
+	return domain.ExerciseSet{}, false //nolint:exhaustruct // zero value signals "not found".
 }
 
 // recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
 func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
 	params exerciseSetParams,
-	exercise workout.Exercise,
+	exercise domain.Exercise,
 ) bool {
 	weightStr := strings.Replace(r.PostForm.Get("weight"), ",", ".", 1)
 	weight, err := strconv.ParseFloat(weightStr, 64)
@@ -209,12 +208,12 @@ func (app *application) recordSetCompletionWithWeight(
 		return false
 	}
 
-	if exercise.ExerciseType == workout.ExerciseTypeAssisted &&
+	if exercise.ExerciseType == domain.ExerciseTypeAssisted &&
 		r.PostForm.Get("assisted") != "" {
 		weight = -math.Abs(weight)
 	}
 
-	signal := workout.Signal(r.PostForm.Get("signal"))
+	signal := domain.Signal(r.PostForm.Get("signal"))
 
 	reps, err := strconv.Atoi(r.PostForm.Get("reps"))
 	if err != nil {
@@ -280,7 +279,7 @@ func (app *application) recordTimedSetCompletion(
 		return false
 	}
 
-	signal := workout.Signal(r.PostForm.Get("signal"))
+	signal := domain.Signal(r.PostForm.Get("signal"))
 
 	if err = app.workoutService.RecordSet(
 		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, nil, completedSeconds); err != nil {
@@ -324,15 +323,15 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	exercise := exerciseSet.Exercise
 
 	switch exercise.ExerciseType {
-	case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:
+	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
 		if !app.recordSetCompletionWithWeight(w, r, params, exercise) {
 			return
 		}
-	case workout.ExerciseTypeTime:
+	case domain.ExerciseTypeTime:
 		if !app.recordTimedSetCompletion(w, r, params) {
 			return
 		}
-	case workout.ExerciseTypeBodyweight:
+	case domain.ExerciseTypeBodyweight:
 		if !app.recordBodyweightSetCompletion(w, r, params) {
 			return
 		}

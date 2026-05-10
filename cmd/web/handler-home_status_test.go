@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 func TestDetermineWorkoutStatus(t *testing.T) {
 	now := time.Now()
-	newSession := func(startedAt, completedAt time.Time) workout.Session {
-		return workout.Session{
+	newSession := func(startedAt, completedAt time.Time) domain.Session {
+		return domain.Session{
 			Date:              time.Time{},
 			DifficultyRating:  nil,
 			StartedAt:         startedAt,
@@ -22,7 +22,7 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		session       workout.Session
+		session       domain.Session
 		isScheduled   bool
 		completedSets int
 		totalSets     int

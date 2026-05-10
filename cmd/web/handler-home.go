@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 )
 
 // isWorkoutScheduled determines if a workout is scheduled for the given date based on user preferences.
-func isWorkoutScheduled(date time.Time, preferences workout.Preferences) bool {
+func isWorkoutScheduled(date time.Time, preferences domain.Preferences) bool {
 	switch date.Weekday() {
 	case time.Monday:
 		return preferences.Monday()
@@ -100,13 +100,13 @@ const (
 )
 
 // regionOrder returns the display order for muscle group regions in the UI.
-func regionOrder() []workout.MuscleGroupRegion {
-	return []workout.MuscleGroupRegion{
-		workout.RegionUpperPush,
-		workout.RegionUpperPull,
-		workout.RegionLegs,
-		workout.RegionCore,
-		workout.RegionOther,
+func regionOrder() []domain.MuscleGroupRegion {
+	return []domain.MuscleGroupRegion{
+		domain.RegionUpperPush,
+		domain.RegionUpperPull,
+		domain.RegionLegs,
+		domain.RegionCore,
+		domain.RegionOther,
 	}
 }
 
@@ -153,7 +153,7 @@ type workoutAction struct {
 // determineWorkoutStatus determines the workout status based on session data and schedule.
 // Sets completed on a day other than the scheduled date still count toward progress, so session-level
 // StartedAt/CompletedAt are not the sole source of truth.
-func determineWorkoutStatus(session workout.Session, isScheduled bool, completedSets, totalSets int) string {
+func determineWorkoutStatus(session domain.Session, isScheduled bool, completedSets, totalSets int) string {
 	allSetsCompleted := totalSets > 0 && completedSets == totalSets
 	hasStarted := !session.StartedAt.IsZero() || completedSets > 0
 
@@ -170,7 +170,7 @@ func determineWorkoutStatus(session workout.Session, isScheduled bool, completed
 }
 
 // calculateProgress counts completed and total sets and returns the progress data.
-func calculateProgress(session workout.Session) (int, int, int) {
+func calculateProgress(session domain.Session) (int, int, int) {
 	var completedSets, totalSets, progressPercent int
 
 	for _, exerciseSet := range session.ExerciseSets {
@@ -269,7 +269,7 @@ func calculateWorkoutAction(status string, isToday bool) *workoutAction {
 	}
 }
 
-func toDays(sessions []workout.Session, preferences workout.Preferences) []dayView {
+func toDays(sessions []domain.Session, preferences domain.Preferences) []dayView {
 	today := time.Now()
 	days := make([]dayView, len(sessions))
 
@@ -310,7 +310,7 @@ func toDays(sessions []workout.Session, preferences workout.Preferences) []dayVi
 // view-model with pre-computed bar percentages. All bars share one scale so the
 // visualization is meaningful at a glance: the largest of (max planned load, max
 // target) sets the right edge, plus 10% headroom. Regions with no bars are omitted.
-func toMuscleBalance(volumes []workout.MuscleGroupVolume) muscleBalanceView {
+func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 	if len(volumes) == 0 {
 		return muscleBalanceView{Regions: nil}
 	}
@@ -326,9 +326,9 @@ func toMuscleBalance(volumes []workout.MuscleGroupVolume) muscleBalanceView {
 	}
 	scale *= scaleHeadroom
 
-	byRegion := make(map[workout.MuscleGroupRegion][]muscleGroupBarView)
+	byRegion := make(map[domain.MuscleGroupRegion][]muscleGroupBarView)
 	for _, v := range volumes {
-		region := workout.RegionFor(v.Name)
+		region := domain.RegionFor(v.Name)
 		byRegion[region] = append(byRegion[region], muscleGroupBarView{
 			Name:           v.Name,
 			Slug:           muscleGroupSlug(v.Name),

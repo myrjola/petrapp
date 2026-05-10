@@ -17,9 +17,9 @@ import (
 	"github.com/myrjola/petrapp/internal/flightrecorder"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/pprofserver"
+	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/webauthnhandler"
-	"github.com/myrjola/petrapp/internal/workout"
 )
 
 type application struct {
@@ -27,7 +27,7 @@ type application struct {
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
-	workoutService  *workout.Service
+	workoutService  *service.Service
 	flightRecorder  *flightrecorder.Service
 	// devMode is true when running outside the Fly.io production deployment.
 	// It enables developer-only routes like /dev/styleguide.
@@ -128,7 +128,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
-		workoutService:  workout.NewService(db, logger, cfg.OpenAIAPIKey),
+		workoutService:  service.NewService(db, logger, cfg.OpenAIAPIKey),
 		flightRecorder:  flightRecorderService,
 		devMode:         cfg.FlyAppName == "",
 	}

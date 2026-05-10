@@ -4,13 +4,13 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 // featureFlagsAdminTemplateData contains data for the feature flags admin template.
 type featureFlagsAdminTemplateData struct {
 	BaseTemplateData
-	FeatureFlags []workout.FeatureFlag
+	FeatureFlags []domain.FeatureFlag
 }
 
 // adminFeatureFlagsGET handles GET requests to the feature flags admin page.

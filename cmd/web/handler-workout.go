@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/workout"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 type workoutTemplateData struct {
 	BaseTemplateData
 	Date    time.Time
-	Session workout.Session
+	Session domain.Session
 }
 
 type workoutCompletionTemplateData struct {
@@ -90,7 +90,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 
 	// Start the workout session
 	if err := app.workoutService.StartSession(r.Context(), date); err != nil {
-		if errors.Is(err, workout.ErrNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			data := workoutNotFoundTemplateData{
 				BaseTemplateData: newBaseTemplateData(r),
 				Date:             date,
@@ -117,7 +117,7 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	session, err := app.workoutService.GetSession(r.Context(), date)
 	if err != nil {
 		// Check if the workout doesn't exist
-		if errors.Is(err, workout.ErrNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			data := workoutNotFoundTemplateData{
 				BaseTemplateData: newBaseTemplateData(r),
 				Date:             date,
@@ -203,7 +203,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	}
 
 	queryLower := strings.ToLower(query)
-	var compatibleExercises []workout.Exercise
+	var compatibleExercises []domain.Exercise
 	for _, exercise := range allExercises {
 		if exercise.ID == currentSlot.Exercise.ID || existingExerciseIDs[exercise.ID] {
 			continue
@@ -215,8 +215,8 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	}
 
 	sort.SliceStable(compatibleExercises, func(i, j int) bool {
-		si := workout.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[i])
-		sj := workout.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[j])
+		si := domain.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[i])
+		sj := domain.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[j])
 		if si != sj {
 			return si > sj
 		}
@@ -279,8 +279,8 @@ type exerciseSwapTemplateData struct {
 	BaseTemplateData
 	Date                time.Time
 	WorkoutExerciseID   int
-	CurrentExercise     workout.Exercise
-	CompatibleExercises []workout.Exercise
+	CurrentExercise     domain.Exercise
+	CompatibleExercises []domain.Exercise
 	Query               string
 }
 
@@ -288,7 +288,7 @@ type exerciseSwapTemplateData struct {
 type exerciseAddTemplateData struct {
 	BaseTemplateData
 	Date      time.Time
-	Exercises []workout.Exercise
+	Exercises []domain.Exercise
 	Query     string
 }
 
@@ -323,7 +323,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	}
 
 	queryLower := strings.ToLower(query)
-	var availableExercises []workout.Exercise
+	var availableExercises []domain.Exercise
 	for _, exercise := range allExercises {
 		if existingExerciseIDs[exercise.ID] {
 			continue
