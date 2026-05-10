@@ -1,280 +1,45 @@
-# Domain Models & Business Logic - Workout Package
-
-> **Migration in progress (Phase 1 of 4 complete as of 2026-05-10).**
-> Pure domain types now live in `internal/domain`. The `workout`
-> package still exists but most of its public types are aliases for
-> `domain` equivalents. New domain logic should be added to
-> `internal/domain`. Phases 2–4 will extract `internal/repository`
-> and `internal/service`, then delete this package entirely. See
-> `docs/superpowers/specs/2026-05-10-workout-service-rearchitecture-design.md`.
-
-Guidelines for working with domain models, business logic, and data access patterns in `internal/workout/`.
-
-## Architecture Overview
-
-### Domain-Driven Design Structure
-
-- **Models** (`models.go`) - Pure domain entities and value objects
-- **Service** (`service.go`) - Business logic and workflow orchestration
-- **Repository** (`repository.go`) - Data access interfaces and aggregates
-- **Generator** (`generator.go`) - Workout generation algorithm
-
-### Separation of Concerns
-
-- **Domain models** represent business concepts (Exercise, Session, Set)
-- **Repository aggregates** represent data persistence structure
-- **Service layer** coordinates between domain and repository, handles business rules
-- **Generators** implement complex algorithms (workout creation, progression)
-
-## Domain Models
-
-### Core Entities
-
-```go
-type Exercise struct {
-    ID                     int
-    Name                   string
-    Category               Category     // full_body, upper, lower
-    ExerciseType           ExerciseType // weighted, bodyweight, assisted, time_based
-    DescriptionMarkdown    string
-    PrimaryMuscleGroups    []string
-    SecondaryMuscleGroups  []string
-    DefaultStartingSeconds *int         // Non-nil for time_based exercises; nil otherwise.
-    RepMin                 *int         // Per-exercise low end of the rep window; nil for time_based.
-    RepMax                 *int         // Per-exercise high end of the rep window; nil for time_based.
-}
-
-type Session struct {
-    Date             time.Time
-    DifficultyRating *int        // 1-5 user feedback
-    StartedAt        time.Time
-    CompletedAt      time.Time
-    ExerciseSets     []ExerciseSet
-}
-
-type ExerciseSet struct {
-    Exercise          Exercise
-    Sets              []Set
-    WarmupCompletedAt *time.Time
-}
-
-type Set struct {
-    WeightKg       *float64   // Nullable for bodyweight and time_based exercises.
-    TargetValue    int        // Reps if rep-based, seconds if time_based — unit derived from parent Exercise.
-    CompletedValue *int       // Same unit as TargetValue.
-    CompletedAt    *time.Time
-    Signal         *Signal
-}
-```
-
-### Strongly Typed Enums
-
-Always use typed constants with exhaustive validation:
-
-```go
-type Category string
-
-const (
-    CategoryFullBody Category = "full_body"
-    CategoryUpper    Category = "upper"  
-    CategoryLower    Category = "lower"
-)
-
-// Validate enum values in constructors/setters
-func (c Category) IsValid() bool {
-    switch c {
-    case CategoryFullBody, CategoryUpper, CategoryLower:
-        return true
-    default:
-        return false
-    }
-}
-```
-
-### Model Validation Patterns
-
-- Use pointer types for nullable fields (`*int`, `*time.Time`)
-- Implement validation methods on domain models
-- Use builder patterns for complex model construction
-- Keep models focused on data and basic validation, not business logic
-
-## Service Layer Patterns
-
-### Business Logic Organization
-
-```go
-type Service struct {
-    repo         *repository
-    logger       *slog.Logger
-    // Dependencies injected via constructor
-}
-
-// Public API methods handle business workflows
-func (s *Service) StartWorkout(ctx context.Context, date time.Time) error {
-    // 1. Validate business rules
-    // 2. Coordinate repository operations
-    // 3. Handle domain events
-    return s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-        sess.StartedAt = time.Now()
-        return true, nil // true = persist changes
-    })
-}
-```
-
-### Error Handling
-
-- Use sentinel errors for business conditions. The package currently exposes `ErrNotFound` (`repository.go`) aliased to `sql.ErrNoRows`
-- Wrap errors with context: `fmt.Errorf("operation description: %w", err)`
-- Check for specific errors using `errors.Is(err, workout.ErrNotFound)`
-- Let service layer handle business validation, repository handles data access
-
-### Context Propagation
-
-- Always pass `context.Context` as first parameter
-- Use context for cancellation, timeouts, and request-scoped values
-- Pass context down to repository methods
-
-## Repository Interface Patterns
-
-### Aggregate-Based Design
-
-```go
-// Repository aggregates represent data persistence structure
-type sessionAggregate struct {
-    Date             time.Time
-    DifficultyRating *int
-    StartedAt        time.Time
-    CompletedAt      time.Time
-    ExerciseSets     []exerciseSetAggregate // Nested aggregates
-}
-
-// Repository interfaces define data access contracts
-type sessionRepository interface {
-    List(ctx context.Context, sinceDate time.Time) ([]sessionAggregate, error)
-    Get(ctx context.Context, date time.Time) (sessionAggregate, error)
-    Create(ctx context.Context, sess sessionAggregate) error
-    Update(ctx context.Context, date time.Time, updateFn func(*sessionAggregate) (bool, error)) error
-}
-```
-
-### Update Pattern with Function Parameter
-
-Use functional updates for transactional safety:
-
-```go
-// Repository method accepts update function
-func (r *sessionRepositoryImpl) Update(ctx context.Context, date time.Time, updateFn func(*sessionAggregate) (bool, error)) error {
-    // 1. Load current state
-    // 2. Call update function
-    // 3. Save if function returns true
-    // 4. Handle concurrency/consistency
-}
-
-// Service calls with lambda
-err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-    if sess.CompletedAt != nil {
-        return false, errors.New("workout already completed")
-    }
-    sess.CompletedAt = time.Now()
-    return true, nil
-})
-```
-
-## Data Conversion Patterns
-
-### Domain ↔ Aggregate Conversion
-
-```go
-// Convert repository aggregate to domain model
-func (r *repository) aggregateToDomain(agg sessionAggregate, exercises []Exercise) (Session, error) {
-    session := Session{
-        Date:             agg.Date,
-        DifficultyRating: agg.DifficultyRating,
-        StartedAt:        agg.StartedAt,
-        CompletedAt:      agg.CompletedAt,
-    }
-
-    // Build exercise sets with domain exercises
-    for _, setAgg := range agg.ExerciseSets {
-        exercise := findExerciseByID(exercises, setAgg.ExerciseID)
-        session.ExerciseSets = append(session.ExerciseSets, ExerciseSet{
-            Exercise:          exercise,
-            Sets:              setAgg.Sets,
-            WarmupCompletedAt: setAgg.WarmupCompletedAt,
-        })
-    }
-
-    return session, nil
-}
-```
-
-### Conversion Guidelines
-
-- Keep conversion logic in repository layer, not service layer
-- Handle missing data gracefully (use zero values or return errors)
-- Validate converted data before returning to service layer
-- Use helper functions for complex nested conversions
-
-## Integration with Other Layers
-
-### Service ↔ Handler Integration
-
-- Handlers call service methods with validated input
-- Service returns domain models to handlers
-- Handlers convert domain models to template data structures
-- Service handles all business validation and coordination
-
-### Repository ↔ Database Integration
-
-- Repository implementations handle SQL queries and transactions
-- Convert between Go types and database types (time.Time ↔ string, etc.)
-- Handle database-specific constraints and validations
-- Use proper foreign key relationships and cascading deletes
-
-## Common Patterns and Anti-Patterns
-
-### ✅ Good Patterns
-
-- Inject dependencies through constructors
-- Use interfaces for testability and flexibility
-- Keep domain models focused on data and basic validation
-- Use functional updates for transactional safety
-- Separate concerns between domain, service, and repository layers
-
-### ❌ Anti-Patterns
-
-- Don't put database logic in domain models
-- Don't put business logic in repository implementations
-- Don't use global variables or singletons
-- Don't bypass service layer from handlers
-- Don't mix domain and repository aggregate types
-
-### Display derivations belong on domain types
-
-Any value that depends on multiple domain attributes, or that encodes a business rule, lives as a method on the domain type that owns the rule (`Exercise.IsTimed()` is the canonical example). Handlers may format primitives (`%d`, `%.1fkg`, `time.Format`) and shape data into per-page template structs, but they may not branch on multiple domain fields to compute a value.
-
-**Test:** if changing the rule would force edits in two or more files outside `internal/workout/`, it is a domain method. The 2026-05-09 hypertrophy-window incident traces back to `formatTarget` in `cmd/web/` reimplementing a rule that already lived (correctly) in the planner.
-
-## Error Handling Strategies
-
-### Business Rule Violations
-
-Today the package exposes a single sentinel error, defined in `repository.go`:
-
-```go
-// ErrNotFound is returned when a record is not found.
-var ErrNotFound = sql.ErrNoRows
-```
-
-Handlers and callers check it with `errors.Is(err, workout.ErrNotFound)`. If you need a new sentinel for a business condition (e.g. "workout already started"), follow the `Err` prefix convention from the root CLAUDE.md:
-
-```go
-var ErrWorkoutAlreadyStarted = errors.New("workout already started")
-```
-
-### Validation and Input Sanitization
-
-- Validate at service layer before calling repository
-- Use domain model validation methods for business rules
-- Sanitize and normalize input data consistently
-- Return meaningful error messages for user-facing errors
+# Workout Package — Migration Status
+
+> **Migration in progress (Phases 1 + 2 of 4 complete as of 2026-05-10).**
+> - Pure logic lives in `internal/domain/` (Phase 1).
+> - Persistence lives in `internal/repository/` (Phase 2).
+> - This package now contains only orchestration code (`service.go`, the
+>   AI exercise generator, and backward-compat type aliases). Phase 3
+>   moves these to `internal/service/`. Phase 4 deletes the package.
+>
+> See `docs/superpowers/specs/2026-05-10-workout-service-rearchitecture-design.md`.
+
+## What still lives here
+
+- **`models.go`** — type aliases (`type Session = domain.Session`, etc.)
+  so `cmd/web/` handlers continue to import `workout.*` symbols without
+  edit. Removed in Phase 4.
+- **`service.go`** — `Service` struct, `NewService`, orchestration that
+  combines repository calls with domain logic, AI exercise creation,
+  weekly plan generation, GDPR export. Moves to `internal/service/` in
+  Phase 3.
+- **`generator-exercise.go`** — OpenAI-backed exercise content
+  generator. Moves to `internal/service/` in Phase 3 alongside its
+  unexported JSON-schema type.
+- **`service_test.go` / `service_internal_test.go` /
+  `generator-exercise_internal_test.go`** — orchestration and helper
+  unit tests; relocate alongside their subjects in Phase 3.
+
+## Where to add new code
+
+- **Pure rules / value objects / aggregate methods:** `internal/domain/`.
+- **New SQL queries / repository methods:** `internal/repository/`.
+- **Cross-aggregate orchestration / external integrations / GDPR:**
+  here, in `service.go` (Phase 3 will move it intact).
+
+## Sentinel errors
+
+`workout.ErrNotFound` re-exports `domain.ErrNotFound`. Handlers and
+existing tests use it; no behaviour change. New sentinels go in
+`internal/domain/errors.go`.
+
+## Display derivations belong on domain types
+
+Unchanged from Phase 1: any value that depends on multiple domain
+attributes, or that encodes a business rule, lives as a method on the
+domain type. See `internal/domain/CLAUDE.md`.
