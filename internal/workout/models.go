@@ -69,6 +69,13 @@ const (
 
 func RegionFor(name string) MuscleGroupRegion { return domain.RegionFor(name) }
 
+// SwapSimilarityScore is re-exported from internal/domain. Handlers call
+// workout.SwapSimilarityScore today; that import path keeps working through
+// this phase.
+func SwapSimilarityScore(current, candidate Exercise) int {
+	return domain.SwapSimilarityScore(current, candidate)
+}
+
 // exerciseJSONSchema and its MarshalJSON method follow — generator-exercise.go
 // consumes the unexported type.
 

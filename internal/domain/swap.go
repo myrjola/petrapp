@@ -1,4 +1,4 @@
-package workout
+package domain
 
 // SwapSimilarityScore returns a non-negative integer describing how similar
 // candidate is to current for the purposes of swapping one workout exercise
