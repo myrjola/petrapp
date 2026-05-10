@@ -11,7 +11,6 @@ import (
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/weekplanner"
 )
 
 // Service handles the business logic for workout management.
@@ -131,7 +130,7 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 	return workouts, nil
 }
 
-// generateWeeklyPlan uses the weekplanner to create all sessions for the week starting
+// generateWeeklyPlan uses the domain planner to create all sessions for the week starting
 // on monday and persists them in a single DB transaction.
 func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) error {
 	prefs, err := s.repo.prefs.Get(ctx)
@@ -149,67 +148,25 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		return fmt.Errorf("get muscle group targets: %w", err)
 	}
 
-	wpPrefs := weekplanner.Preferences{
-		MondayMinutes:    prefs.MondayMinutes,
-		TuesdayMinutes:   prefs.TuesdayMinutes,
-		WednesdayMinutes: prefs.WednesdayMinutes,
-		ThursdayMinutes:  prefs.ThursdayMinutes,
-		FridayMinutes:    prefs.FridayMinutes,
-		SaturdayMinutes:  prefs.SaturdayMinutes,
-		SundayMinutes:    prefs.SundayMinutes,
-	}
-
-	wpExercises := make([]weekplanner.Exercise, len(exercises))
-	for i, ex := range exercises {
-		wpExercises[i] = weekplanner.Exercise{
-			ID:                     ex.ID,
-			Category:               weekplanner.Category(ex.Category),
-			ExerciseType:           weekplanner.ExerciseType(ex.ExerciseType),
-			PrimaryMuscleGroups:    ex.PrimaryMuscleGroups,
-			SecondaryMuscleGroups:  ex.SecondaryMuscleGroups,
-			DefaultStartingSeconds: ex.DefaultStartingSeconds,
-			RepMin:                 ex.RepMin,
-			RepMax:                 ex.RepMax,
-		}
-	}
-
-	wpTargets := make([]weekplanner.MuscleGroupTarget, len(targets))
-	for i, t := range targets {
-		wpTargets[i] = weekplanner.MuscleGroupTarget{
-			Name:            t.MuscleGroupName,
-			WeeklySetTarget: t.WeeklySetTarget,
-		}
-	}
-
-	planner := weekplanner.NewWeeklyPlanner(wpPrefs, wpExercises, wpTargets)
+	planner := domain.NewPlanner(prefs, exercises, targets)
 	plannedSessions, err := planner.Plan(monday)
 	if err != nil {
 		return fmt.Errorf("plan week: %w", err)
 	}
 
-	exerciseByID := make(map[int]Exercise, len(exercises))
-	for _, ex := range exercises {
-		exerciseByID[ex.ID] = ex
-	}
-
 	sessionAggrs := make([]sessionAggregate, len(plannedSessions))
 	for i, ps := range plannedSessions {
-		periodType := PeriodizationStrength
-		if ps.PeriodizationType == weekplanner.PeriodizationHypertrophy {
-			periodType = PeriodizationHypertrophy
-		}
-
 		exerciseSets := make([]exerciseSetAggregate, len(ps.ExerciseSets))
-		for j, pes := range ps.ExerciseSets {
+		for j, es := range ps.ExerciseSets {
 			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
-				ExerciseID: pes.ExerciseID,
-				Sets:       domain.BuildPlannedSets(exerciseByID[pes.ExerciseID], periodType),
+				ExerciseID: es.Exercise.ID,
+				Sets:       es.Sets,
 			}
 		}
 
 		sessionAggrs[i] = sessionAggregate{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
 			Date:              ps.Date,
-			PeriodizationType: periodType,
+			PeriodizationType: ps.PeriodizationType,
 			ExerciseSets:      exerciseSets,
 		}
 	}

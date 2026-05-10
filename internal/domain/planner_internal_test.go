@@ -1,12 +1,10 @@
-package weekplanner
+package domain
 
 import (
 	"fmt"
 	"math/rand/v2"
 	"testing"
 	"time"
-
-	"github.com/myrjola/petrapp/internal/exerciseprogression"
 )
 
 // monday2026Date returns 2026-01-05, a known Monday.
@@ -91,7 +89,7 @@ func TestDetermineCategory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wp := NewWeeklyPlanner(tt.prefs, nil, nil)
+			wp := NewPlanner(tt.prefs, nil, nil)
 			got := wp.determineCategory(tt.date)
 			if got != tt.expected {
 				t.Errorf("determineCategory(%s) = %s, want %s", tt.date.Weekday(), got, tt.expected)
@@ -104,7 +102,7 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 	t.Run("consecutive weeks alternate for odd exercise count", func(t *testing.T) {
 		// Mon/Wed/Fri at 60 min = 3 exercises each = 9 exercises/week (odd).
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
-		wp := NewWeeklyPlanner(p, nil, nil)
+		wp := NewPlanner(p, nil, nil)
 
 		monday1 := monday2026Date()                  // week N
 		monday2 := monday2026Date().AddDate(0, 0, 7) // week N+1
@@ -120,7 +118,7 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 	t.Run("consecutive weeks alternate for even exercise count", func(t *testing.T) {
 		// Mon/Wed at 60 min = 3 exercises each = 6 exercises/week (even).
 		p := prefs(time.Monday, time.Wednesday)
-		wp := NewWeeklyPlanner(p, nil, nil)
+		wp := NewPlanner(p, nil, nil)
 
 		monday1 := monday2026Date()
 		monday2 := monday2026Date().AddDate(0, 0, 7)
@@ -135,7 +133,7 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 
 	t.Run("determinism", func(t *testing.T) {
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
-		wp := NewWeeklyPlanner(p, nil, nil)
+		wp := NewPlanner(p, nil, nil)
 
 		monday1 := monday2026Date()
 		pt1 := wp.firstSessionPeriodizationType(monday1)
@@ -147,35 +145,43 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 
 func minimalExercises() []Exercise {
 	return []Exercise{
-		{ID: 1, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 1, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Quads", "Glutes"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 2, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 2, Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Hamstrings"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Chest", "Triceps", "Shoulders"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Lats", "Upper Back"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 5, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 5, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Biceps"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 6, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 6, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Hamstrings", "Glutes"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 7, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 7, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
-		{ID: 8, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 8, Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Quads"}, SecondaryMuscleGroups: nil,
 			DefaultStartingSeconds: nil,
 			RepMin:                 new(5), RepMax: new(10)},
@@ -184,15 +190,15 @@ func minimalExercises() []Exercise {
 
 func minimalTargets() []MuscleGroupTarget {
 	return []MuscleGroupTarget{
-		{Name: "Chest", WeeklySetTarget: 10},
-		{Name: "Shoulders", WeeklySetTarget: 10},
-		{Name: "Triceps", WeeklySetTarget: 8},
-		{Name: "Biceps", WeeklySetTarget: 8},
-		{Name: "Upper Back", WeeklySetTarget: 10},
-		{Name: "Lats", WeeklySetTarget: 10},
-		{Name: "Quads", WeeklySetTarget: 10},
-		{Name: "Hamstrings", WeeklySetTarget: 8},
-		{Name: "Glutes", WeeklySetTarget: 8},
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
+		{MuscleGroupName: "Triceps", WeeklySetTarget: 8},
+		{MuscleGroupName: "Biceps", WeeklySetTarget: 8},
+		{MuscleGroupName: "Upper Back", WeeklySetTarget: 10},
+		{MuscleGroupName: "Lats", WeeklySetTarget: 10},
+		{MuscleGroupName: "Quads", WeeklySetTarget: 10},
+		{MuscleGroupName: "Hamstrings", WeeklySetTarget: 8},
+		{MuscleGroupName: "Glutes", WeeklySetTarget: 8},
 	}
 }
 
@@ -200,7 +206,7 @@ func TestAllocateMuscleGroups(t *testing.T) {
 	// Mon(Lower), Tue(Upper), Thu(Full Body) schedule.
 	monday := monday2026Date()
 	p := prefs(time.Monday, time.Tuesday, time.Thursday)
-	wp := NewWeeklyPlanner(p, minimalExercises(), minimalTargets())
+	wp := NewPlanner(p, minimalExercises(), minimalTargets())
 
 	mon := monday          // Lower
 	tue := date(monday, 1) // Upper
@@ -242,15 +248,15 @@ func TestAllocateMuscleGroups(t *testing.T) {
 		}
 	}
 	for _, target := range minimalTargets() {
-		if !allGroups[target.Name] {
-			t.Errorf("muscle group %q not assigned to any day", target.Name)
+		if !allGroups[target.MuscleGroupName] {
+			t.Errorf("muscle group %q not assigned to any day", target.MuscleGroupName)
 		}
 	}
 }
 
 func TestSelectExercisesForDay(t *testing.T) {
 	p := prefs(time.Monday, time.Tuesday, time.Thursday)
-	wp := NewWeeklyPlanner(p, minimalExercises(), minimalTargets())
+	wp := NewPlanner(p, minimalExercises(), minimalTargets())
 	wp.rng = rand.New(rand.NewPCG(42, 0)) // fixed seed for determinism
 
 	t.Run("lower day only selects lower exercises", func(t *testing.T) {
@@ -259,7 +265,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 			t.Fatalf("want 2 exercise sets, got %d", len(sets))
 		}
 		for _, es := range sets {
-			ex := findExercise(wp.Exercises, es.ExerciseID)
+			ex := findExercise(wp.Exercises, es.Exercise.ID)
 			if ex.Category != CategoryLower {
 				t.Errorf("lower day got exercise with category %s", ex.Category)
 			}
@@ -269,7 +275,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 	t.Run("upper day only selects upper exercises", func(t *testing.T) {
 		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest", "Lats"}, 2)
 		for _, es := range sets {
-			ex := findExercise(wp.Exercises, es.ExerciseID)
+			ex := findExercise(wp.Exercises, es.Exercise.ID)
 			if ex.Category != CategoryUpper {
 				t.Errorf("upper day got exercise with category %s", ex.Category)
 			}
@@ -278,13 +284,13 @@ func TestSelectExercisesForDay(t *testing.T) {
 
 	t.Run("full body day can select any category", func(t *testing.T) {
 		sets := wp.selectExercisesForDay(CategoryFullBody, []string{"Hamstrings", "Chest"}, 3)
-		categories := make(map[Category]bool)
+		categorySet := make(map[Category]bool)
 		for _, es := range sets {
-			ex := findExercise(wp.Exercises, es.ExerciseID)
-			categories[ex.Category] = true
+			ex := findExercise(wp.Exercises, es.Exercise.ID)
+			categorySet[ex.Category] = true
 		}
 		// With Hamstrings and Chest as priorities, expect both lower and upper exercises selected.
-		if !categories[CategoryLower] || !categories[CategoryUpper] {
+		if !categorySet[CategoryLower] || !categorySet[CategoryUpper] {
 			t.Error("full body day should draw from multiple categories when priorities span both")
 		}
 	})
@@ -295,7 +301,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 			t.Fatalf("want 1 exercise set, got %d", len(sets))
 		}
 		// With Strength + window 5-10, DeriveScheme returns 4 sets (reps=5 ≤ 5).
-		expectedSets := exerciseprogression.DeriveScheme(5, 10, exerciseprogression.Strength).TargetSets
+		expectedSets := DeriveScheme(5, 10, PeriodizationStrength).TargetSets
 		if len(sets[0].Sets) != expectedSets {
 			t.Errorf("want %d sets, got %d", expectedSets, len(sets[0].Sets))
 		}
@@ -303,7 +309,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 
 	t.Run("strength periodization sets correct target value", func(t *testing.T) {
 		sets := wp.selectExercisesForDay(CategoryUpper, nil, 1)
-		expectedReps := exerciseprogression.DeriveScheme(5, 10, exerciseprogression.Strength).TargetReps
+		expectedReps := DeriveScheme(5, 10, PeriodizationStrength).TargetReps
 		for _, s := range sets[0].Sets {
 			if s.TargetValue != expectedReps {
 				t.Errorf("strength set: want TargetValue=%d, got %d", expectedReps, s.TargetValue)
@@ -316,22 +322,26 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 	t.Run("no primary muscle group overlap within session", func(t *testing.T) {
 		// Exercise pool: multiple exercises that could target overlapping muscles.
 		exercises := []Exercise{
-			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Triceps"},
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Shoulders"},
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Shoulders", "Triceps"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
 		}
 
 		p := prefs(time.Tuesday) // 3 exercises
-		wp := NewWeeklyPlanner(p, exercises, nil)
+		wp := NewPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Request 3 exercises with priority Chest, Shoulders, Triceps.
@@ -341,7 +351,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 			[]string{"Chest", "Shoulders", "Triceps"},
 			3,
 			PeriodizationStrength,
-			make(map[int]bool), // Empty week-used set
+			make(map[int]bool), // Empty week-used set.
 		)
 
 		if len(sets) < 2 {
@@ -351,7 +361,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 		// Collect all primary muscle groups across selected exercises.
 		seenPrimary := make(map[string]bool)
 		for _, es := range sets {
-			ex := findExercise(exercises, es.ExerciseID)
+			ex := findExercise(exercises, es.Exercise.ID)
 			for _, mg := range ex.PrimaryMuscleGroups {
 				if seenPrimary[mg] {
 					t.Errorf("primary muscle group %q appears in multiple exercises in the same session", mg)
@@ -364,19 +374,22 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 	t.Run("skip priority muscle group when no non-conflicting exercise available", func(t *testing.T) {
 		// Exercise pool: all Chest exercises have overlapping primary muscles.
 		exercises := []Exercise{
-			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest", "Triceps"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest", "Shoulders"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
 		}
 
 		p := prefs(time.Tuesday) // 3 exercises
-		wp := NewWeeklyPlanner(p, exercises, nil)
+		wp := NewPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Request 3 exercises, but only 1 non-overlapping is available.
@@ -398,7 +411,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 			// Check that no primary muscle groups repeat.
 			seenPrimary := make(map[string]bool)
 			for _, es := range sets {
-				ex := findExercise(exercises, es.ExerciseID)
+				ex := findExercise(exercises, es.Exercise.ID)
 				for _, mg := range ex.PrimaryMuscleGroups {
 					if seenPrimary[mg] {
 						t.Errorf("primary muscle group %q appears twice; expected graceful degradation to 1 exercise", mg)
@@ -413,19 +426,22 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 	t.Run("exercise used earlier in week is skipped", func(t *testing.T) {
 		exercises := []Exercise{
-			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
 		}
 
 		p := prefs(time.Tuesday)
-		wp := NewWeeklyPlanner(p, exercises, nil)
+		wp := NewPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Simulate that exercise 1 was already used earlier in the week.
@@ -445,19 +461,19 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 			t.Fatalf("want 1 exercise, got 0")
 		}
 
-		selectedID := sets[0].ExerciseID
+		selectedID := sets[0].Exercise.ID
 		if selectedID == 1 {
 			t.Errorf("exercise 1 was already used this week; expected a different exercise, got %d", selectedID)
 		}
 	})
 
 	t.Run("plan() does not repeat exercises across days", func(t *testing.T) {
-		exercises := minimalExercises() // Use existing test fixture
+		exercises := minimalExercises() // Use existing test fixture.
 		targets := minimalTargets()
 
 		monday := monday2026Date()
 		p := prefs(time.Monday, time.Tuesday, time.Thursday)
-		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		sessions, err := wp.Plan(monday)
@@ -469,10 +485,10 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 		usedExercises := make(map[int]bool)
 		for _, session := range sessions {
 			for _, es := range session.ExerciseSets {
-				if usedExercises[es.ExerciseID] {
-					t.Errorf("exercise %d appears in multiple sessions across the week", es.ExerciseID)
+				if usedExercises[es.Exercise.ID] {
+					t.Errorf("exercise %d appears in multiple sessions across the week", es.Exercise.ID)
 				}
-				usedExercises[es.ExerciseID] = true
+				usedExercises[es.Exercise.ID] = true
 			}
 		}
 
@@ -487,16 +503,18 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 	t.Run("returns fewer exercises if constraints can't be fully satisfied", func(t *testing.T) {
 		// Exercise pool: only 2 non-overlapping exercises available.
 		exercises := []Exercise{
-			{ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
 				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
 		}
 
-		p := prefs(time.Tuesday) // Requests 3 exercises
-		wp := NewWeeklyPlanner(p, exercises, nil)
+		p := prefs(time.Tuesday) // Requests 3 exercises.
+		wp := NewPlanner(p, exercises, nil)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Request 3 exercises, but only 2 non-overlapping available.
@@ -516,7 +534,7 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 		// Verify the 2 selected have no overlapping primary muscles.
 		seenPrimary := make(map[string]bool)
 		for _, es := range sets {
-			ex := findExercise(exercises, es.ExerciseID)
+			ex := findExercise(exercises, es.Exercise.ID)
 			for _, mg := range ex.PrimaryMuscleGroups {
 				if seenPrimary[mg] {
 					t.Errorf("primary muscle group %q appears twice", mg)
@@ -531,7 +549,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 	t.Parallel()
 
 	starting := 30
-	plank := Exercise{
+	plank := Exercise{ //nolint:exhaustruct // Test exercise omits unused display fields.
 		ID:                     21,
 		Category:               CategoryUpper,
 		ExerciseType:           ExerciseTypeTime,
@@ -542,7 +560,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 		RepMax:                 nil,
 	}
 
-	wp := &WeeklyPlanner{
+	wp := &Planner{
 		Prefs: Preferences{
 			MondayMinutes:    60,
 			TuesdayMinutes:   0,
@@ -553,7 +571,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 			SundayMinutes:    0,
 		},
 		Exercises: []Exercise{plank},
-		Targets:   []MuscleGroupTarget{{Name: "Abs", WeeklySetTarget: 8}},
+		Targets:   []MuscleGroupTarget{{MuscleGroupName: "Abs", WeeklySetTarget: 8}},
 		rng:       nil,
 	}
 
@@ -566,13 +584,13 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 	)
 
 	if len(sets) != 1 {
-		t.Fatalf("got %d PlannedExerciseSets, want 1", len(sets))
+		t.Fatalf("got %d ExerciseSets, want 1", len(sets))
 	}
-	if sets[0].ExerciseID != plank.ID {
-		t.Fatalf("got exerciseID %d, want %d", sets[0].ExerciseID, plank.ID)
+	if sets[0].Exercise.ID != plank.ID {
+		t.Fatalf("got exerciseID %d, want %d", sets[0].Exercise.ID, plank.ID)
 	}
-	if len(sets[0].Sets) != timeBasedSets {
-		t.Fatalf("got %d sets, want %d", len(sets[0].Sets), timeBasedSets)
+	if len(sets[0].Sets) != defaultTimedSets {
+		t.Fatalf("got %d sets, want %d", len(sets[0].Sets), defaultTimedSets)
 	}
 	for i, s := range sets[0].Sets {
 		if s.TargetValue != 30 {
@@ -597,15 +615,15 @@ func TestPlan(t *testing.T) {
 
 	t.Run("returns error for non-Monday start date", func(t *testing.T) {
 		p := prefs(time.Monday, time.Wednesday)
-		wp := NewWeeklyPlanner(p, exercises, targets)
-		_, err := wp.Plan(date(monday, 1)) // Tuesday
+		wp := NewPlanner(p, exercises, targets)
+		_, err := wp.Plan(date(monday, 1)) // Tuesday.
 		if err == nil {
 			t.Error("want error for non-Monday start date, got nil")
 		}
 	})
 
 	t.Run("returns error when no workout days scheduled", func(t *testing.T) {
-		wp := NewWeeklyPlanner(prefs(), exercises, targets)
+		wp := NewPlanner(prefs(), exercises, targets)
 		_, err := wp.Plan(monday)
 		if err == nil {
 			t.Error("want error when no workout days scheduled, got nil")
@@ -614,7 +632,7 @@ func TestPlan(t *testing.T) {
 
 	t.Run("returns one session per scheduled day", func(t *testing.T) {
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
-		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
 
 		sessions, err := wp.Plan(monday)
@@ -628,7 +646,7 @@ func TestPlan(t *testing.T) {
 
 	t.Run("session dates match scheduled weekdays", func(t *testing.T) {
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
-		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
 
 		sessions, err := wp.Plan(monday)
@@ -646,7 +664,7 @@ func TestPlan(t *testing.T) {
 	t.Run("each session has correct exercise count for duration", func(t *testing.T) {
 		// 60 min → 3 exercises.
 		p := prefs(time.Monday, time.Wednesday)
-		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(2, 0))
 
 		sessions, err := wp.Plan(monday)
@@ -662,7 +680,7 @@ func TestPlan(t *testing.T) {
 
 	t.Run("consecutive sessions alternate periodization", func(t *testing.T) {
 		p := prefs(time.Monday, time.Tuesday)
-		wp := NewWeeklyPlanner(p, exercises, targets)
+		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(3, 0))
 
 		sessions, err := wp.Plan(monday)

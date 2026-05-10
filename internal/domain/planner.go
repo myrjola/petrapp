@@ -1,4 +1,4 @@
-package weekplanner
+package domain
 
 import (
 	"errors"
@@ -6,42 +6,6 @@ import (
 	"math/rand/v2"
 	"slices"
 	"time"
-
-	"github.com/myrjola/petrapp/internal/exerciseprogression"
-)
-
-// Category is the workout focus for a session.
-type Category string
-
-const (
-	CategoryFullBody Category = "full_body"
-	CategoryUpper    Category = "upper"
-	CategoryLower    Category = "lower"
-)
-
-// ExerciseType distinguishes weighted, bodyweight, assisted, and time-based exercises.
-type ExerciseType string
-
-const (
-	ExerciseTypeWeighted   ExerciseType = "weighted"
-	ExerciseTypeBodyweight ExerciseType = "bodyweight"
-	ExerciseTypeAssisted   ExerciseType = "assisted"
-	ExerciseTypeTime       ExerciseType = "time_based"
-)
-
-// PeriodizationType controls rep targets for the session.
-type PeriodizationType int
-
-const (
-	PeriodizationStrength    PeriodizationType = 0 // 5 reps
-	PeriodizationHypertrophy PeriodizationType = 1 // 6-10 reps
-)
-
-const (
-	// timeBasedSets is the fixed set count for time-based exercises (e.g.
-	// planks). Rep-based exercises derive their set count via
-	// exerciseprogression.DeriveScheme.
-	timeBasedSets = 3
 )
 
 const (
@@ -56,47 +20,29 @@ const (
 	numPeriodizationTypes     = 2
 )
 
-// Preferences describes which days are workout days and their duration in minutes.
-// A value of 0 means rest day; 45, 60, or 90 means workout day.
-type Preferences struct {
-	MondayMinutes    int
-	TuesdayMinutes   int
-	WednesdayMinutes int
-	ThursdayMinutes  int
-	FridayMinutes    int
-	SaturdayMinutes  int
-	SundayMinutes    int
+// Planner holds the static inputs needed to plan a full week of workouts.
+type Planner struct {
+	Prefs     Preferences
+	Exercises []Exercise
+	Targets   []MuscleGroupTarget
+	rng       *rand.Rand
 }
 
-func (p Preferences) minutesForDay(weekday time.Weekday) int {
-	switch weekday {
-	case time.Monday:
-		return p.MondayMinutes
-	case time.Tuesday:
-		return p.TuesdayMinutes
-	case time.Wednesday:
-		return p.WednesdayMinutes
-	case time.Thursday:
-		return p.ThursdayMinutes
-	case time.Friday:
-		return p.FridayMinutes
-	case time.Saturday:
-		return p.SaturdayMinutes
-	case time.Sunday:
-		return p.SundayMinutes
-	default:
-		return 0
+// NewPlanner creates a Planner with a randomly seeded RNG.
+func NewPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTarget) *Planner {
+	// Non-cryptographic randomness is intentional for exercise selection.
+	rng := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)) //nolint:gosec // not security-sensitive
+	return &Planner{
+		Prefs:     prefs,
+		Exercises: exercises,
+		Targets:   targets,
+		rng:       rng,
 	}
 }
 
-// IsWorkoutDay returns true if the given weekday has a non-zero duration in preferences.
-func (p Preferences) IsWorkoutDay(weekday time.Weekday) bool {
-	return p.minutesForDay(weekday) > 0
-}
-
-// ExercisesPerSession returns how many exercises to include based on session duration.
-func (p Preferences) ExercisesPerSession(weekday time.Weekday) int {
-	switch minutes := p.minutesForDay(weekday); {
+// exercisesPerSession returns how many exercises to include based on session duration.
+func exercisesPerSession(prefs Preferences, weekday time.Weekday) int {
+	switch minutes := prefs.MinutesForDay(weekday); {
 	case minutes >= minutesLong:
 		return exercisesLong
 	case minutes >= minutesMedium:
@@ -108,72 +54,10 @@ func (p Preferences) ExercisesPerSession(weekday time.Weekday) int {
 	}
 }
 
-// Exercise is a dependency-free representation of an exercise for planning.
-// StartingWeightKg is intentionally absent — resolved lazily by exerciseprogression.
-// RepMin/RepMax are nil for time_based exercises (which use DefaultStartingSeconds);
-// non-nil for everything else, enforced at the DB layer by a CHECK constraint.
-type Exercise struct {
-	ID                     int
-	Category               Category
-	ExerciseType           ExerciseType
-	PrimaryMuscleGroups    []string
-	SecondaryMuscleGroups  []string
-	DefaultStartingSeconds *int
-	RepMin                 *int
-	RepMax                 *int
-}
-
-// MuscleGroupTarget holds the minimum weekly set target for a tracked muscle group.
-type MuscleGroupTarget struct {
-	Name            string
-	WeeklySetTarget int
-}
-
-// PlannedSession is the output of Plan() for a single workout day.
-type PlannedSession struct {
-	Date              time.Time
-	Category          Category
-	PeriodizationType PeriodizationType
-	ExerciseSets      []PlannedExerciseSet
-}
-
-// PlannedExerciseSet groups the planned sets for one exercise.
-type PlannedExerciseSet struct {
-	ExerciseID int
-	Sets       []PlannedSet
-}
-
-// PlannedSet holds the target value and rest. WeightKg is always nil at plan time.
-// TargetValue's unit (reps or seconds) is derived from the parent exercise type.
-type PlannedSet struct {
-	TargetValue int
-	RestSeconds int
-}
-
-// WeeklyPlanner holds the static inputs needed to plan a full week of workouts.
-type WeeklyPlanner struct {
-	Prefs     Preferences
-	Exercises []Exercise
-	Targets   []MuscleGroupTarget
-	rng       *rand.Rand
-}
-
-// NewWeeklyPlanner creates a WeeklyPlanner with a randomly seeded RNG.
-func NewWeeklyPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTarget) *WeeklyPlanner {
-	// Non-cryptographic randomness is intentional for exercise selection.
-	rng := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)) //nolint:gosec // not security-sensitive
-	return &WeeklyPlanner{
-		Prefs:     prefs,
-		Exercises: exercises,
-		Targets:   targets,
-		rng:       rng,
-	}
-}
-
 // determineCategory returns the workout category for a given date using the adjacency rule.
 // Uses preference-based weekday checks so week boundaries wrap naturally through date arithmetic:
 // Sunday's "tomorrow" is Monday, Monday's "yesterday" is Sunday.
-func (wp *WeeklyPlanner) determineCategory(date time.Time) Category {
+func (wp *Planner) determineCategory(date time.Time) Category {
 	today := date.Weekday()
 	tomorrow := date.AddDate(0, 0, 1).Weekday()
 	yesterday := date.AddDate(0, 0, -1).Weekday()
@@ -190,20 +74,20 @@ func (wp *WeeklyPlanner) determineCategory(date time.Time) Category {
 // exercisesPerWeek sums the exercise count across all scheduled days.
 //
 //nolint:unused // kept for future extensibility.
-func (wp *WeeklyPlanner) exercisesPerWeek() int {
+func (wp *Planner) exercisesPerWeek() int {
 	total := 0
 	for _, wd := range []time.Weekday{
 		time.Monday, time.Tuesday, time.Wednesday,
 		time.Thursday, time.Friday, time.Saturday, time.Sunday,
 	} {
-		total += wp.Prefs.ExercisesPerSession(wd)
+		total += exercisesPerSession(wp.Prefs, wd)
 	}
 	return total
 }
 
 // firstSessionPeriodizationType derives the periodization type for the first session of the
 // week deterministically from the start date and preferences — no DB query needed.
-func (wp *WeeklyPlanner) firstSessionPeriodizationType(startingDate time.Time) PeriodizationType {
+func (wp *Planner) firstSessionPeriodizationType(startingDate time.Time) PeriodizationType {
 	const secondsPerWeek = 7 * 24 * 3600
 	weeksSinceEpoch := startingDate.Unix() / secondsPerWeek
 	if weeksSinceEpoch%2 == 0 {
@@ -225,7 +109,7 @@ func isCategoryCompatible(exerciseCategory, dayCategory Category) bool {
 
 // hasCategoryExerciseForMuscleGroup reports whether the pool contains at least
 // one exercise compatible with dayCategory whose primary muscles include muscleGroup.
-func (wp *WeeklyPlanner) hasCategoryExerciseForMuscleGroup(dayCategory Category, muscleGroup string) bool {
+func (wp *Planner) hasCategoryExerciseForMuscleGroup(dayCategory Category, muscleGroup string) bool {
 	for _, ex := range wp.Exercises {
 		if !isCategoryCompatible(ex.Category, dayCategory) {
 			continue
@@ -240,7 +124,7 @@ func (wp *WeeklyPlanner) hasCategoryExerciseForMuscleGroup(dayCategory Category,
 // allocateMuscleGroups assigns each tracked muscle group to up to 2 workout days
 // using a most-constrained-first greedy algorithm. A muscle group is valid for a
 // day if at least one compatible exercise targets it as a primary muscle.
-func (wp *WeeklyPlanner) allocateMuscleGroups(
+func (wp *Planner) allocateMuscleGroups(
 	workoutDays []time.Time,
 	categories map[time.Time]Category,
 ) map[time.Time][]string {
@@ -253,11 +137,11 @@ func (wp *WeeklyPlanner) allocateMuscleGroups(
 	for i, target := range wp.Targets {
 		var valid []time.Time
 		for _, day := range workoutDays {
-			if wp.hasCategoryExerciseForMuscleGroup(categories[day], target.Name) {
+			if wp.hasCategoryExerciseForMuscleGroup(categories[day], target.MuscleGroupName) {
 				valid = append(valid, day)
 			}
 		}
-		entries[i] = mgEntry{name: target.Name, validDays: valid}
+		entries[i] = mgEntry{name: target.MuscleGroupName, validDays: valid}
 	}
 
 	// Sort ascending by number of valid days (most constrained first).
@@ -312,7 +196,6 @@ func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]b
 	return false
 }
 
-// selectExercisesForDay picks n exercises for a day via category-filtered, score-based
 // scoreExerciseForPriority scores an exercise by how many unsatisfied priority muscle groups it covers.
 func scoreExerciseForPriority(ex Exercise, priorityMuscleGroups []string, satisfied map[string]bool) int {
 	score := 0
@@ -326,7 +209,7 @@ func scoreExerciseForPriority(ex Exercise, priorityMuscleGroups []string, satisf
 
 // findBestExerciseInPool finds the highest-scoring exercise from the pool that doesn't conflict.
 // Returns the index in pool, or -1 if no suitable exercise found.
-func (wp *WeeklyPlanner) findBestExerciseInPool(
+func (wp *Planner) findBestExerciseInPool(
 	pool []Exercise,
 	priorityMuscleGroups []string,
 	selectedPrimaryMuscles map[string]bool,
@@ -360,14 +243,13 @@ func selectAndRemoveFromPool(pool *[]Exercise, idx int, selectedPrimaryMuscles m
 	return ex
 }
 
+// selectExercisesForDay picks n exercises for a day via category-filtered, score-based
 // greedy selection. Uses Strength periodization by default.
-//
-//nolint:unused // Tests migrated to internal/domain; file kept for Task 19 removal.
-func (wp *WeeklyPlanner) selectExercisesForDay(
+func (wp *Planner) selectExercisesForDay(
 	category Category,
 	priorityMuscleGroups []string,
 	n int,
-) []PlannedExerciseSet {
+) []ExerciseSet {
 	return wp.selectExercisesForDayWithPeriodization(
 		category,
 		priorityMuscleGroups,
@@ -377,13 +259,13 @@ func (wp *WeeklyPlanner) selectExercisesForDay(
 	)
 }
 
-func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
+func (wp *Planner) selectExercisesForDayWithPeriodization(
 	category Category,
 	priorityMuscleGroups []string,
 	n int,
 	pt PeriodizationType,
 	weekUsedExercises map[int]bool,
-) []PlannedExerciseSet {
+) []ExerciseSet {
 	// Filter exercise pool by category compatibility.
 	pool := make([]Exercise, 0, len(wp.Exercises))
 	for _, ex := range wp.Exercises {
@@ -419,63 +301,28 @@ func (wp *WeeklyPlanner) selectExercisesForDayWithPeriodization(
 		selected = append(selected, ex)
 	}
 
-	// Build PlannedExerciseSets. Time-based exercises use their own
+	// Build ExerciseSets. Time-based exercises use their own
 	// DefaultStartingSeconds with a fixed set count; rep-based exercises
-	// derive their full prescription from the per-exercise window via
-	// exerciseprogression.DeriveScheme.
-	result := make([]PlannedExerciseSet, len(selected))
+	// derive their full prescription from the per-exercise window via DeriveScheme.
+	result := make([]ExerciseSet, len(selected))
 	for i, ex := range selected {
 		result[i] = buildPlannedExerciseSet(ex, pt)
 	}
 	return result
 }
 
-// buildPlannedExerciseSet creates a PlannedExerciseSet for one exercise.
-// For time_based exercises, sets count is fixed at timeBasedSets and target
-// is DefaultStartingSeconds. For rep-based exercises, all three (reps, sets,
-// rest) come from DeriveScheme.
-func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType) PlannedExerciseSet {
-	if ex.ExerciseType == ExerciseTypeTime {
-		if ex.DefaultStartingSeconds == nil {
-			panic(fmt.Sprintf("time_based exercise %d missing DefaultStartingSeconds (fixture invariant violation)", ex.ID))
-		}
-		sets := make([]PlannedSet, timeBasedSets)
-		for j := range sets {
-			sets[j] = PlannedSet{TargetValue: *ex.DefaultStartingSeconds, RestSeconds: 0}
-		}
-		return PlannedExerciseSet{ExerciseID: ex.ID, Sets: sets}
-	}
-
-	if ex.RepMin == nil || ex.RepMax == nil {
-		panic(fmt.Sprintf("non-time_based exercise %d missing RepMin/RepMax (fixture invariant violation)", ex.ID))
-	}
-	scheme := exerciseprogression.DeriveScheme(*ex.RepMin, *ex.RepMax, toProgressionPeriodization(pt))
-	sets := make([]PlannedSet, scheme.TargetSets)
-	for j := range sets {
-		sets[j] = PlannedSet{TargetValue: scheme.TargetReps, RestSeconds: scheme.RestSeconds}
-	}
-	return PlannedExerciseSet{ExerciseID: ex.ID, Sets: sets}
-}
-
-// toProgressionPeriodization maps the planner's PeriodizationType enum to the
-// equivalent value in the exerciseprogression package. The two enums are kept
-// independent because the packages don't depend on each other; an explicit
-// switch (rather than a numeric cast) ensures any future divergence is caught
-// at the point of use rather than producing silently wrong derivations.
-func toProgressionPeriodization(pt PeriodizationType) exerciseprogression.PeriodizationType {
-	switch pt {
-	case PeriodizationStrength:
-		return exerciseprogression.Strength
-	case PeriodizationHypertrophy:
-		return exerciseprogression.Hypertrophy
-	default:
-		panic(fmt.Sprintf("weekplanner: unknown PeriodizationType %d", pt))
+// buildPlannedExerciseSet creates an ExerciseSet for one exercise using
+// BuildPlannedSets as the single source of truth for set prescription.
+func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType) ExerciseSet {
+	return ExerciseSet{ //nolint:exhaustruct // ID auto-assigned at insert; WarmupCompletedAt nil.
+		Exercise: ex,
+		Sets:     BuildPlannedSets(ex, pt),
 	}
 }
 
 // hasExercisesForCategory reports whether the exercise pool contains at least one
 // exercise compatible with the given day category.
-func (wp *WeeklyPlanner) hasExercisesForCategory(category Category) bool {
+func (wp *Planner) hasExercisesForCategory(category Category) bool {
 	for _, ex := range wp.Exercises {
 		if isCategoryCompatible(ex.Category, category) {
 			return true
@@ -484,10 +331,22 @@ func (wp *WeeklyPlanner) hasExercisesForCategory(category Category) bool {
 	return false
 }
 
-// Plan generates one PlannedSession per scheduled workout day for the week beginning on
+// nextPeriodizationType cycles between PeriodizationStrength and PeriodizationHypertrophy.
+// It uses index-based alternation: even indices get the first type, odd indices get the second.
+func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
+	if idx%numPeriodizationTypes == 0 {
+		return first
+	}
+	if first == PeriodizationStrength {
+		return PeriodizationHypertrophy
+	}
+	return PeriodizationStrength
+}
+
+// Plan generates one Session per scheduled workout day for the week beginning on
 // startingDate. Returns an error if startingDate is not a Monday, if no workout days are
 // scheduled, or if a scheduled day has no compatible exercises.
-func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) {
+func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 	if startingDate.Weekday() != time.Monday {
 		return nil, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
 	}
@@ -522,10 +381,10 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 
 	// Phase 3: select exercises and build sessions.
 	weekUsedExercises := make(map[int]bool)
-	sessions := make([]PlannedSession, len(workoutDays))
+	sessions := make([]Session, len(workoutDays))
 	for i, day := range workoutDays {
-		pt := PeriodizationType((int(firstPT) + i) % numPeriodizationTypes)
-		n := wp.Prefs.ExercisesPerSession(day.Weekday())
+		pt := nextPeriodizationType(firstPT, i)
+		n := exercisesPerSession(wp.Prefs, day.Weekday())
 		exerciseSets := wp.selectExercisesForDayWithPeriodization(
 			categories[day],
 			dayMuscleGroups[day],
@@ -536,12 +395,11 @@ func (wp *WeeklyPlanner) Plan(startingDate time.Time) ([]PlannedSession, error) 
 
 		// Record which exercises were used this week.
 		for _, es := range exerciseSets {
-			weekUsedExercises[es.ExerciseID] = true
+			weekUsedExercises[es.Exercise.ID] = true
 		}
 
-		sessions[i] = PlannedSession{
+		sessions[i] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
 			Date:              day,
-			Category:          categories[day],
 			PeriodizationType: pt,
 			ExerciseSets:      exerciseSets,
 		}
