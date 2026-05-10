@@ -2,6 +2,7 @@ package workout
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -35,7 +36,7 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (Preferences, err
 		&prefs.FridayMinutes, &prefs.SaturdayMinutes, &prefs.SundayMinutes,
 	)
 
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		// If no preferences are found, return default preferences (all rest days)
 		return Preferences{
 			MondayMinutes:    0,

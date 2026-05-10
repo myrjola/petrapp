@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
@@ -188,5 +189,6 @@ func (f *repositoryFactory) newRepository() *repository {
 	}
 }
 
-// ErrNotFound is a sentinel error for when a record is not found.
-var ErrNotFound = sql.ErrNoRows
+// ErrNotFound aliases the canonical domain sentinel for backward
+// compatibility — handlers and tests still import workout.ErrNotFound.
+var ErrNotFound = domain.ErrNotFound

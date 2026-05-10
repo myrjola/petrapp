@@ -2,6 +2,7 @@ package workout
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -30,7 +31,7 @@ func (r *sqliteFeatureFlagRepository) Get(ctx context.Context, name string) (Fea
 		FROM feature_flags 
 		WHERE name = ?`, name).Scan(&flag.Name, &enabled)
 
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return FeatureFlag{}, ErrNotFound
 	}
 
