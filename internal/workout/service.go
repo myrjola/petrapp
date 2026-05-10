@@ -203,7 +203,7 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		for j, pes := range ps.ExerciseSets {
 			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
 				ExerciseID: pes.ExerciseID,
-				Sets:       buildPlannedSets(exerciseByID[pes.ExerciseID], periodType),
+				Sets:       domain.BuildPlannedSets(exerciseByID[pes.ExerciseID], periodType),
 			}
 		}
 
@@ -1007,33 +1007,6 @@ func (s *Service) copySetsWithoutCompletion(sets []Set) []Set {
 	return result
 }
 
-// defaultTimedSets is the fixed set count for time-based exercises, matching the
-// planner's timeBasedSets constant in weekplanner.
-const defaultTimedSets = 3
-
-// deriveSchemeForExercise returns the per-set target reps and total set count
-// for an exercise within a session of the given periodization. For time-based
-// exercises, uses DefaultStartingSeconds and a fixed set count of defaultTimedSets
-// (mirrors the planner's timeBasedSets). For rep-based exercises, returns
-// DeriveScheme values.
-func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
-	if ex.IsTimed() {
-		if ex.DefaultStartingSeconds != nil {
-			return *ex.DefaultStartingSeconds, defaultTimedSets
-		}
-		// Defensive: time_based exercises must have DefaultStartingSeconds per the
-		// schema CHECK, but fall back gracefully rather than panicking.
-		return defaultTargetValue, defaultTimedSets
-	}
-	if ex.RepMin == nil || ex.RepMax == nil {
-		// Defensive: non-time_based exercises must have rep_min/rep_max per the
-		// schema CHECK; fall back to old defaults if a fixture invariant is violated.
-		return defaultTargetValue, defaultTimedSets
-	}
-	scheme := domain.DeriveScheme(*ex.RepMin, *ex.RepMax, pt)
-	return scheme.TargetReps, scheme.TargetSets
-}
-
 // buildSetsForAdd produces the Set slice for an exercise being added to or
 // swapping into an existing session. The session's periodization always
 // dictates TargetValue and TargetSets (so a Deadlift added in a Strength
@@ -1044,7 +1017,7 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 // the user's progression isn't lost just because the prescription changed.
 // Completion fields are always reset.
 func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalSets []Set) []Set {
-	sets := buildPlannedSets(ex, pt)
+	sets := domain.BuildPlannedSets(ex, pt)
 	// Allocate empty weight pointers for weighted/assisted exercises. The
 	// form input on the per-set page binds to *float64; nil would render
 	// as "no weight" instead of an empty editable input. Bodyweight and
@@ -1127,9 +1100,6 @@ func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) (
 
 	return otherExercises, nil
 }
-
-// defaultTargetValue is the fallback target value (reps) when no history is available.
-const defaultTargetValue = 8
 
 // AddExercise adds a new exercise to an existing workout session.
 // It will retrieve historical weight data if available. Returns the
