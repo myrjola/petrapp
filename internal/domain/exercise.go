@@ -6,6 +6,11 @@
 // (repository, service, handlers) build on top of these types.
 package domain
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // Category is the workout focus for a session — the muscle-group split a day
 // targets.
 type Category string
@@ -30,4 +35,41 @@ const (
 type Resource struct {
 	Title string `json:"title"`
 	URL   string `json:"url"`
+}
+
+// Exercise represents a single exercise type, e.g. Squat, Bench Press, etc.
+type Exercise struct {
+	ID                     int          `json:"id"`
+	Name                   string       `json:"name"`
+	Category               Category     `json:"category"`
+	ExerciseType           ExerciseType `json:"exercise_type"`
+	DescriptionMarkdown    string       `json:"description_markdown"`
+	PrimaryMuscleGroups    []string     `json:"primary_muscle_groups"`
+	SecondaryMuscleGroups  []string     `json:"secondary_muscle_groups"`
+	DefaultStartingSeconds *int         `json:"default_starting_seconds,omitempty"`
+	RepMin                 *int         `json:"rep_min,omitempty"`
+	RepMax                 *int         `json:"rep_max,omitempty"`
+}
+
+// IsTimed returns true if this exercise uses duration targets instead of rep counts.
+func (e Exercise) IsTimed() bool { return e.ExerciseType == ExerciseTypeTime }
+
+// FormatSetValue returns the user-visible string for a set's target or
+// completed value. Reps render as "%d"; seconds render as "%ds". The unit
+// choice is driven by ExerciseType — display layers must call this rather
+// than reconstruct the formatting from periodization or any other field.
+func (e Exercise) FormatSetValue(value int) string {
+	if e.IsTimed() {
+		return fmt.Sprintf("%ds", value)
+	}
+	return strconv.Itoa(value)
+}
+
+// SetValueUnit returns the input-label unit for a set value: "reps" or
+// "seconds". Used by handlers when rendering input form labels.
+func (e Exercise) SetValueUnit() string {
+	if e.IsTimed() {
+		return "seconds"
+	}
+	return "reps"
 }

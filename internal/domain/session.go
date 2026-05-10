@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // PeriodizationType is the rep-target style for a session. The two values
 // alternate week-to-week (see Planner.firstSessionPeriodizationType) and
 // determine the rep target via DeriveScheme.
@@ -9,3 +11,35 @@ const (
 	PeriodizationStrength    PeriodizationType = "strength"
 	PeriodizationHypertrophy PeriodizationType = "hypertrophy"
 )
+
+// ExerciseSet groups all sets for a specific exercise in a workout.
+type ExerciseSet struct {
+	// ID is the stable identifier of this exercise slot within the workout. It survives
+	// swapping the exercise to a different one, which is what keeps URLs stable.
+	ID                int
+	Exercise          Exercise
+	Sets              []Set
+	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
+}
+
+// ExerciseProgressEntry represents the sets performed for an exercise on a specific date.
+type ExerciseProgressEntry struct {
+	Date time.Time
+	Sets []Set
+}
+
+// ExerciseProgress represents an exercise with its historical performance data across sessions.
+type ExerciseProgress struct {
+	Exercise Exercise
+	Entries  []ExerciseProgressEntry
+}
+
+// Session represents a complete workout session including all exercises and their sets.
+type Session struct {
+	Date              time.Time
+	DifficultyRating  *int
+	StartedAt         time.Time
+	CompletedAt       time.Time
+	ExerciseSets      []ExerciseSet
+	PeriodizationType PeriodizationType
+}

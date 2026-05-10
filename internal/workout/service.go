@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/exerciseprogression"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/weekplanner"
@@ -804,14 +805,6 @@ func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
 	return groups, nil
 }
 
-// PrimarySetWeight and SecondarySetWeight are the per-set contributions to a
-// muscle group's weekly load. The split reflects that secondary engagement
-// receives meaningfully less stimulus than primary engagement.
-const (
-	PrimarySetWeight   = 1.0
-	SecondarySetWeight = 0.5
-)
-
 // WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly load per muscle
 // group across the supplied sessions. One entry is returned for every known
 // muscle group, sorted alphabetically; groups with no contributions appear as
@@ -859,8 +852,8 @@ func (s *Service) WeeklyMuscleGroupVolume(
 
 // aggregateMuscleGroupLoad walks every set in the supplied sessions and totals the
 // weighted load for each muscle group, accumulating into the planned and completed
-// maps. Primary contributions count as PrimarySetWeight, secondary as
-// SecondarySetWeight. Muscle group names not present in known are silently skipped
+// maps. Primary contributions count as domain.PrimarySetWeight, secondary as
+// domain.SecondarySetWeight. Muscle group names not present in known are silently skipped
 // — they cannot occur in production due to FK constraints, but the guard keeps
 // tests safe when synthetic exercises reference unknown groups.
 func aggregateMuscleGroupLoad(
@@ -872,8 +865,8 @@ func aggregateMuscleGroupLoad(
 		for _, ex := range sess.ExerciseSets {
 			for _, set := range ex.Sets {
 				done := set.CompletedAt != nil
-				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetWeight, done, known, planned, completed)
-				creditMuscleGroups(ex.Exercise.SecondaryMuscleGroups, SecondarySetWeight, done, known, planned, completed)
+				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, domain.PrimarySetWeight, done, known, planned, completed)
+				creditMuscleGroups(ex.Exercise.SecondaryMuscleGroups, domain.SecondarySetWeight, done, known, planned, completed)
 			}
 		}
 	}
