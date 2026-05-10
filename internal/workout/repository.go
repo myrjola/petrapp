@@ -52,13 +52,8 @@ type datedExerciseSetAggregate struct {
 	exerciseSetAggregate
 }
 
-// LatestStartingSet captures the weight of the most recent completed first set
-// for an exercise along with the periodization type of the session it came from.
-// PeriodizationType is empty when no history exists.
-type LatestStartingSet struct {
-	WeightKg          float64
-	PeriodizationType PeriodizationType
-}
+// LatestStartingSet aliases the canonical domain type.
+type LatestStartingSet = domain.LatestStartingSet
 
 // sessionRepository handles workout sessions.
 type sessionRepository interface {
