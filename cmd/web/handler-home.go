@@ -239,15 +239,9 @@ func calculateWorkoutAction(status string, isToday bool) *workoutAction {
 			Label:        "Start Workout",
 		}
 	case statusInProgress:
-		if isToday {
-			return &workoutAction{
-				StartWorkout: false,
-				Label:        "Continue Workout",
-			}
-		}
 		return &workoutAction{
 			StartWorkout: false,
-			Label:        "Complete Workout",
+			Label:        "Continue Workout",
 		}
 	case statusCompleted:
 		if isToday {
