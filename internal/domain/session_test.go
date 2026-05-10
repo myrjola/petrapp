@@ -69,3 +69,28 @@ func Test_Session_Complete_NotStarted_ReturnsErrNotStarted(t *testing.T) {
 		t.Errorf("CompletedAt = %v, want zero", sess.CompletedAt)
 	}
 }
+
+func Test_Session_SetDifficulty_ValidRange(t *testing.T) {
+	for _, rating := range []int{1, 2, 3, 4, 5} {
+		sess := domain.Session{} //nolint:exhaustruct
+		if err := sess.SetDifficulty(rating); err != nil {
+			t.Errorf("SetDifficulty(%d): %v", rating, err)
+		}
+		if sess.DifficultyRating == nil || *sess.DifficultyRating != rating {
+			t.Errorf("DifficultyRating = %v, want %d", sess.DifficultyRating, rating)
+		}
+	}
+}
+
+func Test_Session_SetDifficulty_OutOfRange(t *testing.T) {
+	for _, rating := range []int{0, -1, 6, 100} {
+		sess := domain.Session{} //nolint:exhaustruct
+		err := sess.SetDifficulty(rating)
+		if !errors.Is(err, domain.ErrInvalidDifficultyRating) {
+			t.Errorf("SetDifficulty(%d): got %v, want ErrInvalidDifficultyRating", rating, err)
+		}
+		if sess.DifficultyRating != nil {
+			t.Errorf("DifficultyRating mutated to %v, want nil", sess.DifficultyRating)
+		}
+	}
+}

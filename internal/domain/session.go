@@ -64,3 +64,13 @@ func (s *Session) Complete(now time.Time) error {
 	s.CompletedAt = now
 	return nil
 }
+
+// SetDifficulty records the post-session difficulty rating (1-5). Returns
+// ErrInvalidDifficultyRating when rating is outside that range.
+func (s *Session) SetDifficulty(rating int) error {
+	if rating < 1 || rating > 5 {
+		return ErrInvalidDifficultyRating
+	}
+	s.DifficultyRating = &rating
+	return nil
+}
