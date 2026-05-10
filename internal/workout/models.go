@@ -3,6 +3,7 @@ package workout
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -58,6 +59,26 @@ type Exercise struct {
 
 // IsTimed returns true if this exercise uses duration targets instead of rep counts.
 func (e Exercise) IsTimed() bool { return e.ExerciseType == ExerciseTypeTime }
+
+// FormatSetValue returns the user-visible string for a set's target or
+// completed value. Reps render as "%d"; seconds render as "%ds". The unit
+// choice is driven by ExerciseType — display layers must call this rather
+// than reconstruct the formatting from periodization or any other field.
+func (e Exercise) FormatSetValue(value int) string {
+	if e.IsTimed() {
+		return fmt.Sprintf("%ds", value)
+	}
+	return strconv.Itoa(value)
+}
+
+// SetValueUnit returns the input-label unit for a set value: "reps" or
+// "seconds". Used by handlers when rendering input form labels.
+func (e Exercise) SetValueUnit() string {
+	if e.IsTimed() {
+		return "seconds"
+	}
+	return "reps"
+}
 
 // Resource represents a learning resource for an exercise.
 type Resource struct {
