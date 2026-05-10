@@ -558,7 +558,6 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = swapLink.Click(); err != nil {
 		t.Fatalf("click swap link: %v", err)
 	}
-	swapURL := page.URL()
 	// Pick a different exercise on the swap page. Each alternative exercise has
 	// a "Swap to this exercise" submit button.
 	swapBtn := page.GetByRole("button",
@@ -566,6 +565,12 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = swapBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for swap button: %v", err)
 	}
+	// Capture swapURL only after the swap-only button is visible. Capturing
+	// before this wait can return the pre-click DETAIL URL — and since swap
+	// redirects back to the same slot URL, the post-submit "url != swapURL"
+	// predicate below would never match (the new detail URL equals the stale
+	// capture) and the test would time out.
+	swapURL := page.URL()
 	if err = swapBtn.Click(); err != nil {
 		t.Fatalf("click swap button: %v", err)
 	}
