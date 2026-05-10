@@ -741,78 +741,11 @@ func (s *Service) WeeklyMuscleGroupVolume(
 	if err != nil {
 		return nil, fmt.Errorf("list muscle groups: %w", err)
 	}
-
 	targets, err := s.repo.muscleTargets.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list muscle group targets: %w", err)
 	}
-	targetByName := make(map[string]int, len(targets))
-	for _, t := range targets {
-		targetByName[t.MuscleGroupName] = t.WeeklySetTarget
-	}
-
-	known := make(map[string]struct{}, len(groupNames))
-	for _, name := range groupNames {
-		known[name] = struct{}{}
-	}
-
-	planned := make(map[string]float64, len(groupNames))
-	completed := make(map[string]float64, len(groupNames))
-	aggregateMuscleGroupLoad(sessions, known, planned, completed)
-
-	result := make([]MuscleGroupVolume, 0, len(groupNames))
-	for _, name := range groupNames {
-		result = append(result, MuscleGroupVolume{
-			Name:          name,
-			CompletedLoad: completed[name],
-			PlannedLoad:   planned[name],
-			TargetSets:    targetByName[name],
-		})
-	}
-	// ListMuscleGroups orders by name, so result is already alphabetical.
-	return result, nil
-}
-
-// aggregateMuscleGroupLoad walks every set in the supplied sessions and totals the
-// weighted load for each muscle group, accumulating into the planned and completed
-// maps. Primary contributions count as domain.PrimarySetWeight, secondary as
-// domain.SecondarySetWeight. Muscle group names not present in known are silently skipped
-// — they cannot occur in production due to FK constraints, but the guard keeps
-// tests safe when synthetic exercises reference unknown groups.
-func aggregateMuscleGroupLoad(
-	sessions []Session,
-	known map[string]struct{},
-	planned, completed map[string]float64,
-) {
-	for _, sess := range sessions {
-		for _, ex := range sess.ExerciseSets {
-			for _, set := range ex.Sets {
-				done := set.CompletedAt != nil
-				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, domain.PrimarySetWeight, done, known, planned, completed)
-				creditMuscleGroups(ex.Exercise.SecondaryMuscleGroups, domain.SecondarySetWeight, done, known, planned, completed)
-			}
-		}
-	}
-}
-
-// creditMuscleGroups credits weight to each muscle group in names, both to planned
-// and (when done) to completed. Groups missing from known are ignored.
-func creditMuscleGroups(
-	names []string,
-	weight float64,
-	done bool,
-	known map[string]struct{},
-	planned, completed map[string]float64,
-) {
-	for _, mg := range names {
-		if _, ok := known[mg]; !ok {
-			continue
-		}
-		planned[mg] += weight
-		if done {
-			completed[mg] += weight
-		}
-	}
+	return domain.WeeklyMuscleGroupVolume(sessions, targets, groupNames), nil
 }
 
 // GenerateExercise generates a new exercise based on a name.
