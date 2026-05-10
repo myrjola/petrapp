@@ -5,8 +5,11 @@
 package service
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
@@ -29,4 +32,21 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 		logger:       logger,
 		openaiAPIKey: openaiAPIKey,
 	}
+}
+
+// GetUserPreferences retrieves the workout preferences for a user.
+func (s *Service) GetUserPreferences(ctx context.Context) (domain.Preferences, error) {
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return domain.Preferences{}, fmt.Errorf("get user preferences: %w", err)
+	}
+	return prefs, nil
+}
+
+// SaveUserPreferences saves the workout preferences for a user.
+func (s *Service) SaveUserPreferences(ctx context.Context, prefs domain.Preferences) error {
+	if err := s.repos.Preferences.Set(ctx, prefs); err != nil {
+		return fmt.Errorf("save user preferences: %w", err)
+	}
+	return nil
 }
