@@ -37,14 +37,14 @@ type exerciseEditTemplateData struct {
 // adminExercisesGET handles GET requests to the exercise admin page.
 func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request) {
 	// Get all exercises from the workout service
-	exercises, err := app.workoutService.List(r.Context())
+	exercises, err := app.service.List(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
 	// Get all muscle groups
-	muscleGroups, err := app.workoutService.ListMuscleGroups(r.Context())
+	muscleGroups, err := app.service.ListMuscleGroups(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -70,14 +70,14 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Get exercise from workout service
-	exercise, err := app.workoutService.GetExercise(r.Context(), id)
+	exercise, err := app.service.GetExercise(r.Context(), id)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
 	// Get all muscle groups
-	muscleGroups, err := app.workoutService.ListMuscleGroups(r.Context())
+	muscleGroups, err := app.service.ListMuscleGroups(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -208,7 +208,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	}
 
 	// Update exercise
-	if err = app.workoutService.UpdateExercise(r.Context(), exercise); err != nil {
+	if err = app.service.UpdateExercise(r.Context(), exercise); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -238,7 +238,7 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 	}
 
 	// Generate the exercise.
-	exercise, err := app.workoutService.GenerateExercise(r.Context(), name)
+	exercise, err := app.service.GenerateExercise(r.Context(), name)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -258,7 +258,7 @@ func (app *application) preserveRepWindow(
 	if exerciseType == domain.ExerciseTypeTime {
 		return nil, nil, nil
 	}
-	existing, err := app.workoutService.GetExercise(ctx, id)
+	existing, err := app.service.GetExercise(ctx, id)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get exercise for rep window: %w", err)
 	}

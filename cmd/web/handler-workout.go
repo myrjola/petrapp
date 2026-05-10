@@ -72,7 +72,7 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// First mark the workout as completed
-	if err := app.workoutService.CompleteSession(r.Context(), date); err != nil {
+	if err := app.service.CompleteSession(r.Context(), date); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -89,7 +89,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Start the workout session
-	if err := app.workoutService.StartSession(r.Context(), date); err != nil {
+	if err := app.service.StartSession(r.Context(), date); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			data := workoutNotFoundTemplateData{
 				BaseTemplateData: newBaseTemplateData(r),
@@ -114,7 +114,7 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch a workout session for the date
-	session, err := app.workoutService.GetSession(r.Context(), date)
+	session, err := app.service.GetSession(r.Context(), date)
 	if err != nil {
 		// Check if the workout doesn't exist
 		if errors.Is(err, domain.ErrNotFound) {
@@ -154,7 +154,7 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Save the feedback
-	if err = app.workoutService.SaveFeedback(r.Context(), date, difficulty); err != nil {
+	if err = app.service.SaveFeedback(r.Context(), date, difficulty); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -177,7 +177,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	session, err := app.workoutService.GetSession(r.Context(), date)
+	session, err := app.service.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -196,7 +196,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		existingExerciseIDs[exerciseSet.Exercise.ID] = true
 	}
 
-	allExercises, err := app.workoutService.List(r.Context())
+	allExercises, err := app.service.List(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -265,7 +265,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err = app.workoutService.SwapExercise(r.Context(), date, workoutExerciseID, newExerciseID); err != nil {
+	if err = app.service.SwapExercise(r.Context(), date, workoutExerciseID, newExerciseID); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
@@ -303,7 +303,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
 	// Get the current workout session to see which exercises are already included
-	session, err := app.workoutService.GetSession(r.Context(), date)
+	session, err := app.service.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -316,7 +316,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get all exercises
-	allExercises, err := app.workoutService.List(r.Context())
+	allExercises, err := app.service.List(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -375,7 +375,7 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 
 	// Add exercise to the workout and capture the new slot ID so we can
 	// land the user straight on the new exercise's detail page.
-	newWorkoutExerciseID, err := app.workoutService.AddExercise(r.Context(), date, exerciseID)
+	newWorkoutExerciseID, err := app.service.AddExercise(r.Context(), date, exerciseID)
 	if err != nil {
 		app.serverError(w, r, err)
 		return

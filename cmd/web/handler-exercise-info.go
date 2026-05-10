@@ -43,7 +43,7 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Resolve the slot to its current exercise via the workout session.
-	session, err := app.workoutService.GetSession(r.Context(), date)
+	session, err := app.service.GetSession(r.Context(), date)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			app.notFound(w, r)
@@ -139,7 +139,7 @@ func (app *application) generateExerciseProgressData(
 	ctx context.Context, currentDate time.Time, exercise domain.Exercise) ([]ExerciseProgressDataPoint, error) {
 	// Get historical data for the past 5 years.
 	fiveYearsAgo := currentDate.AddDate(-5, 0, 0)
-	progress, err := app.workoutService.GetExerciseSetsForExerciseSince(ctx, exercise.ID, fiveYearsAgo)
+	progress, err := app.service.GetExerciseSetsForExerciseSince(ctx, exercise.ID, fiveYearsAgo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get exercise sets: %w", err)
 	}

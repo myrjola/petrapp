@@ -27,7 +27,7 @@ type application struct {
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
-	workoutService  *service.Service
+	service         *service.Service
 	flightRecorder  *flightrecorder.Service
 	// devMode is true when running outside the Fly.io production deployment.
 	// It enables developer-only routes like /dev/styleguide.
@@ -128,7 +128,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
-		workoutService:  service.NewService(db, logger, cfg.OpenAIAPIKey),
+		service:         service.NewService(db, logger, cfg.OpenAIAPIKey),
 		flightRecorder:  flightRecorderService,
 		devMode:         cfg.FlyAppName == "",
 	}

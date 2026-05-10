@@ -174,8 +174,8 @@ if doc.Find("h1:contains('Add Exercise')").Length() == 0 {
 
 ### Calling Service Methods
 
-- All business logic goes through service layer (`app.workoutService`, etc.)
-- Pass request context to service methods: `app.workoutService.Method(r.Context(), params)`
+- All business logic goes through service layer (`app.service`, etc.)
+- Pass request context to service methods: `app.service.Method(r.Context(), params)`
 - Handle service errors appropriately (business errors vs system errors)
 - Don't implement business logic in handlers - delegate to services
 

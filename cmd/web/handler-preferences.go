@@ -85,7 +85,7 @@ func weekdaysToPreferences(r *http.Request) domain.Preferences {
 
 func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	prefs, err := app.workoutService.GetUserPreferences(ctx)
+	prefs, err := app.service.GetUserPreferences(ctx)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
@@ -109,13 +109,13 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 
 	prefs := weekdaysToPreferences(r)
 
-	if err := app.workoutService.SaveUserPreferences(r.Context(), prefs); err != nil {
+	if err := app.service.SaveUserPreferences(r.Context(), prefs); err != nil {
 		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))
 		app.logger.LogAttrs(r.Context(), slog.LevelDebug, "preferences details", slog.Any("preferences", prefs))
 		return
 	}
 
-	if err := app.workoutService.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
+	if err := app.service.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
 		// Preferences are already saved; regeneration failure is not fatal because
 		// ResolveWeeklySchedule on the home page will regenerate the plan automatically.
 		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "regenerate weekly plan after preference save",
@@ -154,7 +154,7 @@ func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 
 	// Create the user database export
-	exportPath, err := app.workoutService.ExportUserData(ctx)
+	exportPath, err := app.service.ExportUserData(ctx)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("export user data: %w", err))
 		return

@@ -101,7 +101,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get workout session
-	session, err := app.workoutService.GetSession(r.Context(), date)
+	session, err := app.service.GetSession(r.Context(), date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -117,14 +117,14 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	var currentSetTimedTarget int
 	switch exerciseSet.Exercise.ExerciseType {
 	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
-		progression, progressionErr := app.workoutService.BuildProgression(r.Context(), date, exerciseSet.Exercise.ID)
+		progression, progressionErr := app.service.BuildProgression(r.Context(), date, exerciseSet.Exercise.ID)
 		if progressionErr != nil {
 			app.serverError(w, r, progressionErr)
 			return
 		}
 		currentSetTarget = progression.CurrentSet()
 	case domain.ExerciseTypeTime:
-		progression, progressionErr := app.workoutService.BuildTimedProgression(r.Context(), date, exerciseSet.Exercise.ID)
+		progression, progressionErr := app.service.BuildTimedProgression(r.Context(), date, exerciseSet.Exercise.ID)
 		if progressionErr != nil {
 			app.serverError(w, r, progressionErr)
 			return
@@ -221,7 +221,7 @@ func (app *application) recordSetCompletionWithWeight(
 		return false
 	}
 
-	err = app.workoutService.RecordSet(
+	err = app.service.RecordSet(
 		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, &weight, reps)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("record set completion: %w", err))
@@ -254,7 +254,7 @@ func (app *application) recordBodyweightSetCompletion(
 		app.serverError(w, r, fmt.Errorf("parse completed_value: %w", err))
 		return false
 	}
-	if err = app.workoutService.UpdateCompletedValue(
+	if err = app.service.UpdateCompletedValue(
 		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, completedValue); err != nil {
 		app.serverError(w, r, fmt.Errorf("update completed value: %w", err))
 		return false
@@ -281,7 +281,7 @@ func (app *application) recordTimedSetCompletion(
 
 	signal := domain.Signal(r.PostForm.Get("signal"))
 
-	if err = app.workoutService.RecordSet(
+	if err = app.service.RecordSet(
 		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, nil, completedSeconds); err != nil {
 		app.serverError(w, r, fmt.Errorf("record timed set completion: %w", err))
 		return false
@@ -309,7 +309,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	session, err := app.workoutService.GetSession(r.Context(), params.Date)
+	session, err := app.service.GetSession(r.Context(), params.Date)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -352,7 +352,7 @@ func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *
 		return
 	}
 
-	if err := app.workoutService.MarkWarmupComplete(r.Context(), date, workoutExerciseID); err != nil {
+	if err := app.service.MarkWarmupComplete(r.Context(), date, workoutExerciseID); err != nil {
 		app.serverError(w, r, fmt.Errorf("mark warmup complete: %w", err))
 		return
 	}

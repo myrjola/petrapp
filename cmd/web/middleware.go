@@ -269,8 +269,8 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check if maintenance mode is enabled (skip if workoutService is nil for tests)
-		if app.workoutService != nil && app.workoutService.IsMaintenanceModeEnabled(ctx) {
+		// Check if maintenance mode is enabled (skip if service is nil for tests)
+		if app.service != nil && app.service.IsMaintenanceModeEnabled(ctx) {
 			// Allow admin access during maintenance.
 			isAdmin := contexthelpers.IsAdmin(r.Context())
 			if isAdmin {

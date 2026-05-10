@@ -16,7 +16,7 @@ type featureFlagsAdminTemplateData struct {
 // adminFeatureFlagsGET handles GET requests to the feature flags admin page.
 func (app *application) adminFeatureFlagsGET(w http.ResponseWriter, r *http.Request) {
 	// Get all feature flags from the workout service
-	flags, err := app.workoutService.ListFeatureFlags(r.Context())
+	flags, err := app.service.ListFeatureFlags(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -40,7 +40,7 @@ func (app *application) adminFeatureFlagTogglePOST(w http.ResponseWriter, r *htt
 	}
 
 	// Get current flag state
-	flag, err := app.workoutService.GetFeatureFlag(r.Context(), name)
+	flag, err := app.service.GetFeatureFlag(r.Context(), name)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -50,7 +50,7 @@ func (app *application) adminFeatureFlagTogglePOST(w http.ResponseWriter, r *htt
 	flag.Enabled = !flag.Enabled
 
 	// Update the flag
-	if err = app.workoutService.SetFeatureFlag(r.Context(), flag); err != nil {
+	if err = app.service.SetFeatureFlag(r.Context(), flag); err != nil {
 		app.serverError(w, r, err)
 		return
 	}

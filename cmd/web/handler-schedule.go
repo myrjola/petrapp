@@ -14,7 +14,7 @@ type scheduleTemplateData struct {
 
 func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	prefs, err := app.workoutService.GetUserPreferences(ctx)
+	prefs, err := app.service.GetUserPreferences(ctx)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
@@ -45,7 +45,7 @@ func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.workoutService.SaveUserPreferences(r.Context(), prefs); err != nil {
+	if err := app.service.SaveUserPreferences(r.Context(), prefs); err != nil {
 		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))
 		return
 	}

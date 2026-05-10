@@ -391,7 +391,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 
 	// Only fetch workout data for authenticated users
 	if data.Authenticated {
-		preferences, err := app.workoutService.GetUserPreferences(r.Context())
+		preferences, err := app.service.GetUserPreferences(r.Context())
 		if err != nil {
 			app.serverError(w, r, err)
 			return
@@ -402,13 +402,13 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		sessions, err := app.workoutService.ResolveWeeklySchedule(r.Context())
+		sessions, err := app.service.ResolveWeeklySchedule(r.Context())
 		if err != nil {
 			app.serverError(w, r, err)
 			return
 		}
 
-		volumes, err := app.workoutService.WeeklyMuscleGroupVolume(r.Context(), sessions)
+		volumes, err := app.service.WeeklyMuscleGroupVolume(r.Context(), sessions)
 		if err != nil {
 			app.serverError(w, r, err)
 			return
