@@ -76,8 +76,8 @@ dev:
 	@go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
 	@bash scripts/dev.sh
 
-.PHONY: dev-tailscale-https
-dev-tailscale-https: build  ## Build and run with Tailscale HTTPS (for iOS WebAuthn).
+.PHONY: dev-tailnet
+dev-tailnet: build  ## Build and run with Tailscale HTTPS (for iOS WebAuthn).
 	@bash scripts/dev-tailscale-https.sh
 
 .PHONY: build-docker
