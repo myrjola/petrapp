@@ -10,12 +10,13 @@ import (
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	repo "github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // Service handles the business logic for workout management.
 type Service struct {
-	repo         *repository
+	repos        *repo.Repositories
 	db           *sqlite.Database
 	logger       *slog.Logger
 	openaiAPIKey string
@@ -23,9 +24,8 @@ type Service struct {
 
 // NewService creates a new workout service.
 func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
-	factory := newRepositoryFactory(db, logger)
 	return &Service{
-		repo:         factory.newRepository(),
+		repos:        repo.New(db, logger),
 		db:           db,
 		logger:       logger,
 		openaiAPIKey: openaiAPIKey,
@@ -34,7 +34,7 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 
 // GetUserPreferences retrieves the workout preferences for a user.
 func (s *Service) GetUserPreferences(ctx context.Context) (Preferences, error) {
-	prefs, err := s.repo.prefs.Get(ctx)
+	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
 		return Preferences{}, fmt.Errorf("get user preferences: %w", err)
 	}
@@ -43,7 +43,7 @@ func (s *Service) GetUserPreferences(ctx context.Context) (Preferences, error) {
 
 // SaveUserPreferences saves the workout preferences for a user.
 func (s *Service) SaveUserPreferences(ctx context.Context, prefs Preferences) error {
-	if err := s.repo.prefs.Set(ctx, prefs); err != nil {
+	if err := s.repos.Preferences.Set(ctx, prefs); err != nil {
 		return fmt.Errorf("save user preferences: %w", err)
 	}
 	return nil
@@ -61,7 +61,7 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 	monday := mondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6)
 
-	existing, err := s.repo.sessions.List(ctx, monday)
+	existing, err := s.repos.Sessions.List(ctx, monday)
 	if err != nil {
 		return fmt.Errorf("list sessions for week: %w", err)
 	}
@@ -74,7 +74,7 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 		}
 	}
 
-	if err = s.repo.sessions.DeleteWeek(ctx, monday); err != nil {
+	if err = s.repos.Sessions.DeleteWeek(ctx, monday); err != nil {
 		return fmt.Errorf("delete current week: %w", err)
 	}
 	if err = s.generateWeeklyPlan(ctx, monday); err != nil {
@@ -90,8 +90,7 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 	monday := mondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6)
 
-	// Check for existing sessions this week.
-	existing, err := s.repo.sessions.List(ctx, monday)
+	existing, err := s.repos.Sessions.List(ctx, monday)
 	if err != nil {
 		return nil, fmt.Errorf("list sessions for week: %w", err)
 	}
@@ -108,24 +107,20 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 		}
 	}
 
-	// Build 7-day schedule: sessions from DB for scheduled days, empty for rest days.
 	workouts := make([]Session, 7)
 	for i := range 7 {
 		day := monday.AddDate(0, 0, i)
-		sessionAggr, getErr := s.repo.sessions.Get(ctx, day)
-		if getErr != nil && !errors.Is(getErr, ErrNotFound) {
-			return nil, fmt.Errorf("get session %s: %w", formatDate(day), getErr)
+		sess, getErr := s.repos.Sessions.Get(ctx, day)
+		if getErr != nil && !errors.Is(getErr, domain.ErrNotFound) {
+			return nil, fmt.Errorf("get session %s: %w", day.Format(time.DateOnly), getErr)
 		}
-		if errors.Is(getErr, ErrNotFound) {
+		if errors.Is(getErr, domain.ErrNotFound) {
 			workouts[i] = Session{ //nolint:exhaustruct // Rest days have no exercise data.
 				Date: day,
 			}
 			continue
 		}
-		workouts[i], err = s.enrichSessionAggregate(ctx, sessionAggr)
-		if err != nil {
-			return nil, fmt.Errorf("enrich session %s: %w", formatDate(day), err)
-		}
+		workouts[i] = sess
 	}
 	return workouts, nil
 }
@@ -133,17 +128,15 @@ func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]Session, error) 
 // generateWeeklyPlan uses the domain planner to create all sessions for the week starting
 // on monday and persists them in a single DB transaction.
 func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) error {
-	prefs, err := s.repo.prefs.Get(ctx)
+	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
 		return fmt.Errorf("get preferences: %w", err)
 	}
-
-	exercises, err := s.repo.exercises.List(ctx)
+	exercises, err := s.repos.Exercises.List(ctx)
 	if err != nil {
 		return fmt.Errorf("get exercises: %w", err)
 	}
-
-	targets, err := s.repo.muscleTargets.List(ctx)
+	targets, err := s.repos.MuscleTargets.List(ctx)
 	if err != nil {
 		return fmt.Errorf("get muscle group targets: %w", err)
 	}
@@ -154,24 +147,7 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		return fmt.Errorf("plan week: %w", err)
 	}
 
-	sessionAggrs := make([]sessionAggregate, len(plannedSessions))
-	for i, ps := range plannedSessions {
-		exerciseSets := make([]exerciseSetAggregate, len(ps.ExerciseSets))
-		for j, es := range ps.ExerciseSets {
-			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
-				ExerciseID: es.Exercise.ID,
-				Sets:       es.Sets,
-			}
-		}
-
-		sessionAggrs[i] = sessionAggregate{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
-			Date:              ps.Date,
-			PeriodizationType: ps.PeriodizationType,
-			ExerciseSets:      exerciseSets,
-		}
-	}
-
-	if err = s.repo.sessions.CreateBatch(ctx, sessionAggrs); err != nil {
+	if err = s.repos.Sessions.CreateBatch(ctx, plannedSessions); err != nil {
 		return fmt.Errorf("create batch sessions: %w", err)
 	}
 	return nil
@@ -179,41 +155,11 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 
 // GetSession retrieves a workout session for a specific date.
 func (s *Service) GetSession(ctx context.Context, date time.Time) (Session, error) {
-	sessionAggr, err := s.repo.sessions.Get(ctx, date)
+	sess, err := s.repos.Sessions.Get(ctx, date)
 	if err != nil {
-		return Session{}, fmt.Errorf("get session %s: %w", formatDate(date), err)
+		return Session{}, fmt.Errorf("get session %s: %w", date.Format(time.DateOnly), err)
 	}
-
-	var session Session
-	session, err = s.enrichSessionAggregate(ctx, sessionAggr)
-	if err != nil {
-		return Session{}, fmt.Errorf("enrich session %s: %w", formatDate(date), err)
-	}
-
-	return session, nil
-}
-
-func (s *Service) enrichSessionAggregate(ctx context.Context, sessionAggr sessionAggregate) (Session, error) {
-	session := Session{
-		Date:              sessionAggr.Date,
-		StartedAt:         sessionAggr.StartedAt,
-		CompletedAt:       sessionAggr.CompletedAt,
-		DifficultyRating:  sessionAggr.DifficultyRating,
-		ExerciseSets:      make([]ExerciseSet, len(sessionAggr.ExerciseSets)),
-		PeriodizationType: sessionAggr.PeriodizationType,
-	}
-
-	for i, ex := range sessionAggr.ExerciseSets {
-		exercise, err := s.repo.exercises.Get(ctx, ex.ExerciseID)
-		if err != nil {
-			return Session{}, fmt.Errorf("get exercise %d: %w", ex.ExerciseID, err)
-		}
-		session.ExerciseSets[i].ID = ex.ID
-		session.ExerciseSets[i].Exercise = exercise
-		session.ExerciseSets[i].Sets = ex.Sets
-		session.ExerciseSets[i].WarmupCompletedAt = ex.WarmupCompletedAt
-	}
-	return session, nil
+	return sess, nil
 }
 
 // mondayOf returns the Monday of the week containing date as midnight UTC. The
@@ -234,11 +180,10 @@ func mondayOf(date time.Time) time.Time {
 
 // StartSession starts a new workout session.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
-	// Generate the week's plan if no sessions exist for this week yet.
 	monday := mondayOf(date)
-	existing, listErr := s.repo.sessions.List(ctx, monday)
+	existing, listErr := s.repos.Sessions.List(ctx, monday)
 	if listErr != nil {
-		return fmt.Errorf("list sessions for week of %s: %w", formatDate(date), listErr)
+		return fmt.Errorf("list sessions for week of %s: %w", date.Format(time.DateOnly), listErr)
 	}
 	sunday := monday.AddDate(0, 0, 6)
 	weekCount := 0
@@ -249,44 +194,53 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	}
 	if weekCount == 0 {
 		if genErr := s.generateWeeklyPlan(ctx, monday); genErr != nil {
-			return fmt.Errorf("generate weekly plan for %s: %w", formatDate(date), genErr)
+			return fmt.Errorf("generate weekly plan for %s: %w", date.Format(time.DateOnly), genErr)
 		}
 	}
 
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		if sess.StartedAt.IsZero() {
-			sess.StartedAt = time.Now()
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+	err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.Start(time.Now())
+	})
+	if errors.Is(err, domain.ErrAlreadyStarted) {
+		return nil
 	}
-
+	if err != nil {
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
+	}
 	return nil
 }
 
 // CompleteSession marks a workout session as completed.
 func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		sess.CompletedAt = time.Now()
-		return true, nil
+	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.Complete(time.Now())
 	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
-
 	return nil
 }
 
 // SaveFeedback saves the difficulty rating for a completed workout session.
 func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty int) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		sess.DifficultyRating = &difficulty
-		return true, nil
+	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.SetDifficulty(difficulty)
 	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
+	return nil
+}
 
+// MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
+func (s *Service) MarkWarmupComplete(
+	ctx context.Context,
+	date time.Time,
+	workoutExerciseID int,
+) error {
+	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.MarkWarmupComplete(workoutExerciseID, time.Now().UTC())
+	}); err != nil {
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
+	}
 	return nil
 }
 
@@ -294,25 +248,15 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
 func (s *Service) UpdateSetWeight(
 	ctx context.Context,
 	date time.Time,
-	exerciseID int,
+	workoutExerciseID int,
 	setIndex int,
 	newWeight float64,
 ) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		for _, ex := range sess.ExerciseSets {
-			if ex.ExerciseID == exerciseID {
-				if setIndex >= len(ex.Sets) {
-					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
-				}
-				ex.Sets[setIndex].WeightKg = &newWeight
-				return true, nil
-			}
-		}
-		return false, errors.New("exercise not found")
+	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.UpdateSetWeight(workoutExerciseID, setIndex, newWeight)
 	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
-
 	return nil
 }
 
@@ -324,113 +268,36 @@ func (s *Service) UpdateCompletedValue(
 	setIndex int,
 	completedValue int,
 ) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		for _, ex := range sess.ExerciseSets {
-			if ex.ID == workoutExerciseID {
-				if setIndex >= len(ex.Sets) {
-					return false, fmt.Errorf("exercise set index %d out of bounds", setIndex)
-				}
-				now := time.Now().UTC()
-				ex.Sets[setIndex].CompletedValue = &completedValue
-				ex.Sets[setIndex].CompletedAt = &now
-				return true, nil
-			}
-		}
-		return false, errors.New("workout exercise not found")
+	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.UpdateCompletedValue(workoutExerciseID, setIndex, completedValue, time.Now().UTC())
 	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
-
 	return nil
 }
 
-// RecordSetCompletion atomically persists the signal, weight, reps, and timestamp for a set.
-func (s *Service) RecordSetCompletion(
+// RecordSet atomically persists the signal, weight (nil for time-based sets),
+// completed value (reps or seconds depending on exercise type), and timestamp.
+func (s *Service) RecordSet(
 	ctx context.Context,
 	date time.Time,
 	workoutExerciseID int,
 	setIndex int,
 	signal Signal,
-	weightKg float64,
-	reps int,
+	weightKg *float64,
+	completedValue int,
 ) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ID == workoutExerciseID {
-				if setIndex >= len(sess.ExerciseSets[i].Sets) {
-					return false, fmt.Errorf("set index %d out of bounds", setIndex)
-				}
-				now := time.Now().UTC()
-				sess.ExerciseSets[i].Sets[setIndex].Signal = &signal
-				sess.ExerciseSets[i].Sets[setIndex].WeightKg = &weightKg
-				sess.ExerciseSets[i].Sets[setIndex].CompletedValue = &reps
-				sess.ExerciseSets[i].Sets[setIndex].CompletedAt = &now
-				return true, nil
-			}
-		}
-		return false, errors.New("workout exercise not found")
+	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		return sess.RecordSet(workoutExerciseID, setIndex, signal, weightKg, completedValue, time.Now().UTC())
 	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
-	return nil
-}
-
-// RecordTimedSetCompletion atomically persists the signal, completed seconds,
-// and timestamp for a time-based set. Mirrors RecordSetCompletion but omits
-// weight (time-based exercises have no weight).
-func (s *Service) RecordTimedSetCompletion(
-	ctx context.Context,
-	date time.Time,
-	workoutExerciseID int,
-	setIndex int,
-	signal Signal,
-	completedSeconds int,
-) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ID == workoutExerciseID {
-				if setIndex >= len(sess.ExerciseSets[i].Sets) {
-					return false, fmt.Errorf("set index %d out of bounds", setIndex)
-				}
-				now := time.Now().UTC()
-				sess.ExerciseSets[i].Sets[setIndex].Signal = &signal
-				sess.ExerciseSets[i].Sets[setIndex].CompletedValue = &completedSeconds
-				sess.ExerciseSets[i].Sets[setIndex].CompletedAt = &now
-				return true, nil
-			}
-		}
-		return false, errors.New("workout exercise not found")
-	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
-	}
-	return nil
-}
-
-// MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
-func (s *Service) MarkWarmupComplete(
-	ctx context.Context,
-	date time.Time,
-	workoutExerciseID int,
-) error {
-	if err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ID == workoutExerciseID {
-				now := time.Now().UTC()
-				sess.ExerciseSets[i].WarmupCompletedAt = &now
-				return true, nil
-			}
-		}
-		return false, errors.New("workout exercise not found")
-	}); err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
-	}
-
 	return nil
 }
 
 // List returns all available exercises.
 func (s *Service) List(ctx context.Context) ([]Exercise, error) {
-	exercises, err := s.repo.exercises.List(ctx)
+	exercises, err := s.repos.Exercises.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list exercises: %w", err)
 	}
@@ -439,7 +306,7 @@ func (s *Service) List(ctx context.Context) ([]Exercise, error) {
 
 // GetExercise retrieves a specific exercise by ID.
 func (s *Service) GetExercise(ctx context.Context, id int) (Exercise, error) {
-	exercise, err := s.repo.exercises.Get(ctx, id)
+	exercise, err := s.repos.Exercises.Get(ctx, id)
 	if err != nil {
 		return Exercise{}, fmt.Errorf("get exercise: %w", err)
 	}
@@ -449,90 +316,53 @@ func (s *Service) GetExercise(ctx context.Context, id int) (Exercise, error) {
 // GetSessionsWithExerciseSince retrieves all sessions since a given date that contain the specified exercise.
 func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID int, since time.Time) (
 	[]Session, error) {
-	sessions, err := s.repo.sessions.List(ctx, since)
+	sessions, err := s.repos.Sessions.List(ctx, since)
 	if err != nil {
 		return nil, fmt.Errorf("get sessions: %w", err)
 	}
 
-	// Filter sessions that contain the specified exercise
 	var result []Session
 	for _, session := range sessions {
-		// Check if this session contains the exercise
-		hasExercise := false
 		for _, es := range session.ExerciseSets {
-			if es.ExerciseID == exerciseID {
-				hasExercise = true
+			if es.Exercise.ID == exerciseID {
+				result = append(result, session)
 				break
 			}
 		}
-
-		if hasExercise {
-			// Convert sessionAggregate to Session by enriching with exercise data
-			enrichedSession := Session{
-				Date:              session.Date,
-				DifficultyRating:  session.DifficultyRating,
-				StartedAt:         session.StartedAt,
-				CompletedAt:       session.CompletedAt,
-				ExerciseSets:      make([]ExerciseSet, len(session.ExerciseSets)),
-				PeriodizationType: session.PeriodizationType,
-			}
-
-			// Enrich exercise sets with exercise data
-			for i, es := range session.ExerciseSets {
-				ex, getErr := s.repo.exercises.Get(ctx, es.ExerciseID)
-				if getErr != nil {
-					return nil, fmt.Errorf("get exercise %d: %w", es.ExerciseID, getErr)
-				}
-
-				enrichedSession.ExerciseSets[i] = ExerciseSet{
-					ID:                es.ID,
-					Exercise:          ex,
-					Sets:              es.Sets,
-					WarmupCompletedAt: es.WarmupCompletedAt,
-				}
-			}
-
-			result = append(result, enrichedSession)
-		}
 	}
-
 	return result, nil
 }
 
 // GetExerciseSetsForExerciseSince retrieves all sets for a specific exercise since a given date.
 func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseID int, since time.Time) (
 	ExerciseProgress, error) {
-	aggs, err := s.repo.sessions.ListSetsForExerciseSince(ctx, exerciseID, since)
+	histories, err := s.repos.Sessions.ListSetsForExerciseSince(ctx, exerciseID, since)
 	if err != nil {
 		return ExerciseProgress{}, fmt.Errorf("list sets for exercise: %w", err)
 	}
 
-	ex, err := s.repo.exercises.Get(ctx, exerciseID)
+	ex, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
 		return ExerciseProgress{}, fmt.Errorf("get exercise %d: %w", exerciseID, err)
 	}
 
-	entries := make([]ExerciseProgressEntry, 0, len(aggs))
-	for _, agg := range aggs {
-		// Collect only completed sets; skip entries with none.
+	entries := make([]ExerciseProgressEntry, 0, len(histories))
+	for _, h := range histories {
 		var completedSets []Set
-		for _, set := range agg.Sets {
+		for _, set := range h.Sets {
 			if set.CompletedValue != nil {
 				completedSets = append(completedSets, set)
 			}
 		}
 		if len(completedSets) > 0 {
 			entries = append(entries, ExerciseProgressEntry{
-				Date: agg.Date,
+				Date: h.Date,
 				Sets: completedSets,
 			})
 		}
 	}
 
-	return ExerciseProgress{
-		Exercise: ex,
-		Entries:  entries,
-	}, nil
+	return ExerciseProgress{Exercise: ex, Entries: entries}, nil
 }
 
 // GetStartingWeight returns the weight to seed a new session for the given exercise.
@@ -549,14 +379,14 @@ func (s *Service) GetStartingWeight(
 	beforeDate time.Time,
 	targetType PeriodizationType,
 ) (float64, error) {
-	prev, err := s.repo.sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
+	prev, err := s.repos.Sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
 	if err != nil {
 		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
 	if prev.PeriodizationType == "" || prev.PeriodizationType == targetType {
 		return prev.WeightKg, nil
 	}
-	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
 		return 0, fmt.Errorf("get exercise for rep window: %w", err)
 	}
@@ -589,14 +419,14 @@ func (s *Service) GetStartingSeconds(
 	exerciseID int,
 	beforeDate time.Time,
 ) (int, error) {
-	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
 		return 0, fmt.Errorf("get exercise: %w", err)
 	}
 	if !exercise.IsTimed() {
 		return 0, fmt.Errorf("exercise %d is not time_based", exerciseID)
 	}
-	seconds, err := s.repo.sessions.GetLatestSuccessfulSecondsBefore(ctx, exerciseID, beforeDate)
+	seconds, err := s.repos.Sessions.GetLatestSuccessfulSecondsBefore(ctx, exerciseID, beforeDate)
 	if err != nil {
 		return 0, fmt.Errorf("get latest successful seconds: %w", err)
 	}
@@ -616,12 +446,12 @@ func (s *Service) BuildProgression(
 	date time.Time,
 	exerciseID int,
 ) (*domain.Progression, error) {
-	sess, err := s.repo.sessions.Get(ctx, date)
+	sess, err := s.repos.Sessions.Get(ctx, date)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
 		return nil, fmt.Errorf("get exercise: %w", err)
 	}
@@ -643,7 +473,7 @@ func (s *Service) BuildProgression(
 
 	var completed []domain.SetResult
 	for _, es := range sess.ExerciseSets {
-		if es.ExerciseID != exerciseID {
+		if es.Exercise.ID != exerciseID {
 			continue
 		}
 		for _, set := range es.Sets {
@@ -680,14 +510,14 @@ func (s *Service) BuildTimedProgression(
 		return nil, fmt.Errorf("get starting seconds: %w", err)
 	}
 
-	sess, err := s.repo.sessions.Get(ctx, date)
+	sess, err := s.repos.Sessions.Get(ctx, date)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
 	var completed []domain.TimedSetResult
 	for _, es := range sess.ExerciseSets {
-		if es.ExerciseID != exerciseID {
+		if es.Exercise.ID != exerciseID {
 			continue
 		}
 		for _, set := range es.Sets {
@@ -710,9 +540,9 @@ func (s *Service) BuildTimedProgression(
 
 // UpdateExercise updates an existing exercise.
 func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
-	if err := s.repo.exercises.Update(ctx, ex.ID, func(oldEx *Exercise) (bool, error) {
+	if err := s.repos.Exercises.Update(ctx, ex.ID, func(oldEx *Exercise) error {
 		*oldEx = ex
-		return true, nil
+		return nil
 	}); err != nil {
 		return fmt.Errorf("update exercise: %w", err)
 	}
@@ -721,7 +551,7 @@ func (s *Service) UpdateExercise(ctx context.Context, ex Exercise) error {
 
 // ListMuscleGroups retrieves all available muscle groups.
 func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
-	groups, err := s.repo.exercises.ListMuscleGroups(ctx)
+	groups, err := s.repos.Exercises.ListMuscleGroups(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list muscle groups: %w", err)
 	}
@@ -737,11 +567,11 @@ func (s *Service) WeeklyMuscleGroupVolume(
 	ctx context.Context,
 	sessions []Session,
 ) ([]MuscleGroupVolume, error) {
-	groupNames, err := s.repo.exercises.ListMuscleGroups(ctx)
+	groupNames, err := s.repos.Exercises.ListMuscleGroups(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list muscle groups: %w", err)
 	}
-	targets, err := s.repo.muscleTargets.List(ctx)
+	targets, err := s.repos.MuscleTargets.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list muscle group targets: %w", err)
 	}
@@ -757,7 +587,7 @@ func (s *Service) GenerateExercise(ctx context.Context, name string) (Exercise, 
 	exercise := s.generateExerciseContent(ctx, name)
 
 	// Persist the exercise
-	persisted, err := s.repo.exercises.Create(ctx, exercise)
+	persisted, err := s.repos.Exercises.Create(ctx, exercise)
 	if err != nil {
 		return Exercise{}, fmt.Errorf("create exercise: %w", err)
 	}
@@ -774,7 +604,7 @@ func (s *Service) generateExerciseContent(ctx context.Context, name string) Exer
 	}
 
 	// Try to get muscle groups for better generation
-	muscleGroups, err := s.repo.exercises.ListMuscleGroups(ctx)
+	muscleGroups, err := s.repos.Exercises.ListMuscleGroups(ctx)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to get muscle groups", slog.Any("error", err))
 		return createMinimalExercise(name)
@@ -829,7 +659,7 @@ func (s *Service) SwapExercise(
 	workoutExerciseID int,
 	newExerciseID int,
 ) error {
-	newExercise, err := s.repo.exercises.Get(ctx, newExerciseID)
+	newExercise, err := s.repos.Exercises.Get(ctx, newExerciseID)
 	if err != nil {
 		return fmt.Errorf("get new exercise: %w", err)
 	}
@@ -839,10 +669,13 @@ func (s *Service) SwapExercise(
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
-	if err = s.replaceExerciseInSession(ctx, date, workoutExerciseID, newExercise, historicalSets); err != nil {
-		return err
+	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+		newSets := s.buildSetsForAdd(newExercise, sess.PeriodizationType, historicalSets)
+		return sess.SwapExerciseInSlot(workoutExerciseID, newExercise, newSets)
+	})
+	if err != nil {
+		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
-
 	return nil
 }
 
@@ -853,7 +686,7 @@ func (s *Service) SwapExercise(
 func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]Set, error) {
 	// Get workout history (past 3 months)
 	threeMonthsAgo := date.AddDate(0, -3, 0)
-	history, err := s.repo.sessions.List(ctx, threeMonthsAgo)
+	history, err := s.repos.Sessions.List(ctx, threeMonthsAgo)
 	if err != nil {
 		return nil, fmt.Errorf("get workout history: %w", err)
 	}
@@ -867,7 +700,7 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 		}
 
 		for _, exerciseSet := range session.ExerciseSets {
-			if exerciseSet.ExerciseID != exerciseID || len(exerciseSet.Sets) == 0 {
+			if exerciseSet.Exercise.ID != exerciseID || len(exerciseSet.Sets) == 0 {
 				continue
 			}
 			// Copy sets and reset completion status
@@ -942,40 +775,10 @@ func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalS
 	return sets
 }
 
-// replaceExerciseInSession swaps the exercise occupying a workout slot, keeping
-// the slot's stable ID intact. Any previously recorded sets on the slot are
-// dropped — historicalSets seeds the replacement when present, otherwise we
-// generate type-appropriate placeholders matching the old set count.
-func (s *Service) replaceExerciseInSession(
-	ctx context.Context,
-	date time.Time,
-	workoutExerciseID int,
-	newExercise Exercise,
-	historicalSets []Set,
-) error {
-	err := s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		for i, exerciseSet := range sess.ExerciseSets {
-			if exerciseSet.ID != workoutExerciseID {
-				continue
-			}
-			sess.ExerciseSets[i].ExerciseID = newExercise.ID
-			sess.ExerciseSets[i].WarmupCompletedAt = nil
-			sess.ExerciseSets[i].Sets = s.buildSetsForAdd(newExercise, sess.PeriodizationType, historicalSets)
-			return true, nil
-		}
-		return false, fmt.Errorf("workout exercise %d not found in workout for date %s",
-			workoutExerciseID, formatDate(date))
-	})
-	if err != nil {
-		return fmt.Errorf("update session %s: %w", formatDate(date), err)
-	}
-	return nil
-}
-
 // FindCompatibleExercises returns all exercises except the specified one.
 func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) ([]Exercise, error) {
 	// Get all exercises
-	allExercises, err := s.repo.exercises.List(ctx)
+	allExercises, err := s.repos.Exercises.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list all exercises: %w", err)
 	}
@@ -996,74 +799,52 @@ func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) (
 // workout_exercise.id assigned to the new slot, so callers can build URLs
 // that point at the new exercise's detail page.
 func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID int) (int, error) {
-	// 1. Validate the exercise exists
-	exercise, err := s.repo.exercises.Get(ctx, exerciseID)
+	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
 		return 0, fmt.Errorf("get exercise: %w", err)
 	}
 
-	// 2. Find historical data for the exercise
 	historicalSets, err := s.findHistoricalSets(ctx, date, exerciseID)
 	if err != nil {
 		return 0, fmt.Errorf("find historical sets: %w", err)
 	}
 
-	// 3. Check if the workout session exists
-	_, err = s.repo.sessions.Get(ctx, date)
-	if errors.Is(err, ErrNotFound) {
-		return 0, fmt.Errorf("workout session for date %s does not exist", formatDate(date))
+	if _, err = s.repos.Sessions.Get(ctx, date); errors.Is(err, domain.ErrNotFound) {
+		return 0, fmt.Errorf("workout session for date %s does not exist", date.Format(time.DateOnly))
 	} else if err != nil {
 		return 0, fmt.Errorf("check session existence: %w", err)
 	}
 
-	// 4. Update the session to add the new exercise
-	err = s.repo.sessions.Update(ctx, date, func(sess *sessionAggregate) (bool, error) {
-		// Check if the exercise already exists in the session
-		for _, existingExercise := range sess.ExerciseSets {
-			if existingExercise.ExerciseID == exerciseID {
-				return false, fmt.Errorf("exercise %s already exists in workout for date %s",
-					exercise.Name, formatDate(date))
-			}
-		}
-
-		// Create sets for the exercise — periodization comes from the session.
+	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
 		newSets := s.buildSetsForAdd(exercise, sess.PeriodizationType, historicalSets)
-
-		// Add the new exercise to the session. ID stays 0 so the repository
-		// assigns a fresh workout_exercise.id on insert.
-		newExerciseSet := exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned by repository.
-			ExerciseID:        exerciseID,
-			Sets:              newSets,
-			WarmupCompletedAt: nil,
+		_, addErr := sess.AddExercise(exercise, newSets)
+		if addErr != nil {
+			return fmt.Errorf("add exercise to session: %w", addErr)
 		}
-
-		sess.ExerciseSets = append(sess.ExerciseSets, newExerciseSet)
-		return true, nil
+		return nil
 	})
-
 	if err != nil {
 		return 0, fmt.Errorf("update session with new exercise: %w", err)
 	}
 
-	// 5. Fetch the session back to learn the slot ID assigned by the
-	// repository on insert. The slot is unique by ExerciseID within a
-	// session (enforced by the duplicate check above), so locating it is
-	// unambiguous.
-	updated, err := s.repo.sessions.Get(ctx, date)
+	// Re-fetch to learn the slot ID assigned by the repository on insert. The
+	// slot is unique by Exercise.ID within a session (Session.AddExercise
+	// rejected duplicates), so locating it is unambiguous.
+	updated, err := s.repos.Sessions.Get(ctx, date)
 	if err != nil {
 		return 0, fmt.Errorf("re-fetch session after add: %w", err)
 	}
 	for _, es := range updated.ExerciseSets {
-		if es.ExerciseID == exerciseID {
+		if es.Exercise.ID == exerciseID {
 			return es.ID, nil
 		}
 	}
-	return 0, fmt.Errorf("added exercise %d not found in session %s", exerciseID, formatDate(date))
+	return 0, fmt.Errorf("added exercise %d not found in session %s", exerciseID, date.Format(time.DateOnly))
 }
 
 // GetFeatureFlag retrieves a feature flag by name.
 func (s *Service) GetFeatureFlag(ctx context.Context, name string) (FeatureFlag, error) {
-	flag, err := s.repo.featureFlags.Get(ctx, name)
+	flag, err := s.repos.FeatureFlags.Get(ctx, name)
 	if err != nil {
 		return FeatureFlag{}, fmt.Errorf("get feature flag %s: %w", name, err)
 	}
@@ -1072,7 +853,7 @@ func (s *Service) GetFeatureFlag(ctx context.Context, name string) (FeatureFlag,
 
 // IsMaintenanceModeEnabled checks if maintenance mode is enabled.
 func (s *Service) IsMaintenanceModeEnabled(ctx context.Context) bool {
-	flag, err := s.repo.featureFlags.Get(ctx, "maintenance_mode")
+	flag, err := s.repos.FeatureFlags.Get(ctx, "maintenance_mode")
 	if err != nil {
 		// If we can't check the flag, assume maintenance is disabled for safety
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to check maintenance mode flag", slog.Any("error", err))
@@ -1083,7 +864,7 @@ func (s *Service) IsMaintenanceModeEnabled(ctx context.Context) bool {
 
 // ListFeatureFlags retrieves all feature flags.
 func (s *Service) ListFeatureFlags(ctx context.Context) ([]FeatureFlag, error) {
-	flags, err := s.repo.featureFlags.List(ctx)
+	flags, err := s.repos.FeatureFlags.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list feature flags: %w", err)
 	}
@@ -1092,7 +873,7 @@ func (s *Service) ListFeatureFlags(ctx context.Context) ([]FeatureFlag, error) {
 
 // SetFeatureFlag updates or creates a feature flag.
 func (s *Service) SetFeatureFlag(ctx context.Context, flag FeatureFlag) error {
-	if err := s.repo.featureFlags.Set(ctx, flag); err != nil {
+	if err := s.repos.FeatureFlags.Set(ctx, flag); err != nil {
 		return fmt.Errorf("set feature flag %s: %w", flag.Name, err)
 	}
 	return nil

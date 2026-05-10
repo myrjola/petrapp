@@ -222,8 +222,8 @@ func (app *application) recordSetCompletionWithWeight(
 		return false
 	}
 
-	err = app.workoutService.RecordSetCompletion(
-		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, weight, reps)
+	err = app.workoutService.RecordSet(
+		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, &weight, reps)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("record set completion: %w", err))
 		return false
@@ -282,8 +282,8 @@ func (app *application) recordTimedSetCompletion(
 
 	signal := workout.Signal(r.PostForm.Get("signal"))
 
-	if err = app.workoutService.RecordTimedSetCompletion(
-		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, completedSeconds); err != nil {
+	if err = app.workoutService.RecordSet(
+		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, nil, completedSeconds); err != nil {
 		app.serverError(w, r, fmt.Errorf("record timed set completion: %w", err))
 		return false
 	}

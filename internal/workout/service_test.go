@@ -1622,8 +1622,9 @@ func Test_RecordSetCompletion(t *testing.T) {
 	svc := workout.NewService(db, logger, "")
 	date, _ := time.Parse("2006-01-02", today)
 
-	if err = svc.RecordSetCompletion(ctx, date, weID, 0, workout.SignalOnTarget, 102.5, 5); err != nil {
-		t.Fatalf("RecordSetCompletion: %v", err)
+	weight := 102.5
+	if err = svc.RecordSet(ctx, date, weID, 0, workout.SignalOnTarget, &weight, 5); err != nil {
+		t.Fatalf("RecordSet: %v", err)
 	}
 
 	sess, err := svc.GetSession(ctx, date)
@@ -1729,8 +1730,9 @@ func Test_BuildProgression(t *testing.T) {
 	}
 
 	// Record set 0 as TooLight at 0kg.
-	if err = svc.RecordSetCompletion(ctx, date, weID, 0, workout.SignalTooLight, 0, 8); err != nil {
-		t.Fatalf("RecordSetCompletion: %v", err)
+	weight := 0.0
+	if err = svc.RecordSet(ctx, date, weID, 0, workout.SignalTooLight, &weight, 8); err != nil {
+		t.Fatalf("RecordSet: %v", err)
 	}
 
 	// Rebuild: next set should be 0 + 1 = 1 kg (1kg increment in dumbbell range).
