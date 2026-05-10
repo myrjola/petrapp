@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -134,8 +133,6 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		// No progression engine for bodyweight — uses the stored target as-is.
 	}
 
-	absCurrentWeight := math.Abs(currentSetTarget.WeightKg)
-
 	data := exerciseSetTemplateData{
 		BaseTemplateData:      newBaseTemplateData(r),
 		Date:                  date,
@@ -147,7 +144,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		LastCompletedAt:       getLastCompletedAt(exerciseSet.Sets),
 		CurrentSetTarget:      currentSetTarget,
 		CurrentSetTimedTarget: currentSetTimedTarget,
-		AbsCurrentWeight:      absCurrentWeight,
+		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)
@@ -208,10 +205,7 @@ func (app *application) recordSetCompletionWithWeight(
 		return false
 	}
 
-	if exercise.ExerciseType == domain.ExerciseTypeAssisted &&
-		r.PostForm.Get("assisted") != "" {
-		weight = -math.Abs(weight)
-	}
+	weight = exercise.EncodeFormWeight(weight, r.PostForm.Get("assisted") != "")
 
 	signal := domain.Signal(r.PostForm.Get("signal"))
 

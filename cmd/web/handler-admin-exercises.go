@@ -154,16 +154,13 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if category != domain.CategoryFullBody && category != domain.CategoryUpper && category != domain.CategoryLower {
+	if !category.IsValid() {
 		app.putFlashError(r.Context(), "Category must be one of full body, upper, or lower.")
 		redirect(w, r, editPath)
 		return
 	}
 
-	if exerciseType != domain.ExerciseTypeWeighted &&
-		exerciseType != domain.ExerciseTypeBodyweight &&
-		exerciseType != domain.ExerciseTypeAssisted &&
-		exerciseType != domain.ExerciseTypeTime {
+	if !exerciseType.IsValid() {
 		app.putFlashError(r.Context(), "Exercise type must be weighted, bodyweight, assisted, or time_based.")
 		redirect(w, r, editPath)
 		return

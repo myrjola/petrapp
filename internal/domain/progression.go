@@ -22,6 +22,11 @@ type SetTarget struct {
 	TargetReps int
 }
 
+// AbsWeightKg returns the unsigned magnitude of WeightKg. Assisted exercises
+// store weight as a negative number to mark assistance use; the form input
+// and any other display surface that wants the bare magnitude calls this.
+func (s SetTarget) AbsWeightKg() float64 { return math.Abs(s.WeightKg) }
+
 // SetResult is recorded by the caller after the user completes a set.
 type SetResult struct {
 	ActualReps int

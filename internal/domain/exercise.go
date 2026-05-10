@@ -8,6 +8,7 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -21,6 +22,16 @@ const (
 	CategoryLower    Category = "lower"
 )
 
+// IsValid reports whether c is one of the defined Category values.
+func (c Category) IsValid() bool {
+	switch c {
+	case CategoryFullBody, CategoryUpper, CategoryLower:
+		return true
+	default:
+		return false
+	}
+}
+
 // ExerciseType distinguishes the load model used by an exercise.
 type ExerciseType string
 
@@ -30,6 +41,16 @@ const (
 	ExerciseTypeAssisted   ExerciseType = "assisted"
 	ExerciseTypeTime       ExerciseType = "time_based"
 )
+
+// IsValid reports whether et is one of the defined ExerciseType values.
+func (et ExerciseType) IsValid() bool {
+	switch et {
+	case ExerciseTypeWeighted, ExerciseTypeBodyweight, ExerciseTypeAssisted, ExerciseTypeTime:
+		return true
+	default:
+		return false
+	}
+}
 
 // Resource is a learning link associated with an exercise (video, article).
 type Resource struct {
@@ -81,4 +102,41 @@ func (e Exercise) SetValueUnit() string {
 		return "seconds"
 	}
 	return "reps"
+}
+
+// EncodeFormWeight applies the assisted-exercise sign convention to a weight
+// value parsed from the per-set form. For ExerciseTypeAssisted with the
+// "assisted" flag set, the stored value is the negative magnitude of the
+// input. All other types/flag combinations pass the input through unchanged.
+func (e Exercise) EncodeFormWeight(input float64, assisted bool) float64 {
+	if e.ExerciseType == ExerciseTypeAssisted && assisted {
+		return -math.Abs(input)
+	}
+	return input
+}
+
+// FormatSetDescription renders a completed set as a single line for history
+// display: "8x10.0kg" for weighted/assisted, "12 reps" for bodyweight, "30s"
+// for time_based. Returns "" when the set is missing the values needed for
+// its exercise type, so callers can drop empty entries.
+func (e Exercise) FormatSetDescription(set Set) string {
+	switch e.ExerciseType {
+	case ExerciseTypeWeighted, ExerciseTypeAssisted:
+		if set.WeightKg == nil || set.CompletedValue == nil {
+			return ""
+		}
+		return fmt.Sprintf("%dx%.1fkg", *set.CompletedValue, *set.WeightKg)
+	case ExerciseTypeBodyweight:
+		if set.CompletedValue == nil {
+			return ""
+		}
+		return fmt.Sprintf("%d reps", *set.CompletedValue)
+	case ExerciseTypeTime:
+		if set.CompletedValue == nil {
+			return ""
+		}
+		return fmt.Sprintf("%ds", *set.CompletedValue)
+	default:
+		return ""
+	}
 }

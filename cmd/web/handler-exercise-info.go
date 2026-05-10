@@ -104,36 +104,6 @@ type ExerciseProgressDataPoint struct {
 	SetDescriptions []string
 }
 
-// processEntryData extracts chart metrics from a single exercise progress entry.
-func processEntryData(entry domain.ExerciseProgressEntry, typ domain.ExerciseType) ExerciseProgressDataPoint {
-	var setDescriptions []string
-
-	for _, set := range entry.Sets {
-		switch typ {
-		// Weighted and assisted share the same metric: signed weight.
-		// `-20 → -10 → 0 → +5` describes a continuous progression.
-		case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
-			if set.WeightKg != nil && set.CompletedValue != nil {
-				weight := *set.WeightKg
-				setDescriptions = append(setDescriptions, fmt.Sprintf("%dx%.1fkg", *set.CompletedValue, weight))
-			}
-		case domain.ExerciseTypeBodyweight:
-			if set.CompletedValue != nil {
-				setDescriptions = append(setDescriptions, fmt.Sprintf("%d reps", *set.CompletedValue))
-			}
-		case domain.ExerciseTypeTime:
-			if set.CompletedValue != nil {
-				setDescriptions = append(setDescriptions, fmt.Sprintf("%ds", *set.CompletedValue))
-			}
-		}
-	}
-
-	return ExerciseProgressDataPoint{
-		Date:            entry.Date,
-		SetDescriptions: setDescriptions,
-	}
-}
-
 // generateExerciseProgressData creates a chart dataset for exercise progress tracking.
 func (app *application) generateExerciseProgressData(
 	ctx context.Context, currentDate time.Time, exercise domain.Exercise) ([]ExerciseProgressDataPoint, error) {
@@ -146,7 +116,16 @@ func (app *application) generateExerciseProgressData(
 
 	dataPoints := make([]ExerciseProgressDataPoint, len(progress.Entries))
 	for i, entry := range progress.Entries {
-		dataPoints[i] = processEntryData(entry, progress.Exercise.ExerciseType)
+		var setDescriptions []string
+		for _, set := range entry.Sets {
+			if desc := progress.Exercise.FormatSetDescription(set); desc != "" {
+				setDescriptions = append(setDescriptions, desc)
+			}
+		}
+		dataPoints[i] = ExerciseProgressDataPoint{
+			Date:            entry.Date,
+			SetDescriptions: setDescriptions,
+		}
 	}
 
 	return dataPoints, nil
