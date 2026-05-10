@@ -15,6 +15,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('go.sum') }}
+
       - name: Build
         run: make ci
 
