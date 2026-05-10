@@ -29,10 +29,12 @@ type Repositories struct {
 // ExerciseRepository into the SessionRepository so Get/List can hydrate
 // ExerciseSet.Exercise inside a single read.
 func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
-	_ = logger // reserved for future per-repo logging; unused today.
+	_ = logger
 	prefs := newSQLitePreferencesRepository(db)
+	muscleTargets := newSQLiteMuscleGroupTargetRepository(db)
 	return &Repositories{ //nolint:exhaustruct // Other fields wired in later tasks.
-		Preferences: prefs,
+		Preferences:   prefs,
+		MuscleTargets: muscleTargets,
 	}
 }
 
