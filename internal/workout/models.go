@@ -1,9 +1,6 @@
 package workout
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
@@ -79,76 +76,4 @@ var ErrNotFound = domain.ErrNotFound
 // this phase.
 func SwapSimilarityScore(current, candidate Exercise) int {
 	return domain.SwapSimilarityScore(current, candidate)
-}
-
-// exerciseJSONSchema and its MarshalJSON method follow — generator-exercise.go
-// consumes the unexported type.
-
-type exerciseJSONSchema struct {
-	muscleGroups []string
-}
-
-func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
-	schema := map[string]any{
-		"type": "object",
-		"required": []string{
-			"id",
-			"name",
-			"category",
-			"exercise_type",
-			"description_markdown",
-			"primary_muscle_groups",
-			"secondary_muscle_groups",
-		},
-		"properties": map[string]any{
-			"id": map[string]any{
-				"type":        "integer",
-				"description": "Unique identifier for the exercise, leave as -1 for new exercises",
-			},
-			"name": map[string]any{
-				"type":        "string",
-				"description": "Name of the exercise",
-			},
-			"category": map[string]any{
-				"type":        "string",
-				"description": "Category of the exercise",
-				"enum":        []string{"full_body", "upper", "lower"},
-			},
-			"exercise_type": map[string]any{
-				"type":        "string",
-				"description": "Type of exercise: weighted, bodyweight, assisted, or time_based",
-				"enum":        []string{"weighted", "bodyweight", "assisted", "time_based"},
-			},
-			"default_starting_seconds": map[string]any{
-				"type":        "integer",
-				"description": "Default starting seconds for time_based exercises; omit for other types",
-			},
-			"description_markdown": map[string]any{
-				"type":        "string",
-				"description": "Markdown description of the exercise",
-			},
-			"primary_muscle_groups": map[string]any{
-				"type":        "array",
-				"description": "Primary muscle groups targeted by the exercise",
-				"items": map[string]any{
-					"type": "string",
-					"enum": ejs.muscleGroups,
-				},
-			},
-			"secondary_muscle_groups": map[string]any{
-				"type":        "array",
-				"description": "Secondary muscle groups targeted by the exercise",
-				"items": map[string]any{
-					"type": "string",
-					"enum": ejs.muscleGroups,
-				},
-			},
-		},
-		"additionalProperties": false,
-	}
-	result, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("marshal exercise schema: %w", err)
-	}
-	return result, nil
 }

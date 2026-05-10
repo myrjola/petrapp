@@ -1,4 +1,4 @@
-package workout
+package service
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
@@ -21,7 +22,6 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 	muscleGroups := []string{"quadriceps", "glutes", "hamstrings", "calves", "core"}
 	eg := newExerciseGenerator(openaiAPIKey, muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
 
-	// Test successful generation
 	t.Run("Successful generation", func(t *testing.T) {
 		exercise, err := eg.Generate(t.Context(), "Squat")
 
@@ -33,7 +33,7 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 			t.Errorf("Got exercise name %q, want %q", got, want)
 		}
 
-		if got, want := exercise.Category, Category("lower"); got != want {
+		if got, want := exercise.Category, domain.Category("lower"); got != want {
 			t.Errorf("Got exercise category %q, want %q", got, want)
 		}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 	repo "github.com/myrjola/petrapp/internal/repository"
+	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
@@ -20,6 +21,7 @@ type Service struct {
 	db           *sqlite.Database
 	logger       *slog.Logger
 	openaiAPIKey string
+	gen          *service.Service // delegate for relocated AI-generation methods (Task 2 transitional)
 }
 
 // NewService creates a new workout service.
@@ -29,6 +31,7 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 		db:           db,
 		logger:       logger,
 		openaiAPIKey: openaiAPIKey,
+		gen:          service.NewService(db, logger, openaiAPIKey),
 	}
 }
 
@@ -578,72 +581,15 @@ func (s *Service) WeeklyMuscleGroupVolume(
 	return domain.WeeklyMuscleGroupVolume(sessions, targets, groupNames), nil
 }
 
-// GenerateExercise generates a new exercise based on a name.
-//
-// In case of errors, it persists a minimal exercise that the user can fill in later.
-// The returned exercise is guaranteed to have at least Name and ID fields set.
+// GenerateExercise delegates to internal/service. Phase 3 transitional:
+// removed in Task 3 when the rest of the service layer relocates and
+// internal/workout.Service becomes a type alias.
 func (s *Service) GenerateExercise(ctx context.Context, name string) (Exercise, error) {
-	// Generate exercise content
-	exercise := s.generateExerciseContent(ctx, name)
-
-	// Persist the exercise
-	persisted, err := s.repos.Exercises.Create(ctx, exercise)
+	exercise, err := s.gen.GenerateExercise(ctx, name)
 	if err != nil {
-		return Exercise{}, fmt.Errorf("create exercise: %w", err)
+		return Exercise{}, fmt.Errorf("generate exercise: %w", err)
 	}
-
-	return persisted, nil
-}
-
-// generateExerciseContent creates exercise content, using AI generation if available
-// or falling back to minimal content if not possible.
-func (s *Service) generateExerciseContent(ctx context.Context, name string) Exercise {
-	// Use minimal exercise if no OpenAI API key is configured
-	if s.openaiAPIKey == "" {
-		return createMinimalExercise(name)
-	}
-
-	// Try to get muscle groups for better generation
-	muscleGroups, err := s.repos.Exercises.ListMuscleGroups(ctx)
-	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to get muscle groups", slog.Any("error", err))
-		return createMinimalExercise(name)
-	}
-
-	// Try to generate a better exercise with AI
-	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups, s.logger)
-	generated, err := generator.Generate(ctx, name)
-	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to generate exercise details",
-			slog.Any("error", err), slog.String("name", name))
-		return createMinimalExercise(name)
-	}
-
-	// Defensive default: the AI prompt does not carry rep_min/rep_max, and
-	// the DB CHECK requires them for non-time-based exercises. Mirror the
-	// values used by createMinimalExercise so the Create downstream succeeds.
-	if generated.ExerciseType != ExerciseTypeTime && (generated.RepMin == nil || generated.RepMax == nil) {
-		repMin, repMax := 5, 10
-		generated.RepMin = &repMin
-		generated.RepMax = &repMax
-	}
-	return generated
-}
-
-// createMinimalExercise returns a basic exercise with just the essential fields populated.
-func createMinimalExercise(name string) Exercise {
-	repMin, repMax := 5, 10
-	return Exercise{ //nolint:exhaustruct // DefaultStartingSeconds is nil for non-time_based exercises.
-		ID:                    -1,
-		Name:                  name,
-		Category:              CategoryFullBody,
-		ExerciseType:          ExerciseTypeWeighted,
-		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
-		PrimaryMuscleGroups:   []string{},
-		SecondaryMuscleGroups: []string{},
-		RepMin:                &repMin,
-		RepMax:                &repMax,
-	}
+	return exercise, nil
 }
 
 // SwapExercise replaces the exercise occupying a workout slot (identified by

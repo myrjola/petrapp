@@ -1,4 +1,13 @@
-package workout
+// Package service: AI-backed exercise generation.
+//
+// This file owns the OpenAI-driven generator that fills in a freshly
+// named exercise's metadata (category, type, muscle groups, description,
+// resources). The decision tree in generateExerciseContent prefers the
+// AI path; on any failure (missing API key, network error, malformed
+// response, schema validation failure) it falls back to a minimal
+// exercise so the user can edit the rest by hand. GenerateExercise
+// persists whichever exercise was produced.
+package service
 
 import (
 	"context"
@@ -9,9 +18,84 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
+
+// exerciseJSONSchema is the JSON-schema description that the OpenAI
+// chat completion endpoint validates the AI's response against. The
+// muscle-group enum is dynamic — the generator constructs the schema
+// per call with the muscle groups the database currently exposes so
+// the AI can never invent ones we don't track.
+type exerciseJSONSchema struct {
+	muscleGroups []string
+}
+
+func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
+	schema := map[string]any{
+		"type": "object",
+		"required": []string{
+			"id",
+			"name",
+			"category",
+			"exercise_type",
+			"description_markdown",
+			"primary_muscle_groups",
+			"secondary_muscle_groups",
+		},
+		"properties": map[string]any{
+			"id": map[string]any{
+				"type":        "integer",
+				"description": "Unique identifier for the exercise, leave as -1 for new exercises",
+			},
+			"name": map[string]any{
+				"type":        "string",
+				"description": "Name of the exercise",
+			},
+			"category": map[string]any{
+				"type":        "string",
+				"description": "Category of the exercise",
+				"enum":        []string{"full_body", "upper", "lower"},
+			},
+			"exercise_type": map[string]any{
+				"type":        "string",
+				"description": "Type of exercise: weighted, bodyweight, assisted, or time_based",
+				"enum":        []string{"weighted", "bodyweight", "assisted", "time_based"},
+			},
+			"default_starting_seconds": map[string]any{
+				"type":        "integer",
+				"description": "Default starting seconds for time_based exercises; omit for other types",
+			},
+			"description_markdown": map[string]any{
+				"type":        "string",
+				"description": "Markdown description of the exercise",
+			},
+			"primary_muscle_groups": map[string]any{
+				"type":        "array",
+				"description": "Primary muscle groups targeted by the exercise",
+				"items": map[string]any{
+					"type": "string",
+					"enum": ejs.muscleGroups,
+				},
+			},
+			"secondary_muscle_groups": map[string]any{
+				"type":        "array",
+				"description": "Secondary muscle groups targeted by the exercise",
+				"items": map[string]any{
+					"type": "string",
+					"enum": ejs.muscleGroups,
+				},
+			},
+		},
+		"additionalProperties": false,
+	}
+	result, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("marshal exercise schema: %w", err)
+	}
+	return result, nil
+}
 
 // exerciseGenerator generates exercises using OpenAI API.
 type exerciseGenerator struct {
@@ -31,15 +115,15 @@ func newExerciseGenerator(openaiAPIKey string, muscleGroups []string, logger *sl
 }
 
 // Generate generates a new exercise based on the given name.
-func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (Exercise, error) {
+func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (domain.Exercise, error) {
 	if name == "" {
-		return Exercise{}, errors.New("exercise name cannot be empty")
+		return domain.Exercise{}, errors.New("exercise name cannot be empty")
 	}
 
 	// Pass 1: Generate exercise with placeholder URLs
 	exercise, err := eg.generateBaseExercise(ctx, name)
 	if err != nil {
-		return Exercise{}, err
+		return domain.Exercise{}, err
 	}
 
 	// Pass 2: Enhance with real URLs from web search (non-blocking failure)
@@ -51,7 +135,7 @@ func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (Exercis
 }
 
 // generateBaseExercise creates the base exercise structure with placeholder URLs.
-func (eg *exerciseGenerator) generateBaseExercise(ctx context.Context, name string) (Exercise, error) {
+func (eg *exerciseGenerator) generateBaseExercise(ctx context.Context, name string) (domain.Exercise, error) {
 	prompt := fmt.Sprintf(`Generate a detailed exercise for "%s".
 
 The response must strictly follow this JSON structure:
@@ -120,36 +204,36 @@ Return only the valid JSON object with no additional text or explanation.`,
 		})
 
 	if err != nil {
-		return Exercise{}, fmt.Errorf("chat completion: %w", err)
+		return domain.Exercise{}, fmt.Errorf("chat completion: %w", err)
 	}
 
 	// Parse the response
-	var exercise Exercise
+	var exercise domain.Exercise
 	err = json.Unmarshal([]byte(chat.Choices[0].Message.Content), &exercise)
 	if err != nil {
-		return Exercise{}, fmt.Errorf("parse exercise response: %w", err)
+		return domain.Exercise{}, fmt.Errorf("parse exercise response: %w", err)
 	}
 
 	// Validate the exercise
 	if exercise.Name == "" || exercise.Category == "" || exercise.DescriptionMarkdown == "" {
-		return Exercise{}, errors.New("generated exercise is missing required fields")
+		return domain.Exercise{}, errors.New("generated exercise is missing required fields")
 	}
 
 	// Verify muscle groups
 	if len(exercise.PrimaryMuscleGroups) == 0 {
-		return Exercise{}, errors.New("generated exercise has no primary muscle groups")
+		return domain.Exercise{}, errors.New("generated exercise has no primary muscle groups")
 	}
 
 	muscleGroups := slices.Concat(exercise.PrimaryMuscleGroups, exercise.SecondaryMuscleGroups)
 	if err = eg.validateMuscleGroups(muscleGroups); err != nil {
-		return Exercise{}, fmt.Errorf("validate muscle groups: %w", err)
+		return domain.Exercise{}, fmt.Errorf("validate muscle groups: %w", err)
 	}
 
 	return exercise, nil
 }
 
 // enhanceWithWebSearch enriches the exercise description with real tutorial links.
-func (eg *exerciseGenerator) enhanceWithWebSearch(ctx context.Context, exercise *Exercise) error {
+func (eg *exerciseGenerator) enhanceWithWebSearch(ctx context.Context, exercise *domain.Exercise) error {
 	prompt := fmt.Sprintf(`Find the best fitness tutorial resources for "%s" exercise.
 
 Search for:
@@ -189,7 +273,7 @@ Return only the JSON object.`, exercise.Name)
 
 	// Parse resources from response
 	var resourceResponse struct {
-		Resources []Resource `json:"resources"`
+		Resources []domain.Resource `json:"resources"`
 	}
 	err = json.Unmarshal([]byte(chat.Choices[0].Message.Content), &resourceResponse)
 	if err != nil {
@@ -210,7 +294,7 @@ Return only the JSON object.`, exercise.Name)
 // updateResourcesInDescription replaces placeholder URLs with real ones.
 func (eg *exerciseGenerator) updateResourcesInDescription(
 	markdown string,
-	resources []Resource,
+	resources []domain.Resource,
 ) string {
 	// Find and replace the Resources section
 	lines := strings.Split(markdown, "\n")
@@ -259,4 +343,68 @@ func (eg *exerciseGenerator) validateMuscleGroups(groups []string) error {
 	}
 
 	return nil
+}
+
+// GenerateExercise generates a new exercise based on a name.
+//
+// In case of errors, it persists a minimal exercise that the user can fill in later.
+// The returned exercise is guaranteed to have at least Name and ID fields set.
+func (s *Service) GenerateExercise(ctx context.Context, name string) (domain.Exercise, error) {
+	exercise := s.generateExerciseContent(ctx, name)
+
+	persisted, err := s.repos.Exercises.Create(ctx, exercise)
+	if err != nil {
+		return domain.Exercise{}, fmt.Errorf("create exercise: %w", err)
+	}
+
+	return persisted, nil
+}
+
+// generateExerciseContent creates exercise content, using AI generation if available
+// or falling back to minimal content if not possible.
+func (s *Service) generateExerciseContent(ctx context.Context, name string) domain.Exercise {
+	if s.openaiAPIKey == "" {
+		return createMinimalExercise(name)
+	}
+
+	muscleGroups, err := s.repos.Exercises.ListMuscleGroups(ctx)
+	if err != nil {
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to get muscle groups", slog.Any("error", err))
+		return createMinimalExercise(name)
+	}
+
+	generator := newExerciseGenerator(s.openaiAPIKey, muscleGroups, s.logger)
+	generated, err := generator.Generate(ctx, name)
+	if err != nil {
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "failed to generate exercise details",
+			slog.Any("error", err), slog.String("name", name))
+		return createMinimalExercise(name)
+	}
+
+	// Defensive default: the AI prompt does not carry rep_min/rep_max, and
+	// the DB CHECK requires them for non-time-based exercises. Mirror the
+	// values used by createMinimalExercise so the Create downstream succeeds.
+	if generated.ExerciseType != domain.ExerciseTypeTime &&
+		(generated.RepMin == nil || generated.RepMax == nil) {
+		repMin, repMax := 5, 10
+		generated.RepMin = &repMin
+		generated.RepMax = &repMax
+	}
+	return generated
+}
+
+// createMinimalExercise returns a basic exercise with just the essential fields populated.
+func createMinimalExercise(name string) domain.Exercise {
+	repMin, repMax := 5, 10
+	return domain.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds is nil for non-time_based exercises.
+		ID:                    -1,
+		Name:                  name,
+		Category:              domain.CategoryFullBody,
+		ExerciseType:          domain.ExerciseTypeWeighted,
+		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
+		PrimaryMuscleGroups:   []string{},
+		SecondaryMuscleGroups: []string{},
+		RepMin:                &repMin,
+		RepMax:                &repMax,
+	}
 }
