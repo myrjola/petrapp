@@ -8,12 +8,12 @@ func Test_buildPlannedSets(t *testing.T) {
 	intPtr := func(i int) *int { return &i }
 
 	cases := []struct {
-		name           string
-		exercise       Exercise
-		periodization  PeriodizationType
-		wantTargetVal  int
-		wantSetCount   int
-		wantWeightNil  bool // true means WeightKg should be nil; false means non-nil empty pointer
+		name          string
+		exercise      Exercise
+		periodization PeriodizationType
+		wantTargetVal int
+		wantSetCount  int
+		wantWeightNil bool // true means WeightKg should be nil; false means non-nil empty pointer
 	}{
 		{
 			name: "weighted Strength: low end of window, 4 sets, weight pointer present",
@@ -29,7 +29,7 @@ func Test_buildPlannedSets(t *testing.T) {
 		},
 		{
 			name: "weighted Hypertrophy: high end, 3 sets",
-			exercise: Exercise{ //nolint:exhaustruct
+			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeWeighted,
 				RepMin:       intPtr(5),
 				RepMax:       intPtr(10),
@@ -41,7 +41,7 @@ func Test_buildPlannedSets(t *testing.T) {
 		},
 		{
 			name: "weighted Hypertrophy: high-rep window, 3 sets",
-			exercise: Exercise{ //nolint:exhaustruct
+			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeWeighted,
 				RepMin:       intPtr(8),
 				RepMax:       intPtr(12),
@@ -53,7 +53,7 @@ func Test_buildPlannedSets(t *testing.T) {
 		},
 		{
 			name: "assisted exercise: weight pointer present",
-			exercise: Exercise{ //nolint:exhaustruct
+			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeAssisted,
 				RepMin:       intPtr(5),
 				RepMax:       intPtr(10),
@@ -65,7 +65,7 @@ func Test_buildPlannedSets(t *testing.T) {
 		},
 		{
 			name: "bodyweight exercise: nil weight",
-			exercise: Exercise{ //nolint:exhaustruct
+			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType: ExerciseTypeBodyweight,
 				RepMin:       intPtr(8),
 				RepMax:       intPtr(12),
@@ -77,7 +77,7 @@ func Test_buildPlannedSets(t *testing.T) {
 		},
 		{
 			name: "time_based exercise: nil weight, defaultTimedSets count",
-			exercise: Exercise{ //nolint:exhaustruct
+			exercise: Exercise{ //nolint:exhaustruct // Only fields read by buildPlannedSets are set.
 				ExerciseType:           ExerciseTypeTime,
 				DefaultStartingSeconds: intPtr(45),
 			},

@@ -1080,30 +1080,6 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 	return scheme.TargetReps, scheme.TargetSets
 }
 
-// createDefaultSets returns N empty sets seeded with the prescription appropriate
-// for this exercise within a session of the given periodization. N is determined
-// by deriveSchemeForExercise (same set count the planner would use). Weight is
-// nil for time_based and bodyweight; zero pointer for weighted/assisted (matches
-// the planner's lazy weight resolution).
-func (s *Service) createDefaultSets(ex Exercise, pt PeriodizationType) []Set {
-	targetValue, n := deriveSchemeForExercise(ex, pt)
-	result := make([]Set, n)
-	for i := range result {
-		var weight *float64
-		if !ex.IsTimed() && ex.ExerciseType != ExerciseTypeBodyweight {
-			weight = new(float64)
-		}
-		result[i] = Set{
-			WeightKg:       weight,
-			TargetValue:    targetValue,
-			CompletedValue: nil,
-			CompletedAt:    nil,
-			Signal:         nil,
-		}
-	}
-	return result
-}
-
 // buildSetsForAdd produces the Set slice for an exercise being added to or
 // swapping into an existing session. The session's periodization always
 // dictates TargetValue and TargetSets (so a Deadlift added in a Strength
@@ -1114,7 +1090,7 @@ func (s *Service) createDefaultSets(ex Exercise, pt PeriodizationType) []Set {
 // the user's progression isn't lost just because the prescription changed.
 // Completion fields are always reset.
 func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalSets []Set) []Set {
-	sets := s.createDefaultSets(ex, pt)
+	sets := buildPlannedSets(ex, pt)
 	if len(historicalSets) == 0 {
 		return sets
 	}
@@ -1131,7 +1107,7 @@ func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalS
 		return sets
 	}
 	for i := range sets {
-		// Only carry weight for exercise types that take weight (mirror createDefaultSets).
+		// Only carry weight for exercise types that take weight (mirrors buildPlannedSets).
 		if !ex.IsTimed() && ex.ExerciseType != ExerciseTypeBodyweight {
 			w := *seedWeight
 			sets[i].WeightKg = &w
