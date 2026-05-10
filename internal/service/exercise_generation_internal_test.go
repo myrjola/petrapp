@@ -11,6 +11,39 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
+// TestExerciseGenerator_PromptCoversSchema asserts the prompt instructs the AI
+// on every exercise_type the schema enum accepts, and mentions the
+// default_starting_seconds field. Without this, the AI silently never produces
+// (e.g.) time_based exercises because the natural-language instructions
+// exclude that option.
+func TestExerciseGenerator_PromptCoversSchema(t *testing.T) {
+	muscleGroups := []string{"quadriceps"}
+	eg := newExerciseGenerator("dummy-key", muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	prompt := eg.baseExercisePrompt("Plank")
+
+	raw, err := exerciseJSONSchema{muscleGroups: muscleGroups}.MarshalJSON()
+	if err != nil {
+		t.Fatalf("marshal schema: %v", err)
+	}
+	var schema struct {
+		Properties map[string]struct {
+			Enum []string `json:"enum"`
+		} `json:"properties"`
+	}
+	if err = json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("unmarshal schema: %v", err)
+	}
+
+	for _, exerciseType := range schema.Properties["exercise_type"].Enum {
+		if !strings.Contains(prompt, exerciseType) {
+			t.Errorf("prompt does not mention exercise_type %q from schema enum", exerciseType)
+		}
+	}
+	if !strings.Contains(prompt, "default_starting_seconds") {
+		t.Errorf("prompt does not mention default_starting_seconds field")
+	}
+}
+
 // TestExerciseJSONSchema_StrictMode asserts the OpenAI strict-mode contract:
 // every key in `properties` must also appear in `required`. Violating this
 // returns a 400 from the chat completions API and silently drops every

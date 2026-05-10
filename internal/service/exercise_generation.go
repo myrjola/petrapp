@@ -135,9 +135,11 @@ func (eg *exerciseGenerator) Generate(ctx context.Context, name string) (domain.
 	return exercise, nil
 }
 
-// generateBaseExercise creates the base exercise structure with placeholder URLs.
-func (eg *exerciseGenerator) generateBaseExercise(ctx context.Context, name string) (domain.Exercise, error) {
-	prompt := fmt.Sprintf(`Generate a detailed exercise for "%s".
+// baseExercisePrompt builds the user prompt sent to the chat completion endpoint
+// for an exercise of the given name. The exercise_type enum values listed here
+// must stay in sync with the schema's exercise_type enum.
+func (eg *exerciseGenerator) baseExercisePrompt(name string) string {
+	return fmt.Sprintf(`Generate a detailed exercise for "%s".
 
 The response must strictly follow this JSON structure:
 {
@@ -145,13 +147,20 @@ The response must strictly follow this JSON structure:
   "name": "%s",
   "category": "CATEGORY",
   "exercise_type": "EXERCISE_TYPE",
+  "default_starting_seconds": 30,
   "description_markdown": "MARKDOWN_DESCRIPTION",
   "primary_muscle_groups": ["PRIMARY_MUSCLE_GROUP1", "PRIMARY_MUSCLE_GROUP2"],
   "secondary_muscle_groups": ["SECONDARY_MUSCLE_GROUP1", "SECONDARY_MUSCLE_GROUP2"]
 }
 
 For "category", use one of: "full_body", "upper", "lower"
-For "exercise_type", use one of: "weighted", "bodyweight", "assisted"
+For "exercise_type", use one of: "weighted", "bodyweight", "assisted", "time_based"
+  - Use "time_based" for isometric holds and timed exercises (planks, wall sits, dead hangs, etc.)
+  - Use "weighted" for exercises performed with external load
+  - Use "bodyweight" for exercises performed against gravity alone
+  - Use "assisted" for exercises that reduce bodyweight (assisted pull-ups, etc.)
+For "default_starting_seconds", set a reasonable beginner duration in seconds (e.g. 20-45)
+when exercise_type is "time_based"; otherwise set it to null.
 For "muscle_groups", use only from this list: %s
 
 The "description_markdown" must follow this exact structure:
@@ -179,6 +188,11 @@ Include relevant safety considerations. The entire description should be 150-200
 
 Return only the valid JSON object with no additional text or explanation.`,
 		name, name, strings.Join(eg.muscleGroups, ", "))
+}
+
+// generateBaseExercise creates the base exercise structure with placeholder URLs.
+func (eg *exerciseGenerator) generateBaseExercise(ctx context.Context, name string) (domain.Exercise, error) {
+	prompt := eg.baseExercisePrompt(name)
 
 	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
 		Name:        "exercise",
