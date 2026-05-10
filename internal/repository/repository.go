@@ -60,9 +60,15 @@ type SessionRepository interface {
 	DeleteWeek(ctx context.Context, monday time.Time) error
 
 	// Read-only specialised queries.
-	ListSetsForExerciseSince(ctx context.Context, exerciseID int, sinceDate time.Time) ([]domain.ExerciseSetHistory, error)
-	GetLatestStartingWeightBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (domain.LatestStartingSet, error)
-	GetLatestSuccessfulSecondsBefore(ctx context.Context, exerciseID int, beforeDate time.Time) (int, error)
+	ListSetsForExerciseSince(
+		ctx context.Context, exerciseID int, sinceDate time.Time,
+	) ([]domain.ExerciseSetHistory, error)
+	GetLatestStartingWeightBefore(
+		ctx context.Context, exerciseID int, beforeDate time.Time,
+	) (domain.LatestStartingSet, error)
+	GetLatestSuccessfulSecondsBefore(
+		ctx context.Context, exerciseID int, beforeDate time.Time,
+	) (int, error)
 	CountCompleted(ctx context.Context) (int, error)
 }
 

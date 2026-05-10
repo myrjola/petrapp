@@ -17,8 +17,8 @@ func newTestExerciseFor(t *testing.T) domain.Exercise {
 		DescriptionMarkdown:   "# Test_Repo_Bench_Press_Sessions",
 		PrimaryMuscleGroups:   []string{"Chest"},
 		SecondaryMuscleGroups: []string{"Triceps"},
-		RepMin:                ptrInt(5),
-		RepMax:                ptrInt(10),
+		RepMin:                new(5),
+		RepMax:                new(10),
 	}
 }
 

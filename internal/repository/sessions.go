@@ -59,11 +59,15 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 			completedAtStr    sql.NullString
 			periodizationType domain.PeriodizationType
 		)
-		if err = rows.Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType); err != nil {
+		if err = rows.Scan(
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType,
+		); err != nil {
 			return nil, fmt.Errorf("scan session row: %w", err)
 		}
 		var session domain.Session
-		session, err = parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType)
+		session, err = parseSessionRow(
+			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType,
+		)
 		if err != nil {
 			return nil, err
 		}
