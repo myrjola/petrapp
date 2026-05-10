@@ -594,16 +594,23 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = page.Locator("a[href$='/swap']").First().Click(); err != nil {
 		t.Fatalf("click swap from new detail: %v", err)
 	}
+	// Both the previous DETAIL page and the SWAP page render an
+	// `a[data-back-button]`, so we must wait for a swap-only element before
+	// locating the back-link — otherwise a fast click could fire on the old
+	// page's back-link (whose href points at the workout overview, not the
+	// detail) and the WaitForURL below would never see newDetailURL.
+	if err = page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Swap to this exercise"}).First().WaitFor(); err != nil {
+		t.Fatalf("Flow 4: wait for swap page: %v", err)
+	}
 	flow4SwapURL := page.URL()
 	backLink := page.Locator("a[data-back-button]")
-	if err = backLink.WaitFor(); err != nil {
-		t.Fatalf("wait for data-back-button: %v", err)
-	}
 	if err = backLink.Click(); err != nil {
 		t.Fatalf("click data-back-button: %v", err)
 	}
 	// Should traverse to existing newDETAIL entry rather than push.
 	if err = page.WaitForURL(newDetailURL); err != nil {
+		dumpNavDiagnostics(t, page, "Flow 4 data-back-button traversal", newDetailURL)
 		t.Fatalf("Flow 4: expected newDetailURL %s after data-back-button: %v", newDetailURL, err)
 	}
 	// Forward should go to SWAP (proves it was a traverse, not a push).
@@ -675,6 +682,29 @@ func Test_playwright_stacknav(t *testing.T) {
 	if got := page.URL(); strings.Contains(got, "/add-exercise") {
 		t.Errorf("Flow 6: forward URL = %q contains /add-exercise — it should have been replaced", got)
 	}
+}
+
+// dumpNavDiagnostics logs the page URL, the Navigation API entry stack, the
+// current load state, and the page heading. Called from t.Fatalf paths whose
+// failure mode is "URL is not what we expected" — the dump narrows the
+// post-mortem from "what happened in the browser?" to a specific divergence.
+func dumpNavDiagnostics(t *testing.T, page playwright.Page, where, wantURL string) {
+	t.Helper()
+	t.Logf("[diag %s] want URL = %s", where, wantURL)
+	t.Logf("[diag %s] page.URL() = %s", where, page.URL())
+	state, err := page.Evaluate(`() => ({
+		readyState: document.readyState,
+		hasNav: 'navigation' in window,
+		currentIndex: window.navigation?.currentEntry?.index ?? null,
+		entries: (window.navigation?.entries() ?? []).map(e => ({index: e.index, url: e.url})),
+		heading: document.querySelector('h1')?.textContent ?? null,
+		invalidationMeta: document.querySelector('meta[name=invalidation-token]')?.content ?? null,
+	})`)
+	if err != nil {
+		t.Logf("[diag %s] evaluate failed: %v", where, err)
+		return
+	}
+	t.Logf("[diag %s] state = %+v", where, state)
 }
 
 // addExerciseToWorkout navigates from the workout page to the add-exercise page,
