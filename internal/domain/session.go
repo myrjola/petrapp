@@ -74,3 +74,16 @@ func (s *Session) SetDifficulty(rating int) error {
 	s.DifficultyRating = &rating
 	return nil
 }
+
+// MarkWarmupComplete records the warmup completion timestamp for the
+// exercise slot identified by slotID. Returns ErrSlotNotFound if no slot
+// matches.
+func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID == slotID {
+			s.ExerciseSets[i].WarmupCompletedAt = &now
+			return nil
+		}
+	}
+	return ErrSlotNotFound
+}

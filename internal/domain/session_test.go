@@ -94,3 +94,37 @@ func Test_Session_SetDifficulty_OutOfRange(t *testing.T) {
 		}
 	}
 }
+
+func Test_Session_MarkWarmupComplete_KnownSlot(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct
+		ExerciseSets: []domain.ExerciseSet{
+			{ID: 11, Exercise: domain.Exercise{ID: 1}, Sets: nil, WarmupCompletedAt: nil}, //nolint:exhaustruct
+			{ID: 12, Exercise: domain.Exercise{ID: 2}, Sets: nil, WarmupCompletedAt: nil}, //nolint:exhaustruct
+		},
+	}
+
+	if err := sess.MarkWarmupComplete(12, now); err != nil {
+		t.Fatalf("MarkWarmupComplete: %v", err)
+	}
+	if sess.ExerciseSets[1].WarmupCompletedAt == nil || !sess.ExerciseSets[1].WarmupCompletedAt.Equal(now) {
+		t.Errorf("slot 12 WarmupCompletedAt = %v, want %v", sess.ExerciseSets[1].WarmupCompletedAt, now)
+	}
+	if sess.ExerciseSets[0].WarmupCompletedAt != nil {
+		t.Errorf("slot 11 WarmupCompletedAt mutated to %v, want nil", sess.ExerciseSets[0].WarmupCompletedAt)
+	}
+}
+
+func Test_Session_MarkWarmupComplete_UnknownSlot(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct
+		ExerciseSets: []domain.ExerciseSet{
+			{ID: 11, Exercise: domain.Exercise{ID: 1}, Sets: nil, WarmupCompletedAt: nil}, //nolint:exhaustruct
+		},
+	}
+
+	err := sess.MarkWarmupComplete(99, now)
+	if !errors.Is(err, domain.ErrSlotNotFound) {
+		t.Fatalf("got %v, want ErrSlotNotFound", err)
+	}
+}
