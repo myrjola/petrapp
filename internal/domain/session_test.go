@@ -10,7 +10,7 @@ import (
 
 func Test_Session_Start_FromZero(t *testing.T) {
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		Date: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 	}
 
@@ -25,7 +25,7 @@ func Test_Session_Start_FromZero(t *testing.T) {
 func Test_Session_Start_AlreadyStarted_ReturnsErrAlreadyStarted(t *testing.T) {
 	earlier := time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		Date:      time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 		StartedAt: earlier,
 	}
@@ -42,7 +42,7 @@ func Test_Session_Start_AlreadyStarted_ReturnsErrAlreadyStarted(t *testing.T) {
 func Test_Session_Complete_AfterStart(t *testing.T) {
 	startAt := time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		Date:      time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 		StartedAt: startAt,
 	}
@@ -57,7 +57,7 @@ func Test_Session_Complete_AfterStart(t *testing.T) {
 
 func Test_Session_Complete_NotStarted_ReturnsErrNotStarted(t *testing.T) {
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		Date: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 	}
 
@@ -72,7 +72,7 @@ func Test_Session_Complete_NotStarted_ReturnsErrNotStarted(t *testing.T) {
 
 func Test_Session_SetDifficulty_ValidRange(t *testing.T) {
 	for _, rating := range []int{1, 2, 3, 4, 5} {
-		sess := domain.Session{} //nolint:exhaustruct
+		sess := domain.Session{} //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		if err := sess.SetDifficulty(rating); err != nil {
 			t.Errorf("SetDifficulty(%d): %v", rating, err)
 		}
@@ -84,7 +84,7 @@ func Test_Session_SetDifficulty_ValidRange(t *testing.T) {
 
 func Test_Session_SetDifficulty_OutOfRange(t *testing.T) {
 	for _, rating := range []int{0, -1, 6, 100} {
-		sess := domain.Session{} //nolint:exhaustruct
+		sess := domain.Session{} //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		err := sess.SetDifficulty(rating)
 		if !errors.Is(err, domain.ErrInvalidDifficultyRating) {
 			t.Errorf("SetDifficulty(%d): got %v, want ErrInvalidDifficultyRating", rating, err)
@@ -97,10 +97,16 @@ func Test_Session_SetDifficulty_OutOfRange(t *testing.T) {
 
 func Test_Session_MarkWarmupComplete_KnownSlot(t *testing.T) {
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		ExerciseSets: []domain.ExerciseSet{
-			{ID: 11, Exercise: domain.Exercise{ID: 1}, Sets: nil, WarmupCompletedAt: nil}, //nolint:exhaustruct
-			{ID: 12, Exercise: domain.Exercise{ID: 2}, Sets: nil, WarmupCompletedAt: nil}, //nolint:exhaustruct
+			{ //nolint:exhaustruct // Test sets omit irrelevant fields.
+				ID:       11,
+				Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Test exercises omit display fields.
+			},
+			{ //nolint:exhaustruct // Test sets omit irrelevant fields.
+				ID:       12,
+				Exercise: domain.Exercise{ID: 2}, //nolint:exhaustruct // Test exercises omit display fields.
+			},
 		},
 	}
 
@@ -117,9 +123,12 @@ func Test_Session_MarkWarmupComplete_KnownSlot(t *testing.T) {
 
 func Test_Session_MarkWarmupComplete_UnknownSlot(t *testing.T) {
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
 		ExerciseSets: []domain.ExerciseSet{
-			{ID: 11, Exercise: domain.Exercise{ID: 1}, Sets: nil, WarmupCompletedAt: nil}, //nolint:exhaustruct
+			{ //nolint:exhaustruct // Test sets omit irrelevant fields.
+				ID:       11,
+				Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Test exercises omit display fields.
+			},
 		},
 	}
 
