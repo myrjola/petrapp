@@ -43,3 +43,14 @@ type Session struct {
 	ExerciseSets      []ExerciseSet
 	PeriodizationType PeriodizationType
 }
+
+// Start marks the session as begun at now. Returns ErrAlreadyStarted if the
+// session was previously started; the existing StartedAt is left untouched
+// in that case.
+func (s *Session) Start(now time.Time) error {
+	if !s.StartedAt.IsZero() {
+		return ErrAlreadyStarted
+	}
+	s.StartedAt = now
+	return nil
+}
