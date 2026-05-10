@@ -32,9 +32,11 @@ func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
 	_ = logger
 	prefs := newSQLitePreferencesRepository(db)
 	muscleTargets := newSQLiteMuscleGroupTargetRepository(db)
+	featureFlags := newSQLiteFeatureFlagRepository(db)
 	return &Repositories{ //nolint:exhaustruct // Other fields wired in later tasks.
 		Preferences:   prefs,
 		MuscleTargets: muscleTargets,
+		FeatureFlags:  featureFlags,
 	}
 }
 
