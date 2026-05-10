@@ -14,16 +14,6 @@ import (
 	"github.com/myrjola/petrapp/internal/workout"
 )
 
-// formatTarget returns the display string for a set target.
-// For timed exercises it appends "s" (e.g. "30s").
-// For rep-based exercises it returns the planner's target integer.
-func formatTarget(exercise workout.Exercise, target int) string {
-	if exercise.IsTimed() {
-		return fmt.Sprintf("%ds", target)
-	}
-	return strconv.Itoa(target)
-}
-
 type setDisplay struct {
 	Set          workout.Set
 	TargetStr    string // Pre-formatted target string (e.g. "5", "30s").
@@ -47,24 +37,16 @@ type exerciseSetTemplateData struct {
 }
 
 func prepareSetsDisplay(exercise workout.Exercise, sets []workout.Set) []setDisplay {
-	unit := "reps"
-	if exercise.IsTimed() {
-		unit = "seconds"
-	}
+	unit := exercise.SetValueUnit()
 	displays := make([]setDisplay, len(sets))
 	for i, set := range sets {
-		targetStr := formatTarget(exercise, set.TargetValue)
 		completedStr := ""
 		if set.CompletedValue != nil {
-			if exercise.IsTimed() {
-				completedStr = fmt.Sprintf("%ds", *set.CompletedValue)
-			} else {
-				completedStr = strconv.Itoa(*set.CompletedValue)
-			}
+			completedStr = exercise.FormatSetValue(*set.CompletedValue)
 		}
 		displays[i] = setDisplay{
 			Set:          set,
-			TargetStr:    targetStr,
+			TargetStr:    exercise.FormatSetValue(set.TargetValue),
 			CompletedStr: completedStr,
 			Unit:         unit,
 			Number:       i + 1,
