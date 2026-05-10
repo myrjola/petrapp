@@ -1,6 +1,6 @@
 
 .DEFAULT_GOAL := info
-.PHONY: info ci gomod init build test dev lint build-docker fly-sqlite3 clean sec \
+.PHONY: info ci gomod init build test dev dev-tailnet lint build-docker fly-sqlite3 clean sec \
         migratetest repomix repomix-clipboard setup-git-hooks lint-fix \
         fly-wake fly-sql-readonly fly-sql-write fly-backup fly-logs fly-pprof-cpu fly-pprof-goroutine
 
@@ -57,6 +57,11 @@ dev:
 	@echo "Running dev server with debug build..."
 	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
 	bash scripts/dev.sh
+
+dev-tailnet:
+	@echo "Running dev server bound to tailnet IP..."
+	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
+	bash scripts/dev-tailnet.sh
 
 build-docker:
 	@echo "Building Docker image..."
