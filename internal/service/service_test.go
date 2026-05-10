@@ -1,4 +1,4 @@
-package workout_test
+package service_test
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/testhelpers"
-	"github.com/myrjola/petrapp/internal/workout"
 )
 
-func setupTestService(t *testing.T) (context.Context, *workout.Service) {
+func setupTestService(t *testing.T) (context.Context, *service.Service) {
 	t.Helper()
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
@@ -35,8 +36,8 @@ func setupTestService(t *testing.T) (context.Context, *workout.Service) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	// Set preferences: Mon, Wed, Fri at 60 min.
-	svc := workout.NewService(db, logger, "")
-	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+	svc := service.NewService(db, logger, "")
+	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
 		MondayMinutes:    60,
 		WednesdayMinutes: 60,
 		FridayMinutes:    60,
@@ -106,7 +107,7 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 	// Request a date in a different week.
 	nextWeekTuesday := time.Now().AddDate(0, 0, 14)
 	_, err := svc.GetSession(ctx, nextWeekTuesday)
-	if !errors.Is(err, workout.ErrNotFound) {
+	if !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("want ErrNotFound for unplanned date, got %v", err)
 	}
 }
@@ -140,7 +141,7 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *tes
 	}
 
 	// Change to Tue, Thu, Sat at 45 min.
-	if err := svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+	if err := svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
 		TuesdayMinutes:  45,
 		ThursdayMinutes: 45,
 		SaturdayMinutes: 45,
@@ -184,7 +185,7 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 	}
 
 	// Change preferences to Tue, Thu, Sat.
-	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
 		TuesdayMinutes:  45,
 		ThursdayMinutes: 45,
 		SaturdayMinutes: 45,
@@ -218,37 +219,37 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 	// Two synthetic exercises sharing a secondary muscle group so we can verify
 	// both the primary (1.0/set) and secondary (0.5/set) weights and that
 	// contributions accumulate across exercises.
-	bench := workout.Exercise{ //nolint:exhaustruct // ID, Description etc. unused by the aggregator.
+	bench := domain.Exercise{ //nolint:exhaustruct // ID, Description etc. unused by the aggregator.
 		Name:                  "Bench",
 		PrimaryMuscleGroups:   []string{"Chest"},
 		SecondaryMuscleGroups: []string{"Triceps", "Shoulders"},
 	}
-	dip := workout.Exercise{ //nolint:exhaustruct // ID, Description etc. unused by the aggregator.
+	dip := domain.Exercise{ //nolint:exhaustruct // ID, Description etc. unused by the aggregator.
 		Name:                  "Dip",
 		PrimaryMuscleGroups:   []string{"Triceps"},
 		SecondaryMuscleGroups: []string{"Chest"},
 	}
 
 	completed := time.Now().UTC()
-	completedSet := workout.Set{ //nolint:exhaustruct // Value and weight are not relevant for volume.
+	completedSet := domain.Set{ //nolint:exhaustruct // Value and weight are not relevant for volume.
 		TargetValue: 12,
 		CompletedAt: &completed,
 	}
-	plannedSet := workout.Set{ //nolint:exhaustruct // CompletedAt nil → planned but not completed.
+	plannedSet := domain.Set{ //nolint:exhaustruct // CompletedAt nil → planned but not completed.
 		TargetValue: 12,
 	}
 
-	benchSet := workout.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
+	benchSet := domain.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
 		Exercise: bench,
-		Sets:     []workout.Set{completedSet, completedSet, plannedSet},
+		Sets:     []domain.Set{completedSet, completedSet, plannedSet},
 	}
-	dipSet := workout.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
+	dipSet := domain.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
 		Exercise: dip,
-		Sets:     []workout.Set{plannedSet, plannedSet},
+		Sets:     []domain.Set{plannedSet, plannedSet},
 	}
-	sessions := []workout.Session{
+	sessions := []domain.Session{
 		{ //nolint:exhaustruct // Date and timestamps are not relevant for the volume aggregator.
-			ExerciseSets: []workout.ExerciseSet{benchSet, dipSet},
+			ExerciseSets: []domain.ExerciseSet{benchSet, dipSet},
 		},
 	}
 
@@ -257,7 +258,7 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 		t.Fatalf("WeeklyMuscleGroupVolume: %v", err)
 	}
 
-	byName := make(map[string]workout.MuscleGroupVolume, len(got))
+	byName := make(map[string]domain.MuscleGroupVolume, len(got))
 	for _, v := range got {
 		byName[v.Name] = v
 	}
@@ -331,7 +332,7 @@ func Test_WeeklyMuscleGroupVolume_EmptyWeek(t *testing.T) {
 	}
 }
 
-func extractExerciseIDs(session workout.Session) []int {
+func extractExerciseIDs(session domain.Session) []int {
 	ids := make([]int, len(session.ExerciseSets))
 	for i, es := range session.ExerciseSets {
 		ids[i] = es.Exercise.ID
@@ -360,7 +361,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	}
 
 	// Create workout service
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	// Insert necessary muscle groups
 	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
@@ -442,11 +443,11 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	repMin, repMax := 5, 10
-	updatedExercise := workout.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds not needed for this test.
+	updatedExercise := domain.Exercise{ //nolint:exhaustruct // DefaultStartingSeconds not needed for this test.
 		ID:                    exerciseID,
 		Name:                  "Updated Test Exercise",
-		Category:              workout.CategoryLower,
-		ExerciseType:          workout.ExerciseTypeWeighted,
+		Category:              domain.CategoryLower,
+		ExerciseType:          domain.ExerciseTypeWeighted,
 		DescriptionMarkdown:   "Updated test description",
 		PrimaryMuscleGroups:   []string{"Quads", "Glutes"},
 		SecondaryMuscleGroups: []string{"Hamstrings", "Core"},
@@ -523,7 +524,7 @@ func Test_AddExercise(t *testing.T) {
 	}
 
 	// Create workout service
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	// Insert necessary muscle groups
 	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
@@ -706,7 +707,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
 		if err = tryInsertMuscleGroup(ctx, t, db, group); err != nil {
@@ -806,7 +807,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	if err = tryInsertMuscleGroup(ctx, t, db, "Core"); err != nil {
 		t.Fatalf("insert muscle group: %v", err)
@@ -855,7 +856,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var plankSets []workout.Set
+	var plankSets []domain.Set
 	for _, es := range session.ExerciseSets {
 		if es.Exercise.ID == plankID {
 			plankSets = es.Sets
@@ -899,7 +900,7 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	for _, group := range []string{"Core", "Quads"} {
 		if err = tryInsertMuscleGroup(ctx, t, db, group); err != nil {
@@ -970,7 +971,7 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var plankSets []workout.Set
+	var plankSets []domain.Set
 	for _, es := range session.ExerciseSets {
 		if es.ID == squatSlotID {
 			if es.Exercise.ID != plankID {
@@ -1022,7 +1023,7 @@ func createTestExercise(ctx context.Context, t *testing.T, db *sqlite.Database, 
 }
 
 // Helper function to count exercise sets for a specific workout date.
-func countExerciseSetsForWorkout(ctx context.Context, t *testing.T, svc *workout.Service, date time.Time) (int, error) {
+func countExerciseSetsForWorkout(ctx context.Context, t *testing.T, svc *service.Service, date time.Time) (int, error) {
 	t.Helper()
 	session, err := svc.GetSession(ctx, date)
 	if err != nil {
@@ -1042,7 +1043,7 @@ func countExerciseSetsForWorkout(ctx context.Context, t *testing.T, svc *workout
 func exerciseExistsInWorkout(
 	ctx context.Context,
 	t *testing.T,
-	svc *workout.Service,
+	svc *service.Service,
 	date time.Time,
 	exerciseID int,
 ) (bool, error) {
@@ -1063,11 +1064,11 @@ func exerciseExistsInWorkout(
 }
 
 // Helper function to check if a workout exists for a date.
-func workoutExistsForDate(ctx context.Context, t *testing.T, svc *workout.Service, date time.Time) (bool, error) {
+func workoutExistsForDate(ctx context.Context, t *testing.T, svc *service.Service, date time.Time) (bool, error) {
 	t.Helper()
 	_, err := svc.GetSession(ctx, date)
 	if err != nil {
-		if errors.Is(err, workout.ErrNotFound) {
+		if errors.Is(err, domain.ErrNotFound) {
 			return false, nil
 		}
 		return false, err
@@ -1095,10 +1096,10 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	// Save preferences with Mon, Wed, Fri as workout days.
-	if err = svc.SaveUserPreferences(ctx, workout.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
+	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
 		MondayMinutes:    60,
 		WednesdayMinutes: 60,
 		FridayMinutes:    60,
@@ -1114,7 +1115,7 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 
 	// Collect periodization types for scheduled days (Mon=0, Wed=2, Fri=4).
 	scheduledIndices := []int{0, 2, 4}
-	types := make([]workout.PeriodizationType, len(scheduledIndices))
+	types := make([]domain.PeriodizationType, len(scheduledIndices))
 	for j, i := range scheduledIndices {
 		types[j] = sessions[i].PeriodizationType
 	}
@@ -1159,12 +1160,12 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("get exercise id: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	today := time.Now()
 
 	// No history: expect 0.
-	got, err := svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight no history: %v", err)
 	}
@@ -1203,7 +1204,7 @@ func Test_GetStartingWeight(t *testing.T) {
 
 	// Same periodization (strength → strength): the latest successful set (set 2 at
 	// 100kg) carries over unchanged, ignoring the failed set 3.
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
 	}
@@ -1213,7 +1214,7 @@ func Test_GetStartingWeight(t *testing.T) {
 
 	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): Epley conversion
 	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.1, rounded to 0.5 = 92.0.
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationHypertrophy)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationHypertrophy)
 	if err != nil {
 		t.Fatalf("GetStartingWeight cross-periodization: %v", err)
 	}
@@ -1247,7 +1248,7 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert today's sets: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight ignoring today: %v", err)
 	}
@@ -1283,7 +1284,7 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert fail sets: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight fallback: %v", err)
 	}
@@ -1329,7 +1330,7 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 		t.Fatalf("get exercise id: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	today := time.Now()
 
@@ -1359,7 +1360,7 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	}
 
 	// Same periodization: -50 kg carries over unchanged.
-	got, err := svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationStrength)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight strength→strength: %v", err)
 	}
@@ -1370,7 +1371,7 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): more reps
 	// require more assistance, so the recommendation must be more negative.
 	// -50 * (1 + 8/30) / (1 + 5/30) ≈ -54.29 → snaps to -54.5.
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, workout.PeriodizationHypertrophy)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationHypertrophy)
 	if err != nil {
 		t.Fatalf("GetStartingWeight strength→hypertrophy: %v", err)
 	}
@@ -1410,7 +1411,7 @@ func Test_GetStartingSeconds(t *testing.T) {
 		t.Fatalf("get exercise id: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 	today := time.Now()
 
 	// Case 1: no history → fallback to default_starting_seconds.
@@ -1511,7 +1512,7 @@ func Test_BuildTimedProgression(t *testing.T) {
 		t.Fatalf("get exercise id: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	today := time.Now().Format("2006-01-02")
 	todayTime, _ := time.Parse("2006-01-02", today)
@@ -1619,11 +1620,11 @@ func Test_RecordSetCompletion(t *testing.T) {
 		t.Fatalf("insert set: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 	date, _ := time.Parse("2006-01-02", today)
 
 	weight := 102.5
-	if err = svc.RecordSet(ctx, date, weID, 0, workout.SignalOnTarget, &weight, 5); err != nil {
+	if err = svc.RecordSet(ctx, date, weID, 0, domain.SignalOnTarget, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -1632,7 +1633,7 @@ func Test_RecordSetCompletion(t *testing.T) {
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var es *workout.ExerciseSet
+	var es *domain.ExerciseSet
 	for i := range sess.ExerciseSets {
 		if sess.ExerciseSets[i].Exercise.ID == exerciseID {
 			es = &sess.ExerciseSets[i]
@@ -1644,7 +1645,7 @@ func Test_RecordSetCompletion(t *testing.T) {
 	}
 
 	set := es.Sets[0]
-	if set.Signal == nil || *set.Signal != workout.SignalOnTarget {
+	if set.Signal == nil || *set.Signal != domain.SignalOnTarget {
 		t.Errorf("signal: want on_target, got %v", set.Signal)
 	}
 	if set.WeightKg == nil || *set.WeightKg != 102.5 {
@@ -1713,7 +1714,7 @@ func Test_BuildProgression(t *testing.T) {
 		t.Fatalf("insert sets: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 	date, _ := time.Parse("2006-01-02", today)
 
 	// No history: starting weight 0, target 8 reps (hypertrophy).
@@ -1731,7 +1732,7 @@ func Test_BuildProgression(t *testing.T) {
 
 	// Record set 0 as TooLight at 0kg.
 	weight := 0.0
-	if err = svc.RecordSet(ctx, date, weID, 0, workout.SignalTooLight, &weight, 8); err != nil {
+	if err = svc.RecordSet(ctx, date, weID, 0, domain.SignalTooLight, &weight, 8); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -1818,7 +1819,7 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 		t.Fatalf("insert workout_exercise: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 	date, _ := time.Parse("2006-01-02", todayStr)
 
 	prog, err := svc.BuildProgression(ctx, date, exerciseID)
@@ -1863,7 +1864,7 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	// Deadlift-like exercise: rep_min=3, rep_max=6.
 	var deadliftID int
@@ -1913,7 +1914,7 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 				t.Fatalf("GetSession: %v", errGet)
 			}
 
-			var sets []workout.Set
+			var sets []domain.Set
 			for _, es := range session.ExerciseSets {
 				if es.Exercise.ID == deadliftID {
 					sets = es.Sets
@@ -1961,7 +1962,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	if err = tryInsertMuscleGroup(ctx, t, db, "Quads"); err != nil {
 		t.Fatalf("insert muscle group: %v", err)
@@ -2043,7 +2044,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var sets []workout.Set
+	var sets []domain.Set
 	for _, es := range session.ExerciseSets {
 		if es.ID == squatSlotID {
 			if es.Exercise.ID != deadliftID {
@@ -2111,7 +2112,7 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 		t.Fatalf("insert exercise: %v", err)
 	}
 
-	svc := workout.NewService(db, logger, "")
+	svc := service.NewService(db, logger, "")
 
 	today := time.Now().Format("2006-01-02")
 
