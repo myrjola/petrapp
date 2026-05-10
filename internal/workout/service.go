@@ -187,6 +187,11 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		return fmt.Errorf("plan week: %w", err)
 	}
 
+	exerciseByID := make(map[int]Exercise, len(exercises))
+	for _, ex := range exercises {
+		exerciseByID[ex.ID] = ex
+	}
+
 	sessionAggrs := make([]sessionAggregate, len(plannedSessions))
 	for i, ps := range plannedSessions {
 		periodType := PeriodizationStrength
@@ -196,17 +201,9 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 
 		exerciseSets := make([]exerciseSetAggregate, len(ps.ExerciseSets))
 		for j, pes := range ps.ExerciseSets {
-			sets := make([]Set, len(pes.Sets))
-			for k, planSet := range pes.Sets {
-				// RestSeconds is computed by DeriveScheme and carried in PlannedSet but not yet
-				// persisted on Set — rest UI is out of scope for the rep-scheme spec.
-				sets[k] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
-					TargetValue: planSet.TargetValue,
-				}
-			}
 			exerciseSets[j] = exerciseSetAggregate{ //nolint:exhaustruct // ID is auto-assigned, WarmupCompletedAt starts nil.
 				ExerciseID: pes.ExerciseID,
-				Sets:       sets,
+				Sets:       buildPlannedSets(exerciseByID[pes.ExerciseID], periodType),
 			}
 		}
 
