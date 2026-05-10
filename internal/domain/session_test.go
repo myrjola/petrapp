@@ -230,3 +230,91 @@ func Test_Session_UpdateCompletedValue_OutOfBoundsIndex(t *testing.T) {
 		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
 	}
 }
+
+func Test_Session_RecordSet_Weighted(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	weight := 80.0
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only ID is read.
+				Sets: []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+
+	err := sess.RecordSet(11, 0, domain.SignalOnTarget, &weight, 5, now)
+	if err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+
+	got := sess.ExerciseSets[0].Sets[0]
+	if got.WeightKg == nil || *got.WeightKg != weight {
+		t.Errorf("WeightKg = %v, want %v", got.WeightKg, weight)
+	}
+	if got.CompletedValue == nil || *got.CompletedValue != 5 {
+		t.Errorf("CompletedValue = %v, want 5", got.CompletedValue)
+	}
+	if got.Signal == nil || *got.Signal != domain.SignalOnTarget {
+		t.Errorf("Signal = %v, want SignalOnTarget", got.Signal)
+	}
+	if got.CompletedAt == nil || !got.CompletedAt.Equal(now) {
+		t.Errorf("CompletedAt = %v, want %v", got.CompletedAt, now)
+	}
+}
+
+func Test_Session_RecordSet_Timed_NoWeight(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11,
+				Exercise: domain.Exercise{ //nolint:exhaustruct // Only ID and ExerciseType are read.
+					ID: 1, ExerciseType: domain.ExerciseTypeTime,
+				},
+				Sets: []domain.Set{{TargetValue: 30}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+
+	err := sess.RecordSet(11, 0, domain.SignalOnTarget, nil, 32, now)
+	if err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+
+	got := sess.ExerciseSets[0].Sets[0]
+	if got.WeightKg != nil {
+		t.Errorf("WeightKg = %v, want nil for timed set", got.WeightKg)
+	}
+	if got.CompletedValue == nil || *got.CompletedValue != 32 {
+		t.Errorf("CompletedValue = %v, want 32", got.CompletedValue)
+	}
+	if got.Signal == nil || *got.Signal != domain.SignalOnTarget {
+		t.Errorf("Signal = %v, want SignalOnTarget", got.Signal)
+	}
+}
+
+func Test_Session_RecordSet_UnknownSlot(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{} //nolint:exhaustruct // Empty session.
+	err := sess.RecordSet(99, 0, domain.SignalOnTarget, nil, 5, now)
+	if !errors.Is(err, domain.ErrSlotNotFound) {
+		t.Fatalf("got %v, want ErrSlotNotFound", err)
+	}
+}
+
+func Test_Session_RecordSet_OutOfBoundsIndex(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only ID is read.
+				Sets: []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+	err := sess.RecordSet(11, 5, domain.SignalOnTarget, nil, 5, now)
+	if !errors.Is(err, domain.ErrSetIndexOutOfBounds) {
+		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
+	}
+}

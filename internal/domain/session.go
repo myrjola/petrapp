@@ -88,6 +88,40 @@ func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
 	return ErrSlotNotFound
 }
 
+// RecordSet records the completion of a single set: signal (perceived
+// effort), weight (nil for time-based exercises), the actual value (reps
+// or seconds), and the completion timestamp. Returns ErrSlotNotFound or
+// ErrSetIndexOutOfBounds when the lookup fails.
+func (s *Session) RecordSet(
+	slotID, setIndex int,
+	signal Signal,
+	weightKg *float64,
+	completedValue int,
+	now time.Time,
+) error {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID != slotID {
+			continue
+		}
+		if setIndex < 0 || setIndex >= len(s.ExerciseSets[i].Sets) {
+			return ErrSetIndexOutOfBounds
+		}
+		set := &s.ExerciseSets[i].Sets[setIndex]
+		sigCopy := signal
+		set.Signal = &sigCopy
+		if weightKg != nil {
+			w := *weightKg
+			set.WeightKg = &w
+		}
+		v := completedValue
+		set.CompletedValue = &v
+		t := now
+		set.CompletedAt = &t
+		return nil
+	}
+	return ErrSlotNotFound
+}
+
 // UpdateCompletedValue records the actual reps (or seconds for time-based)
 // achieved on a set, and stamps the completion time. Returns
 // ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
