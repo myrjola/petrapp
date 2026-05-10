@@ -1,6 +1,6 @@
 
 .DEFAULT_GOAL := info
-.PHONY: info ci gomod init build test dev dev-tailnet lint build-docker fly-sqlite3 clean sec \
+.PHONY: info ci gomod init build test dev dev-tailnet dev-tailscale-https lint build-docker fly-sqlite3 clean sec \
         migratetest repomix repomix-clipboard setup-git-hooks lint-fix \
         fly-wake fly-sql-readonly fly-sql-write fly-backup fly-logs fly-pprof-cpu fly-pprof-goroutine
 
@@ -62,6 +62,10 @@ dev-tailnet:
 	@echo "Running dev server bound to tailnet IP..."
 	go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
 	bash scripts/dev-tailnet.sh
+
+.PHONY: dev-tailscale-https
+dev-tailscale-https: build  ## Build and run with Tailscale HTTPS (for iOS WebAuthn)
+	bash scripts/dev-tailscale-https.sh
 
 build-docker:
 	@echo "Building Docker image..."
