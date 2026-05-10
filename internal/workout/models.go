@@ -69,6 +69,11 @@ const (
 
 func RegionFor(name string) MuscleGroupRegion { return domain.RegionFor(name) }
 
+// ErrNotFound is re-exported from internal/domain for the duration of the
+// rearchitecture. Phase 4 will retire this alias along with the rest of the
+// workout package.
+var ErrNotFound = domain.ErrNotFound
+
 // SwapSimilarityScore is re-exported from internal/domain. Handlers call
 // workout.SwapSimilarityScore today; that import path keeps working through
 // this phase.
