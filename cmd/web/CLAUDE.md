@@ -48,7 +48,7 @@ type workoutTemplateData struct {
 - Transform enums to display-friendly structures with labels
 - Compute derived values and format data before template rendering
 - Create maps for lookups to avoid complex template logic
-- **Don't recompute domain rules.** Handlers may format primitives and shape data, but any value that depends on multiple domain fields must come from a method on the domain type. If you find yourself writing `if exercise.X && session.Y { ... }` in a handler, move it to `internal/workout/`.
+- **Don't recompute domain rules.** Handlers may format primitives and shape data, but any value that depends on multiple domain fields must come from a method on the domain type. If you find yourself writing `if exercise.X && session.Y { ... }` in a handler, move it to `internal/domain/`.
 
 Example:
 
