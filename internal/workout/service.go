@@ -1113,7 +1113,7 @@ func (s *Service) buildSetsForAdd(ex Exercise, pt PeriodizationType, historicalS
 		return sets
 	}
 	for i := range sets {
-		// Only carry weight for exercise types that take weight (mirrors buildPlannedSets).
+		// Only seed weight for exercise types that carry weight (same guard as the allocation above).
 		if !ex.IsTimed() && ex.ExerciseType != ExerciseTypeBodyweight {
 			w := *seedWeight
 			sets[i].WeightKg = &w
