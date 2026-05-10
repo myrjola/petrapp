@@ -1,15 +1,15 @@
-package exerciseprogression_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/myrjola/petrapp/internal/exerciseprogression"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 func TestCurrentSet_FirstSet(t *testing.T) {
 	tests := []struct {
 		name           string
-		periodization  exerciseprogression.PeriodizationType
+		periodization  domain.PeriodizationType
 		repMin         int
 		repMax         int
 		startingWeight float64
@@ -18,7 +18,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 	}{
 		{
 			name:           "strength returns 5 reps",
-			periodization:  exerciseprogression.Strength,
+			periodization:  domain.PeriodizationStrength,
 			repMin:         5,
 			repMax:         10,
 			startingWeight: 80.0,
@@ -27,7 +27,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		},
 		{
 			name:           "hypertrophy returns 8 reps",
-			periodization:  exerciseprogression.Hypertrophy,
+			periodization:  domain.PeriodizationHypertrophy,
 			repMin:         5,
 			repMax:         8,
 			startingWeight: 60.0,
@@ -35,17 +35,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 			wantWeight:     60.0,
 		},
 		{
-			name:           "endurance returns 15 reps",
-			periodization:  exerciseprogression.Endurance,
-			repMin:         10,
-			repMax:         15,
-			startingWeight: 40.0,
-			wantReps:       15,
-			wantWeight:     40.0,
-		},
-		{
 			name:           "zero starting weight is returned as-is",
-			periodization:  exerciseprogression.Hypertrophy,
+			periodization:  domain.PeriodizationHypertrophy,
 			repMin:         5,
 			repMax:         8,
 			startingWeight: 0.0,
@@ -56,7 +47,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := exerciseprogression.New(exerciseprogression.Config{
+			p := domain.New(domain.Config{
 				Type:           tt.periodization,
 				RepMin:         tt.repMin,
 				RepMax:         tt.repMax,
@@ -78,35 +69,35 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		signal     exerciseprogression.Signal
+		signal     domain.Signal
 		wantWeight float64
 	}{
 		{
 			name:       "TooLight increases by 2.5kg",
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: 102.5,
 		},
 		{
 			name:       "TooHeavy decreases by max(2.5kg, 10%)",
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: 90.0, // |w|*0.10 = 10kg > 2.5kg minimum → 100 - 10 = 90.0
 		},
 		{
 			name:       "OnTarget keeps same weight",
-			signal:     exerciseprogression.SignalOnTarget,
+			signal:     domain.SignalOnTarget,
 			wantWeight: startWeight,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := exerciseprogression.New(exerciseprogression.Config{
-				Type:           exerciseprogression.Hypertrophy,
+			p := domain.New(domain.Config{
+				Type:           domain.PeriodizationHypertrophy,
 				RepMin:         5,
 				RepMax:         8,
 				StartingWeight: startWeight,
 			})
-			p.RecordCompletion(exerciseprogression.SetResult{
+			p.RecordCompletion(domain.SetResult{
 				ActualReps: 8,
 				Signal:     tt.signal,
 				WeightKg:   startWeight,
@@ -121,15 +112,15 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 
 func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 	// 23kg: |w|*0.10 = 2.3, below the 2.5kg minimum step → 23 - 2.5 = 20.5
-	p := exerciseprogression.New(exerciseprogression.Config{
-		Type:           exerciseprogression.Hypertrophy,
+	p := domain.New(domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 23.0,
 	})
-	p.RecordCompletion(exerciseprogression.SetResult{
+	p.RecordCompletion(domain.SetResult{
 		ActualReps: 5,
-		Signal:     exerciseprogression.SignalTooHeavy,
+		Signal:     domain.SignalTooHeavy,
 		WeightKg:   23.0,
 	})
 	got := p.CurrentSet()
@@ -141,15 +132,15 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 func TestCurrentSet_OverridePropagates(t *testing.T) {
 	// Recommended set 1 = 100kg. User overrides to 95kg and signals OnTarget.
 	// Set 2 recommendation must be 95kg (from actual), not 100kg.
-	p := exerciseprogression.New(exerciseprogression.Config{
-		Type:           exerciseprogression.Hypertrophy,
+	p := domain.New(domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 100.0,
 	})
-	p.RecordCompletion(exerciseprogression.SetResult{
+	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
-		Signal:     exerciseprogression.SignalOnTarget,
+		Signal:     domain.SignalOnTarget,
 		WeightKg:   95.0, // user lifted less than recommended
 	})
 	got := p.CurrentSet()
@@ -161,20 +152,20 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 	// User overrides set 2 to 90kg and signals TooLight.
 	// Set 3 must be 90 + 2.5 = 92.5kg.
-	p := exerciseprogression.New(exerciseprogression.Config{
-		Type:           exerciseprogression.Hypertrophy,
+	p := domain.New(domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 100.0,
 	})
-	p.RecordCompletion(exerciseprogression.SetResult{
+	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
-		Signal:     exerciseprogression.SignalOnTarget,
+		Signal:     domain.SignalOnTarget,
 		WeightKg:   100.0,
 	})
-	p.RecordCompletion(exerciseprogression.SetResult{
+	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
-		Signal:     exerciseprogression.SignalTooLight,
+		Signal:     domain.SignalTooLight,
 		WeightKg:   90.0, // user overrode set 2 down to 90kg
 	})
 	got := p.CurrentSet()
@@ -184,25 +175,25 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 }
 
 func TestNewFromHistory_MatchesReplay(t *testing.T) {
-	config := exerciseprogression.Config{
-		Type:           exerciseprogression.Hypertrophy,
+	config := domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 80.0,
 	}
-	results := []exerciseprogression.SetResult{
-		{ActualReps: 8, Signal: exerciseprogression.SignalTooLight, WeightKg: 80.0},
-		{ActualReps: 8, Signal: exerciseprogression.SignalOnTarget, WeightKg: 82.5},
+	results := []domain.SetResult{
+		{ActualReps: 8, Signal: domain.SignalTooLight, WeightKg: 80.0},
+		{ActualReps: 8, Signal: domain.SignalOnTarget, WeightKg: 82.5},
 	}
 
 	// Build via replay.
-	replay := exerciseprogression.New(config)
+	replay := domain.New(config)
 	for _, r := range results {
 		replay.RecordCompletion(r)
 	}
 
 	// Build via NewFromHistory.
-	history := exerciseprogression.NewFromHistory(config, results)
+	history := domain.NewFromHistory(config, results)
 
 	replayTarget := replay.CurrentSet()
 	historyTarget := history.CurrentSet()
@@ -216,14 +207,14 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 }
 
 func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
-	config := exerciseprogression.Config{
-		Type:           exerciseprogression.Strength,
+	config := domain.Config{
+		Type:           domain.PeriodizationStrength,
 		RepMin:         5,
 		RepMax:         10,
 		StartingWeight: 60.0,
 	}
-	fresh := exerciseprogression.New(config)
-	fromEmpty := exerciseprogression.NewFromHistory(config, nil)
+	fresh := domain.New(config)
+	fromEmpty := domain.NewFromHistory(config, nil)
 
 	if fresh.CurrentSet() != fromEmpty.CurrentSet() {
 		t.Errorf("CurrentSet mismatch: fresh=%+v history=%+v", fresh.CurrentSet(), fromEmpty.CurrentSet())
@@ -231,8 +222,8 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 }
 
 func TestSetsCompleted(t *testing.T) {
-	p := exerciseprogression.New(exerciseprogression.Config{
-		Type:           exerciseprogression.Hypertrophy,
+	p := domain.New(domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 60.0,
@@ -242,18 +233,18 @@ func TestSetsCompleted(t *testing.T) {
 		t.Errorf("SetsCompleted before any sets = %d, want 0", p.SetsCompleted())
 	}
 
-	p.RecordCompletion(exerciseprogression.SetResult{
+	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
-		Signal:     exerciseprogression.SignalOnTarget,
+		Signal:     domain.SignalOnTarget,
 		WeightKg:   60.0,
 	})
 	if p.SetsCompleted() != 1 {
 		t.Errorf("SetsCompleted after 1 set = %d, want 1", p.SetsCompleted())
 	}
 
-	p.RecordCompletion(exerciseprogression.SetResult{
+	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
-		Signal:     exerciseprogression.SignalTooLight,
+		Signal:     domain.SignalTooLight,
 		WeightKg:   60.0,
 	})
 	if p.SetsCompleted() != 2 {
@@ -265,105 +256,105 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 	tests := []struct {
 		name       string
 		lastWeight float64
-		signal     exerciseprogression.Signal
+		signal     domain.Signal
 		wantWeight float64
 	}{
 		{
 			name:       "negative TooHeavy goes further negative (more assistance)",
 			lastWeight: -20.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: -22.5,
 		},
 		{
 			name:       "zero TooHeavy goes negative (zero boundary fixed)",
 			lastWeight: 0.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: -1.0,
 		},
 		{
 			name:       "negative TooLight goes less negative (less assistance)",
 			lastWeight: -20.0,
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: -17.5,
 		},
 		{
 			name:       "negative OnTarget holds steady",
 			lastWeight: -20.0,
-			signal:     exerciseprogression.SignalOnTarget,
+			signal:     domain.SignalOnTarget,
 			wantWeight: -20.0,
 		},
 		{
 			name:       "threshold weight TooHeavy uses 2.5kg increment and snaps to whole kg",
 			lastWeight: 10.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: 8.0, // 10 - max(2.5, 1.0) = 7.5; below threshold, snaps to 8.
 		},
 		{
 			name:       "high positive TooHeavy uses percentage (regression)",
 			lastWeight: 100.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: 90.0,
 		},
 		{
 			name:       "mid positive TooHeavy uses percentage (regression)",
 			lastWeight: 50.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: 45.0,
 		},
 		{
 			name:       "dumbbell-range TooLight increases by 1kg",
 			lastWeight: 5.0,
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: 6.0,
 		},
 		{
 			name:       "dumbbell-range TooLight at 9kg lands on 10kg threshold",
 			lastWeight: 9.0,
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: 10.0,
 		},
 		{
 			name:       "zero TooLight increases by 1kg",
 			lastWeight: 0.0,
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: 1.0,
 		},
 		{
 			name:       "dumbbell-range TooHeavy decreases by 1kg",
 			lastWeight: 5.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: 4.0,
 		},
 		{
 			name:       "dumbbell-range TooHeavy at 1kg lands on 0kg",
 			lastWeight: 1.0,
-			signal:     exerciseprogression.SignalTooHeavy,
+			signal:     domain.SignalTooHeavy,
 			wantWeight: 0.0,
 		},
 		{
 			name:       "threshold TooLight crosses into 2.5kg increment",
 			lastWeight: 10.0,
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: 12.5,
 		},
 		{
 			name:       "off-grid override TooLight snaps to whole kg",
 			lastWeight: 7.5, // user override; not a real fixed dumbbell.
-			signal:     exerciseprogression.SignalTooLight,
+			signal:     domain.SignalTooLight,
 			wantWeight: 9.0, // 7.5 + 1 = 8.5 → snaps to 9.
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := exerciseprogression.NewFromHistory(
-				exerciseprogression.Config{
-					Type:           exerciseprogression.Strength,
+			p := domain.NewFromHistory(
+				domain.Config{
+					Type:           domain.PeriodizationStrength,
 					RepMin:         5,
 					RepMax:         10,
 					StartingWeight: 0,
 				},
-				[]exerciseprogression.SetResult{
+				[]domain.SetResult{
 					{ActualReps: 5, Signal: tt.signal, WeightKg: tt.lastWeight},
 				},
 			)
@@ -382,13 +373,12 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 func TestExhaustivePeriodizationCoverage(t *testing.T) {
 	// Use a wide window so repMin/repMax don't mask any periodization branch.
 	const repMin, repMax = 5, 15
-	all := []exerciseprogression.PeriodizationType{
-		exerciseprogression.Strength,
-		exerciseprogression.Hypertrophy,
-		exerciseprogression.Endurance,
+	all := []domain.PeriodizationType{
+		domain.PeriodizationStrength,
+		domain.PeriodizationHypertrophy,
 	}
 	for _, p := range all {
-		if got := exerciseprogression.DeriveScheme(repMin, repMax, p).TargetReps; got <= 0 {
+		if got := domain.DeriveScheme(repMin, repMax, p).TargetReps; got <= 0 {
 			t.Errorf("DeriveScheme(%d,%d,%v).TargetReps = %d, want positive", repMin, repMax, p, got)
 		}
 	}
@@ -396,29 +386,28 @@ func TestExhaustivePeriodizationCoverage(t *testing.T) {
 
 // TestExhaustiveSignalCoverage documents that every valid Signal resolves to
 // a finite weight via the package's internal adjustedWeight switch (exercised
-// through CurrentSet). SignalUnknown is intentionally excluded — it is the
-// zero-value sentinel and panicking on its use is the documented contract.
+// through CurrentSet).
 func TestExhaustiveSignalCoverage(t *testing.T) {
-	valid := []exerciseprogression.Signal{
-		exerciseprogression.SignalTooHeavy,
-		exerciseprogression.SignalOnTarget,
-		exerciseprogression.SignalTooLight,
+	valid := []domain.Signal{
+		domain.SignalTooHeavy,
+		domain.SignalOnTarget,
+		domain.SignalTooLight,
 	}
 	for _, s := range valid {
-		p := exerciseprogression.NewFromHistory(
-			exerciseprogression.Config{
-				Type:           exerciseprogression.Hypertrophy,
+		p := domain.NewFromHistory(
+			domain.Config{
+				Type:           domain.PeriodizationHypertrophy,
 				RepMin:         5,
 				RepMax:         8,
 				StartingWeight: 50,
 			},
-			[]exerciseprogression.SetResult{
+			[]domain.SetResult{
 				{ActualReps: 8, Signal: s, WeightKg: 50},
 			},
 		)
 		// The call would panic if the switch in adjustedWeight failed to
 		// handle the signal; the assertion just guards against silent zeros.
-		if got := p.CurrentSet().WeightKg; got == 0 && s != exerciseprogression.SignalTooHeavy {
+		if got := p.CurrentSet().WeightKg; got == 0 && s != domain.SignalTooHeavy {
 			t.Errorf("CurrentSet for signal %v unexpectedly returned 0", s)
 		}
 	}

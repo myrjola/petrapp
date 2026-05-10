@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/exerciseprogression"
+	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/workout"
 )
 
@@ -28,12 +28,12 @@ type exerciseSetTemplateData struct {
 	ExerciseSet           workout.ExerciseSet
 	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex  int
-	EditingIndex          int                           // Index of the set being edited
-	IsEditing             bool                          // Whether we're in edit mode
-	LastCompletedAt       *time.Time                    // Timestamp of most recently completed set
-	CurrentSetTarget      exerciseprogression.SetTarget // Recommended weight and reps from progression
-	CurrentSetTimedTarget int                           // Recommended seconds for time_based exercises; 0 for others.
-	AbsCurrentWeight      float64                       // |CurrentSetTarget.WeightKg|, for assisted form input
+	EditingIndex          int              // Index of the set being edited
+	IsEditing             bool             // Whether we're in edit mode
+	LastCompletedAt       *time.Time       // Timestamp of most recently completed set
+	CurrentSetTarget      domain.SetTarget // Recommended weight and reps from progression
+	CurrentSetTimedTarget int              // Recommended seconds for time_based exercises; 0 for others.
+	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
 }
 
 func prepareSetsDisplay(exercise workout.Exercise, sets []workout.Set) []setDisplay {
@@ -114,7 +114,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currentSetTarget exerciseprogression.SetTarget
+	var currentSetTarget domain.SetTarget
 	var currentSetTimedTarget int
 	switch exerciseSet.Exercise.ExerciseType {
 	case workout.ExerciseTypeWeighted, workout.ExerciseTypeAssisted:

@@ -10,7 +10,6 @@ import (
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/exerciseprogression"
 	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/weekplanner"
 )
@@ -610,15 +609,15 @@ func (s *Service) GetStartingWeight(
 		// defensive return preserves the historical weight unchanged.
 		return prev.WeightKg, nil
 	}
-	fromReps := exerciseprogression.DeriveScheme(
+	fromReps := domain.DeriveScheme(
 		*exercise.RepMin, *exercise.RepMax,
-		periodizationToProgression(prev.PeriodizationType),
+		prev.PeriodizationType,
 	).TargetReps
-	toReps := exerciseprogression.DeriveScheme(
+	toReps := domain.DeriveScheme(
 		*exercise.RepMin, *exercise.RepMax,
-		periodizationToProgression(targetType),
+		targetType,
 	).TargetReps
-	return exerciseprogression.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
+	return domain.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
 }
 
 // GetStartingSeconds returns the seconds target to seed a new session for
@@ -653,26 +652,13 @@ func (s *Service) GetStartingSeconds(
 	return *exercise.DefaultStartingSeconds, nil
 }
 
-// periodizationToProgression maps a workout periodization to its exerciseprogression
-// counterpart. Unknown values default to Strength.
-func periodizationToProgression(p PeriodizationType) exerciseprogression.PeriodizationType {
-	switch p {
-	case PeriodizationHypertrophy:
-		return exerciseprogression.Hypertrophy
-	case PeriodizationStrength:
-		return exerciseprogression.Strength
-	default:
-		return exerciseprogression.Strength
-	}
-}
-
-// BuildProgression constructs an exerciseprogression.Progression for the given exercise
+// BuildProgression constructs a domain.Progression for the given exercise
 // in the given session, ready to call CurrentSet() for the next set recommendation.
 func (s *Service) BuildProgression(
 	ctx context.Context,
 	date time.Time,
 	exerciseID int,
-) (*exerciseprogression.Progression, error) {
+) (*domain.Progression, error) {
 	sess, err := s.repo.sessions.Get(ctx, date)
 	if err != nil {
 		return nil, fmt.Errorf("get session: %w", err)
@@ -691,16 +677,14 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get starting weight: %w", err)
 	}
 
-	epType := periodizationToProgression(sess.PeriodizationType)
-
-	config := exerciseprogression.Config{
-		Type:           epType,
+	config := domain.Config{
+		Type:           sess.PeriodizationType,
 		RepMin:         *exercise.RepMin,
 		RepMax:         *exercise.RepMax,
 		StartingWeight: startingWeight,
 	}
 
-	var completed []exerciseprogression.SetResult
+	var completed []domain.SetResult
 	for _, es := range sess.ExerciseSets {
 		if es.ExerciseID != exerciseID {
 			continue
@@ -709,32 +693,23 @@ func (s *Service) BuildProgression(
 			if set.CompletedValue == nil || set.Signal == nil {
 				continue
 			}
-			var sig exerciseprogression.Signal
-			switch *set.Signal {
-			case SignalTooHeavy:
-				sig = exerciseprogression.SignalTooHeavy
-			case SignalOnTarget:
-				sig = exerciseprogression.SignalOnTarget
-			case SignalTooLight:
-				sig = exerciseprogression.SignalTooLight
-			}
 			var kg float64
 			if set.WeightKg != nil {
 				kg = *set.WeightKg
 			}
-			completed = append(completed, exerciseprogression.SetResult{
+			completed = append(completed, domain.SetResult{
 				ActualReps: *set.CompletedValue,
-				Signal:     sig,
+				Signal:     *set.Signal,
 				WeightKg:   kg,
 			})
 		}
 		break
 	}
 
-	return exerciseprogression.NewFromHistory(config, completed), nil
+	return domain.NewFromHistory(config, completed), nil
 }
 
-// BuildTimedProgression constructs an exerciseprogression.TimedProgression
+// BuildTimedProgression constructs a domain.TimedProgression
 // for the given time-based exercise in the given session, ready to call
 // CurrentSet() for the next hold's recommendation. Returns an error if the
 // exercise is not time_based or if the lookup fails.
@@ -742,7 +717,7 @@ func (s *Service) BuildTimedProgression(
 	ctx context.Context,
 	date time.Time,
 	exerciseID int,
-) (*exerciseprogression.TimedProgression, error) {
+) (*domain.TimedProgression, error) {
 	starting, err := s.GetStartingSeconds(ctx, exerciseID, date)
 	if err != nil {
 		return nil, fmt.Errorf("get starting seconds: %w", err)
@@ -753,7 +728,7 @@ func (s *Service) BuildTimedProgression(
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	var completed []exerciseprogression.TimedSetResult
+	var completed []domain.TimedSetResult
 	for _, es := range sess.ExerciseSets {
 		if es.ExerciseID != exerciseID {
 			continue
@@ -762,25 +737,16 @@ func (s *Service) BuildTimedProgression(
 			if set.CompletedValue == nil || set.Signal == nil {
 				continue
 			}
-			var sig exerciseprogression.Signal
-			switch *set.Signal {
-			case SignalTooHeavy:
-				sig = exerciseprogression.SignalTooHeavy
-			case SignalOnTarget:
-				sig = exerciseprogression.SignalOnTarget
-			case SignalTooLight:
-				sig = exerciseprogression.SignalTooLight
-			}
-			completed = append(completed, exerciseprogression.TimedSetResult{
+			completed = append(completed, domain.TimedSetResult{
 				ActualSeconds: *set.CompletedValue,
-				Signal:        sig,
+				Signal:        *set.Signal,
 			})
 		}
 		break
 	}
 
-	return exerciseprogression.NewTimedFromHistory(
-		exerciseprogression.TimedConfig{StartingSeconds: starting},
+	return domain.NewTimedFromHistory(
+		domain.TimedConfig{StartingSeconds: starting},
 		completed,
 	), nil
 }
@@ -1064,7 +1030,7 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 		// schema CHECK; fall back to old defaults if a fixture invariant is violated.
 		return defaultTargetValue, defaultTimedSets
 	}
-	scheme := exerciseprogression.DeriveScheme(*ex.RepMin, *ex.RepMax, periodizationToProgression(pt))
+	scheme := domain.DeriveScheme(*ex.RepMin, *ex.RepMax, pt)
 	return scheme.TargetReps, scheme.TargetSets
 }
 

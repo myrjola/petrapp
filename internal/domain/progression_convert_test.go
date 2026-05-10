@@ -1,9 +1,9 @@
-package exerciseprogression_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/myrjola/petrapp/internal/exerciseprogression"
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 func TestConvertWeight(t *testing.T) {
@@ -116,7 +116,7 @@ func TestConvertWeight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := exerciseprogression.ConvertWeight(tt.weight, tt.fromReps, tt.toReps)
+			got := domain.ConvertWeight(tt.weight, tt.fromReps, tt.toReps)
 			if got != tt.want {
 				t.Errorf("ConvertWeight(%v, %d, %d) = %v; want %v",
 					tt.weight, tt.fromReps, tt.toReps, got, tt.want)
