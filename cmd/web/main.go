@@ -41,6 +41,11 @@ type config struct {
 	FQDN string `env:"PETRAPP_FQDN" envDefault:"localhost"`
 	// FlyAppName is the name of the Fly application. It's used to override the FQDN.
 	FlyAppName string `env:"FLY_APP_NAME" envDefault:""`
+	// TLSCert is the path to the TLS certificate file. When both TLSCert and TLSKey are set, the
+	// server starts with TLS using ServeTLS instead of Serve.
+	TLSCert string `env:"PETRAPP_TLS_CERT" envDefault:""`
+	// TLSKey is the path to the TLS key file. See TLSCert.
+	TLSKey string `env:"PETRAPP_TLS_KEY" envDefault:""`
 	// SqliteURL is the URL to the SQLite database. You can use ":memory:" for an ethereal in-memory database.
 	SqliteURL string `env:"PETRAPP_SQLITE_URL" envDefault:"./petrapp.sqlite3"`
 	// PProfAddr is the optional address to listen on for the pprof server.
@@ -103,7 +108,8 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		fqdn = cfg.FlyAppName + ".fly.dev"
 	}
 	var webAuthnHandler *webauthnhandler.WebAuthnHandler
-	if webAuthnHandler, err = webauthnhandler.New(actualAddr, fqdn, logger, sessionManager, db); err != nil {
+	tlsEnabled := cfg.TLSCert != ""
+	if webAuthnHandler, err = webauthnhandler.New(actualAddr, fqdn, tlsEnabled, logger, sessionManager, db); err != nil {
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
@@ -138,7 +144,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("initialize routes: %w", err)
 	}
 
-	return app.configureAndStartServer(ctx, listener, actualAddr, routes)
+	return app.configureAndStartServer(ctx, listener, actualAddr, cfg.TLSCert, cfg.TLSKey, routes)
 }
 
 const (

@@ -62,3 +62,7 @@ node_modules
 .superpowers
 .worktrees
 .claude/worktrees/
+
+# Tailnet certs
+/*.crt
+/*.key

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -42,6 +43,7 @@ type WebAuthnHandler struct {
 func New(
 	addr string,
 	fqdn string,
+	tlsEnabled bool,
 	logger *slog.Logger,
 	sessionManager *scs.SessionManager,
 	dbs *sqlite.Database,
@@ -57,10 +59,20 @@ func New(
 		gob.Register(webauthn.SessionData{}) //nolint:exhaustruct // only need to register the struct.
 	})
 
-	rpOrigins := []string{fmt.Sprintf("https://%s", fqdn)}
-	if fqdn == "localhost" {
+	var rpOrigins []string
+	switch {
+	case fqdn == "localhost":
 		//goland:noinspection HttpUrlsUsage // This is a local server.
-		rpOrigins = []string{fmt.Sprintf("http://%s", addr)}
+		rpOrigins = []string{"http://" + addr}
+	case tlsEnabled:
+		_, port, _ := net.SplitHostPort(addr)
+		if port != "" && port != "443" {
+			rpOrigins = []string{"https://" + net.JoinHostPort(fqdn, port)}
+		} else {
+			rpOrigins = []string{"https://" + fqdn}
+		}
+	default:
+		rpOrigins = []string{"https://" + fqdn}
 	}
 
 	var webauthnConfig = &webauthn.Config{

@@ -45,8 +45,9 @@ func createListener(ctx context.Context, addr string) (net.Listener, string, err
 
 // configureAndStartServer configures and starts the HTTP server using an already-bound listener.
 // logAddr is the human-readable address logged and used by e2etest to build the server URL.
+// When tlsCert and tlsKey are both non-empty, the server uses ServeTLS for HTTPS.
 func (app *application) configureAndStartServer(
-	ctx context.Context, listener net.Listener, logAddr string, handler http.Handler,
+	ctx context.Context, listener net.Listener, logAddr string, tlsCert, tlsKey string, handler http.Handler,
 ) error {
 	var err error
 	shutdownComplete := make(chan struct{})
@@ -101,7 +102,12 @@ func (app *application) configureAndStartServer(
 	}()
 
 	app.logger.LogAttrs(ctx, slog.LevelInfo, "starting server", slog.Any(e2etest.LogAddrKey, logAddr))
-	if err = srv.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+	if tlsCert != "" && tlsKey != "" {
+		err = srv.ServeTLS(listener, tlsCert, tlsKey)
+	} else {
+		err = srv.Serve(listener)
+	}
+	if !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server serve: %w", err)
 	}
 

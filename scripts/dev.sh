@@ -1,11 +1,12 @@
 #!/bin/bash
 # Start the dev server on a random free port and open the browser once bound.
+set -euo pipefail
 
 PETRAPP_ADDR=localhost:0 ./bin/petrapp 2>&1 | while IFS= read -r line; do
     printf '%s\n' "$line"
     case "$line" in
         *'msg="starting server"'*)
-            addr=$(printf '%s' "$line" | grep -oE 'addr=[^ ]+' | cut -d= -f2)
+            addr=$(printf '%s' "$line" | grep -oE '(^|[[:space:]])addr=[^[:space:]]+' | grep -oE 'addr=[^[:space:]]+' | cut -d= -f2)
             if [ -n "$addr" ]; then
                 url="http://$addr"
                 if command -v open > /dev/null 2>&1; then
@@ -16,4 +17,4 @@ PETRAPP_ADDR=localhost:0 ./bin/petrapp 2>&1 | while IFS= read -r line; do
             fi
             ;;
     esac
-done
+done; exit "${PIPESTATUS[0]}"
