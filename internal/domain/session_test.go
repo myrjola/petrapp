@@ -137,3 +137,50 @@ func Test_Session_MarkWarmupComplete_UnknownSlot(t *testing.T) {
 		t.Fatalf("got %v, want ErrSlotNotFound", err)
 	}
 }
+
+func Test_Session_UpdateSetWeight_KnownSlotAndIndex(t *testing.T) {
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only ID is read.
+				Sets: []domain.Set{
+					{TargetValue: 5}, //nolint:exhaustruct // Other fields nil.
+					{TargetValue: 5}, //nolint:exhaustruct // Other fields nil.
+				},
+			},
+		},
+	}
+
+	if err := sess.UpdateSetWeight(11, 1, 80.0); err != nil {
+		t.Fatalf("UpdateSetWeight: %v", err)
+	}
+	if sess.ExerciseSets[0].Sets[1].WeightKg == nil || *sess.ExerciseSets[0].Sets[1].WeightKg != 80.0 {
+		t.Errorf("WeightKg = %v, want 80.0", sess.ExerciseSets[0].Sets[1].WeightKg)
+	}
+	if sess.ExerciseSets[0].Sets[0].WeightKg != nil {
+		t.Errorf("set 0 WeightKg mutated to %v, want nil", sess.ExerciseSets[0].Sets[0].WeightKg)
+	}
+}
+
+func Test_Session_UpdateSetWeight_UnknownSlot(t *testing.T) {
+	sess := domain.Session{} //nolint:exhaustruct // Empty session.
+	err := sess.UpdateSetWeight(99, 0, 80.0)
+	if !errors.Is(err, domain.ErrSlotNotFound) {
+		t.Fatalf("got %v, want ErrSlotNotFound", err)
+	}
+}
+
+func Test_Session_UpdateSetWeight_OutOfBoundsIndex(t *testing.T) {
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only ID is read.
+				Sets: []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+	err := sess.UpdateSetWeight(11, 5, 80.0)
+	if !errors.Is(err, domain.ErrSetIndexOutOfBounds) {
+		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
+	}
+}

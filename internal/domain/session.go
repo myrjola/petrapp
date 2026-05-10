@@ -87,3 +87,20 @@ func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
 	}
 	return ErrSlotNotFound
 }
+
+// UpdateSetWeight overwrites the weight on a single set within a slot.
+// Returns ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
+func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID != slotID {
+			continue
+		}
+		if setIndex < 0 || setIndex >= len(s.ExerciseSets[i].Sets) {
+			return ErrSetIndexOutOfBounds
+		}
+		w := weightKg
+		s.ExerciseSets[i].Sets[setIndex].WeightKg = &w
+		return nil
+	}
+	return ErrSlotNotFound
+}
