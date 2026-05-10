@@ -1,5 +1,13 @@
 # Domain Models & Business Logic - Workout Package
 
+> **Migration in progress (Phase 1 of 4 complete as of 2026-05-10).**
+> Pure domain types now live in `internal/domain`. The `workout`
+> package still exists but most of its public types are aliases for
+> `domain` equivalents. New domain logic should be added to
+> `internal/domain`. Phases 2–4 will extract `internal/repository`
+> and `internal/service`, then delete this package entirely. See
+> `docs/superpowers/specs/2026-05-10-workout-service-rearchitecture-design.md`.
+
 Guidelines for working with domain models, business logic, and data access patterns in `internal/workout/`.
 
 ## Architecture Overview
