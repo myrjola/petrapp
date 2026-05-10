@@ -54,3 +54,13 @@ func (s *Session) Start(now time.Time) error {
 	s.StartedAt = now
 	return nil
 }
+
+// Complete marks the session as finished at now. Returns ErrNotStarted if
+// the session has not been started yet — completion implies a prior start.
+func (s *Session) Complete(now time.Time) error {
+	if s.StartedAt.IsZero() {
+		return ErrNotStarted
+	}
+	s.CompletedAt = now
+	return nil
+}

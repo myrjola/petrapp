@@ -38,3 +38,34 @@ func Test_Session_Start_AlreadyStarted_ReturnsErrAlreadyStarted(t *testing.T) {
 		t.Errorf("StartedAt mutated to %v, want %v (unchanged)", sess.StartedAt, earlier)
 	}
 }
+
+func Test_Session_Complete_AfterStart(t *testing.T) {
+	startAt := time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct
+		Date:      time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+		StartedAt: startAt,
+	}
+
+	if err := sess.Complete(now); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if !sess.CompletedAt.Equal(now) {
+		t.Errorf("CompletedAt = %v, want %v", sess.CompletedAt, now)
+	}
+}
+
+func Test_Session_Complete_NotStarted_ReturnsErrNotStarted(t *testing.T) {
+	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct
+		Date: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+	}
+
+	err := sess.Complete(now)
+	if !errors.Is(err, domain.ErrNotStarted) {
+		t.Fatalf("Complete: got %v, want ErrNotStarted", err)
+	}
+	if !sess.CompletedAt.IsZero() {
+		t.Errorf("CompletedAt = %v, want zero", sess.CompletedAt)
+	}
+}
