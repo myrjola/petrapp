@@ -32,8 +32,11 @@ type workoutDurationOption struct {
 
 type preferencesTemplateData struct {
 	BaseTemplateData
-	Weekdays        []weekdayPreference
-	DurationOptions []workoutDurationOption
+	Weekdays                 []weekdayPreference
+	DurationOptions          []workoutDurationOption
+	VAPIDPublicKey           string
+	PushSubscriptionCount    int
+	RestNotificationsEnabled bool
 }
 
 func getWorkoutDurationOptions() []workoutDurationOption {
@@ -90,11 +93,19 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
 	}
+	subCount, err := app.service.CountPushSubscriptions(ctx)
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("count push subscriptions: %w", err))
+		return
+	}
 
 	data := preferencesTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Weekdays:         preferencesToWeekdays(prefs),
-		DurationOptions:  getWorkoutDurationOptions(),
+		BaseTemplateData:         newBaseTemplateData(r),
+		Weekdays:                 preferencesToWeekdays(prefs),
+		DurationOptions:          getWorkoutDurationOptions(),
+		VAPIDPublicKey:           app.vapidPublicKey,
+		PushSubscriptionCount:    subCount,
+		RestNotificationsEnabled: prefs.RestNotificationsEnabled,
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)
@@ -193,4 +204,23 @@ func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request
 			slog.String("path", exportPath), slog.Any("error", err))
 		return
 	}
+}
+
+func (app *application) preferencesRestNotificationsTogglePOST(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
+	if err := r.ParseForm(); err != nil {
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+		return
+	}
+	prefs, err := app.service.GetUserPreferences(r.Context())
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("get preferences: %w", err))
+		return
+	}
+	prefs.RestNotificationsEnabled = r.Form.Get("rest_notifications_enabled") == "on"
+	if err = app.service.SaveUserPreferences(r.Context(), prefs); err != nil {
+		app.serverError(w, r, fmt.Errorf("save preferences: %w", err))
+		return
+	}
+	redirect(w, r, "/preferences")
 }

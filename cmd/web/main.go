@@ -32,6 +32,12 @@ type application struct {
 	// devMode is true when running outside the Fly.io production deployment.
 	// It enables developer-only routes like /dev/styleguide.
 	devMode bool
+	// vapidPublicKey is the VAPID public key (base64url, uncompressed P-256)
+	// exposed to the browser so it can call pushManager.subscribe. Wired in
+	// from config / env in a later task; empty here means push subscribes will
+	// fail with a runtime error surfaced to the user, while the UI still
+	// renders correctly.
+	vapidPublicKey string
 }
 
 type config struct {
@@ -137,6 +143,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		service:         service.NewService(db, logger, cfg.OpenAIAPIKey),
 		flightRecorder:  flightRecorderService,
 		devMode:         cfg.FlyAppName == "",
+		vapidPublicKey:  "",
 	}
 
 	routes, err := app.routes()

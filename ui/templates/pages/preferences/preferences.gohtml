@@ -282,6 +282,202 @@
             <button type="submit" class="save-button">Save Schedule</button>
         </form>
 
+        <div class="rest-notifications-section">
+            <style {{ nonce }}>
+                @scope (.rest-notifications-section) {
+                    :scope {
+                        background: var(--color-surface-elevated);
+                        border: var(--border-size-1) solid var(--color-border);
+                        border-radius: var(--radius-3);
+                        padding: var(--size-6);
+                        margin-bottom: var(--size-6);
+                        box-shadow: var(--shadow-2);
+                    }
+
+                    h2 {
+                        font-size: var(--font-size-3);
+                        font-weight: var(--font-weight-6);
+                        color: var(--color-text-primary);
+                        margin-bottom: var(--size-3);
+                    }
+
+                    .status {
+                        font-size: var(--font-size-1);
+                        color: var(--color-text-secondary);
+                        margin-bottom: var(--size-3);
+                    }
+
+                    .toggle-row {
+                        display: flex;
+                        align-items: center;
+                        gap: var(--size-2);
+                        margin-top: var(--size-3);
+                        font-size: var(--font-size-1);
+                    }
+
+                    .push-button {
+                        padding: var(--size-2) var(--size-4);
+                        border-radius: var(--radius-2);
+                        border: var(--border-size-1) solid var(--color-border);
+                        background: var(--color-surface);
+                        font-weight: var(--font-weight-5);
+                        cursor: pointer;
+                    }
+
+                    .push-button.danger {
+                        color: var(--red-8);
+                        border-color: var(--red-3);
+                    }
+
+                    .error {
+                        color: var(--red-8);
+                        font-size: var(--font-size-1);
+                        margin-top: var(--size-2);
+                    }
+
+                    .hidden {
+                        display: none;
+                    }
+                }
+            </style>
+
+            <h2>Rest notifications</h2>
+
+            <div data-rest-notifications data-vapid-key="{{ .VAPIDPublicKey }}"
+                 data-sub-count="{{ .PushSubscriptionCount }}">
+                <p class="status not-standalone hidden">
+                    On iOS, Add to Home Screen first, then open the installed app and try again.
+                </p>
+                <div class="standalone hidden">
+                    <p class="status not-subscribed hidden">Not enabled on this device.</p>
+                    <p class="status subscribed hidden">
+                        Enabled — you'll be pinged when each rest is up.
+                    </p>
+                    <button type="button" class="push-button enable-btn hidden">Enable rest notifications</button>
+                    <button type="button" class="push-button danger disable-btn hidden">Disable on this device</button>
+                    <p class="error hidden"></p>
+                    <form method="post" action="/preferences/rest-notifications-toggle"
+                          class="toggle-row subscribed hidden">
+                        <label>
+                            <input type="checkbox" name="rest_notifications_enabled"
+                                   {{ if .RestNotificationsEnabled }}checked{{ end }}
+                                   onchange="this.form.submit()">
+                            Send notifications when rest is over
+                        </label>
+                    </form>
+                </div>
+            </div>
+
+            <script {{ nonce }}>
+                (() => {
+                    const root = document.querySelector('[data-rest-notifications]');
+                    if (!root) return;
+                    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                                         window.navigator.standalone === true;
+                    const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+                    if (!supported) {
+                        root.style.display = 'none';
+                        return;
+                    }
+                    const notStandaloneEl = root.querySelector('.not-standalone');
+                    const standaloneEl = root.querySelector('.standalone');
+                    if (!isStandalone) {
+                        notStandaloneEl.classList.remove('hidden');
+                        return;
+                    }
+                    standaloneEl.classList.remove('hidden');
+
+                    const notSubEl = root.querySelector('.not-subscribed');
+                    const subEl = root.querySelector('.status.subscribed');
+                    const enableBtn = root.querySelector('.enable-btn');
+                    const disableBtn = root.querySelector('.disable-btn');
+                    const toggleForm = root.querySelector('.toggle-row.subscribed');
+                    const errorEl = root.querySelector('.error');
+                    const vapidKey = root.dataset.vapidKey;
+
+                    const showError = (msg) => {
+                        errorEl.textContent = msg;
+                        errorEl.classList.remove('hidden');
+                    };
+                    const clearError = () => {
+                        errorEl.textContent = '';
+                        errorEl.classList.add('hidden');
+                    };
+
+                    const refreshUI = async () => {
+                        const reg = await navigator.serviceWorker.ready;
+                        const sub = await reg.pushManager.getSubscription();
+                        if (sub) {
+                            notSubEl.classList.add('hidden');
+                            subEl.classList.remove('hidden');
+                            enableBtn.classList.add('hidden');
+                            disableBtn.classList.remove('hidden');
+                            toggleForm.classList.remove('hidden');
+                        } else {
+                            notSubEl.classList.remove('hidden');
+                            subEl.classList.add('hidden');
+                            enableBtn.classList.remove('hidden');
+                            disableBtn.classList.add('hidden');
+                            toggleForm.classList.add('hidden');
+                        }
+                    };
+
+                    const b64ToUint8 = (b64) => {
+                        const padding = '='.repeat((4 - b64.length % 4) % 4);
+                        const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+                        const raw = atob(base64);
+                        return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+                    };
+
+                    enableBtn.addEventListener('click', async () => {
+                        clearError();
+                        try {
+                            const perm = await Notification.requestPermission();
+                            if (perm !== 'granted') {
+                                showError('Notification permission was denied. Re-enable in your device settings if you change your mind.');
+                                return;
+                            }
+                            const reg = await navigator.serviceWorker.ready;
+                            const sub = await reg.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: b64ToUint8(vapidKey),
+                            });
+                            const resp = await fetch('/api/push/subscribe', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+                                body: JSON.stringify(sub),
+                            });
+                            if (!resp.ok) throw new Error('subscribe HTTP ' + resp.status);
+                            await refreshUI();
+                        } catch (e) {
+                            showError(e.name + ': ' + e.message);
+                        }
+                    });
+
+                    disableBtn.addEventListener('click', async () => {
+                        clearError();
+                        try {
+                            const reg = await navigator.serviceWorker.ready;
+                            const sub = await reg.pushManager.getSubscription();
+                            if (sub) {
+                                await fetch('/api/push/unsubscribe', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+                                    body: JSON.stringify({endpoint: sub.endpoint}),
+                                });
+                                await sub.unsubscribe();
+                            }
+                            await refreshUI();
+                        } catch (e) {
+                            showError(e.name + ': ' + e.message);
+                        }
+                    });
+
+                    navigator.serviceWorker.ready.then(refreshUI);
+                })();
+            </script>
+        </div>
+
         <div class="data-export-section">
             <h2>Export Your Data</h2>
             <p>Download all your workout data as an SQLite database file for your personal records or data
