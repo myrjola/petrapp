@@ -72,7 +72,7 @@ func parseMinutes(value string) int {
 }
 
 func weekdaysToPreferences(r *http.Request) domain.Preferences {
-	return domain.Preferences{
+	return domain.Preferences{ //nolint:exhaustruct // RestNotificationsEnabled handled by separate endpoint.
 		MondayMinutes:    parseMinutes(r.Form.Get("monday_minutes")),
 		TuesdayMinutes:   parseMinutes(r.Form.Get("tuesday_minutes")),
 		WednesdayMinutes: parseMinutes(r.Form.Get("wednesday_minutes")),

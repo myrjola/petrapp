@@ -17,7 +17,7 @@ func date(base time.Time, offsetDays int) time.Time {
 }
 
 func prefs(days ...time.Weekday) Preferences {
-	p := Preferences{
+	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled irrelevant to planner tests.
 		MondayMinutes:    0,
 		TuesdayMinutes:   0,
 		WednesdayMinutes: 0,
@@ -561,7 +561,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 	}
 
 	wp := &Planner{
-		Prefs: Preferences{
+		Prefs: Preferences{ //nolint:exhaustruct // RestNotificationsEnabled irrelevant to planner tests.
 			MondayMinutes:    60,
 			TuesdayMinutes:   0,
 			WednesdayMinutes: 0,

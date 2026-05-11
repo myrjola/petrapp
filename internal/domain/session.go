@@ -200,3 +200,18 @@ func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error 
 	}
 	return ErrSlotNotFound
 }
+
+// HasIncompleteSets reports whether any set across any exercise slot in the
+// session has not yet been completed. Used by the service layer to decide
+// whether a just-completed set is the final set of the workout — if so, no
+// rest push should be scheduled.
+func (s *Session) HasIncompleteSets() bool {
+	for i := range s.ExerciseSets {
+		for j := range s.ExerciseSets[i].Sets {
+			if s.ExerciseSets[i].Sets[j].CompletedAt == nil {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -62,3 +62,17 @@ func DeriveScheme(repMin, repMax int, p PeriodizationType) Scheme {
 
 	return Scheme{TargetReps: reps, TargetSets: sets, RestSeconds: rest}
 }
+
+// RestSecondsFor returns the inter-set rest in seconds for the given exercise
+// under the session's periodization. Returns 0 for time-based exercises and
+// for exercises with missing rep windows — service code treats 0 as "no
+// rest scheduling".
+func RestSecondsFor(ex Exercise, pt PeriodizationType) int {
+	if ex.IsTimed() {
+		return 0
+	}
+	if ex.RepMin == nil || ex.RepMax == nil {
+		return 0
+	}
+	return DeriveScheme(*ex.RepMin, *ex.RepMax, pt).RestSeconds
+}

@@ -6,13 +6,14 @@ import "time"
 // A value of 0 means rest day; any positive integer means workout day with
 // that duration in minutes.
 type Preferences struct {
-	MondayMinutes    int
-	TuesdayMinutes   int
-	WednesdayMinutes int
-	ThursdayMinutes  int
-	FridayMinutes    int
-	SaturdayMinutes  int
-	SundayMinutes    int
+	MondayMinutes            int
+	TuesdayMinutes           int
+	WednesdayMinutes         int
+	ThursdayMinutes          int
+	FridayMinutes            int
+	SaturdayMinutes          int
+	SundayMinutes            int
+	RestNotificationsEnabled bool
 }
 
 func (p Preferences) Monday() bool    { return p.MondayMinutes > 0 }

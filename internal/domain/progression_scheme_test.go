@@ -71,3 +71,73 @@ func TestDeriveSchemePanicOnUnknownPeriodization(t *testing.T) {
 	}()
 	_ = domain.DeriveScheme(5, 10, domain.PeriodizationType("unknown"))
 }
+
+func TestRestSecondsFor(t *testing.T) {
+	t.Parallel()
+
+	repMin5, repMax5 := 5, 5
+	repMin6, repMax10 := 6, 10
+	repMin12, repMax15 := 12, 15
+	startSecs := 30
+
+	tests := []struct {
+		name string
+		ex   domain.Exercise
+		pt   domain.PeriodizationType
+		want int
+	}{
+		{
+			name: "weighted strength 5 reps to 180s",
+			ex: domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
+				ExerciseType: domain.ExerciseTypeWeighted,
+				RepMin:       &repMin5, RepMax: &repMax5,
+			},
+			pt:   domain.PeriodizationStrength,
+			want: 180,
+		},
+		{
+			name: "weighted hypertrophy 10 reps to 150s",
+			ex: domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
+				ExerciseType: domain.ExerciseTypeWeighted,
+				RepMin:       &repMin6, RepMax: &repMax10,
+			},
+			pt:   domain.PeriodizationHypertrophy,
+			want: 150,
+		},
+		{
+			name: "weighted hypertrophy 15 reps to 90s",
+			ex: domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
+				ExerciseType: domain.ExerciseTypeWeighted,
+				RepMin:       &repMin12, RepMax: &repMax15,
+			},
+			pt:   domain.PeriodizationHypertrophy,
+			want: 90,
+		},
+		{
+			name: "time-based exercise to 0 (no scheduling)",
+			ex: domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
+				ExerciseType:           domain.ExerciseTypeTime,
+				DefaultStartingSeconds: &startSecs,
+			},
+			pt:   domain.PeriodizationStrength,
+			want: 0,
+		},
+		{
+			name: "rep-based with nil rep window to 0 (defensive)",
+			ex: domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
+				ExerciseType: domain.ExerciseTypeWeighted,
+			},
+			pt:   domain.PeriodizationStrength,
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := domain.RestSecondsFor(tt.ex, tt.pt)
+			if got != tt.want {
+				t.Errorf("RestSecondsFor() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}

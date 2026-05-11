@@ -407,3 +407,64 @@ func Test_Session_SwapExerciseInSlot_UnknownSlot(t *testing.T) {
 		t.Fatalf("got %v, want ErrSlotNotFound", err)
 	}
 }
+
+func TestSessionHasIncompleteSets(t *testing.T) {
+	t.Parallel()
+
+	completedAt := time.Date(2026, 5, 11, 10, 0, 0, 0, time.UTC)
+	completedVal := 5
+	completedSet := domain.Set{
+		WeightKg:       nil,
+		TargetValue:    5,
+		CompletedValue: &completedVal,
+		CompletedAt:    &completedAt,
+		Signal:         nil,
+	}
+	incompleteSet := domain.Set{TargetValue: 5} //nolint:exhaustruct // Other fields nil — represents an unfinished set.
+
+	tests := []struct {
+		name string
+		sess domain.Session
+		want bool
+	}{
+		{
+			name: "empty session — no sets, no incomplete",
+			sess: domain.Session{}, //nolint:exhaustruct // Empty session.
+			want: false,
+		},
+		{
+			name: "all sets complete",
+			sess: domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+				ExerciseSets: []domain.ExerciseSet{
+					{ //nolint:exhaustruct // Only ID and Sets are read.
+						ID: 1, Sets: []domain.Set{completedSet, completedSet},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "one set incomplete in a later slot",
+			sess: domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
+				ExerciseSets: []domain.ExerciseSet{
+					{ //nolint:exhaustruct // Only ID and Sets are read.
+						ID: 1, Sets: []domain.Set{completedSet, completedSet},
+					},
+					{ //nolint:exhaustruct // Only ID and Sets are read.
+						ID: 2, Sets: []domain.Set{completedSet, incompleteSet},
+					},
+				},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := tt.sess.HasIncompleteSets()
+			if got != tt.want {
+				t.Errorf("HasIncompleteSets() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
