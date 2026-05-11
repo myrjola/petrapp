@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# VAPID keys: PETRAPP_VAPID_PUBLIC / PETRAPP_VAPID_PRIVATE.
+# Unset → binary generates ephemeral pair on startup and logs the public key.
+
 TAILSCALE_FQDN=$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')
 if [[ -z "$TAILSCALE_FQDN" ]]; then
     echo "Could not determine Tailscale FQDN. Is tailscale running?" >&2

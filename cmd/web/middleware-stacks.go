@@ -7,10 +7,12 @@ import "net/http"
 // step (auth, CSRF, maintenance mode, panic recovery, etc.).
 
 // withoutMaintenanceModeStack is the base of every other stack: tracing,
-// security headers, CSRF, common context, and the request timeout.
+// security headers, CSRF, common context, and the request timeout. Wraps
+// stampLastRequest at the outside so the idle monitor sees every request,
+// including ones that 404 inside the file server or short-circuit on CSRF.
 func (app *application) withoutMaintenanceModeStack(next http.Handler) http.Handler {
-	return app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
-		commonContext(app.timeout(next)))))
+	return app.stampLastRequest(app.logAndTraceRequest(secureHeaders(app.crossOriginProtection(
+		commonContext(app.timeout(next))))))
 }
 
 // sharedStack adds maintenance mode and the bfcache-busting cookie on top of

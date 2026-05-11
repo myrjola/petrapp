@@ -291,6 +291,17 @@ func (app *application) maintenanceMode(next http.Handler) http.Handler {
 	})
 }
 
+// stampLastRequest updates the application's lastRequestAt atomic on every
+// request. Used by notification.IdleMonitor to gate process exit.
+func (app *application) stampLastRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if app.lastRequestAt != nil {
+			app.lastRequestAt.Store(time.Now().UnixNano())
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // setInvalidationCookieOnPost busts bfcache by setting a cookie.
 func setInvalidationCookieOnPost(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

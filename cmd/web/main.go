@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -9,13 +10,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"sync/atomic"
+	"syscall"
 	"time"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/envstruct"
 	"github.com/myrjola/petrapp/internal/flightrecorder"
 	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/notification"
 	"github.com/myrjola/petrapp/internal/pprofserver"
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -38,6 +44,10 @@ type application struct {
 	// fail with a runtime error surfaced to the user, while the UI still
 	// renders correctly.
 	vapidPublicKey string
+	// lastRequestAt is updated by stampLastRequest middleware on every
+	// request. notification.IdleMonitor reads it to gate process exit so the
+	// Fly Machine can scale to zero between workouts.
+	lastRequestAt *atomic.Int64
 }
 
 type config struct {
@@ -62,6 +72,20 @@ type config struct {
 	TracesDirectory string `env:"PETRAPP_TRACES_DIRECTORY" envDefault:""`
 	// OpenAIAPIKey is optional. It's used to authenticate with the OpenAI API.
 	OpenAIAPIKey string `env:"OPENAI_API_KEY" envDefault:""`
+	// VAPIDPublic is the base64url-encoded VAPID public key used by both the
+	// server (to sign push JWTs) and the client (passed as applicationServerKey
+	// to pushManager.subscribe). Generated ephemerally in dev when empty.
+	VAPIDPublic string `env:"PETRAPP_VAPID_PUBLIC" envDefault:""`
+	// VAPIDPrivate is the base64url-encoded VAPID private key. Must be set in
+	// production via Fly secrets; dev generates an ephemeral pair when empty.
+	VAPIDPrivate string `env:"PETRAPP_VAPID_PRIVATE" envDefault:""`
+	// VAPIDSubject is the email passed as the JWT sub claim. Bare email — the
+	// webpush-go library prepends "mailto:" itself.
+	VAPIDSubject string `env:"PETRAPP_VAPID_SUBJECT" envDefault:"vapid@example.com"`
+	// NotificationIdleTimeoutSec is the idle-monitor threshold in seconds.
+	// Stored as a string env var because envstruct only handles strings;
+	// parsed inside run().
+	NotificationIdleTimeoutSec string `env:"PETRAPP_NOTIFICATION_IDLE_TIMEOUT_SECONDS" envDefault:"300"`
 }
 
 func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (string, bool)) error {
@@ -135,15 +159,26 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		}
 	}
 
+	if err = ensureVAPIDKeys(ctx, &cfg, logger); err != nil {
+		return err
+	}
+
+	notif, err := buildNotificationStack(ctx, &cfg, db, logger)
+	if err != nil {
+		return err
+	}
+	go notif.idleMonitor.Run(ctx)
+
 	app := application{
 		logger:          logger,
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
-		service:         service.NewService(db, logger, cfg.OpenAIAPIKey),
+		service:         notif.svc,
 		flightRecorder:  flightRecorderService,
 		devMode:         cfg.FlyAppName == "",
-		vapidPublicKey:  "",
+		vapidPublicKey:  cfg.VAPIDPublic,
+		lastRequestAt:   notif.lastRequestAt,
 	}
 
 	routes, err := app.routes()
@@ -163,6 +198,100 @@ const (
 	// so a 7am passkey login doesn't expire before the evening's lift.
 	sessionLifetime = 7 * 24 * time.Hour
 )
+
+// ensureVAPIDKeys validates the VAPID config: production requires both keys
+// to be set via Fly secrets; dev generates an ephemeral pair on each start
+// and logs the public key.
+func ensureVAPIDKeys(ctx context.Context, cfg *config, logger *slog.Logger) error {
+	if cfg.VAPIDPublic != "" && cfg.VAPIDPrivate != "" {
+		return nil
+	}
+	if cfg.FlyAppName != "" {
+		return errors.New("PETRAPP_VAPID_PUBLIC and PETRAPP_VAPID_PRIVATE must be set in production")
+	}
+	priv, pub, err := webpush.GenerateVAPIDKeys()
+	if err != nil {
+		return fmt.Errorf("generate dev vapid keys: %w", err)
+	}
+	cfg.VAPIDPrivate, cfg.VAPIDPublic = priv, pub
+	logger.LogAttrs(ctx, slog.LevelWarn, "generated ephemeral VAPID keys for dev",
+		slog.String("public", pub))
+	return nil
+}
+
+// notificationStack groups the wired notification pieces handed back to run().
+type notificationStack struct {
+	svc           *service.Service
+	idleMonitor   *notification.IdleMonitor
+	lastRequestAt *atomic.Int64
+}
+
+// buildNotificationStack wires Sender + Scheduler + IdleMonitor and returns the
+// Scheduler-aware Service plus the lastRequestAt atomic the stamping middleware
+// updates.
+func buildNotificationStack(
+	ctx context.Context,
+	cfg *config,
+	db *sqlite.Database,
+	logger *slog.Logger,
+) (*notificationStack, error) {
+	idleSeconds, err := strconv.Atoi(cfg.NotificationIdleTimeoutSec)
+	if err != nil {
+		return nil, fmt.Errorf("parse PETRAPP_NOTIFICATION_IDLE_TIMEOUT_SECONDS: %w", err)
+	}
+	if idleSeconds <= 0 {
+		return nil, fmt.Errorf("PETRAPP_NOTIFICATION_IDLE_TIMEOUT_SECONDS must be positive: got %d", idleSeconds)
+	}
+	idleTimeout := time.Duration(idleSeconds) * time.Second
+
+	// HTTPClient is intentionally left unset so the Sender uses http.DefaultClient.
+	senderCfg := notification.SenderConfig{ //nolint:exhaustruct // HTTPClient defaults to http.DefaultClient.
+		VAPIDSubject:    cfg.VAPIDSubject,
+		VAPIDPublicKey:  cfg.VAPIDPublic,
+		VAPIDPrivateKey: cfg.VAPIDPrivate,
+		Logger:          logger,
+	}
+	sender := notification.NewSender(senderCfg)
+
+	baseService := service.NewService(db, logger, cfg.OpenAIAPIKey)
+
+	scheduler := notification.NewScheduler(notification.SchedulerConfig{
+		Repo:     baseService.ScheduledPushRepo(),
+		Dispatch: makeDispatchFunc(logger, baseService, sender),
+		Logger:   logger,
+		Now:      time.Now,
+	})
+	if err = scheduler.Reload(ctx); err != nil {
+		return nil, fmt.Errorf("reload scheduled pushes: %w", err)
+	}
+
+	svc := baseService.WithScheduler(scheduler)
+
+	lastRequestAt := new(atomic.Int64)
+	lastRequestAt.Store(time.Now().UnixNano())
+
+	const idleTickInterval = 10 * time.Second
+	idleMonitor := notification.NewIdleMonitor(notification.IdleMonitorConfig{
+		IdleThreshold: idleTimeout,
+		TickInterval:  idleTickInterval,
+		Now:           time.Now,
+		LastRequestAt: func() time.Time { return time.Unix(0, lastRequestAt.Load()) },
+		PendingCount:  scheduler.PendingCount,
+		Trigger: func() {
+			if killErr := syscall.Kill(os.Getpid(), syscall.SIGTERM); killErr != nil {
+				logger.LogAttrs(ctx, slog.LevelError, "idle monitor SIGTERM failed",
+					slog.Any("error", killErr))
+			}
+		},
+		Logger: logger,
+	})
+
+	return &notificationStack{
+		svc:           svc,
+		idleMonitor:   idleMonitor,
+		lastRequestAt: lastRequestAt,
+	}, nil
+}
 
 func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 	sessionManager := scs.New()

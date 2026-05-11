@@ -50,3 +50,21 @@ func (s *Service) CountPushSubscriptions(ctx context.Context) (int, error) {
 	}
 	return n, nil
 }
+
+// ListPushSubscriptions returns all push subscriptions for the authenticated user.
+func (s *Service) ListPushSubscriptions(ctx context.Context) ([]domain.PushSubscription, error) {
+	subs, err := s.repos.PushSubscriptions.ListByUser(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list push subscriptions: %w", err)
+	}
+	return subs, nil
+}
+
+// DeletePushSubscriptionByID removes a subscription by primary key, bypassing
+// user-scoping. Used by the push dispatcher to prune 410/404'd subscriptions.
+func (s *Service) DeletePushSubscriptionByID(ctx context.Context, id int) error {
+	if err := s.repos.PushSubscriptions.DeleteByID(ctx, id); err != nil {
+		return fmt.Errorf("delete push subscription by id: %w", err)
+	}
+	return nil
+}

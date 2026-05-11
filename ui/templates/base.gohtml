@@ -34,6 +34,11 @@
             }
         </script>
         <script {{nonce}} src="/main.js"></script>
+        <script {{nonce}}>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').catch(() => { /* ignore — push is opt-in */ });
+            }
+        </script>
     </head>
     <body>
     {{ template "page" . }}
