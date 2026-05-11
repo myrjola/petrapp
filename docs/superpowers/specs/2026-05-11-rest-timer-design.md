@@ -168,7 +168,7 @@ The unique index on `workout_exercise_id` enforces the "one pending push per slo
 |---|---|
 | `PETRAPP_VAPID_PUBLIC` | Base64url-encoded public key. Sent to client during subscribe. |
 | `PETRAPP_VAPID_PRIVATE` | Base64url-encoded private key. Used to sign JWTs. |
-| `PETRAPP_VAPID_SUBJECT` | Email address for the VAPID `sub` claim. Defaults to `martin.yrjola@gmail.com` (the project owner). **Bare email, no `mailto:` prefix.** |
+| `PETRAPP_VAPID_SUBJECT` | Email address for the VAPID `sub` claim. Defaults to `vapid@example.com` (placeholder; real push services treat it as non-deliverable, so prod must override via Fly secret). **Bare email, no `mailto:` prefix.** |
 | `PETRAPP_NOTIFICATION_IDLE_TIMEOUT` | Idle-monitor threshold, default `5m`. |
 
 Dev script (`scripts/dev.sh`, `scripts/dev-tailscale-https.sh`) generates a fresh keypair via `webpush.GenerateVAPIDKeys` if `PETRAPP_VAPID_PUBLIC` is unset, exports both, and prints the public key so subscribed dev devices can be re-aligned across restarts.
