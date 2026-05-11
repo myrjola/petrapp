@@ -55,12 +55,12 @@ func (s *Service) RecordSet(
 	completedValue int,
 ) error {
 	var (
-		wasComplete   bool
-		exercise      domain.Exercise
-		periodization domain.PeriodizationType
-		setNumber     int
-		setsTotal     int
-		hasMoreAfter  bool
+		wasComplete        bool
+		exercise           domain.Exercise
+		periodization      domain.PeriodizationType
+		completedSetNumber int
+		setsTotal          int
+		hasMoreAfter       bool
 	)
 	now := time.Now().UTC()
 
@@ -74,14 +74,16 @@ func (s *Service) RecordSet(
 			}
 			wasComplete = sess.ExerciseSets[i].Sets[setIndex].CompletedAt != nil
 			exercise = sess.ExerciseSets[i].Exercise
-			setNumber = setIndex + 1
+			completedSetNumber = setIndex + 1
 			setsTotal = len(sess.ExerciseSets[i].Sets)
 			break
 		}
 		periodization = sess.PeriodizationType
 
 		if recErr := sess.RecordSet(workoutExerciseID, setIndex, signal, weightKg, completedValue, now); recErr != nil {
-			return recErr //nolint:wrapcheck // Propagate domain sentinel unchanged.
+			// Domain sentinels propagate unchanged so callers can errors.Is at the call site;
+			// the outer `if err != nil` wraps for diagnostic context.
+			return recErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
 		}
 		hasMoreAfter = sess.HasIncompleteSets()
 		return nil
@@ -91,21 +93,21 @@ func (s *Service) RecordSet(
 	}
 
 	if !wasComplete && hasMoreAfter {
-		s.maybeSchedulePush(ctx, workoutExerciseID, exercise, periodization, setNumber, setsTotal, now)
+		s.maybeSchedulePush(ctx, workoutExerciseID, exercise, periodization, completedSetNumber, setsTotal, now)
 	}
 	return nil
 }
 
 // maybeSchedulePush schedules a rest-over push if every precondition holds:
 // the user has push enabled, has at least one subscription, and the exercise's
-// derivation yields a positive RestSeconds. Failures are logged at Debug; the
-// completion itself is already persisted.
+// derivation yields a positive RestSeconds. The completion itself is already
+// persisted, so failures here just mean the user won't get a notification.
 func (s *Service) maybeSchedulePush(
 	ctx context.Context,
 	workoutExerciseID int,
 	exercise domain.Exercise,
 	periodization domain.PeriodizationType,
-	setNumber, setsTotal int,
+	completedSetNumber, setsTotal int,
 	completedAt time.Time,
 ) {
 	if s.scheduler == nil {
@@ -117,7 +119,7 @@ func (s *Service) maybeSchedulePush(
 	}
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelDebug, "rest push: get preferences failed",
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: get preferences failed",
 			slog.Any("error", err))
 		return
 	}
@@ -126,7 +128,7 @@ func (s *Service) maybeSchedulePush(
 	}
 	subCount, err := s.repos.PushSubscriptions.CountByUser(ctx)
 	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelDebug, "rest push: count subscriptions failed",
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: count subscriptions failed",
 			slog.Any("error", err))
 		return
 	}
@@ -135,6 +137,9 @@ func (s *Service) maybeSchedulePush(
 	}
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	fireAt := completedAt.Add(time.Duration(restSeconds) * time.Second)
+	// nextSetNumber is the upcoming set the notification is announcing. The
+	// completion that triggered scheduling means the next set is the rest's reason.
+	nextSetNumber := completedSetNumber + 1
 
 	payloadBytes, err := json.Marshal(struct {
 		Title        string `json:"title"`
@@ -145,14 +150,14 @@ func (s *Service) maybeSchedulePush(
 		FireAtMS     int64  `json:"fire_at_ms"`
 	}{
 		Title:        "Rest over",
-		Body:         fmt.Sprintf("Time for set %d of %d — %s", setNumber+1, setsTotal, exercise.Name),
+		Body:         fmt.Sprintf("Time for set %d of %d — %s", nextSetNumber, setsTotal, exercise.Name),
 		ExerciseName: exercise.Name,
-		SetNumber:    setNumber,
+		SetNumber:    nextSetNumber,
 		SetsTotal:    setsTotal,
 		FireAtMS:     fireAt.UnixMilli(),
 	})
 	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelDebug, "rest push: marshal payload",
+		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: marshal payload",
 			slog.Any("error", err))
 		return
 	}

@@ -181,7 +181,7 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 }
 
 func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
-	ctx, db, _, _ := setupSessionForRecordSet(t)
+	ctx, db, userID, _ := setupSessionForRecordSet(t)
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
 	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
 		WithScheduler(fake)
@@ -195,7 +195,13 @@ func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
 	if len(fake.workout) != 1 {
-		t.Errorf("CancelForWorkout calls = %d, want 1", len(fake.workout))
+		t.Fatalf("CancelForWorkout calls = %d, want 1", len(fake.workout))
+	}
+	if fake.workout[0].userID != userID {
+		t.Errorf("CancelForWorkout userID = %d, want %d", fake.workout[0].userID, userID)
+	}
+	if !fake.workout[0].date.Equal(today) {
+		t.Errorf("CancelForWorkout date = %v, want %v", fake.workout[0].date, today)
 	}
 }
 
