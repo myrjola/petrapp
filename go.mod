@@ -20,6 +20,7 @@ require (
 replace github.com/descope/virtualwebauthn v1.0.4 => github.com/myrjola/virtualwebauthn v0.0.0-20260317143742-cbddf7bb22e9
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/deckarep/golang-set/v2 v2.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect

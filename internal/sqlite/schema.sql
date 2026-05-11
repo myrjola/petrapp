@@ -68,14 +68,15 @@ END;
 
 CREATE TABLE workout_preferences
 (
-    user_id           INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
-    monday_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (monday_minutes IN (0, 45, 60, 90)),
-    tuesday_minutes   INTEGER NOT NULL DEFAULT 0 CHECK (tuesday_minutes IN (0, 45, 60, 90)),
-    wednesday_minutes INTEGER NOT NULL DEFAULT 0 CHECK (wednesday_minutes IN (0, 45, 60, 90)),
-    thursday_minutes  INTEGER NOT NULL DEFAULT 0 CHECK (thursday_minutes IN (0, 45, 60, 90)),
-    friday_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (friday_minutes IN (0, 45, 60, 90)),
-    saturday_minutes  INTEGER NOT NULL DEFAULT 0 CHECK (saturday_minutes IN (0, 45, 60, 90)),
-    sunday_minutes    INTEGER NOT NULL DEFAULT 0 CHECK (sunday_minutes IN (0, 45, 60, 90))
+    user_id                    INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+    monday_minutes             INTEGER NOT NULL DEFAULT 0 CHECK (monday_minutes IN (0, 45, 60, 90)),
+    tuesday_minutes            INTEGER NOT NULL DEFAULT 0 CHECK (tuesday_minutes IN (0, 45, 60, 90)),
+    wednesday_minutes          INTEGER NOT NULL DEFAULT 0 CHECK (wednesday_minutes IN (0, 45, 60, 90)),
+    thursday_minutes           INTEGER NOT NULL DEFAULT 0 CHECK (thursday_minutes IN (0, 45, 60, 90)),
+    friday_minutes             INTEGER NOT NULL DEFAULT 0 CHECK (friday_minutes IN (0, 45, 60, 90)),
+    saturday_minutes           INTEGER NOT NULL DEFAULT 0 CHECK (saturday_minutes IN (0, 45, 60, 90)),
+    sunday_minutes             INTEGER NOT NULL DEFAULT 0 CHECK (sunday_minutes IN (0, 45, 60, 90)),
+    rest_notifications_enabled INTEGER NOT NULL DEFAULT 1 CHECK (rest_notifications_enabled IN (0, 1))
 ) WITHOUT ROWID, STRICT;
 
 CREATE TABLE exercises
@@ -168,3 +169,35 @@ CREATE TABLE feature_flags
     name    TEXT PRIMARY KEY CHECK (LENGTH(name) < 256),
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
 ) WITHOUT ROWID, STRICT;
+
+-------------------
+-- Push delivery --
+-------------------
+
+CREATE TABLE push_subscriptions
+(
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    endpoint   TEXT    NOT NULL UNIQUE CHECK (LENGTH(endpoint) < 1024),
+    p256dh     TEXT    NOT NULL CHECK (LENGTH(p256dh) < 256),
+    auth       TEXT    NOT NULL CHECK (LENGTH(auth) < 256),
+    created_at TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at)
+) STRICT;
+
+CREATE INDEX push_subscriptions_user_id ON push_subscriptions (user_id);
+
+CREATE TABLE scheduled_pushes
+(
+    id                  INTEGER PRIMARY KEY,
+    user_id             INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercise (id) ON DELETE CASCADE,
+    fire_at             TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', fire_at) = fire_at),
+    payload             TEXT    NOT NULL CHECK (LENGTH(payload) < 2048),
+    created_at          TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at)
+) STRICT;
+
+CREATE UNIQUE INDEX scheduled_pushes_workout_exercise_id
+    ON scheduled_pushes (workout_exercise_id);
+CREATE INDEX scheduled_pushes_fire_at ON scheduled_pushes (fire_at);
