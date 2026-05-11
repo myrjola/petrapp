@@ -62,6 +62,10 @@ func (r *sqlitePushSubscriptionRepository) DeleteByEndpoint(
 	return nil
 }
 
+// DeleteByID removes a subscription by its primary key without checking
+// ownership. Intended for the push sender to prune endpoints rejected with
+// 410 Gone / 404 Not Found from the push service; user-initiated deletes
+// must go through DeleteByEndpoint, which scopes by the authenticated user.
 func (r *sqlitePushSubscriptionRepository) DeleteByID(ctx context.Context, id int) error {
 	if _, err := r.db.ReadWrite.ExecContext(ctx,
 		`DELETE FROM push_subscriptions WHERE id = ?`, id,
@@ -108,13 +112,9 @@ func (r *sqlitePushSubscriptionRepository) ListByUser(ctx context.Context) (_ []
 func (r *sqlitePushSubscriptionRepository) CountByUser(ctx context.Context) (int, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	var count int
-	err := r.db.ReadOnly.QueryRowContext(ctx,
+	if err := r.db.ReadOnly.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM push_subscriptions WHERE user_id = ?`, userID,
-	).Scan(&count)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
-		}
+	).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count push subscriptions: %w", err)
 	}
 	return count, nil

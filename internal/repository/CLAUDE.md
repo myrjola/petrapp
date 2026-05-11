@@ -7,9 +7,10 @@ template logic, no business orchestration.
 
 ## What lives here
 
-- **SQLite implementations** of the five repository contracts:
+- **SQLite implementations** of the six repository contracts:
   `SessionRepository`, `ExerciseRepository`, `PreferencesRepository`,
-  `FeatureFlagRepository`, `MuscleGroupTargetRepository`. Implementations
+  `FeatureFlagRepository`, `MuscleGroupTargetRepository`,
+  `PushSubscriptionRepository`. Implementations
   are unexported (`sqliteSessionRepository`, etc.).
 - **The `Repositories` composite struct** plus the single public
   constructor `New(db *sqlite.Database, logger *slog.Logger) *Repositories`
