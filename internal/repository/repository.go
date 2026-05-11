@@ -24,9 +24,10 @@ type Repositories struct {
 	FeatureFlags      FeatureFlagRepository
 	MuscleTargets     MuscleGroupTargetRepository
 	PushSubscriptions PushSubscriptionRepository
+	ScheduledPushes   ScheduledPushRepository
 }
 
-// New constructs all six SQLite-backed repositories, wiring the
+// New constructs all seven SQLite-backed repositories, wiring the
 // ExerciseRepository into the SessionRepository so Get/List can hydrate
 // ExerciseSet.Exercise inside a single read.
 func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
@@ -37,6 +38,7 @@ func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
 	exercises := newSQLiteExerciseRepository(db)
 	sessions := newSQLiteSessionRepository(db, exercises)
 	pushSubs := newSQLitePushSubscriptionRepository(db)
+	scheduledPushes := newSQLiteScheduledPushRepository(db)
 	return &Repositories{
 		Preferences:       prefs,
 		MuscleTargets:     muscleTargets,
@@ -44,6 +46,7 @@ func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
 		Exercises:         exercises,
 		Sessions:          sessions,
 		PushSubscriptions: pushSubs,
+		ScheduledPushes:   scheduledPushes,
 	}
 }
 
@@ -115,4 +118,16 @@ type PushSubscriptionRepository interface {
 	DeleteByID(ctx context.Context, id int) error
 	ListByUser(ctx context.Context) ([]domain.PushSubscription, error)
 	CountByUser(ctx context.Context) (int, error)
+}
+
+// ScheduledPushRepository persists pending push fires so they survive
+// process restarts. One row per workout_exercise_id (enforced by UNIQUE
+// index).
+type ScheduledPushRepository interface {
+	Replace(ctx context.Context, push domain.ScheduledPush) (domain.ScheduledPush, error)
+	Delete(ctx context.Context, id int) error
+	DeleteByWorkoutExercise(ctx context.Context, workoutExerciseID int) error
+	DeleteByWorkoutSession(ctx context.Context, userID int, date time.Time) error
+	Get(ctx context.Context, workoutExerciseID int) (domain.ScheduledPush, error)
+	ListAll(ctx context.Context) ([]domain.ScheduledPush, error)
 }
