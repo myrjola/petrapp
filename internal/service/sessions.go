@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
@@ -174,6 +176,13 @@ func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
 		return sess.Complete(time.Now())
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
+	}
+	if s.scheduler != nil {
+		userID := contexthelpers.AuthenticatedUserID(ctx)
+		if err := s.scheduler.CancelForWorkout(ctx, userID, date); err != nil {
+			s.logger.LogAttrs(ctx, slog.LevelWarn, "cancel pending pushes on workout complete",
+				slog.Any("error", err))
+		}
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -76,6 +77,14 @@ func (s *Service) SwapExercise(
 	})
 	if err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
+	}
+
+	if s.scheduler != nil {
+		if err = s.scheduler.Cancel(ctx, workoutExerciseID); err != nil {
+			s.logger.LogAttrs(ctx, slog.LevelWarn, "cancel pending push on swap",
+				slog.Int("workout_exercise_id", workoutExerciseID),
+				slog.Any("error", err))
+		}
 	}
 	return nil
 }

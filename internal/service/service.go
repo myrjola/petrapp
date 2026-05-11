@@ -8,11 +8,22 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
+
+// PushScheduler is the subset of notification.Scheduler the service depends on.
+// Declared as an interface so tests can substitute a fake or pass nil. The real
+// implementation lives in internal/notification — this package doesn't import
+// it, keeping the dependency graph clean.
+type PushScheduler interface {
+	Schedule(ctx context.Context, push domain.ScheduledPush) error
+	Cancel(ctx context.Context, workoutExerciseID int) error
+	CancelForWorkout(ctx context.Context, userID int, date time.Time) error
+}
 
 // Service coordinates workout-domain operations across the repository
 // layer and external integrations. One instance per process; safe for
@@ -22,6 +33,7 @@ type Service struct {
 	db           *sqlite.Database
 	logger       *slog.Logger
 	openaiAPIKey string
+	scheduler    PushScheduler // nil-safe; methods no-op when nil.
 }
 
 // NewService creates a new workout service.
@@ -31,7 +43,18 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 		db:           db,
 		logger:       logger,
 		openaiAPIKey: openaiAPIKey,
+		scheduler:    nil,
 	}
+}
+
+// WithScheduler returns a copy of the service wired to a push scheduler.
+// Called from main.go after the notification package is initialised. Tests
+// that need scheduling behaviour call this with a fake; tests that don't
+// leave it nil.
+func (s *Service) WithScheduler(scheduler PushScheduler) *Service {
+	cp := *s
+	cp.scheduler = scheduler
+	return &cp
 }
 
 // GetUserPreferences retrieves the workout preferences for a user.

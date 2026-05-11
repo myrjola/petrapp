@@ -180,6 +180,25 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 	}
 }
 
+func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
+	ctx, db, _, _ := setupSessionForRecordSet(t)
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	// CompleteSession requires StartedAt to be set, which setupSessionForRecordSet
+	// already does via the INSERT INTO workout_sessions ... started_at clause.
+	if err := svc.CompleteSession(ctx, today); err != nil {
+		t.Fatalf("CompleteSession: %v", err)
+	}
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.workout) != 1 {
+		t.Errorf("CancelForWorkout calls = %d, want 1", len(fake.workout))
+	}
+}
+
 func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
