@@ -20,9 +20,8 @@ func newSQLitePreferencesRepository(db *sqlite.Database) *sqlitePreferencesRepos
 }
 
 // Get returns the authenticated user's weekly schedule preferences. When no
-// row exists yet the all-zero (all rest days) Preferences value is returned —
-// this mirrors the previous workout package behaviour and keeps first-time
-// users on a clean slate without a special "missing" sentinel.
+// row exists yet the weekday minutes default to zero (all rest days) and
+// RestNotificationsEnabled defaults to true, matching the SQL column default.
 func (r *sqlitePreferencesRepository) Get(ctx context.Context) (domain.Preferences, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
