@@ -29,15 +29,18 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (domain.Preferenc
 	var prefs domain.Preferences
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
-		       friday_minutes, saturday_minutes, sunday_minutes
+		       friday_minutes, saturday_minutes, sunday_minutes,
+		       rest_notifications_enabled
 		FROM workout_preferences
 		WHERE user_id = ?`, userID).Scan(
 		&prefs.MondayMinutes, &prefs.TuesdayMinutes, &prefs.WednesdayMinutes, &prefs.ThursdayMinutes,
 		&prefs.FridayMinutes, &prefs.SaturdayMinutes, &prefs.SundayMinutes,
+		&prefs.RestNotificationsEnabled,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Preferences{ //nolint:exhaustruct // All fields zero by design.
+		return domain.Preferences{ //nolint:exhaustruct // Weekday minutes zero by design.
+			RestNotificationsEnabled: true,
 		}, nil
 	}
 	if err != nil {
@@ -53,8 +56,8 @@ func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs domain.Pref
 	if _, err := r.db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO workout_preferences (
 			user_id, monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
-			friday_minutes, saturday_minutes, sunday_minutes
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			friday_minutes, saturday_minutes, sunday_minutes, rest_notifications_enabled
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (user_id) DO UPDATE SET
 			monday_minutes = excluded.monday_minutes,
 			tuesday_minutes = excluded.tuesday_minutes,
@@ -62,10 +65,12 @@ func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs domain.Pref
 			thursday_minutes = excluded.thursday_minutes,
 			friday_minutes = excluded.friday_minutes,
 			saturday_minutes = excluded.saturday_minutes,
-			sunday_minutes = excluded.sunday_minutes`,
+			sunday_minutes = excluded.sunday_minutes,
+			rest_notifications_enabled = excluded.rest_notifications_enabled`,
 		userID,
 		prefs.MondayMinutes, prefs.TuesdayMinutes, prefs.WednesdayMinutes, prefs.ThursdayMinutes,
 		prefs.FridayMinutes, prefs.SaturdayMinutes, prefs.SundayMinutes,
+		prefs.RestNotificationsEnabled,
 	); err != nil {
 		return fmt.Errorf("save workout preferences: %w", err)
 	}

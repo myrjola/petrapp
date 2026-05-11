@@ -13,9 +13,38 @@ func TestPreferencesRepository_GetEmptyReturnsZeroValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get on empty: %v", err)
 	}
-	want := domain.Preferences{} //nolint:exhaustruct // All zero by design.
+	want := domain.Preferences{ //nolint:exhaustruct // Weekday minutes still zero by design.
+		RestNotificationsEnabled: true,
+	}
 	if got != want {
 		t.Errorf("empty Get: want %+v, got %+v", want, got)
+	}
+}
+
+func TestPreferences_RestNotificationsEnabled_RoundTrip(t *testing.T) {
+	t.Parallel()
+	ctx, repos := setupTestRepos(t)
+
+	// Default for first-time users is true.
+	prefs, err := repos.Preferences.Get(ctx)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !prefs.RestNotificationsEnabled {
+		t.Errorf("default RestNotificationsEnabled = false, want true")
+	}
+
+	// Flip to false and confirm.
+	prefs.RestNotificationsEnabled = false
+	if err = repos.Preferences.Set(ctx, prefs); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	got, err := repos.Preferences.Get(ctx)
+	if err != nil {
+		t.Fatalf("Get after Set: %v", err)
+	}
+	if got.RestNotificationsEnabled {
+		t.Errorf("after Set false, got true")
 	}
 }
 
