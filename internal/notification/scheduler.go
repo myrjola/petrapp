@@ -132,20 +132,35 @@ func (s *Scheduler) PendingCount() int {
 func (s *Scheduler) startTimer(push domain.ScheduledPush) {
 	delay := max(push.FireAt.Sub(s.cfg.Now()), 0)
 	weID := push.WorkoutExerciseID
-	timer := time.AfterFunc(delay, func() {
-		s.fire(push)
-	})
+
+	// Hold the mutex across AfterFunc creation and map install. AfterFunc's callback runs on its
+	// own goroutine and will block on s.mu inside fire() until we release here, so the map entry
+	// is guaranteed installed before fire() can observe (or fail to find) it. This closes a race
+	// where a zero-delay timer could fire before the map install completed, leaking the entry.
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if existing, ok := s.timers[weID]; ok {
 		existing.Stop()
 	}
-	s.timers[weID] = timer
-	s.mu.Unlock()
+	// Heap-allocate the timer-pointer holder so the AfterFunc closure can read it after we've
+	// written it without racing on the stack-local. We hold s.mu here, and fire() acquires s.mu
+	// before dereferencing the holder, so the write below happens-before any read in fire().
+	selfBox := new(*time.Timer)
+	*selfBox = time.AfterFunc(delay, func() {
+		s.fire(selfBox, push)
+	})
+	s.timers[weID] = *selfBox
 }
 
-func (s *Scheduler) fire(push domain.ScheduledPush) {
+func (s *Scheduler) fire(selfBox **time.Timer, push domain.ScheduledPush) {
 	s.mu.Lock()
-	delete(s.timers, push.WorkoutExerciseID)
+	// Identity check: only clear the map entry if it still points at *this* timer. A concurrent
+	// Schedule may have installed a replacement between our timer firing and us acquiring the
+	// lock; in that case the replacement is the rightful map owner and must not be evicted.
+	self := *selfBox
+	if current, ok := s.timers[push.WorkoutExerciseID]; ok && current == self {
+		delete(s.timers, push.WorkoutExerciseID)
+	}
 	s.mu.Unlock()
 
 	// 30s is generous enough for a single Web Push round-trip plus row delete; tighter than

@@ -123,10 +123,11 @@ func TestScheduler_ReplaceOnlyFiresLatest(t *testing.T) {
 		Now:      time.Now,
 	})
 
-	// Schedule far-future, then immediately reschedule near-future.
+	// Schedule far-future, then immediately reschedule near-future. Far-future is tight enough
+	// that we'd catch a missed Stop() within the test window — see post-fire sleep below.
 	farFuture := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
 		UserID: 1, WorkoutExerciseID: 7,
-		FireAt:  time.Now().Add(5 * time.Second),
+		FireAt:  time.Now().Add(300 * time.Millisecond),
 		Payload: `"original"`,
 	}
 	nearFuture := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
@@ -146,10 +147,8 @@ func TestScheduler_ReplaceOnlyFiresLatest(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatalf("replacement never fired within window")
 	}
-	// Wait long enough that the far-future would have fired if the timer
-	// wasn't stopped — but only briefly, since 5s would slow tests too much.
-	// 200ms is enough to verify the replacement happened before far-future.
-	time.Sleep(100 * time.Millisecond)
+	// Wait long enough for far-future to have fired if it wasn't stopped.
+	time.Sleep(400 * time.Millisecond)
 	if got := fd.fired(); len(got) != 1 {
 		t.Errorf("got %d fires, want exactly 1 (replacement only): %v", len(got), got)
 	}
