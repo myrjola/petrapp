@@ -83,6 +83,13 @@ func NewClientWithSecFetchSite(url, rpID, rpOrigin, secFetchSite string) (*Clien
 	}, nil
 }
 
+// HTTPClient returns the underlying http.Client. Use only for tests that
+// need a one-off custom request (e.g. JSON API endpoints); webauthn flows
+// should continue to use the higher-level helpers.
+func (c *Client) HTTPClient() *http.Client {
+	return c.client
+}
+
 // WaitForReady calls the specified endpoint until it gets a HTTP 200 Success
 // response or until the context is cancelled or the 1-second timeout is reached.
 func (c *Client) WaitForReady(ctx context.Context, urlPath string) error {

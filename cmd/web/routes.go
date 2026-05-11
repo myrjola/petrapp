@@ -40,6 +40,11 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("GET /preferences/export-data", app.mustSessionStack(http.HandlerFunc(app.exportUserDataGET)))
 	mux.Handle("POST /preferences/delete-user", app.mustSessionStack(http.HandlerFunc(app.deleteUserPOST)))
 
+	mux.Handle("POST /api/push/subscribe",
+		app.mustSessionStack(http.HandlerFunc(app.pushSubscribePOST)))
+	mux.Handle("POST /api/push/unsubscribe",
+		app.mustSessionStack(http.HandlerFunc(app.pushUnsubscribePOST)))
+
 	mux.Handle("POST /api/registration/start", app.noStoreSessionStack(http.HandlerFunc(app.beginRegistration)))
 	mux.Handle("POST /api/registration/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishRegistration)))
 	mux.Handle("POST /api/login/start", app.noStoreSessionStack(http.HandlerFunc(app.beginLogin)))
