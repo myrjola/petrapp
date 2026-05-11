@@ -18,14 +18,15 @@ import (
 // New. Its fields are interface-typed so callers depend on the contract, not
 // the SQLite implementation.
 type Repositories struct {
-	Sessions      SessionRepository
-	Exercises     ExerciseRepository
-	Preferences   PreferencesRepository
-	FeatureFlags  FeatureFlagRepository
-	MuscleTargets MuscleGroupTargetRepository
+	Sessions          SessionRepository
+	Exercises         ExerciseRepository
+	Preferences       PreferencesRepository
+	FeatureFlags      FeatureFlagRepository
+	MuscleTargets     MuscleGroupTargetRepository
+	PushSubscriptions PushSubscriptionRepository
 }
 
-// New constructs all five SQLite-backed repositories, wiring the
+// New constructs all six SQLite-backed repositories, wiring the
 // ExerciseRepository into the SessionRepository so Get/List can hydrate
 // ExerciseSet.Exercise inside a single read.
 func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
@@ -35,12 +36,14 @@ func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
 	featureFlags := newSQLiteFeatureFlagRepository(db)
 	exercises := newSQLiteExerciseRepository(db)
 	sessions := newSQLiteSessionRepository(db, exercises)
+	pushSubs := newSQLitePushSubscriptionRepository(db)
 	return &Repositories{
-		Preferences:   prefs,
-		MuscleTargets: muscleTargets,
-		FeatureFlags:  featureFlags,
-		Exercises:     exercises,
-		Sessions:      sessions,
+		Preferences:       prefs,
+		MuscleTargets:     muscleTargets,
+		FeatureFlags:      featureFlags,
+		Exercises:         exercises,
+		Sessions:          sessions,
+		PushSubscriptions: pushSubs,
 	}
 }
 
@@ -103,4 +106,13 @@ type FeatureFlagRepository interface {
 // targets used by the planner.
 type MuscleGroupTargetRepository interface {
 	List(ctx context.Context) ([]domain.MuscleGroupTarget, error)
+}
+
+// PushSubscriptionRepository persists per-device Web Push subscriptions.
+type PushSubscriptionRepository interface {
+	Insert(ctx context.Context, sub domain.PushSubscription) (domain.PushSubscription, error)
+	DeleteByEndpoint(ctx context.Context, endpoint string) error
+	DeleteByID(ctx context.Context, id int) error
+	ListByUser(ctx context.Context) ([]domain.PushSubscription, error)
+	CountByUser(ctx context.Context) (int, error)
 }
