@@ -32,6 +32,7 @@ type exerciseSetTemplateData struct {
 	CurrentSetTarget      domain.SetTarget // Recommended weight and reps from progression
 	CurrentSetTimedTarget int              // Recommended seconds for time_based exercises; 0 for others.
 	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
+	RestEndAtMs           int64            // 0 when no rest chip should be shown.
 }
 
 func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDisplay {
@@ -133,6 +134,19 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		// No progression engine for bodyweight — uses the stored target as-is.
 	}
 
+	lastCompletedAt := getLastCompletedAt(exerciseSet.Sets)
+
+	var restEndAtMs int64
+	if lastCompletedAt != nil {
+		restSeconds := domain.RestSecondsFor(exerciseSet.Exercise, session.PeriodizationType)
+		if restSeconds > 0 {
+			restEnd := lastCompletedAt.Add(time.Duration(restSeconds) * time.Second)
+			if restEnd.After(time.Now()) {
+				restEndAtMs = restEnd.UnixMilli()
+			}
+		}
+	}
+
 	data := exerciseSetTemplateData{
 		BaseTemplateData:      newBaseTemplateData(r),
 		Date:                  date,
@@ -141,10 +155,11 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSet.Sets),
 		EditingIndex:          editingIndex,
 		IsEditing:             isEditing,
-		LastCompletedAt:       getLastCompletedAt(exerciseSet.Sets),
+		LastCompletedAt:       lastCompletedAt,
 		CurrentSetTarget:      currentSetTarget,
 		CurrentSetTimedTarget: currentSetTimedTarget,
 		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
+		RestEndAtMs:           restEndAtMs,
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)

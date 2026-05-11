@@ -900,3 +900,104 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Errorf("set 3 weight = %v, want -15.0 (negative input + assisted=on must not double-negate)", weight3)
 	}
 }
+
+// Test_ExerciseSet_RestChipAfterCompletedSet verifies that completing a
+// weighted set renders a rest countdown chip with a future
+// data-rest-end-at-ms timestamp.
+func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	// Pick the first exercise slot URL — matches the pattern used by other tests
+	// in this file (the first exercise is a weighted exercise with a rep window).
+	var slotURL string
+	doc.Find("a.exercise").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		if href, exists := s.Attr("href"); exists {
+			slotURL = href
+			return false
+		}
+		return true
+	})
+	if slotURL == "" {
+		t.Fatal("no exercise found on workout page")
+	}
+
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("get exercise: %v", err)
+	}
+
+	// Complete warmup.
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+	}).First()
+	if warmupForm.Length() == 0 {
+		t.Fatal("warmup form not found")
+	}
+	warmupAction, exists := warmupForm.Attr("action")
+	if !exists {
+		t.Fatal("warmup form has no action")
+	}
+	if doc, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+		t.Fatalf("warmup complete: %v", err)
+	}
+
+	// Submit the active weighted set form (signal=on_target).
+	setForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button[name='signal']").Length() > 0
+	}).First()
+	if setForm.Length() == 0 {
+		t.Fatal("expected signal form for active set")
+	}
+	setAction, exists := setForm.Attr("action")
+	if !exists {
+		t.Fatal("signal form has no action")
+	}
+	if doc, err = client.SubmitForm(ctx, doc, setAction, map[string]string{
+		"weight": "20",
+		"reps":   "5",
+		"signal": "on_target",
+	}); err != nil {
+		t.Fatalf("submit set: %v", err)
+	}
+
+	chip := doc.Find(".rest-chip[data-rest-end-at-ms]")
+	if chip.Length() == 0 {
+		t.Fatal("expected .rest-chip on the page after completing a set")
+	}
+	endAtStr, exists := chip.Attr("data-rest-end-at-ms")
+	if !exists {
+		t.Fatal("rest chip missing data-rest-end-at-ms attribute")
+	}
+	endAtMs, err := strconv.ParseInt(endAtStr, 10, 64)
+	if err != nil {
+		t.Fatalf("parse data-rest-end-at-ms: %v", err)
+	}
+	if endAtMs < time.Now().UnixMilli() {
+		t.Errorf("data-rest-end-at-ms = %d is in the past", endAtMs)
+	}
+}

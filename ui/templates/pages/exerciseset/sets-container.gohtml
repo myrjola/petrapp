@@ -301,6 +301,58 @@
             }
         </style>
 
+        {{ if gt .RestEndAtMs 0 }}
+        <div class="rest-chip" data-rest-end-at-ms="{{ .RestEndAtMs }}" aria-live="polite">
+            <style {{ nonce }}>
+                @scope (.rest-chip) {
+                    :scope {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: var(--size-2);
+                        padding: var(--size-2) var(--size-3);
+                        border-radius: var(--radius-round);
+                        background: var(--color-info-bg);
+                        color: var(--color-info);
+                        font-weight: var(--font-weight-6);
+                        font-size: var(--font-size-1);
+                        align-self: flex-start;
+                    }
+                    :scope.ready {
+                        background: var(--color-success-bg);
+                        color: var(--color-success);
+                    }
+                }
+            </style>
+            <span class="label">Rest</span>
+            <span class="time" data-rest-time>—:—</span>
+        </div>
+        <script {{ nonce }}>
+            (() => {
+                const chips = document.querySelectorAll('.rest-chip[data-rest-end-at-ms]');
+                if (chips.length === 0) return;
+                const tick = () => {
+                    const now = Date.now();
+                    chips.forEach((chip) => {
+                        const endAt = parseInt(chip.dataset.restEndAtMs, 10);
+                        const remaining = Math.max(0, endAt - now);
+                        const timeEl = chip.querySelector('[data-rest-time]');
+                        if (remaining === 0) {
+                            chip.classList.add('ready');
+                            if (timeEl) timeEl.textContent = 'Ready';
+                        } else {
+                            const totalSec = Math.ceil(remaining / 1000);
+                            const m = Math.floor(totalSec / 60);
+                            const s = totalSec % 60;
+                            if (timeEl) timeEl.textContent = m + ':' + String(s).padStart(2, '0');
+                        }
+                    });
+                };
+                tick();
+                setInterval(tick, 250);
+            })();
+        </script>
+        {{ end }}
+
         {{ range $index, $setDisplay := .SetsDisplay }}
             {{ $set := $setDisplay.Set }}
             {{ $isActive := and $.ExerciseSet.WarmupCompletedAt (or (and (not $set.CompletedValue) (eq $.FirstIncompleteIndex $index)) (and $.IsEditing (eq $index $.EditingIndex))) }}
