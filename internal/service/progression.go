@@ -104,7 +104,12 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("exercise %d has no rep window (use BuildTimedProgression for time_based)", exerciseID)
 	}
 
-	startingWeight, err := s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
+	var startingWeight float64
+	if sess.IsDeload {
+		startingWeight, err = s.GetDeloadStartingWeight(ctx, exerciseID, date)
+	} else {
+		startingWeight, err = s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("get starting weight: %w", err)
 	}
@@ -140,6 +145,37 @@ func (s *Service) BuildProgression(
 	}
 
 	return domain.NewFromHistory(config, completed), nil
+}
+
+const (
+	deloadFactor   = 0.90
+	deloadFallback = 0.80
+)
+
+// GetDeloadStartingWeight returns the seed weight for a deload week's first
+// set of the given exercise: 90% of the most recent hypertrophy working
+// weight, falling back to 80% of any recent working weight, then to zero
+// when no history exists. Snapped via the existing weight-grid rule.
+//
+// The repository's GetLatestStartingWeightBefore already excludes deload
+// sessions (Task 11), so the lookups below see only normal-week history.
+func (s *Service) GetDeloadStartingWeight(
+	ctx context.Context,
+	exerciseID int,
+	beforeDate time.Time,
+) (float64, error) {
+	prev, err := s.repos.Sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
+	if err != nil {
+		return 0, fmt.Errorf("get latest starting weight: %w", err)
+	}
+	if prev.PeriodizationType == domain.PeriodizationHypertrophy && prev.WeightKg > 0 {
+		return domain.SnapWeightKg(prev.WeightKg * deloadFactor), nil
+	}
+	// No hypertrophy history (or zero weight): use the broader fallback.
+	if prev.WeightKg > 0 {
+		return domain.SnapWeightKg(prev.WeightKg * deloadFallback), nil
+	}
+	return 0, nil
 }
 
 // BuildTimedProgression constructs a domain.TimedProgression

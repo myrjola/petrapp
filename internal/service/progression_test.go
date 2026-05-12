@@ -640,6 +640,77 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 // session must produce CurrentSet().TargetReps == 6 (repMax), not 8 (the old
 // hypertrophy constant). Before this fix the workout UI displayed "8 reps" even
 // though the planner had persisted target_value=6.
+func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("deload-user"), "Deload User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Deload Test Press", "upper", "desc", 5, 8)
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+	var exerciseID int
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Deload Test Press'").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("get exercise id: %v", err)
+	}
+
+	svc := service.NewService(db, logger, "")
+
+	monday := time.Date(2026, time.April, 27, 0, 0, 0, 0, time.UTC)
+	deloadMonday := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	mondayStr := monday.Format("2006-01-02")
+
+	// Insert a completed hypertrophy session on monday with 80 kg on_target.
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, '2026-04-27T10:00:00.000Z', 'hypertrophy')`,
+		userID, mondayStr)
+	if err != nil {
+		t.Fatalf("insert hypertrophy session: %v", err)
+	}
+	var weID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, mondayStr, exerciseID).Scan(&weID)
+	if err != nil {
+		t.Fatalf("insert workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		 weight_kg, target_value, completed_value, completed_at, signal)
+		 VALUES (?, 1, 80.0, 8, 8, '2026-04-27T10:00:00.000Z', 'on_target')`,
+		weID)
+	if err != nil {
+		t.Fatalf("insert sets: %v", err)
+	}
+
+	// GetDeloadStartingWeight returns 80 × 0.9 = 72 (snapped to 0.5).
+	got, err := svc.GetDeloadStartingWeight(ctx, exerciseID, deloadMonday)
+	if err != nil {
+		t.Fatalf("GetDeloadStartingWeight: %v", err)
+	}
+	if got != 72.0 {
+		t.Errorf("got %v, want 72.0 (= 80 * 0.9, snapped)", got)
+	}
+}
+
 func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))

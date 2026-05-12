@@ -110,13 +110,18 @@ func incrementFor(weight float64) float64 {
 	return weightIncrementKgHigh
 }
 
-// snapWeight rounds to the nearest realisable load: 1kg in the dumbbell
-// range, 0.5kg above. User overrides may sit off-grid, so each adjustment
-// is snapped before being recommended.
-func snapWeight(kg float64) float64 {
+// SnapWeightKg rounds a kilo value to the nearest realisable load: 1kg
+// inside the dumbbell range (|w| < 10kg), 0.5kg above. Exposed for service
+// callers that derive weights outside the per-set progression flow.
+func SnapWeightKg(kg float64) float64 {
 	if math.Abs(kg) < dumbbellThresholdKg {
 		return math.Round(kg)
 	}
 	const halfKg = 0.5
 	return math.Round(kg/halfKg) * halfKg
 }
+
+// snapWeight rounds to the nearest realisable load: 1kg in the dumbbell
+// range, 0.5kg above. User overrides may sit off-grid, so each adjustment
+// is snapped before being recommended.
+func snapWeight(kg float64) float64 { return SnapWeightKg(kg) }
