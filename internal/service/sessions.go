@@ -107,6 +107,26 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		return fmt.Errorf("plan week: %w", err)
 	}
 
+	for i := range plannedSessions {
+		if !plannedSessions[i].IsDeload {
+			continue
+		}
+		for j := range plannedSessions[i].ExerciseSets {
+			ex := plannedSessions[i].ExerciseSets[j].Exercise
+			if !ex.HasWeight() {
+				continue
+			}
+			w, err := s.GetDeloadStartingWeight(ctx, ex.ID, plannedSessions[i].Date)
+			if err != nil {
+				return fmt.Errorf("seed deload weight for %s: %w", ex.Name, err)
+			}
+			weight := w
+			for k := range plannedSessions[i].ExerciseSets[j].Sets {
+				plannedSessions[i].ExerciseSets[j].Sets[k].WeightKg = &weight
+			}
+		}
+	}
+
 	if err = s.repos.Sessions.CreateBatch(ctx, plannedSessions); err != nil {
 		return fmt.Errorf("create batch sessions: %w", err)
 	}
