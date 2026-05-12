@@ -114,6 +114,7 @@ func (s *Service) BuildProgression(
 		RepMin:         *exercise.RepMin,
 		RepMax:         *exercise.RepMax,
 		StartingWeight: startingWeight,
+		IsDeload:       sess.IsDeload,
 	}
 
 	var completed []domain.SetResult
