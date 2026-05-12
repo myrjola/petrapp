@@ -31,6 +31,7 @@ func (app *application) baseTemplateFuncs() template.FuncMap {
 		"nonce":       func() template.HTMLAttr { return "" },
 		"mdToHTML":    func(_ string) template.HTML { return "" },
 		"formatFloat": formatFloat,
+		"sub":         func(a, b int) int { return a - b },
 	}
 }
 
@@ -45,6 +46,7 @@ func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncM
 			return app.renderMarkdownToHTML(ctx, markdown)
 		},
 		"formatFloat": formatFloat,
+		"sub":         func(a, b int) int { return a - b },
 	}
 }
 

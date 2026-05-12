@@ -554,6 +554,72 @@
             </script>
         </div>
 
+        <section class="deload-section" aria-labelledby="deload-heading">
+            <style {{ nonce }}>
+                @scope (.deload-section) {
+                    :scope {
+                        margin-top: var(--size-5);
+                        padding: var(--size-4);
+                        background: var(--gray-0);
+                        border-radius: var(--radius-2);
+
+                        h2 {
+                            margin-top: 0;
+                        }
+
+                        .deload-controls {
+                            display: flex;
+                            flex-direction: column;
+                            gap: var(--size-3);
+                        }
+
+                        .anchor-line {
+                            font-size: var(--font-size-0);
+                            color: var(--gray-7);
+                        }
+                    }
+                }
+            </style>
+
+            <h2 id="deload-heading">Deload</h2>
+            <p>Planned deload weeks give your body time to recover. On a deload week, every session
+               runs lighter and shorter — the goal is recovery, not progress.</p>
+
+            <form method="post" action="/preferences" class="deload-controls">
+                <label>
+                    <input type="checkbox" name="deload_enabled" {{ if .DeloadEnabled }}checked{{ end }}>
+                    Enable planned deloads
+                </label>
+
+                <label>
+                    Block length
+                    <select name="mesocycle_length">
+                        {{ range .MesocycleLengthOptions }}
+                            <option value="{{ . }}" {{ if eq . $.MesocycleLength }}selected{{ end }}>
+                                {{ . }} weeks ({{ printf "%d+1" (sub . 1) }})
+                            </option>
+                        {{ end }}
+                    </select>
+                </label>
+
+                {{ range .Weekdays }}
+                    <input type="hidden" name="{{ .ID }}_minutes" value="{{ .Minutes }}">
+                {{ end }}
+
+                <button type="submit">Save deload settings</button>
+            </form>
+
+            {{ if and .DeloadEnabled (not .MesocycleAnchor.IsZero) }}
+                <p class="anchor-line">Current cycle starts on {{ .MesocycleAnchor.Format "Mon 2 Jan 2006" }}.</p>
+            {{ end }}
+
+            <form method="post" action="/preferences/mesocycle/restart">
+                <button type="submit" {{ if not .DeloadEnabled }}disabled{{ end }}>
+                    Restart cycle from next Monday
+                </button>
+            </form>
+        </section>
+
         <div class="data-export-section">
             <h2>Export Your Data</h2>
             <p>Download all your workout data as an SQLite database file for your personal records or data
