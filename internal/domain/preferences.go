@@ -14,6 +14,9 @@ type Preferences struct {
 	SaturdayMinutes          int
 	SundayMinutes            int
 	RestNotificationsEnabled bool
+	DeloadEnabled            bool
+	MesocycleLength          int
+	MesocycleAnchor          time.Time
 }
 
 func (p Preferences) Monday() bool    { return p.MondayMinutes > 0 }
