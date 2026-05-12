@@ -51,9 +51,14 @@ and user-configurable to 4 / 5 / 6 / 7 weeks. Mesocycle position is
 the same shape as the existing strength/hypertrophy alternation.
 
 The deload week is implemented as a **forced-hypertrophy week with cut
-volume and cut starting weight**. Periodization on a deload session is
-invariantly `Hypertrophy`; planner overrides the normal alternation for
-that week and resumes alternation in week 1 of the next block.
+volume, cut starting weight, and no set-level autoregulation**.
+Periodization on a deload session is invariantly `Hypertrophy`; the
+planner overrides the normal alternation for that week and resumes
+alternation in week 1 of the next block. Signal buttons (too-heavy /
+on-target / too-light) are **hidden** in the UI on deload sessions, all
+sets target the same pre-stamped weight, and deload session rows are
+**excluded from every future starting-weight lookup**, so a deload
+week never anchors subsequent progression.
 
 ## Mesocycle model
 
@@ -155,8 +160,7 @@ is forced to hypertrophy).
 
 ### Progression
 
-`Progression.Config` gains an `IsDeload bool` field. Two behaviour
-changes when set:
+`Progression.Config` gains an `IsDeload bool` field. When set:
 
 1. **Starting weight derivation is the caller's responsibility** (as
    today), but the contract becomes: on deload, the caller passes
@@ -164,32 +168,57 @@ changes when set:
    snapped via the existing `snapWeight` rule. If no hypertrophy
    history exists yet, fall back to 80% of any recent working weight
    for the exercise (rough adjustment from low-rep to high-rep load).
-2. **`SignalTooLight` is treated as `SignalOnTarget`** inside
-   `adjustedWeight` — no progression during deload. `SignalTooHeavy`
-   still decreases (safety valve). `SignalOnTarget` is unchanged.
+2. **`CurrentSet()` returns the starting weight for every set.**
+   No set-to-set adjustment. Signals are not collected on deload
+   (see UX section), so `RecordCompletion` will receive a `nil`
+   signal; `adjustedWeight` is skipped entirely on the deload code
+   path. This removes the need for any "what does
+   SignalTooLight mean on deload?" branching — the question never
+   arises because the signal isn't there.
+
+Concretely, `CurrentSet()` on a deload `Progression` ignores
+`p.completed` and always returns `{WeightKg: config.StartingWeight,
+TargetReps: ...}`. The reps target still comes from `DeriveScheme`
+(hypertrophy, halved sets).
+
+The set's `Signal` column ends up NULL — already permitted by the
+`exercise_sets.signal` schema constraint.
 
 This concentrates the deload knowledge in two well-bounded places:
-`DeriveScheme` (volume) and `Progression.adjustedWeight` (intensity
-autoregulation).
+`DeriveScheme` (volume) and `Progression.CurrentSet()` (intensity —
+constant weight, no autoregulation).
 
-### Starting-weight lookup
+### Starting-weight lookup — deload sessions are excluded everywhere
 
-The "most recent hypertrophy-zone working weight" lookup is the only
-genuinely new query. It belongs in the service layer (or repository,
-depending on which is cleaner for that codebase region) alongside the
-existing starting-weight derivation. The query is:
+Deload sets must not contribute to future starting-weight derivations.
+This is enforced at the repository: `GetLatestStartingWeightBefore`
+(`internal/repository/sessions.go:493`) gains an `AND
+workout_sessions.is_deload = 0` filter in its query — applied
+unconditionally, regardless of whether the *upcoming* session is a
+deload or a normal session. Rationale: deload weights are
+intentionally suppressed and shouldn't anchor any progression — the
+user lifted lighter on purpose, not because that's their current
+working weight.
+
+The same filter applies to the **new** "most recent hypertrophy-zone
+working weight" query used to seed a deload week's starting weight:
 
 > Find the most recent `workout_sessions` row for this user where
-> `periodization_type = 'hypertrophy'` and `is_deload = 0`, walk its
+> `periodization_type = 'hypertrophy'` AND `is_deload = 0`, walk its
 > `exercise_sets` for this exercise, and return the maximum
 > `weight_kg` recorded across those sets. (Maximum, not median: it
 > reflects the actual working weight the user got to, ignoring any
 > mid-session decreases triggered by `SignalTooHeavy`.)
 
-Fallback policy when no hypertrophy history:
+Fallback policy when no hypertrophy history exists:
 
-1. Most recent working weight for the exercise, × 0.80.
+1. Most recent non-deload working weight for the exercise, × 0.80.
 2. If no history at all: the exercise's default starting weight × 0.80.
+
+To keep this clean, both queries — the existing
+`GetLatestStartingWeightBefore` and the new hypertrophy-specific
+lookup — go through one repository method that takes the desired
+periodization filter, with `is_deload = 0` baked in.
 
 ## Planner behaviour
 
@@ -248,15 +277,37 @@ Three small touchpoints:
      when toggle is off.
 2. **Plan / week view** — small chip on the week header showing
    `Week 3 of 5` or `Week 5 of 5 · Deload`. Hidden when feature is off.
-3. **Session page on a deload day** — one-line banner at the top:
-   *"Deload week — lighter loads, fewer sets. Skip the heavy signals;
-   the goal is recovery, not progress."* No new controls.
+3. **Session page on a deload day** — three changes:
+   - Banner at the top of the session: *"Deload week — lighter loads,
+     same weight every set. Just hit your reps and rest. These sets
+     don't influence future progression."*
+   - **Signal buttons hidden** on every set's completion form. The
+     completion control on a deload set is a single "Done" action
+     that records the actual reps and timestamp, without prompting
+     for too-heavy / on-target / too-light. The `Signal` column ends
+     up NULL in the database (already permitted by schema).
+   - Per-set weight display shows the deload weight consistently
+     across all sets in the exercise — there is no "next set might
+     be heavier/lighter" hint because the planner pre-stamps the
+     same weight on every set.
 
-No changes to existing controls. The `SignalTooLight` button remains
-visible on deload sessions — the suppression is in the *response* to
-the signal, not the UI. (Reasoning: hiding the button would lose the
-record of "user felt this was light," which is useful signal for
-future autoregulation work.)
+Rationale for hiding signals (vs. capturing them as a softer
+disabled-but-visible state):
+
+- **Conceptual coherence with the user instruction:** deload sets are
+  declared not to influence progression. Hiding the signals enforces
+  this in the UI, not just in the back-end query filters.
+- **Removes cognitive load on a recovery week** — the point of the
+  deload is to stop grading effort.
+- **Trivially reversible** if a future autoregulation feature wants
+  signal data on deload weeks: the column is already nullable, the
+  hide is just a template branch on `Session.IsDeload`.
+
+The handler / form posting from a deload set therefore omits the
+`signal` field; the service layer's `RecordSet` path is reached with
+a `nil` signal (the underlying `Session.RecordSet` aggregate method
+signature is updated to accept `*Signal` rather than `Signal` — a
+small, safe refactor since storage is already nullable).
 
 ## Testing
 
@@ -264,22 +315,32 @@ future autoregulation work.)
   - `WeekInBlock` / `IsDeloadWeek` — table-driven across cadences
     (4, 5, 6, 7) and anchor dates including DST boundaries.
   - `DeriveScheme` with `isDeload=true` — every rep band, both
-    nominal periodization types (the function should ignore
-    incoming `p` and produce hypertrophy + halved sets).
-  - `Progression.adjustedWeight` with `IsDeload=true` — verify
-    `SignalTooLight` is a no-op; `SignalTooHeavy` still decreases;
-    `SignalOnTarget` is unchanged.
+    nominal periodization types (the function defensively forces
+    hypertrophy + halved sets regardless of the incoming `p`).
+  - `Progression.CurrentSet()` with `IsDeload=true` — verify the
+    starting weight is returned for every set, and `RecordCompletion`
+    with `nil` signal does not panic and does not move the weight.
+  - `Session.RecordSet` with `*Signal == nil` — verify the set is
+    recorded with `Signal == nil` in storage.
 - **Planner integration test**:
   - Plan a week that lands on a deload week — every session has
-    `IsDeload=true`, `PeriodizationType=Hypertrophy`, halved sets.
+    `IsDeload=true`, `PeriodizationType=Hypertrophy`, halved sets,
+    and starting weight at 90% of prior hypertrophy weight.
   - Plan a week that lands on week N-2 — feature off / normal output.
-- **Repository round-trip** for the new preferences and sessions
-  columns; existing tests should continue to pass with default
-  zero-valued columns.
-- **Starting-weight derivation test** in the service layer:
-  most-recent-hypertrophy-weight lookup with fallbacks.
+- **Repository tests**:
+  - Round-trip the new preferences and sessions columns; existing
+    tests should pass with default zero-valued columns.
+  - `GetLatestStartingWeightBefore` excludes rows where `is_deload =
+    1`. Seed two prior sessions for the same exercise — one normal,
+    one deload (lighter weight) — and verify the lookup returns the
+    normal weight even when the deload session is more recent.
+- **Service-layer starting-weight test** for the hypertrophy-zone
+  lookup with both fallback branches.
 - **Handler test** for the preferences form: persisting the new
   fields, validating cadence bounds.
+- **Template / handler test** for the session page on a deload day:
+  signal buttons are absent; the "Done" form submits without a
+  `signal` field; the banner is rendered.
 
 ## Out of scope (intentional follow-ups)
 
