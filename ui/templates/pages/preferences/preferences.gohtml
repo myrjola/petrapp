@@ -438,6 +438,10 @@
                     // promise can take seconds or stall, and the previous code left the
                     // user with an empty card and nothing to click. The click handler
                     // takes care of registering the SW if it isn't active yet.
+                    //
+                    // For users who already have a subscription, this causes a brief
+                    // flash of the Enable button before refreshUI() below swaps to the
+                    // Disable view. Accepted tradeoff over the empty-card regression.
                     notSubEl.classList.remove('hidden');
                     enableBtn.classList.remove('hidden');
 
@@ -481,9 +485,12 @@
                             const reg = await navigator.serviceWorker.getRegistration();
                             const sub = reg ? await reg.pushManager.getSubscription() : null;
                             if (sub) showSubscribed(); else showUnsubscribed();
-                        } catch (_) {
+                        } catch (err) {
                             // Leave the default (unsubscribed) UI in place; the user can
                             // still attempt Enable and we'll surface any error from there.
+                            // Logged so transient failures (permission revoked mid-session,
+                            // browser quirks) are at least visible in devtools.
+                            console.error('rest-notifications refreshUI failed', err);
                         }
                     };
 
