@@ -516,6 +516,7 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		WHERE we.workout_user_id = ?
 		  AND we.exercise_id = ?
 		  AND we.workout_date < ?
+		  AND ws.is_deload = 0
 		  AND es.completed_value IS NOT NULL
 		  AND es.weight_kg IS NOT NULL
 		  AND es.signal IN ('on_target', 'too_light')
@@ -545,9 +546,13 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 		SELECT es.completed_value
 		FROM exercise_sets es
 		JOIN workout_exercise we ON we.id = es.workout_exercise_id
+		JOIN workout_sessions ws
+		  ON ws.user_id = we.workout_user_id
+		 AND ws.workout_date = we.workout_date
 		WHERE we.workout_user_id = ?
 		  AND we.exercise_id = ?
 		  AND we.workout_date < ?
+		  AND ws.is_deload = 0
 		  AND es.completed_value IS NOT NULL
 		  AND es.signal IN ('on_target', 'too_light')
 		ORDER BY we.workout_date DESC, es.set_number DESC

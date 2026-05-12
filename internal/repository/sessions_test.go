@@ -219,6 +219,76 @@ func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
 	}
 }
 
+func intPtrLocal(i int) *int { return &i }
+
+func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
+	if err != nil {
+		t.Fatalf("Create exercise: %v", err)
+	}
+
+	mondayNormal := time.Date(2026, time.April, 27, 0, 0, 0, 0, time.UTC)
+	mondayDeload := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+
+	weight100 := 100.0
+	weight90 := 90.0
+	onTarget := domain.SignalOnTarget
+	completedAt := time.Date(2026, time.April, 27, 10, 0, 0, 0, time.UTC)
+
+	normal := domain.Session{ //nolint:exhaustruct
+		Date:              mondayNormal,
+		PeriodizationType: domain.PeriodizationHypertrophy,
+		IsDeload:          false,
+		ExerciseSets: []domain.ExerciseSet{ //nolint:exhaustruct
+			{
+				Exercise: exercise,
+				Sets: []domain.Set{
+					{
+						TargetValue:    10,
+						WeightKg:       &weight100,
+						CompletedValue: intPtrLocal(10),
+						CompletedAt:    &completedAt,
+						Signal:         &onTarget,
+					},
+				},
+			},
+		},
+	}
+	deload := domain.Session{ //nolint:exhaustruct
+		Date:              mondayDeload,
+		PeriodizationType: domain.PeriodizationHypertrophy,
+		IsDeload:          true,
+		ExerciseSets: []domain.ExerciseSet{ //nolint:exhaustruct
+			{
+				Exercise: exercise,
+				Sets: []domain.Set{
+					{
+						TargetValue:    10,
+						WeightKg:       &weight90,
+						CompletedValue: intPtrLocal(10),
+						CompletedAt:    &completedAt,
+						Signal:         &onTarget,
+					},
+				},
+			},
+		},
+	}
+
+	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{normal, deload}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+
+	got, err := repos.Sessions.GetLatestStartingWeightBefore(ctx, exercise.ID, mondayDeload.AddDate(0, 0, 7))
+	if err != nil {
+		t.Fatalf("GetLatestStartingWeightBefore: %v", err)
+	}
+	if got.WeightKg != 100.0 {
+		t.Errorf("WeightKg = %v, want 100.0 (deload session must be excluded)", got.WeightKg)
+	}
+}
+
 func TestSessionRepository_DeleteWeek(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
