@@ -12,7 +12,8 @@ const defaultTimedSets = 3
 // count for an exercise within a session of the given periodization. For
 // time-based exercises, uses DefaultStartingSeconds and a fixed set count of
 // defaultTimedSets. For rep-based exercises, returns DeriveScheme values.
-func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
+// isDeload halves the set count and targets repMax (see DeriveScheme).
+func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool) (int, int) {
 	if ex.IsTimed() {
 		if ex.DefaultStartingSeconds != nil {
 			return *ex.DefaultStartingSeconds, defaultTimedSets
@@ -26,7 +27,7 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 		// schema CHECK; fall back to old defaults if a fixture invariant is violated.
 		return defaultTargetValue, defaultTimedSets
 	}
-	scheme := DeriveScheme(*ex.RepMin, *ex.RepMax, pt, false)
+	scheme := DeriveScheme(*ex.RepMin, *ex.RepMax, pt, isDeload)
 	return scheme.TargetReps, scheme.TargetSets
 }
 
@@ -39,8 +40,10 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 // untouched set is distinguishable from one with a recorded weight of zero —
 // downstream code (notably BuildSetsForAdd's seed-weight lookup) relies on
 // `WeightKg == nil` meaning "never recorded".
-func BuildPlannedSets(exercise Exercise, periodization PeriodizationType) []Set {
-	targetValue, n := deriveSchemeForExercise(exercise, periodization)
+//
+// isDeload halves the set count and targets repMax (lighter load, fewer sets).
+func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDeload bool) []Set {
+	targetValue, n := deriveSchemeForExercise(exercise, periodization, isDeload)
 	sets := make([]Set, n)
 	for i := range sets {
 		sets[i] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
@@ -60,8 +63,10 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType) []Set 
 // WeightKg, the most recent one seeds every new set so the user's progression
 // isn't lost just because the prescription changed; otherwise the seed is 0.
 // Bodyweight and time-based exercises stay nil.
-func BuildSetsForAdd(exercise Exercise, periodization PeriodizationType, historicalSets []Set) []Set {
-	sets := BuildPlannedSets(exercise, periodization)
+//
+// isDeload halves the set count and targets repMax (see BuildPlannedSets).
+func BuildSetsForAdd(exercise Exercise, periodization PeriodizationType, isDeload bool, historicalSets []Set) []Set {
+	sets := BuildPlannedSets(exercise, periodization, isDeload)
 	if !exercise.HasWeight() {
 		return sets
 	}

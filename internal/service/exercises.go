@@ -72,7 +72,7 @@ func (s *Service) SwapExercise(
 	}
 
 	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		newSets := domain.BuildSetsForAdd(newExercise, sess.PeriodizationType, historicalSets)
+		newSets := domain.BuildSetsForAdd(newExercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
 		return sess.SwapExerciseInSlot(workoutExerciseID, newExercise, newSets)
 	})
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	}
 
 	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		newSets := domain.BuildSetsForAdd(exercise, sess.PeriodizationType, historicalSets)
+		newSets := domain.BuildSetsForAdd(exercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
 		_, addErr := sess.AddExercise(exercise, newSets)
 		if addErr != nil {
 			return fmt.Errorf("add exercise to session: %w", addErr)

@@ -316,7 +316,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType) ExerciseSet {
 	return ExerciseSet{ //nolint:exhaustruct // ID auto-assigned at insert; WarmupCompletedAt nil.
 		Exercise: ex,
-		Sets:     BuildPlannedSets(ex, pt),
+		Sets:     BuildPlannedSets(ex, pt, false), // false: planner deload override applied in Task 11.
 	}
 }
 

@@ -7,8 +7,6 @@ import (
 )
 
 func Test_BuildPlannedSets(t *testing.T) {
-	intPtr := func(i int) *int { return &i }
-
 	cases := []struct {
 		name          string
 		exercise      domain.Exercise
@@ -85,7 +83,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := domain.BuildPlannedSets(tc.exercise, tc.periodization)
+			got := domain.BuildPlannedSets(tc.exercise, tc.periodization, false)
 			if len(got) != tc.wantSetCount {
 				t.Fatalf("len = %d, want %d", len(got), tc.wantSetCount)
 			}
@@ -111,7 +109,6 @@ func Test_BuildPlannedSets(t *testing.T) {
 }
 
 func Test_BuildSetsForAdd(t *testing.T) {
-	intPtr := func(i int) *int { return &i }
 	weightPtr := func(w float64) *float64 { return &w }
 
 	weighted := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
@@ -135,7 +132,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	}
 
 	t.Run("weighted with no history allocates zero-valued weight pointer", func(t *testing.T) {
-		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, nil)
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, false, nil)
 		if len(sets) != 4 {
 			t.Fatalf("len = %d, want 4", len(sets))
 		}
@@ -154,7 +151,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 			{WeightKg: weightPtr(62.5), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil}, // never recorded
 		}
-		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationHypertrophy, history)
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationHypertrophy, false, history)
 		for i, s := range sets {
 			if s.WeightKg == nil || *s.WeightKg != 62.5 {
 				t.Errorf("set[%d].WeightKg = %v, want 62.5", i, s.WeightKg)
@@ -167,7 +164,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
-		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, history)
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, false, history)
 		for i, s := range sets {
 			if s.WeightKg == nil || *s.WeightKg != 0 {
 				t.Errorf("set[%d].WeightKg = %v, want 0", i, s.WeightKg)
@@ -179,7 +176,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 		history := []domain.Set{
 			{WeightKg: weightPtr(-20), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
-		sets := domain.BuildSetsForAdd(assisted, domain.PeriodizationStrength, history)
+		sets := domain.BuildSetsForAdd(assisted, domain.PeriodizationStrength, false, history)
 		for i, s := range sets {
 			if s.WeightKg == nil || *s.WeightKg != -20 {
 				t.Errorf("set[%d].WeightKg = %v, want -20", i, s.WeightKg)
@@ -191,7 +188,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 		history := []domain.Set{
 			{WeightKg: weightPtr(100), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
-		sets := domain.BuildSetsForAdd(bodyweight, domain.PeriodizationStrength, history)
+		sets := domain.BuildSetsForAdd(bodyweight, domain.PeriodizationStrength, false, history)
 		for i, s := range sets {
 			if s.WeightKg != nil {
 				t.Errorf("set[%d].WeightKg = %v, want nil", i, *s.WeightKg)
@@ -203,7 +200,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 		history := []domain.Set{
 			{WeightKg: weightPtr(100), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
-		sets := domain.BuildSetsForAdd(timeBased, domain.PeriodizationStrength, history)
+		sets := domain.BuildSetsForAdd(timeBased, domain.PeriodizationStrength, false, history)
 		for i, s := range sets {
 			if s.WeightKg != nil {
 				t.Errorf("set[%d].WeightKg = %v, want nil", i, *s.WeightKg)
@@ -215,7 +212,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 		history := []domain.Set{
 			{WeightKg: weightPtr(80), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
-		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, history)
+		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, false, history)
 		if len(sets) < 2 {
 			t.Fatalf("need at least 2 sets to verify pointer independence, got %d", len(sets))
 		}
@@ -225,3 +222,22 @@ func Test_BuildSetsForAdd(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildPlannedSets_Deload(t *testing.T) {
+	ex := domain.Exercise{ //nolint:exhaustruct // Only the planning fields are read.
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       intPtr(8),
+		RepMax:       intPtr(12),
+	}
+	got := domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true)
+	// Normal mid-rep band: 3 sets. Deload: ceil(3/2) = 2.
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2 (deload halves sets)", len(got))
+	}
+	for i, s := range got {
+		if s.TargetValue != 12 {
+			t.Errorf("set %d TargetValue = %d, want 12 (deload forces repMax)", i, s.TargetValue)
+		}
+	}
+}
+
