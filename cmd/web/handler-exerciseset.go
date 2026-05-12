@@ -222,7 +222,11 @@ func (app *application) recordSetCompletionWithWeight(
 
 	weight = exercise.EncodeFormWeight(weight, r.PostForm.Get("assisted") != "")
 
-	signal := domain.Signal(r.PostForm.Get("signal"))
+	var signal *domain.Signal
+	if raw := r.PostForm.Get("signal"); raw != "" {
+		s := domain.Signal(raw)
+		signal = &s
+	}
 
 	reps, err := strconv.Atoi(r.PostForm.Get("reps"))
 	if err != nil {
@@ -237,11 +241,15 @@ func (app *application) recordSetCompletionWithWeight(
 		return false
 	}
 
+	signalStr := ""
+	if signal != nil {
+		signalStr = string(*signal)
+	}
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded set completion",
 		slog.String("date", params.Date.Format("2006-01-02")),
 		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
 		slog.Int("set_index", params.SetIndex),
-		slog.String("signal", string(signal)),
+		slog.String("signal", signalStr),
 		slog.Float64("weight", weight),
 		slog.Int("reps", reps))
 	return true
@@ -288,7 +296,11 @@ func (app *application) recordTimedSetCompletion(
 		return false
 	}
 
-	signal := domain.Signal(r.PostForm.Get("signal"))
+	var signal *domain.Signal
+	if raw := r.PostForm.Get("signal"); raw != "" {
+		s := domain.Signal(raw)
+		signal = &s
+	}
 
 	if err = app.service.RecordSet(
 		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, nil, completedSeconds); err != nil {
@@ -296,11 +308,15 @@ func (app *application) recordTimedSetCompletion(
 		return false
 	}
 
+	signalStr := ""
+	if signal != nil {
+		signalStr = string(*signal)
+	}
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded timed set completion",
 		slog.String("date", params.Date.Format("2006-01-02")),
 		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
 		slog.Int("set_index", params.SetIndex),
-		slog.String("signal", string(signal)),
+		slog.String("signal", signalStr),
 		slog.Int("completed_seconds", completedSeconds))
 	return true
 }

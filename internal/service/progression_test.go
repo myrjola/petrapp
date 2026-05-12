@@ -527,7 +527,8 @@ func Test_BuildProgression(t *testing.T) {
 
 	// Record set 0 as TooLight at 0kg.
 	weight := 0.0
-	if err = svc.RecordSet(ctx, date, weID, 0, domain.SignalTooLight, &weight, 8); err != nil {
+	sig := domain.SignalTooLight
+	if err = svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 8); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 

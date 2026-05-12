@@ -43,14 +43,15 @@ func (s *Service) UpdateCompletedValue(
 	return nil
 }
 
-// RecordSet atomically persists the signal, weight (nil for time-based sets),
-// completed value (reps or seconds depending on exercise type), and timestamp.
+// RecordSet atomically persists the signal (nil for deload sets), weight
+// (nil for time-based sets), completed value (reps or seconds depending on
+// exercise type), and timestamp.
 func (s *Service) RecordSet(
 	ctx context.Context,
 	date time.Time,
 	workoutExerciseID int,
 	setIndex int,
-	signal domain.Signal,
+	signal *domain.Signal,
 	weightKg *float64,
 	completedValue int,
 ) error {

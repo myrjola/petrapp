@@ -243,7 +243,8 @@ func Test_Session_RecordSet_Weighted(t *testing.T) {
 		},
 	}
 
-	err := sess.RecordSet(11, 0, domain.SignalOnTarget, &weight, 5, now)
+	sig := domain.SignalOnTarget
+	err := sess.RecordSet(11, 0, &sig, &weight, 5, now)
 	if err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
@@ -277,7 +278,8 @@ func Test_Session_RecordSet_Timed_NoWeight(t *testing.T) {
 		},
 	}
 
-	err := sess.RecordSet(11, 0, domain.SignalOnTarget, nil, 32, now)
+	sig := domain.SignalOnTarget
+	err := sess.RecordSet(11, 0, &sig, nil, 32, now)
 	if err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
@@ -297,7 +299,8 @@ func Test_Session_RecordSet_Timed_NoWeight(t *testing.T) {
 func Test_Session_RecordSet_UnknownSlot(t *testing.T) {
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
 	sess := domain.Session{} //nolint:exhaustruct // Empty session.
-	err := sess.RecordSet(99, 0, domain.SignalOnTarget, nil, 5, now)
+	sig := domain.SignalOnTarget
+	err := sess.RecordSet(99, 0, &sig, nil, 5, now)
 	if !errors.Is(err, domain.ErrSlotNotFound) {
 		t.Fatalf("got %v, want ErrSlotNotFound", err)
 	}
@@ -313,7 +316,8 @@ func Test_Session_RecordSet_OutOfBoundsIndex(t *testing.T) {
 			},
 		},
 	}
-	err := sess.RecordSet(11, 5, domain.SignalOnTarget, nil, 5, now)
+	sig := domain.SignalOnTarget
+	err := sess.RecordSet(11, 5, &sig, nil, 5, now)
 	if !errors.Is(err, domain.ErrSetIndexOutOfBounds) {
 		t.Fatalf("got %v, want ErrSetIndexOutOfBounds", err)
 	}
@@ -405,6 +409,29 @@ func Test_Session_SwapExerciseInSlot_UnknownSlot(t *testing.T) {
 	err := sess.SwapExerciseInSlot(99, domain.Exercise{ID: 2}, nil) //nolint:exhaustruct // Only ID read.
 	if !errors.Is(err, domain.ErrSlotNotFound) {
 		t.Fatalf("got %v, want ErrSlotNotFound", err)
+	}
+}
+
+func TestSession_RecordSet_NilSignalIsAllowed(t *testing.T) {
+	now := time.Date(2026, time.May, 4, 10, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // only fields used by RecordSet
+		ExerciseSets: []domain.ExerciseSet{ //nolint:exhaustruct
+			{
+				ID:       1,
+				Exercise: domain.Exercise{ID: 1, ExerciseType: domain.ExerciseTypeBodyweight}, //nolint:exhaustruct
+				Sets:     []domain.Set{{TargetValue: 12}},
+			},
+		},
+	}
+	if err := sess.RecordSet(1, 0, nil, nil, 11, now); err != nil {
+		t.Fatalf("RecordSet with nil signal: %v", err)
+	}
+	got := sess.ExerciseSets[0].Sets[0]
+	if got.Signal != nil {
+		t.Errorf("Signal = %v, want nil", got.Signal)
+	}
+	if got.CompletedValue == nil || *got.CompletedValue != 11 {
+		t.Errorf("CompletedValue = %v, want 11", got.CompletedValue)
 	}
 }
 

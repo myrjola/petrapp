@@ -66,7 +66,8 @@ func Test_RecordSetCompletion(t *testing.T) {
 	date, _ := time.Parse("2006-01-02", today)
 
 	weight := 102.5
-	if err = svc.RecordSet(ctx, date, weID, 0, domain.SignalOnTarget, &weight, 5); err != nil {
+	sig := domain.SignalOnTarget
+	if err = svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -165,7 +166,8 @@ func Test_RecordSet_SchedulesRestPush(t *testing.T) {
 
 	weight := 100.0
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.RecordSet(ctx, date, weID, 0, domain.SignalOnTarget, &weight, 5); err != nil {
+	sig := domain.SignalOnTarget
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -193,7 +195,8 @@ func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 
 	weight := 100.0
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.RecordSet(ctx, date, weID, 0, domain.SignalOnTarget, &weight, 5); err != nil {
+	sig2 := domain.SignalOnTarget
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig2, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
