@@ -42,6 +42,7 @@ type Session struct {
 	CompletedAt       time.Time
 	ExerciseSets      []ExerciseSet
 	PeriodizationType PeriodizationType
+	IsDeload          bool
 }
 
 // Start marks the session as begun at now. Returns ErrAlreadyStarted if the
