@@ -47,11 +47,11 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 	}
 }
 
-// ScheduledPushRepo returns the persistent scheduled-push repo so the
-// notification.Scheduler can be wired without re-instantiating the
-// repositories. Only intended for process startup in main.go.
-func (s *Service) ScheduledPushRepo() repository.ScheduledPushRepository {
-	return s.repos.ScheduledPushes
+// Repos exposes the wired repositories so the notification.Scheduler can
+// reuse them at process startup without re-instantiating. Only intended
+// for main.go; HTTP handlers should call typed Service methods instead.
+func (s *Service) Repos() *repository.Repositories {
+	return s.repos
 }
 
 // WithScheduler returns a copy of the service wired to a push scheduler.

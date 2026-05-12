@@ -130,6 +130,58 @@ func Test_application_preferences(t *testing.T) {
 	verifySelected(t, doc, weekdaysAfterPersistence)
 }
 
+// Regression test for the rest-timer hotfix: submitting the weekday form must
+// not flip rest_notifications_enabled back to false. The bug was a partial
+// domain.Preferences{} literal in preferencesPOST that defaulted the column
+// to Go's zero-value and clobbered the persisted true.
+func Test_application_preferencesPOST_preservesRestNotificationsEnabled(t *testing.T) {
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Fresh users default to rest_notifications_enabled = true. Confirm the
+	// checkbox is rendered checked so the test's premise is solid.
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+	checkbox := doc.Find("input[name='rest_notifications_enabled']")
+	if checkbox.Length() == 0 {
+		t.Fatal("Expected rest_notifications_enabled checkbox to be rendered")
+	}
+	if _, checked := checkbox.Attr("checked"); !checked {
+		t.Fatal("Expected rest_notifications_enabled checkbox to start checked (default true)")
+	}
+
+	// Submit the weekday-schedule form. Pre-fix this clobbered the column.
+	if _, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+		"Monday": "60",
+	}); err != nil {
+		t.Fatalf("Failed to submit weekday form: %v", err)
+	}
+
+	// Re-fetch and assert the checkbox is still checked.
+	doc, err = client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Failed to re-get preferences: %v", err)
+	}
+	checkbox = doc.Find("input[name='rest_notifications_enabled']")
+	if checkbox.Length() == 0 {
+		t.Fatal("Expected rest_notifications_enabled checkbox to be rendered after submit")
+	}
+	if _, checked := checkbox.Attr("checked"); !checked {
+		t.Error("rest_notifications_enabled was cleared by weekday-form submit; should be preserved")
+	}
+}
+
 func Test_application_exportUserData(t *testing.T) {
 	var (
 		ctx = t.Context()

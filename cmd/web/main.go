@@ -256,7 +256,7 @@ func buildNotificationStack(
 	baseService := service.NewService(db, logger, cfg.OpenAIAPIKey)
 
 	scheduler := notification.NewScheduler(notification.SchedulerConfig{
-		Repo:     baseService.ScheduledPushRepo(),
+		Repo:     baseService.Repos().ScheduledPushes,
 		Dispatch: makeDispatchFunc(logger, baseService, sender),
 		Logger:   logger,
 		Now:      time.Now,
