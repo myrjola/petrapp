@@ -116,7 +116,8 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 			if !ex.HasWeight() {
 				continue
 			}
-			w, err := s.GetDeloadStartingWeight(ctx, ex.ID, plannedSessions[i].Date)
+			var w float64
+			w, err = s.GetDeloadStartingWeight(ctx, ex.ID, plannedSessions[i].Date)
 			if err != nil {
 				return fmt.Errorf("seed deload weight for %s: %w", ex.Name, err)
 			}

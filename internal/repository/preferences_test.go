@@ -106,7 +106,7 @@ func TestPreferencesRepository_DeloadFields(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
-	prefs := domain.Preferences{ //nolint:exhaustruct
+	prefs := domain.Preferences{ //nolint:exhaustruct // only deload fields are exercised here
 		DeloadEnabled:   true,
 		MesocycleLength: 4,
 		MesocycleAnchor: anchor,

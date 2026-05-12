@@ -202,7 +202,7 @@ func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
 	date := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct
+	sess := domain.Session{ //nolint:exhaustruct // only IsDeload round-trip is exercised
 		Date:              date,
 		PeriodizationType: domain.PeriodizationHypertrophy,
 		IsDeload:          true,
@@ -218,8 +218,6 @@ func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
 		t.Error("IsDeload = false, want true")
 	}
 }
-
-func intPtrLocal(i int) *int { return &i }
 
 func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
@@ -237,18 +235,18 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 	onTarget := domain.SignalOnTarget
 	completedAt := time.Date(2026, time.April, 27, 10, 0, 0, 0, time.UTC)
 
-	normal := domain.Session{ //nolint:exhaustruct
+	normal := domain.Session{ //nolint:exhaustruct // only fields relevant to deload skip test
 		Date:              mondayNormal,
 		PeriodizationType: domain.PeriodizationHypertrophy,
 		IsDeload:          false,
-		ExerciseSets: []domain.ExerciseSet{ //nolint:exhaustruct
-			{
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // ID and WarmupCompletedAt not needed for round-trip test
 				Exercise: exercise,
 				Sets: []domain.Set{
 					{
 						TargetValue:    10,
 						WeightKg:       &weight100,
-						CompletedValue: intPtrLocal(10),
+						CompletedValue: new(10),
 						CompletedAt:    &completedAt,
 						Signal:         &onTarget,
 					},
@@ -256,18 +254,18 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 			},
 		},
 	}
-	deload := domain.Session{ //nolint:exhaustruct
+	deload := domain.Session{ //nolint:exhaustruct // only fields relevant to deload skip test
 		Date:              mondayDeload,
 		PeriodizationType: domain.PeriodizationHypertrophy,
 		IsDeload:          true,
-		ExerciseSets: []domain.ExerciseSet{ //nolint:exhaustruct
-			{
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // ID and WarmupCompletedAt not needed for round-trip test
 				Exercise: exercise,
 				Sets: []domain.Set{
 					{
 						TargetValue:    10,
 						WeightKg:       &weight90,
-						CompletedValue: intPtrLocal(10),
+						CompletedValue: new(10),
 						CompletedAt:    &completedAt,
 						Signal:         &onTarget,
 					},

@@ -80,7 +80,7 @@ func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme
 
 // deloadSets halves the set count for deload weeks, with a floor of 1.
 func deloadSets(normalSets int) int {
-	half := (normalSets + 1) / 2 // ceil division
+	half := (normalSets + 1) / 2 //nolint:mnd // ceil division by 2
 	if half < 1 {
 		return 1
 	}

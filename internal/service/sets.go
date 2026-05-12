@@ -96,7 +96,9 @@ func (s *Service) RecordSet(
 	}
 
 	if !wasComplete && hasMoreAfter {
-		s.maybeSchedulePush(ctx, workoutExerciseID, exercise, periodization, sessionIsDeload, completedSetNumber, setsTotal, now)
+		s.maybeSchedulePush(
+			ctx, workoutExerciseID, exercise, periodization, sessionIsDeload, completedSetNumber, setsTotal, now,
+		)
 	}
 	return nil
 }

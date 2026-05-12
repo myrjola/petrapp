@@ -18,6 +18,9 @@ const (
 	FortyFiveMinutes      = 45
 	OneHourMinutes        = 60
 	OneAndHalfHourMinutes = 90
+
+	// defaultMesocycleLength is the fallback mesocycle length when input is absent or out of range.
+	defaultMesocycleLength = 5
 )
 
 type weekdayPreference struct {
@@ -68,10 +71,10 @@ func preferencesToWeekdays(prefs domain.Preferences) []weekdayPreference {
 func parseMesocycleLength(value string) int {
 	n, err := strconv.Atoi(value)
 	if err != nil {
-		return 5 // default
+		return defaultMesocycleLength
 	}
 	if n < 4 || n > 7 {
-		return 5
+		return defaultMesocycleLength
 	}
 	return n
 }

@@ -90,7 +90,7 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs domain.Preferen
 	if prefs.DeloadEnabled && prefs.MesocycleAnchor.IsZero() && !current.MesocycleAnchor.IsZero() {
 		prefs.MesocycleAnchor = current.MesocycleAnchor
 	}
-	if err := s.repos.Preferences.Set(ctx, prefs); err != nil {
+	if err = s.repos.Preferences.Set(ctx, prefs); err != nil {
 		return fmt.Errorf("save user preferences: %w", err)
 	}
 	return nil
@@ -104,7 +104,7 @@ func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
 		return fmt.Errorf("get preferences: %w", err)
 	}
 	prefs.MesocycleAnchor = nextMonday(time.Now().UTC())
-	if err := s.repos.Preferences.Set(ctx, prefs); err != nil {
+	if err = s.repos.Preferences.Set(ctx, prefs); err != nil {
 		return fmt.Errorf("save preferences: %w", err)
 	}
 	return nil

@@ -52,6 +52,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 				RepMin:         tt.repMin,
 				RepMax:         tt.repMax,
 				StartingWeight: tt.startingWeight,
+				IsDeload:       false,
 			})
 			got := p.CurrentSet()
 			if got.TargetReps != tt.wantReps {
@@ -96,6 +97,7 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 				RepMin:         5,
 				RepMax:         8,
 				StartingWeight: startWeight,
+				IsDeload:       false,
 			})
 			p.RecordCompletion(domain.SetResult{
 				ActualReps: 8,
@@ -117,6 +119,7 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 23.0,
+		IsDeload:       false,
 	})
 	p.RecordCompletion(domain.SetResult{
 		ActualReps: 5,
@@ -137,6 +140,7 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 100.0,
+		IsDeload:       false,
 	})
 	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
@@ -157,6 +161,7 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 100.0,
+		IsDeload:       false,
 	})
 	p.RecordCompletion(domain.SetResult{
 		ActualReps: 8,
@@ -180,6 +185,7 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 80.0,
+		IsDeload:       false,
 	}
 	results := []domain.SetResult{
 		{ActualReps: 8, Signal: domain.SignalTooLight, WeightKg: 80.0},
@@ -212,6 +218,7 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 		RepMin:         5,
 		RepMax:         10,
 		StartingWeight: 60.0,
+		IsDeload:       false,
 	}
 	fresh := domain.New(config)
 	fromEmpty := domain.NewFromHistory(config, nil)
@@ -227,6 +234,7 @@ func TestSetsCompleted(t *testing.T) {
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 60.0,
+		IsDeload:       false,
 	})
 
 	if p.SetsCompleted() != 0 {
@@ -353,6 +361,7 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 					RepMin:         5,
 					RepMax:         10,
 					StartingWeight: 0,
+					IsDeload:       false,
 				},
 				[]domain.SetResult{
 					{ActualReps: 5, Signal: tt.signal, WeightKg: tt.lastWeight},
@@ -439,6 +448,7 @@ func TestExhaustiveSignalCoverage(t *testing.T) {
 				RepMin:         5,
 				RepMax:         8,
 				StartingWeight: 50,
+				IsDeload:       false,
 			},
 			[]domain.SetResult{
 				{ActualReps: 8, Signal: s, WeightKg: 50},

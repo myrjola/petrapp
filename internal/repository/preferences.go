@@ -12,6 +12,9 @@ import (
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
+// defaultMesocycleLengthWeeks is the default mesocycle length in weeks, matching the SQL column default.
+const defaultMesocycleLengthWeeks = 5
+
 type sqlitePreferencesRepository struct {
 	baseRepository
 }
@@ -47,7 +50,7 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (domain.Preferenc
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Preferences{ //nolint:exhaustruct // Weekday minutes zero by design.
 			RestNotificationsEnabled: true,
-			MesocycleLength:          5,
+			MesocycleLength:          defaultMesocycleLengthWeeks,
 		}, nil
 	}
 	if err != nil {

@@ -144,8 +144,8 @@ func TestRestSecondsFor(t *testing.T) {
 
 func TestDeriveScheme_Deload(t *testing.T) {
 	tests := []struct {
-		name             string
-		repMin, repMax   int
+		name            string
+		repMin, repMax  int
 		periodization   domain.PeriodizationType
 		wantTargetReps  int
 		wantTargetSets  int
@@ -174,12 +174,10 @@ func TestDeriveScheme_Deload(t *testing.T) {
 func TestRestSecondsFor_Deload(t *testing.T) {
 	ex := domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
 		ExerciseType: domain.ExerciseTypeWeighted,
-		RepMin:       intPtr(8),
-		RepMax:       intPtr(12),
+		RepMin:       new(8),
+		RepMax:       new(12),
 	}
 	if got := domain.RestSecondsFor(ex, domain.PeriodizationStrength, true); got != 90 {
 		t.Errorf("RestSecondsFor deload = %d, want 90 (hypertrophy mapping)", got)
 	}
 }
-
-func intPtr(i int) *int { return &i }

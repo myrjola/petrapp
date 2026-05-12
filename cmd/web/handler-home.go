@@ -395,51 +395,66 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData: newBaseTemplateData(r),
 		Days:             nil,
 		MuscleBalance:    muscleBalanceView{Regions: nil},
+		WeekInBlock:      0,
+		MesocycleLength:  0,
+		IsDeloadWeek:     false,
+		DeloadEnabled:    false,
 	}
 
-	// Only fetch workout data for authenticated users
+	// Only fetch workout data for authenticated users.
 	if data.Authenticated {
-		preferences, err := app.service.GetUserPreferences(r.Context())
-		if err != nil {
-			app.serverError(w, r, err)
+		if !app.homePopulateAuthenticated(w, r, &data) {
 			return
 		}
-
-		if preferences.IsEmpty() {
-			redirect(w, r, "/schedule")
-			return
-		}
-
-		sessions, err := app.service.ResolveWeeklySchedule(r.Context())
-		if err != nil {
-			app.serverError(w, r, err)
-			return
-		}
-
-		volumes, err := app.service.WeeklyMuscleGroupVolume(r.Context(), sessions)
-		if err != nil {
-			app.serverError(w, r, err)
-			return
-		}
-
-		now := time.Now()
-		y, m, d := now.Date()
-		mondayOffset := int(time.Monday - now.Weekday())
-		if mondayOffset > 0 {
-			mondayOffset = -6
-		}
-		monday := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, mondayOffset)
-
-		weekInBlock := domain.WeekInBlock(monday, preferences.MesocycleAnchor, preferences.MesocycleLength)
-		isDeload := domain.IsDeloadWeek(monday, preferences.MesocycleAnchor, preferences.MesocycleLength, preferences.DeloadEnabled)
-		data.WeekInBlock = weekInBlock + 1
-		data.MesocycleLength = preferences.MesocycleLength
-		data.IsDeloadWeek = isDeload
-		data.DeloadEnabled = preferences.DeloadEnabled
-
-		data.Days = toDays(sessions, preferences)
-		data.MuscleBalance = toMuscleBalance(volumes)
 	}
 
 	app.render(w, r, http.StatusOK, "home", data)
+}
+
+// homePopulateAuthenticated fills authenticated-only fields on data and returns true on success.
+// On error or redirect it writes the response and returns false.
+func (app *application) homePopulateAuthenticated(w http.ResponseWriter, r *http.Request, data *homeTemplateData) bool {
+	preferences, err := app.service.GetUserPreferences(r.Context())
+	if err != nil {
+		app.serverError(w, r, err)
+		return false
+	}
+
+	if preferences.IsEmpty() {
+		redirect(w, r, "/schedule")
+		return false
+	}
+
+	sessions, err := app.service.ResolveWeeklySchedule(r.Context())
+	if err != nil {
+		app.serverError(w, r, err)
+		return false
+	}
+
+	volumes, err := app.service.WeeklyMuscleGroupVolume(r.Context(), sessions)
+	if err != nil {
+		app.serverError(w, r, err)
+		return false
+	}
+
+	now := time.Now()
+	y, m, d := now.Date()
+	mondayOffset := int(time.Monday - now.Weekday())
+	if mondayOffset > 0 {
+		mondayOffset = -6
+	}
+	monday := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, mondayOffset)
+
+	weekInBlock := domain.WeekInBlock(monday, preferences.MesocycleAnchor, preferences.MesocycleLength)
+	isDeload := domain.IsDeloadWeek(
+		monday, preferences.MesocycleAnchor, preferences.MesocycleLength, preferences.DeloadEnabled,
+	)
+	data.WeekInBlock = weekInBlock + 1
+	data.MesocycleLength = preferences.MesocycleLength
+	data.IsDeloadWeek = isDeload
+	data.DeloadEnabled = preferences.DeloadEnabled
+
+	data.Days = toDays(sessions, preferences)
+	data.MuscleBalance = toMuscleBalance(volumes)
+	return true
 }

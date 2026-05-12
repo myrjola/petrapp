@@ -415,11 +415,14 @@ func Test_Session_SwapExerciseInSlot_UnknownSlot(t *testing.T) {
 func TestSession_RecordSet_NilSignalIsAllowed(t *testing.T) {
 	now := time.Date(2026, time.May, 4, 10, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // only fields used by RecordSet
-		ExerciseSets: []domain.ExerciseSet{ //nolint:exhaustruct
-			{
-				ID:       1,
-				Exercise: domain.Exercise{ID: 1, ExerciseType: domain.ExerciseTypeBodyweight}, //nolint:exhaustruct
-				Sets:     []domain.Set{{TargetValue: 12}},
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt not relevant to RecordSet
+				ID: 1,
+				Exercise: domain.Exercise{ //nolint:exhaustruct // only ID and ExerciseType matter here
+					ID:           1,
+					ExerciseType: domain.ExerciseTypeBodyweight,
+				},
+				Sets: []domain.Set{{TargetValue: 12}}, //nolint:exhaustruct // only TargetValue is needed
 			},
 		},
 	}

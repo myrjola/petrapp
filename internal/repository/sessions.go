@@ -106,7 +106,8 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date = ?`,
-		userID, dateStr).Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload)
+		userID, dateStr).Scan(
+		&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Session{}, domain.ErrNotFound
 	}
@@ -114,7 +115,9 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 		return domain.Session{}, fmt.Errorf("query session: %w", err)
 	}
 
-	session, err := parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload)
+	session, err := parseSessionRow(
+		workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
+	)
 	if err != nil {
 		return domain.Session{}, err
 	}

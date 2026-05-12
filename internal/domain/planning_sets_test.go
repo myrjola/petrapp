@@ -18,8 +18,8 @@ func Test_BuildPlannedSets(t *testing.T) {
 			name: "weighted Strength: low end of window, 4 sets, nil weight (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeWeighted,
-				RepMin:       intPtr(5),
-				RepMax:       intPtr(10),
+				RepMin:       new(5),
+				RepMax:       new(10),
 			},
 			periodization: domain.PeriodizationStrength,
 			wantTargetVal: 5,
@@ -29,8 +29,8 @@ func Test_BuildPlannedSets(t *testing.T) {
 			name: "weighted Hypertrophy: high end, 3 sets, nil weight (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeWeighted,
-				RepMin:       intPtr(5),
-				RepMax:       intPtr(10),
+				RepMin:       new(5),
+				RepMax:       new(10),
 			},
 			periodization: domain.PeriodizationHypertrophy,
 			wantTargetVal: 10,
@@ -40,8 +40,8 @@ func Test_BuildPlannedSets(t *testing.T) {
 			name: "weighted Hypertrophy: high-rep window, 3 sets, nil weight (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeWeighted,
-				RepMin:       intPtr(8),
-				RepMax:       intPtr(12),
+				RepMin:       new(8),
+				RepMax:       new(12),
 			},
 			periodization: domain.PeriodizationHypertrophy,
 			wantTargetVal: 12,
@@ -51,8 +51,8 @@ func Test_BuildPlannedSets(t *testing.T) {
 			name: "assisted exercise: nil weight pointer (BuildSetsForAdd allocates)",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeAssisted,
-				RepMin:       intPtr(5),
-				RepMax:       intPtr(10),
+				RepMin:       new(5),
+				RepMax:       new(10),
 			},
 			periodization: domain.PeriodizationStrength,
 			wantTargetVal: 5,
@@ -62,8 +62,8 @@ func Test_BuildPlannedSets(t *testing.T) {
 			name: "bodyweight exercise: nil weight",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType: domain.ExerciseTypeBodyweight,
-				RepMin:       intPtr(8),
-				RepMax:       intPtr(12),
+				RepMin:       new(8),
+				RepMax:       new(12),
 			},
 			periodization: domain.PeriodizationStrength,
 			wantTargetVal: 8,
@@ -73,7 +73,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 			name: "time_based exercise: nil weight, 3 sets",
 			exercise: domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildPlannedSets are set.
 				ExerciseType:           domain.ExerciseTypeTime,
-				DefaultStartingSeconds: intPtr(45),
+				DefaultStartingSeconds: new(45),
 			},
 			periodization: domain.PeriodizationStrength,
 			wantTargetVal: 45,
@@ -113,22 +113,22 @@ func Test_BuildSetsForAdd(t *testing.T) {
 
 	weighted := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
 		ExerciseType: domain.ExerciseTypeWeighted,
-		RepMin:       intPtr(5),
-		RepMax:       intPtr(10),
+		RepMin:       new(5),
+		RepMax:       new(10),
 	}
 	assisted := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
 		ExerciseType: domain.ExerciseTypeAssisted,
-		RepMin:       intPtr(5),
-		RepMax:       intPtr(10),
+		RepMin:       new(5),
+		RepMax:       new(10),
 	}
 	bodyweight := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
 		ExerciseType: domain.ExerciseTypeBodyweight,
-		RepMin:       intPtr(8),
-		RepMax:       intPtr(12),
+		RepMin:       new(8),
+		RepMax:       new(12),
 	}
 	timeBased := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
 		ExerciseType:           domain.ExerciseTypeTime,
-		DefaultStartingSeconds: intPtr(45),
+		DefaultStartingSeconds: new(45),
 	}
 
 	t.Run("weighted with no history allocates zero-valued weight pointer", func(t *testing.T) {
@@ -226,8 +226,8 @@ func Test_BuildSetsForAdd(t *testing.T) {
 func TestBuildPlannedSets_Deload(t *testing.T) {
 	ex := domain.Exercise{ //nolint:exhaustruct // Only the planning fields are read.
 		ExerciseType: domain.ExerciseTypeWeighted,
-		RepMin:       intPtr(8),
-		RepMax:       intPtr(12),
+		RepMin:       new(8),
+		RepMax:       new(12),
 	}
 	got := domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true)
 	// Normal mid-rep band: 3 sets. Deload: ceil(3/2) = 2.
@@ -240,4 +240,3 @@ func TestBuildPlannedSets_Deload(t *testing.T) {
 		}
 	}
 }
-

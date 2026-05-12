@@ -17,6 +17,7 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 			CompletedAt:       completedAt,
 			ExerciseSets:      nil,
 			PeriodizationType: "",
+			IsDeload:          false,
 		}
 	}
 
