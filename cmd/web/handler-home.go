@@ -48,11 +48,19 @@ func isWorkoutScheduled(date time.Time, preferences domain.Preferences) bool {
 
 type homeTemplateData struct {
 	BaseTemplateData
-	// Days contains the workout sessions for the current week
+	// Days contains the workout sessions for the current week.
 	Days []dayView
 	// MuscleBalance summarises weekly volume per muscle group, grouped by region.
 	// Empty for unauthenticated users; Regions is empty when the week has no exercises.
 	MuscleBalance muscleBalanceView
+	// WeekInBlock is the 1-based week index within the current mesocycle.
+	WeekInBlock int
+	// MesocycleLength is the total number of weeks in the mesocycle block.
+	MesocycleLength int
+	// IsDeloadWeek reports whether the current week is the last (deload) week.
+	IsDeloadWeek bool
+	// DeloadEnabled reports whether the deload feature is enabled for this user.
+	DeloadEnabled bool
 }
 
 // muscleBalanceView wraps the per-region groupings rendered below the weekly schedule.
@@ -413,6 +421,21 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 			app.serverError(w, r, err)
 			return
 		}
+
+		now := time.Now()
+		y, m, d := now.Date()
+		mondayOffset := int(time.Monday - now.Weekday())
+		if mondayOffset > 0 {
+			mondayOffset = -6
+		}
+		monday := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, mondayOffset)
+
+		weekInBlock := domain.WeekInBlock(monday, preferences.MesocycleAnchor, preferences.MesocycleLength)
+		isDeload := domain.IsDeloadWeek(monday, preferences.MesocycleAnchor, preferences.MesocycleLength, preferences.DeloadEnabled)
+		data.WeekInBlock = weekInBlock + 1
+		data.MesocycleLength = preferences.MesocycleLength
+		data.IsDeloadWeek = isDeload
+		data.DeloadEnabled = preferences.DeloadEnabled
 
 		data.Days = toDays(sessions, preferences)
 		data.MuscleBalance = toMuscleBalance(volumes)

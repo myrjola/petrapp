@@ -56,6 +56,30 @@
             </a>
         </header>
 
+        {{ if .DeloadEnabled }}
+            <style {{ nonce }}>
+                @scope (.week-chip) {
+                    :scope {
+                        display: inline-block;
+                        padding: var(--size-1) var(--size-2);
+                        border-radius: var(--radius-2);
+                        background: var(--gray-1);
+                        color: var(--gray-9);
+                        font-size: var(--font-size-0);
+
+                        &.week-chip--deload {
+                            background: var(--sky-2);
+                            color: var(--sky-10);
+                            font-weight: var(--font-weight-7);
+                        }
+                    }
+                }
+            </style>
+            <span class="week-chip{{ if .IsDeloadWeek }} week-chip--deload{{ end }}">
+                Week {{ .WeekInBlock }} of {{ .MesocycleLength }}{{ if .IsDeloadWeek }} · Deload{{ end }}
+            </span>
+        {{ end }}
+
         <div class="weekly-schedule">
             {{ template "day-cards" . }}
         </div>
