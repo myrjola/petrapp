@@ -25,21 +25,32 @@ type Scheme struct {
 	RestSeconds int
 }
 
-// DeriveScheme returns the prescription for one exercise given its rep window
-// and the session periodization. Pure: same inputs → same output, no DB, no
-// clock.
+// DeriveScheme returns the prescription for one exercise given its rep window,
+// the session periodization, and whether the session is a deload. Pure: same
+// inputs → same output, no DB, no clock.
 //
 // Reps:
 //
 //	Strength    → repMin (low end of the window)
 //	Hypertrophy → repMax (high end of the window)
+//	Deload      → repMax always (forces hypertrophy target regardless of p)
 //
 // Sets and rest are derived from the resulting rep target:
 //
 //	reps ≤ 5  → 4 sets, 180s rest  (heavy work, more sets, full ATP-PCr recovery)
 //	reps 6-10 → 3 sets, 150s rest  (moderate; longer rest improves hypertrophy in trained lifters per Schoenfeld 2016)
 //	reps ≥ 11 → 3 sets, 90s rest   (lighter; volume kept up, rest shortens)
-func DeriveScheme(repMin, repMax int, p PeriodizationType) Scheme {
+//
+// During deload the set count is halved (min 1); rest stays at the hypertrophy
+// mapping for the resulting rep band.
+func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme {
+	if isDeload {
+		// Deload forces hypertrophy targets regardless of incoming p, then
+		// halves the set count (min 1). Rest stays at the hypertrophy
+		// mapping for the resulting rep band.
+		p = PeriodizationHypertrophy
+	}
+
 	var reps int
 	switch p {
 	case PeriodizationStrength:
@@ -60,19 +71,32 @@ func DeriveScheme(repMin, repMax int, p PeriodizationType) Scheme {
 		sets, rest = setsHigh, restHigh
 	}
 
+	if isDeload {
+		sets = deloadSets(sets)
+	}
+
 	return Scheme{TargetReps: reps, TargetSets: sets, RestSeconds: rest}
+}
+
+// deloadSets halves the set count for deload weeks, with a floor of 1.
+func deloadSets(normalSets int) int {
+	half := (normalSets + 1) / 2 // ceil division
+	if half < 1 {
+		return 1
+	}
+	return half
 }
 
 // RestSecondsFor returns the inter-set rest in seconds for the given exercise
 // under the session's periodization. Returns 0 for time-based exercises and
 // for exercises with missing rep windows — service code treats 0 as "no
 // rest scheduling".
-func RestSecondsFor(ex Exercise, pt PeriodizationType) int {
+func RestSecondsFor(ex Exercise, pt PeriodizationType, isDeload bool) int {
 	if ex.IsTimed() {
 		return 0
 	}
 	if ex.RepMin == nil || ex.RepMax == nil {
 		return 0
 	}
-	return DeriveScheme(*ex.RepMin, *ex.RepMax, pt).RestSeconds
+	return DeriveScheme(*ex.RepMin, *ex.RepMax, pt, isDeload).RestSeconds
 }

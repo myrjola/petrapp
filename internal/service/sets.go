@@ -113,7 +113,7 @@ func (s *Service) maybeSchedulePush(
 	if s.scheduler == nil {
 		return
 	}
-	restSeconds := domain.RestSecondsFor(exercise, periodization)
+	restSeconds := domain.RestSecondsFor(exercise, periodization, false)
 	if restSeconds <= 0 {
 		return
 	}

@@ -49,7 +49,7 @@ func TestDeriveScheme(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization)
+			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, false)
 			if got.TargetReps != tt.wantReps {
 				t.Errorf("TargetReps: want %d, got %d", tt.wantReps, got.TargetReps)
 			}
@@ -69,7 +69,7 @@ func TestDeriveSchemePanicOnUnknownPeriodization(t *testing.T) {
 			t.Error("expected panic for unknown PeriodizationType")
 		}
 	}()
-	_ = domain.DeriveScheme(5, 10, domain.PeriodizationType("unknown"))
+	_ = domain.DeriveScheme(5, 10, domain.PeriodizationType("unknown"), false)
 }
 
 func TestRestSecondsFor(t *testing.T) {
@@ -134,10 +134,52 @@ func TestRestSecondsFor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := domain.RestSecondsFor(tt.ex, tt.pt)
+			got := domain.RestSecondsFor(tt.ex, tt.pt, false)
 			if got != tt.want {
 				t.Errorf("RestSecondsFor() = %d, want %d", got, tt.want)
 			}
 		})
 	}
 }
+
+func TestDeriveScheme_Deload(t *testing.T) {
+	tests := []struct {
+		name             string
+		repMin, repMax   int
+		periodization   domain.PeriodizationType
+		wantTargetReps  int
+		wantTargetSets  int
+		wantRestSeconds int
+	}{
+		{"low rep window, deload still hypertrophy", 3, 5, domain.PeriodizationStrength, 5, 2, 180},
+		{"mid rep window, deload halves 3 sets to 2", 6, 10, domain.PeriodizationStrength, 10, 2, 150},
+		{"high rep window, deload halves 3 sets to 2", 12, 15, domain.PeriodizationHypertrophy, 15, 2, 90},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, true)
+			if got.TargetReps != tt.wantTargetReps {
+				t.Errorf("TargetReps = %d, want %d (deload always uses repMax)", got.TargetReps, tt.wantTargetReps)
+			}
+			if got.TargetSets != tt.wantTargetSets {
+				t.Errorf("TargetSets = %d, want %d (halved, min 1)", got.TargetSets, tt.wantTargetSets)
+			}
+			if got.RestSeconds != tt.wantRestSeconds {
+				t.Errorf("RestSeconds = %d, want %d (unchanged from hypertrophy mapping)", got.RestSeconds, tt.wantRestSeconds)
+			}
+		})
+	}
+}
+
+func TestRestSecondsFor_Deload(t *testing.T) {
+	ex := domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       intPtr(8),
+		RepMax:       intPtr(12),
+	}
+	if got := domain.RestSecondsFor(ex, domain.PeriodizationStrength, true); got != 90 {
+		t.Errorf("RestSecondsFor deload = %d, want 90 (hypertrophy mapping)", got)
+	}
+}
+
+func intPtr(i int) *int { return &i }

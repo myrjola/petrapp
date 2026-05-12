@@ -42,10 +42,12 @@ func (s *Service) GetStartingWeight(
 	fromReps := domain.DeriveScheme(
 		*exercise.RepMin, *exercise.RepMax,
 		prev.PeriodizationType,
+		false,
 	).TargetReps
 	toReps := domain.DeriveScheme(
 		*exercise.RepMin, *exercise.RepMax,
 		targetType,
+		false,
 	).TargetReps
 	return domain.ConvertWeight(prev.WeightKg, fromReps, toReps), nil
 }

@@ -378,7 +378,7 @@ func TestExhaustivePeriodizationCoverage(t *testing.T) {
 		domain.PeriodizationHypertrophy,
 	}
 	for _, p := range all {
-		if got := domain.DeriveScheme(repMin, repMax, p).TargetReps; got <= 0 {
+		if got := domain.DeriveScheme(repMin, repMax, p, false).TargetReps; got <= 0 {
 			t.Errorf("DeriveScheme(%d,%d,%v).TargetReps = %d, want positive", repMin, repMax, p, got)
 		}
 	}

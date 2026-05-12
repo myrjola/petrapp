@@ -301,7 +301,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 			t.Fatalf("want 1 exercise set, got %d", len(sets))
 		}
 		// With Strength + window 5-10, DeriveScheme returns 4 sets (reps=5 ≤ 5).
-		expectedSets := DeriveScheme(5, 10, PeriodizationStrength).TargetSets
+		expectedSets := DeriveScheme(5, 10, PeriodizationStrength, false).TargetSets
 		if len(sets[0].Sets) != expectedSets {
 			t.Errorf("want %d sets, got %d", expectedSets, len(sets[0].Sets))
 		}
@@ -309,7 +309,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 
 	t.Run("strength periodization sets correct target value", func(t *testing.T) {
 		sets := wp.selectExercisesForDay(CategoryUpper, nil, 1)
-		expectedReps := DeriveScheme(5, 10, PeriodizationStrength).TargetReps
+		expectedReps := DeriveScheme(5, 10, PeriodizationStrength, false).TargetReps
 		for _, s := range sets[0].Sets {
 			if s.TargetValue != expectedReps {
 				t.Errorf("strength set: want TargetValue=%d, got %d", expectedReps, s.TargetValue)

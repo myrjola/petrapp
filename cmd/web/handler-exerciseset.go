@@ -138,7 +138,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 
 	var restEndAtMs int64
 	if lastCompletedAt != nil {
-		restSeconds := domain.RestSecondsFor(exerciseSet.Exercise, session.PeriodizationType)
+		restSeconds := domain.RestSecondsFor(exerciseSet.Exercise, session.PeriodizationType, false)
 		if restSeconds > 0 {
 			restEnd := lastCompletedAt.Add(time.Duration(restSeconds) * time.Second)
 			if restEnd.After(time.Now()) {

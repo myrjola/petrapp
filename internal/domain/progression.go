@@ -66,7 +66,7 @@ func NewFromHistory(config Config, completed []SetResult) *Progression {
 
 // CurrentSet returns the recommended target for the next set.
 func (p *Progression) CurrentSet() SetTarget {
-	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type).TargetReps
+	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type, false).TargetReps
 	if len(p.completed) == 0 {
 		return SetTarget{WeightKg: p.config.StartingWeight, TargetReps: reps}
 	}

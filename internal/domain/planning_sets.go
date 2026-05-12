@@ -26,7 +26,7 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType) (int, int) {
 		// schema CHECK; fall back to old defaults if a fixture invariant is violated.
 		return defaultTargetValue, defaultTimedSets
 	}
-	scheme := DeriveScheme(*ex.RepMin, *ex.RepMax, pt)
+	scheme := DeriveScheme(*ex.RepMin, *ex.RepMax, pt, false)
 	return scheme.TargetReps, scheme.TargetSets
 }
 
