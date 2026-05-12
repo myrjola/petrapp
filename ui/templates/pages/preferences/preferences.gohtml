@@ -472,7 +472,7 @@
                     const ensureRegistration = async () => {
                         let reg = await navigator.serviceWorker.getRegistration();
                         if (!reg) {
-                            reg = await navigator.serviceWorker.register('/sw.js');
+                            reg = await registerServiceWorker();
                         }
                         if (!reg.active) {
                             reg = await navigator.serviceWorker.ready;

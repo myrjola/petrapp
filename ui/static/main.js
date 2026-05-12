@@ -183,6 +183,34 @@ document.addEventListener('click', (e) => {
     }
 })
 
+/**
+ * Service-worker registration helper.
+ *
+ * The CSP `require-trusted-types-for 'script'` makes the browser reject raw
+ * strings passed to script-loading sinks like `navigator.serviceWorker.register`.
+ * We funnel registration through one TrustedTypePolicy that whitelists the
+ * single URL we actually load, so callers don't have to know about Trusted
+ * Types. Add a new allowed URL to this policy rather than creating a second
+ * policy with the same name — the CSP has no `'allow-duplicates'`, so a
+ * second `createPolicy('sw-loader', ...)` would throw.
+ *
+ * @returns {Promise<ServiceWorkerRegistration>}
+ */
+const swUrl = (() => {
+    if (!window.trustedTypes || !window.trustedTypes.createPolicy) return '/sw.js'
+    const policy = window.trustedTypes.createPolicy('sw-loader', {
+        createScriptURL: (input) => {
+            if (input === '/sw.js') return input
+            throw new TypeError(`sw-loader: disallowed URL ${input}`)
+        },
+    })
+    return policy.createScriptURL('/sw.js')
+})()
+
+function registerServiceWorker() {
+    return navigator.serviceWorker.register(swUrl)
+}
+
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
         // Reload if the invalidation cookie has changed since this page was rendered.

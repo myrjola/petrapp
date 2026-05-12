@@ -99,6 +99,39 @@ Example:
 </script>
 ```
 
+## JavaScript & CSP (Trusted Types)
+
+The CSP set in `cmd/web/middleware.go` includes `require-trusted-types-for 'script'`. The browser then rejects raw strings passed to "script-loading sinks" — they must be a `TrustedHTML`, `TrustedScript`, or `TrustedScriptURL` value produced by a `TrustedTypePolicy`. Forget this and the call throws `TypeError: This assignment requires a TrustedScriptURL` (or `TrustedHTML` / `TrustedScript`).
+
+### Sinks to avoid
+
+| Category | Examples |
+| --- | --- |
+| HTML sinks | `el.innerHTML`, `el.outerHTML`, `el.insertAdjacentHTML`, `document.write`, `Range.createContextualFragment` |
+| Script sinks | `eval`, `new Function`, `setTimeout(stringArg, ...)`, `setInterval(stringArg, ...)` |
+| Script-URL sinks | `script.src = …`, `new Worker(url)`, `new SharedWorker(url)`, `importScripts(url)`, `navigator.serviceWorker.register(url)` |
+
+### Build DOM with nodes, not HTML strings
+
+The CSP would block string-to-HTML conversion anyway, and there's no reason to assemble markup at runtime when the server already renders templates. Patterns to prefer:
+
+- **Text into an existing element** — set `textContent` (or `innerText`). Both are inert to markup. Existing examples: `errorEl.textContent = msg` in `ui/templates/pages/preferences/preferences.gohtml`, `timeEl.textContent = m + ':' + …` in `ui/templates/pages/exerciseset/sets-container.gohtml`.
+- **Build new nodes** — `document.createElement(tag)`, set properties via setters (`el.className`, `el.dataset.x`, `el.href`), append with `el.append(child, ' text ', otherChild)`. Plain strings passed to `append` become text nodes, not parsed HTML.
+- **Repeat server-rendered markup client-side** — declare an inert `<template id="…">` block in the page template (the `<template>` element is parsed but its contents aren't rendered), then `template.content.cloneNode(true)` in JS and fill in the clone with `textContent` / property setters. The markup still lives in the server template, which means it's still typechecked by gotype comments and styled by the page's `<style>` block.
+- **Show/hide** — toggle classes (`.classList.add('hidden')` / `.remove('hidden')`); don't swap in pre-built HTML strings.
+
+### Script-URL sinks need a Trusted Types policy
+
+When you genuinely have to load a script (a service worker, a Worker), define a `TrustedTypePolicy` whose `createScriptURL` callback whitelists the exact URLs and feed all URLs through it. The policy is the one chokepoint where the allowlist lives, so a code review only has to audit that callback.
+
+The service-worker URL already goes through one such policy. Don't call `navigator.serviceWorker.register('/sw.js')` directly — call `registerServiceWorker()` from `ui/static/main.js`, which routes through the `sw-loader` policy. If you need to load a new script URL, **add it to that policy's allowlist** rather than creating a second policy: a policy name can only be created once per realm, and the CSP has no `trusted-types … 'allow-duplicates'` directive, so `createPolicy('sw-loader', …)` a second time throws.
+
+Dynamic `import()` of bare specifiers resolved through the `<script type="importmap">` (e.g. `await import("webauthn")`) is the existing pattern for code-split modules; it works because import-map keys aren't treated as URL sinks. Stick with it for new modules — register them in the importmap in `ui/templates/base.gohtml`.
+
+### Inline scripts are still preferred
+
+The "JavaScript in Templates" guidance above is unchanged. The nonce on `<script {{ nonce }}>` authorizes the inline JS itself; Trusted Types is a separate runtime constraint on what that JS does. Inline scripts must follow the same DOM-construction and script-URL rules — there's no relaxation for being inline.
+
 ## CSS Architecture and Scoping
 
 ### Scoped CSS Pattern
