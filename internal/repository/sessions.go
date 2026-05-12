@@ -36,7 +36,7 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 	sinceDateStr := formatDate(sinceDate)
 
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type
+		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date >= ?
 		ORDER BY workout_date DESC`,
@@ -58,15 +58,16 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 			startedAtStr      sql.NullString
 			completedAtStr    sql.NullString
 			periodizationType domain.PeriodizationType
+			isDeload          bool
 		)
 		if err = rows.Scan(
-			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType,
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload,
 		); err != nil {
 			return nil, fmt.Errorf("scan session row: %w", err)
 		}
 		var session domain.Session
 		session, err = parseSessionRow(
-			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType,
+			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
 		)
 		if err != nil {
 			return nil, err
@@ -99,12 +100,13 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 		startedAtStr      sql.NullString
 		completedAtStr    sql.NullString
 		periodizationType domain.PeriodizationType
+		isDeload          bool
 	)
 	err := q.QueryRowContext(ctx, `
-		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type
+		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date = ?`,
-		userID, dateStr).Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType)
+		userID, dateStr).Scan(&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Session{}, domain.ErrNotFound
 	}
@@ -112,7 +114,7 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 		return domain.Session{}, fmt.Errorf("query session: %w", err)
 	}
 
-	session, err := parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType)
+	session, err := parseSessionRow(workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload)
 	if err != nil {
 		return domain.Session{}, err
 	}
@@ -195,11 +197,11 @@ func (r *sqliteSessionRepository) insertSession(ctx context.Context, tx *sql.Tx,
 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO workout_sessions (
-			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type
-		) VALUES (?, ?, ?, ?, ?, ?)`,
+			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		userID, dateStr, sess.DifficultyRating,
 		formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
-		sess.PeriodizationType); err != nil {
+		sess.PeriodizationType, sess.IsDeload); err != nil {
 		return fmt.Errorf("insert session: %w", err)
 	}
 	if err := r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); err != nil {
@@ -228,6 +230,7 @@ func parseSessionRow(
 	startedAtStr sql.NullString,
 	completedAtStr sql.NullString,
 	periodizationType domain.PeriodizationType,
+	isDeload bool,
 ) (domain.Session, error) {
 	date, err := time.Parse(dateFormat, workoutDateStr)
 	if err != nil {
@@ -236,6 +239,7 @@ func parseSessionRow(
 	session := domain.Session{ //nolint:exhaustruct // ExerciseSets filled by caller.
 		Date:              date,
 		PeriodizationType: periodizationType,
+		IsDeload:          isDeload,
 	}
 	if difficultyRating.Valid {
 		rating := int(difficultyRating.Int32)

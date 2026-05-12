@@ -198,6 +198,27 @@ func TestSessionRepository_UpdatePropagatesDomainSentinel(t *testing.T) {
 	}
 }
 
+func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	date := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct
+		Date:              date,
+		PeriodizationType: domain.PeriodizationHypertrophy,
+		IsDeload:          true,
+	}
+	if err := repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+	got, err := repos.Sessions.Get(ctx, date)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !got.IsDeload {
+		t.Error("IsDeload = false, want true")
+	}
+}
+
 func TestSessionRepository_DeleteWeek(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
