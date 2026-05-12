@@ -96,6 +96,20 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs domain.Preferen
 	return nil
 }
 
+// RestartMesocycleAnchor snaps the mesocycle anchor to the next Monday,
+// effectively restarting the deload cycle from that date.
+func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+	prefs.MesocycleAnchor = nextMonday(time.Now().UTC())
+	if err := s.repos.Preferences.Set(ctx, prefs); err != nil {
+		return fmt.Errorf("save preferences: %w", err)
+	}
+	return nil
+}
+
 // nextMonday returns the upcoming Monday at 00:00 UTC. If now is already a
 // Monday, it returns now truncated to the date.
 func nextMonday(now time.Time) time.Time {

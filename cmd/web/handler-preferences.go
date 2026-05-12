@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 )
@@ -37,6 +38,10 @@ type preferencesTemplateData struct {
 	VAPIDPublicKey           string
 	PushSubscriptionCount    int
 	RestNotificationsEnabled bool
+	DeloadEnabled            bool
+	MesocycleLength          int
+	MesocycleLengthOptions   []int
+	MesocycleAnchor          time.Time
 }
 
 func getWorkoutDurationOptions() []workoutDurationOption {
@@ -58,6 +63,17 @@ func preferencesToWeekdays(prefs domain.Preferences) []weekdayPreference {
 		{ID: "saturday", Name: "Saturday", Minutes: prefs.SaturdayMinutes},
 		{ID: "sunday", Name: "Sunday", Minutes: prefs.SundayMinutes},
 	}
+}
+
+func parseMesocycleLength(value string) int {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 5 // default
+	}
+	if n < 4 || n > 7 {
+		return 5
+	}
+	return n
 }
 
 func parseMinutes(value string) int {
@@ -94,6 +110,10 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		VAPIDPublicKey:           app.vapidPublicKey,
 		PushSubscriptionCount:    subCount,
 		RestNotificationsEnabled: prefs.RestNotificationsEnabled,
+		DeloadEnabled:            prefs.DeloadEnabled,
+		MesocycleLength:          prefs.MesocycleLength,
+		MesocycleLengthOptions:   []int{4, 5, 6, 7},
+		MesocycleAnchor:          prefs.MesocycleAnchor,
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)
@@ -111,6 +131,8 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
 	}
+	prefs.DeloadEnabled = r.Form.Get("deload_enabled") == "on"
+	prefs.MesocycleLength = parseMesocycleLength(r.Form.Get("mesocycle_length"))
 	prefs.MondayMinutes = parseMinutes(r.Form.Get("monday_minutes"))
 	prefs.TuesdayMinutes = parseMinutes(r.Form.Get("tuesday_minutes"))
 	prefs.WednesdayMinutes = parseMinutes(r.Form.Get("wednesday_minutes"))
@@ -203,6 +225,19 @@ func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request
 			slog.String("path", exportPath), slog.Any("error", err))
 		return
 	}
+}
+
+func (app *application) preferencesRestartMesocyclePOST(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
+	if err := r.ParseForm(); err != nil {
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+		return
+	}
+	if err := app.service.RestartMesocycleAnchor(r.Context()); err != nil {
+		app.serverError(w, r, fmt.Errorf("restart mesocycle: %w", err))
+		return
+	}
+	redirect(w, r, "/preferences")
 }
 
 func (app *application) preferencesRestNotificationsTogglePOST(w http.ResponseWriter, r *http.Request) {
