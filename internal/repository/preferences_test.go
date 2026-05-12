@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 )
@@ -15,6 +16,7 @@ func TestPreferencesRepository_GetEmptyReturnsZeroValue(t *testing.T) {
 	}
 	want := domain.Preferences{ //nolint:exhaustruct // Weekday minutes still zero by design.
 		RestNotificationsEnabled: true,
+		MesocycleLength:          5,
 	}
 	if got != want {
 		t.Errorf("empty Get: want %+v, got %+v", want, got)
@@ -51,12 +53,12 @@ func TestPreferences_RestNotificationsEnabled_RoundTrip(t *testing.T) {
 func TestPreferencesRepository_SetThenGetRoundTrip(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
-	want := domain.Preferences{ //nolint:exhaustruct // Untouched days stay zero.
+	set := domain.Preferences{ //nolint:exhaustruct // Untouched days stay zero.
 		MondayMinutes:    60,
 		WednesdayMinutes: 45,
 		FridayMinutes:    90,
 	}
-	if err := repos.Preferences.Set(ctx, want); err != nil {
+	if err := repos.Preferences.Set(ctx, set); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 
@@ -64,6 +66,9 @@ func TestPreferencesRepository_SetThenGetRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
+	// MesocycleLength defaults to 5 when not explicitly set.
+	want := set
+	want.MesocycleLength = 5
 	if got != want {
 		t.Errorf("round-trip: want %+v, got %+v", want, got)
 	}
@@ -89,7 +94,37 @@ func TestPreferencesRepository_SetUpdatesExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if got != updated {
-		t.Errorf("after upsert: want %+v, got %+v", updated, got)
+	// MesocycleLength defaults to 5 when not explicitly set.
+	want := updated
+	want.MesocycleLength = 5
+	if got != want {
+		t.Errorf("after upsert: want %+v, got %+v", want, got)
+	}
+}
+
+func TestPreferencesRepository_DeloadFields(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	prefs := domain.Preferences{ //nolint:exhaustruct
+		DeloadEnabled:   true,
+		MesocycleLength: 4,
+		MesocycleAnchor: anchor,
+	}
+	if err := repos.Preferences.Set(ctx, prefs); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	got, err := repos.Preferences.Get(ctx)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !got.DeloadEnabled {
+		t.Error("DeloadEnabled = false, want true")
+	}
+	if got.MesocycleLength != 4 {
+		t.Errorf("MesocycleLength = %d, want 4", got.MesocycleLength)
+	}
+	if !got.MesocycleAnchor.Equal(anchor) {
+		t.Errorf("MesocycleAnchor = %s, want %s", got.MesocycleAnchor, anchor)
 	}
 }

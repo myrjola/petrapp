@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
@@ -20,30 +21,44 @@ func newSQLitePreferencesRepository(db *sqlite.Database) *sqlitePreferencesRepos
 }
 
 // Get returns the authenticated user's weekly schedule preferences. When no
-// row exists yet the weekday minutes default to zero (all rest days) and
-// RestNotificationsEnabled defaults to true, matching the SQL column default.
+// row exists yet the weekday minutes default to zero (all rest days),
+// RestNotificationsEnabled defaults to true, and MesocycleLength defaults
+// to 5, matching the SQL column defaults.
 func (r *sqlitePreferencesRepository) Get(ctx context.Context) (domain.Preferences, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
-	var prefs domain.Preferences
+	var (
+		prefs     domain.Preferences
+		anchorStr sql.NullString
+	)
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
 		       friday_minutes, saturday_minutes, sunday_minutes,
-		       rest_notifications_enabled
+		       rest_notifications_enabled,
+		       deload_enabled, mesocycle_length, mesocycle_anchor
 		FROM workout_preferences
 		WHERE user_id = ?`, userID).Scan(
 		&prefs.MondayMinutes, &prefs.TuesdayMinutes, &prefs.WednesdayMinutes, &prefs.ThursdayMinutes,
 		&prefs.FridayMinutes, &prefs.SaturdayMinutes, &prefs.SundayMinutes,
 		&prefs.RestNotificationsEnabled,
+		&prefs.DeloadEnabled, &prefs.MesocycleLength, &anchorStr,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Preferences{ //nolint:exhaustruct // Weekday minutes zero by design.
 			RestNotificationsEnabled: true,
+			MesocycleLength:          5,
 		}, nil
 	}
 	if err != nil {
 		return domain.Preferences{}, fmt.Errorf("query workout preferences: %w", err)
+	}
+	if anchorStr.Valid {
+		anchor, parseErr := time.Parse(dateFormat, anchorStr.String)
+		if parseErr != nil {
+			return domain.Preferences{}, fmt.Errorf("parse mesocycle_anchor: %w", parseErr)
+		}
+		prefs.MesocycleAnchor = anchor
 	}
 	return prefs, nil
 }
@@ -52,11 +67,20 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (domain.Preferenc
 func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs domain.Preferences) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
+	var anchorStr sql.NullString
+	if !prefs.MesocycleAnchor.IsZero() {
+		anchorStr = sql.NullString{Valid: true, String: formatDate(prefs.MesocycleAnchor)}
+	}
+	length := prefs.MesocycleLength
+	if length == 0 {
+		length = 5
+	}
 	if _, err := r.db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO workout_preferences (
 			user_id, monday_minutes, tuesday_minutes, wednesday_minutes, thursday_minutes,
-			friday_minutes, saturday_minutes, sunday_minutes, rest_notifications_enabled
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			friday_minutes, saturday_minutes, sunday_minutes, rest_notifications_enabled,
+			deload_enabled, mesocycle_length, mesocycle_anchor
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (user_id) DO UPDATE SET
 			monday_minutes = excluded.monday_minutes,
 			tuesday_minutes = excluded.tuesday_minutes,
@@ -65,11 +89,15 @@ func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs domain.Pref
 			friday_minutes = excluded.friday_minutes,
 			saturday_minutes = excluded.saturday_minutes,
 			sunday_minutes = excluded.sunday_minutes,
-			rest_notifications_enabled = excluded.rest_notifications_enabled`,
+			rest_notifications_enabled = excluded.rest_notifications_enabled,
+			deload_enabled = excluded.deload_enabled,
+			mesocycle_length = excluded.mesocycle_length,
+			mesocycle_anchor = excluded.mesocycle_anchor`,
 		userID,
 		prefs.MondayMinutes, prefs.TuesdayMinutes, prefs.WednesdayMinutes, prefs.ThursdayMinutes,
 		prefs.FridayMinutes, prefs.SaturdayMinutes, prefs.SundayMinutes,
 		prefs.RestNotificationsEnabled,
+		prefs.DeloadEnabled, length, anchorStr,
 	); err != nil {
 		return fmt.Errorf("save workout preferences: %w", err)
 	}
