@@ -74,9 +74,34 @@ func (s *Service) GetUserPreferences(ctx context.Context) (domain.Preferences, e
 }
 
 // SaveUserPreferences saves the workout preferences for a user.
+// If deload is being enabled and no anchor is provided, the anchor is snapped
+// to the next Monday so the first mesocycle starts with an accumulation week.
 func (s *Service) SaveUserPreferences(ctx context.Context, prefs domain.Preferences) error {
+	current, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("load current preferences: %w", err)
+	}
+	// Snap anchor to next Monday when deload is enabled but neither the incoming
+	// prefs nor the stored prefs carry an anchor.
+	if prefs.DeloadEnabled && prefs.MesocycleAnchor.IsZero() && current.MesocycleAnchor.IsZero() {
+		prefs.MesocycleAnchor = nextMonday(time.Now().UTC())
+	}
+	// Preserve an existing anchor when the caller omits it but deload is still on.
+	if prefs.DeloadEnabled && prefs.MesocycleAnchor.IsZero() && !current.MesocycleAnchor.IsZero() {
+		prefs.MesocycleAnchor = current.MesocycleAnchor
+	}
 	if err := s.repos.Preferences.Set(ctx, prefs); err != nil {
 		return fmt.Errorf("save user preferences: %w", err)
 	}
 	return nil
+}
+
+// nextMonday returns the upcoming Monday at 00:00 UTC. If now is already a
+// Monday, it returns now truncated to the date.
+func nextMonday(now time.Time) time.Time {
+	d := now.UTC().Truncate(24 * time.Hour)
+	for d.Weekday() != time.Monday {
+		d = d.AddDate(0, 0, 1)
+	}
+	return d
 }
