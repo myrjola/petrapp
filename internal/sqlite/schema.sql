@@ -76,7 +76,11 @@ CREATE TABLE workout_preferences
     friday_minutes             INTEGER NOT NULL DEFAULT 0 CHECK (friday_minutes IN (0, 45, 60, 90)),
     saturday_minutes           INTEGER NOT NULL DEFAULT 0 CHECK (saturday_minutes IN (0, 45, 60, 90)),
     sunday_minutes             INTEGER NOT NULL DEFAULT 0 CHECK (sunday_minutes IN (0, 45, 60, 90)),
-    rest_notifications_enabled INTEGER NOT NULL DEFAULT 1 CHECK (rest_notifications_enabled IN (0, 1))
+    rest_notifications_enabled INTEGER NOT NULL DEFAULT 1 CHECK (rest_notifications_enabled IN (0, 1)),
+    deload_enabled             INTEGER NOT NULL DEFAULT 0 CHECK (deload_enabled IN (0, 1)),
+    mesocycle_length           INTEGER NOT NULL DEFAULT 5 CHECK (mesocycle_length BETWEEN 4 AND 7),
+    mesocycle_anchor           TEXT CHECK (mesocycle_anchor IS NULL
+                                           OR STRFTIME('%Y-%m-%d', mesocycle_anchor) = mesocycle_anchor)
 ) WITHOUT ROWID, STRICT;
 
 CREATE TABLE exercises
@@ -104,6 +108,7 @@ CREATE TABLE workout_sessions
     completed_at       TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
     periodization_type TEXT    NOT NULL DEFAULT 'strength'
         CHECK (periodization_type IN ('strength', 'hypertrophy')),
+    is_deload          INTEGER NOT NULL DEFAULT 0 CHECK (is_deload IN (0, 1)),
 
     PRIMARY KEY (user_id, workout_date)
 ) WITHOUT ROWID, STRICT;
