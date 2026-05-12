@@ -351,6 +351,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 			[]string{"Chest", "Shoulders", "Triceps"},
 			3,
 			PeriodizationStrength,
+			false,
 			make(map[int]bool), // Empty week-used set.
 		)
 
@@ -399,6 +400,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 			[]string{"Chest", "Shoulders", "Triceps"}, // Three priorities, but can't all be satisfied.
 			3,
 			PeriodizationStrength,
+			false,
 			make(map[int]bool),
 		)
 
@@ -454,6 +456,7 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 			[]string{"Chest"},
 			1,
 			PeriodizationStrength,
+			false,
 			weekUsedExercises,
 		)
 
@@ -524,6 +527,7 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 			[]string{"Chest", "Shoulders", "Triceps"},
 			3,
 			PeriodizationStrength,
+			false,
 			make(map[int]bool),
 		)
 
@@ -580,6 +584,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 		[]string{"Abs"},
 		1,
 		PeriodizationStrength,
+		false,
 		map[int]bool{},
 	)
 
@@ -606,6 +611,108 @@ func findExercise(exercises []Exercise, id int) Exercise {
 		}
 	}
 	panic(fmt.Sprintf("exercise %d not found", id))
+}
+
+func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
+	// Anchor on the same Monday we'll plan: week 0 of length 4 would NOT be a
+	// deload (we want length-1 → 3, so plan on a date that is anchor + 21 days).
+	anchor := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC) // Monday
+	planMonday := anchor.AddDate(0, 0, 21)                         // week 3 of 4 → deload
+
+	prefs := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and other UI prefs irrelevant.
+		MondayMinutes:   60,
+		TuesdayMinutes:  60,
+		DeloadEnabled:   true,
+		MesocycleLength: 4,
+		MesocycleAnchor: anchor,
+	}
+	// Use a fixture exercise list with rep windows that produce 3 normal sets
+	// (mid rep band 8–12 with Hypertrophy → DeriveScheme gives 3 sets).
+	repMin, repMax := 8, 12
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID:                  1,
+			Name:                "Bench Press",
+			Category:            CategoryUpper,
+			ExerciseType:        ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"chest"},
+			RepMin:              &repMin,
+			RepMax:              &repMax,
+		},
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID:                  2,
+			Name:                "Squat",
+			Category:            CategoryLower,
+			ExerciseType:        ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"quads"},
+			RepMin:              &repMin,
+			RepMax:              &repMax,
+		},
+	}
+	targets := []MuscleGroupTarget{
+		{MuscleGroupName: "chest", WeeklySetTarget: 6},
+		{MuscleGroupName: "quads", WeeklySetTarget: 6},
+	}
+	wp := NewPlanner(prefs, exercises, targets)
+	sessions, err := wp.Plan(planMonday)
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	if len(sessions) == 0 {
+		t.Fatal("expected at least one session")
+	}
+	for _, s := range sessions {
+		if !s.IsDeload {
+			t.Errorf("session %s IsDeload = false, want true", s.Date.Format("2006-01-02"))
+		}
+		if s.PeriodizationType != PeriodizationHypertrophy {
+			t.Errorf("session %s PeriodizationType = %s, want hypertrophy", s.Date.Format("2006-01-02"), s.PeriodizationType)
+		}
+		for _, es := range s.ExerciseSets {
+			// Normal mid-rep band has 3 sets. Deload halves to 2.
+			if len(es.Sets) != 2 {
+				t.Errorf("session %s, exercise %s: %d sets, want 2 (deload halves)",
+					s.Date.Format("2006-01-02"), es.Exercise.Name, len(es.Sets))
+			}
+			for _, set := range es.Sets {
+				if set.TargetValue != 12 {
+					t.Errorf("set TargetValue = %d, want 12 (repMax for hypertrophy)", set.TargetValue)
+				}
+			}
+		}
+	}
+}
+
+func TestPlanner_NonDeloadWeekUnchanged(t *testing.T) {
+	anchor := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC)
+	planMonday := anchor.AddDate(0, 0, 7) // week 1 → not a deload
+
+	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and other UI prefs irrelevant.
+		MondayMinutes:   60,
+		DeloadEnabled:   true,
+		MesocycleLength: 4,
+		MesocycleAnchor: anchor,
+	}
+	repMin, repMax := 8, 12
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			ID: 1, Name: "Bench", Category: CategoryFullBody,
+			ExerciseType:        ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"chest"},
+			RepMin:              &repMin, RepMax: &repMax,
+		},
+	}
+	targets := []MuscleGroupTarget{{MuscleGroupName: "chest", WeeklySetTarget: 3}}
+	wp := NewPlanner(p, exercises, targets)
+	sessions, err := wp.Plan(planMonday)
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	for _, s := range sessions {
+		if s.IsDeload {
+			t.Errorf("session %s IsDeload = true, want false (week 1 is not deload)", s.Date.Format("2006-01-02"))
+		}
+	}
 }
 
 func TestPlan(t *testing.T) {

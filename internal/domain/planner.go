@@ -255,6 +255,7 @@ func (wp *Planner) selectExercisesForDay(
 		priorityMuscleGroups,
 		n,
 		PeriodizationStrength,
+		false,
 		make(map[int]bool),
 	)
 }
@@ -264,6 +265,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	priorityMuscleGroups []string,
 	n int,
 	pt PeriodizationType,
+	isDeload bool,
 	weekUsedExercises map[int]bool,
 ) []ExerciseSet {
 	// Filter exercise pool by category compatibility.
@@ -306,17 +308,17 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	// derive their full prescription from the per-exercise window via DeriveScheme.
 	result := make([]ExerciseSet, len(selected))
 	for i, ex := range selected {
-		result[i] = buildPlannedExerciseSet(ex, pt)
+		result[i] = buildPlannedExerciseSet(ex, pt, isDeload)
 	}
 	return result
 }
 
 // buildPlannedExerciseSet creates an ExerciseSet for one exercise using
 // BuildPlannedSets as the single source of truth for set prescription.
-func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType) ExerciseSet {
+func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType, isDeload bool) ExerciseSet {
 	return ExerciseSet{ //nolint:exhaustruct // ID auto-assigned at insert; WarmupCompletedAt nil.
 		Exercise: ex,
-		Sets:     BuildPlannedSets(ex, pt, false), // false: planner deload override applied in Task 11.
+		Sets:     BuildPlannedSets(ex, pt, isDeload),
 	}
 }
 
@@ -378,18 +380,23 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 
 	// Determine periodization type for first session.
 	firstPT := wp.firstSessionPeriodizationType(startingDate)
+	isDeload := IsDeloadWeek(startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
 
 	// Phase 3: select exercises and build sessions.
 	weekUsedExercises := make(map[int]bool)
 	sessions := make([]Session, len(workoutDays))
 	for i, day := range workoutDays {
 		pt := nextPeriodizationType(firstPT, i)
+		if isDeload {
+			pt = PeriodizationHypertrophy
+		}
 		n := exercisesPerSession(wp.Prefs, day.Weekday())
 		exerciseSets := wp.selectExercisesForDayWithPeriodization(
 			categories[day],
 			dayMuscleGroups[day],
 			n,
 			pt,
+			isDeload,
 			weekUsedExercises,
 		)
 
@@ -401,6 +408,7 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 		sessions[i] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
 			Date:              day,
 			PeriodizationType: pt,
+			IsDeload:          isDeload,
 			ExerciseSets:      exerciseSets,
 		}
 	}
