@@ -384,6 +384,45 @@ func TestExhaustivePeriodizationCoverage(t *testing.T) {
 	}
 }
 
+func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
+	cfg := domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
+		RepMin:         8,
+		RepMax:         12,
+		StartingWeight: 67.5,
+		IsDeload:       true,
+	}
+	p := domain.New(cfg)
+
+	target := p.CurrentSet()
+	if target.WeightKg != 67.5 {
+		t.Errorf("initial CurrentSet WeightKg = %v, want 67.5", target.WeightKg)
+	}
+	if target.TargetReps != 12 {
+		t.Errorf("initial CurrentSet TargetReps = %d, want 12 (hypertrophy → repMax)", target.TargetReps)
+	}
+
+	// Even with completed sets recorded (signals present), deload returns
+	// the starting weight every time — no autoregulation.
+	p.RecordCompletion(domain.SetResult{
+		ActualReps: 12,
+		Signal:     domain.SignalTooLight,
+		WeightKg:   67.5,
+	})
+	if got := p.CurrentSet().WeightKg; got != 67.5 {
+		t.Errorf("after SignalTooLight, deload CurrentSet WeightKg = %v, want 67.5 (no progression)", got)
+	}
+
+	p.RecordCompletion(domain.SetResult{
+		ActualReps: 10,
+		Signal:     domain.SignalTooHeavy,
+		WeightKg:   67.5,
+	})
+	if got := p.CurrentSet().WeightKg; got != 67.5 {
+		t.Errorf("after SignalTooHeavy, deload CurrentSet WeightKg = %v, want 67.5 (no autoreg)", got)
+	}
+}
+
 // TestExhaustiveSignalCoverage documents that every valid Signal resolves to
 // a finite weight via the package's internal adjustedWeight switch (exercised
 // through CurrentSet).

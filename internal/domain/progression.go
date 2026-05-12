@@ -14,6 +14,7 @@ type Config struct {
 	RepMin         int
 	RepMax         int
 	StartingWeight float64 // kg; caller-derived from history, may be user-overridden
+	IsDeload       bool
 }
 
 // SetTarget is what the package recommends for the upcoming set.
@@ -66,8 +67,8 @@ func NewFromHistory(config Config, completed []SetResult) *Progression {
 
 // CurrentSet returns the recommended target for the next set.
 func (p *Progression) CurrentSet() SetTarget {
-	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type, false).TargetReps
-	if len(p.completed) == 0 {
+	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type, p.config.IsDeload).TargetReps
+	if p.config.IsDeload || len(p.completed) == 0 {
 		return SetTarget{WeightKg: p.config.StartingWeight, TargetReps: reps}
 	}
 	last := p.completed[len(p.completed)-1]
