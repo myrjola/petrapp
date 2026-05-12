@@ -372,6 +372,9 @@
                         <li>Open Petra from the Home Screen and come back to this page.</li>
                     </ol>
                 </div>
+                <p class="status unsupported hidden">
+                    This browser doesn't support web push notifications.
+                </p>
                 <div class="standalone hidden">
                     <p class="status not-subscribed hidden">Not enabled on this device.</p>
                     <p class="status subscribed hidden">
@@ -402,17 +405,22 @@
                     // via maxTouchPoints.
                     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                    // iOS PWAs launched from the Home Screen set navigator.standalone even
+                    // when the manifest's display mode is "fullscreen", so a media-query miss
+                    // is not enough on its own.
                     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                                         window.matchMedia('(display-mode: fullscreen)').matches ||
                                          window.navigator.standalone === true;
                     const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
                     const notStandaloneEl = root.querySelector('.not-standalone');
+                    const unsupportedEl = root.querySelector('.unsupported');
                     const standaloneEl = root.querySelector('.standalone');
                     if (isIOS && !isStandalone) {
                         notStandaloneEl.classList.remove('hidden');
                         return;
                     }
                     if (!supported) {
-                        root.style.display = 'none';
+                        unsupportedEl.classList.remove('hidden');
                         return;
                     }
                     standaloneEl.classList.remove('hidden');
@@ -425,6 +433,14 @@
                     const errorEl = root.querySelector('.error');
                     const vapidKey = root.dataset.vapidKey;
 
+                    // Show the Enable button immediately. We deliberately do NOT wait on
+                    // navigator.serviceWorker.ready — on a fresh iOS PWA launch the ready
+                    // promise can take seconds or stall, and the previous code left the
+                    // user with an empty card and nothing to click. The click handler
+                    // takes care of registering the SW if it isn't active yet.
+                    notSubEl.classList.remove('hidden');
+                    enableBtn.classList.remove('hidden');
+
                     const showError = (msg) => {
                         errorEl.textContent = msg;
                         errorEl.classList.remove('hidden');
@@ -434,21 +450,40 @@
                         errorEl.classList.add('hidden');
                     };
 
+                    const showSubscribed = () => {
+                        notSubEl.classList.add('hidden');
+                        subEl.classList.remove('hidden');
+                        enableBtn.classList.add('hidden');
+                        disableBtn.classList.remove('hidden');
+                        toggleForm.classList.remove('hidden');
+                    };
+                    const showUnsubscribed = () => {
+                        notSubEl.classList.remove('hidden');
+                        subEl.classList.add('hidden');
+                        enableBtn.classList.remove('hidden');
+                        disableBtn.classList.add('hidden');
+                        toggleForm.classList.add('hidden');
+                    };
+
+                    const ensureRegistration = async () => {
+                        let reg = await navigator.serviceWorker.getRegistration();
+                        if (!reg) {
+                            reg = await navigator.serviceWorker.register('/sw.js');
+                        }
+                        if (!reg.active) {
+                            reg = await navigator.serviceWorker.ready;
+                        }
+                        return reg;
+                    };
+
                     const refreshUI = async () => {
-                        const reg = await navigator.serviceWorker.ready;
-                        const sub = await reg.pushManager.getSubscription();
-                        if (sub) {
-                            notSubEl.classList.add('hidden');
-                            subEl.classList.remove('hidden');
-                            enableBtn.classList.add('hidden');
-                            disableBtn.classList.remove('hidden');
-                            toggleForm.classList.remove('hidden');
-                        } else {
-                            notSubEl.classList.remove('hidden');
-                            subEl.classList.add('hidden');
-                            enableBtn.classList.remove('hidden');
-                            disableBtn.classList.add('hidden');
-                            toggleForm.classList.add('hidden');
+                        try {
+                            const reg = await navigator.serviceWorker.getRegistration();
+                            const sub = reg ? await reg.pushManager.getSubscription() : null;
+                            if (sub) showSubscribed(); else showUnsubscribed();
+                        } catch (_) {
+                            // Leave the default (unsubscribed) UI in place; the user can
+                            // still attempt Enable and we'll surface any error from there.
                         }
                     };
 
@@ -462,12 +497,14 @@
                     enableBtn.addEventListener('click', async () => {
                         clearError();
                         try {
+                            // requestPermission must be the first await so the user-gesture
+                            // context is preserved on iOS Safari.
                             const perm = await Notification.requestPermission();
                             if (perm !== 'granted') {
                                 showError('Notification permission was denied. Re-enable in your device settings if you change your mind.');
                                 return;
                             }
-                            const reg = await navigator.serviceWorker.ready;
+                            const reg = await ensureRegistration();
                             const sub = await reg.pushManager.subscribe({
                                 userVisibleOnly: true,
                                 applicationServerKey: b64ToUint8(vapidKey),
@@ -478,7 +515,7 @@
                                 body: JSON.stringify(sub),
                             });
                             if (!resp.ok) throw new Error('subscribe HTTP ' + resp.status);
-                            await refreshUI();
+                            showSubscribed();
                         } catch (e) {
                             showError(e.name + ': ' + e.message);
                         }
@@ -487,23 +524,25 @@
                     disableBtn.addEventListener('click', async () => {
                         clearError();
                         try {
-                            const reg = await navigator.serviceWorker.ready;
-                            const sub = await reg.pushManager.getSubscription();
-                            if (sub) {
-                                await fetch('/api/push/unsubscribe', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
-                                    body: JSON.stringify({endpoint: sub.endpoint}),
-                                });
-                                await sub.unsubscribe();
+                            const reg = await navigator.serviceWorker.getRegistration();
+                            if (reg) {
+                                const sub = await reg.pushManager.getSubscription();
+                                if (sub) {
+                                    await fetch('/api/push/unsubscribe', {
+                                        method: 'POST',
+                                        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+                                        body: JSON.stringify({endpoint: sub.endpoint}),
+                                    });
+                                    await sub.unsubscribe();
+                                }
                             }
-                            await refreshUI();
+                            showUnsubscribed();
                         } catch (e) {
                             showError(e.name + ': ' + e.message);
                         }
                     });
 
-                    navigator.serviceWorker.ready.then(refreshUI);
+                    refreshUI();
                 })();
             </script>
         </div>
