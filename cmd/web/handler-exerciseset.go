@@ -28,6 +28,7 @@ type exerciseSetTemplateData struct {
 	FirstIncompleteIndex  int
 	EditingIndex          int              // Index of the set being edited
 	IsEditing             bool             // Whether we're in edit mode
+	IsDeload              bool             // Whether this session is a deload week.
 	LastCompletedAt       *time.Time       // Timestamp of most recently completed set
 	CurrentSetTarget      domain.SetTarget // Recommended weight and reps from progression
 	CurrentSetTimedTarget int              // Recommended seconds for time_based exercises; 0 for others.
@@ -155,6 +156,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSet.Sets),
 		EditingIndex:          editingIndex,
 		IsEditing:             isEditing,
+		IsDeload:              session.IsDeload,
 		LastCompletedAt:       lastCompletedAt,
 		CurrentSetTarget:      currentSetTarget,
 		CurrentSetTimedTarget: currentSetTimedTarget,

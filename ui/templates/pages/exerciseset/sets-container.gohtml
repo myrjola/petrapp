@@ -301,6 +301,26 @@
             }
         </style>
 
+        {{ if .IsDeload }}
+        <style {{ nonce }}>
+            @scope (.deload-banner) {
+                :scope {
+                    margin: var(--size-3) 0;
+                    padding: var(--size-3) var(--size-4);
+                    background: var(--sky-1);
+                    color: var(--sky-10);
+                    border-left: var(--border-size-3) solid var(--sky-7);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                }
+            }
+        </style>
+        <div class="deload-banner" role="status">
+            Deload week — lighter loads, same weight every set. Just hit your reps and rest.
+            These sets don't influence future progression.
+        </div>
+        {{ end }}
+
         {{ if gt .RestEndAtMs 0 }}
         <div class="rest-chip" data-rest-end-at-ms="{{ .RestEndAtMs }}" aria-live="polite">
             <style {{ nonce }}>
@@ -439,20 +459,24 @@
                                 >
                                 <div id="reps-help-{{ $index }}" class="sr-only">Enter actual repetitions completed</div>
                             </div>
-                            <fieldset class="signal-group">
-                                <legend>Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</legend>
-                                <div class="signal-buttons">
-                                    <button type="submit" name="signal" value="too_heavy"
-                                            class="signal-btn too-heavy-btn"
-                                            aria-label="No, I failed to reach target reps">No</button>
-                                    <button type="submit" name="signal" value="on_target"
-                                            class="signal-btn on-target-btn"
-                                            aria-label="Barely reached target reps">Barely</button>
-                                    <button type="submit" name="signal" value="too_light"
-                                            class="signal-btn too-light-btn"
-                                            aria-label="Could have done more reps">Could do more</button>
-                                </div>
-                            </fieldset>
+                            {{ if $.IsDeload }}
+                                <button type="submit" class="submit-button" aria-label="Complete set">Done!</button>
+                            {{ else }}
+                                <fieldset class="signal-group">
+                                    <legend>Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</legend>
+                                    <div class="signal-buttons">
+                                        <button type="submit" name="signal" value="too_heavy"
+                                                class="signal-btn too-heavy-btn"
+                                                aria-label="No, I failed to reach target reps">No</button>
+                                        <button type="submit" name="signal" value="on_target"
+                                                class="signal-btn on-target-btn"
+                                                aria-label="Barely reached target reps">Barely</button>
+                                        <button type="submit" name="signal" value="too_light"
+                                                class="signal-btn too-light-btn"
+                                                aria-label="Could have done more reps">Could do more</button>
+                                    </div>
+                                </fieldset>
+                            {{ end }}
                         </form>
                     {{ else if eq $.ExerciseSet.Exercise.ExerciseType "time_based" }}
                         <form method="post"
@@ -472,20 +496,24 @@
                                         class="reps-input"
                                 >
                             </div>
-                            <fieldset class="signal-group">
-                                <legend>Did you reach {{ $.CurrentSetTimedTarget }}s?</legend>
-                                <div class="signal-buttons">
-                                    <button type="submit" name="signal" value="too_heavy"
-                                            class="signal-btn too-heavy-btn"
-                                            aria-label="No, I failed to reach the target hold">No</button>
-                                    <button type="submit" name="signal" value="on_target"
-                                            class="signal-btn on-target-btn"
-                                            aria-label="Barely reached target hold">Barely</button>
-                                    <button type="submit" name="signal" value="too_light"
-                                            class="signal-btn too-light-btn"
-                                            aria-label="Could have held longer">Could do more</button>
-                                </div>
-                            </fieldset>
+                            {{ if $.IsDeload }}
+                                <button type="submit" class="submit-button" aria-label="Complete set">Done!</button>
+                            {{ else }}
+                                <fieldset class="signal-group">
+                                    <legend>Did you reach {{ $.CurrentSetTimedTarget }}s?</legend>
+                                    <div class="signal-buttons">
+                                        <button type="submit" name="signal" value="too_heavy"
+                                                class="signal-btn too-heavy-btn"
+                                                aria-label="No, I failed to reach the target hold">No</button>
+                                        <button type="submit" name="signal" value="on_target"
+                                                class="signal-btn on-target-btn"
+                                                aria-label="Barely reached target hold">Barely</button>
+                                        <button type="submit" name="signal" value="too_light"
+                                                class="signal-btn too-light-btn"
+                                                aria-label="Could have held longer">Could do more</button>
+                                    </div>
+                                </fieldset>
+                            {{ end }}
                         </form>
                     {{ else }}
                         <form method="post"
