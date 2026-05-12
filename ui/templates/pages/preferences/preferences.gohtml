@@ -307,6 +307,23 @@
                         margin-bottom: var(--size-3);
                     }
 
+                    .install-steps {
+                        margin: var(--size-3) 0 0;
+                        padding-left: var(--size-5);
+                        color: var(--color-text-secondary);
+                        font-size: var(--font-size-1);
+                        line-height: 1.6;
+
+                        li {
+                            margin-bottom: var(--size-2);
+                        }
+
+                        strong {
+                            color: var(--color-text-primary);
+                            font-weight: var(--font-weight-6);
+                        }
+                    }
+
                     .toggle-row {
                         display: flex;
                         align-items: center;
@@ -345,9 +362,16 @@
 
             <div data-rest-notifications data-vapid-key="{{ .VAPIDPublicKey }}"
                  data-sub-count="{{ .PushSubscriptionCount }}">
-                <p class="status not-standalone hidden">
-                    On iOS, Add to Home Screen first, then open the installed app and try again.
-                </p>
+                <div class="not-standalone hidden">
+                    <p class="status">
+                        Rest notifications need Petra installed to your Home Screen on iOS.
+                    </p>
+                    <ol class="install-steps">
+                        <li>Tap the <strong>Share</strong> button in Safari's toolbar.</li>
+                        <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+                        <li>Open Petra from the Home Screen and come back to this page.</li>
+                    </ol>
+                </div>
                 <div class="standalone hidden">
                     <p class="status not-subscribed hidden">Not enabled on this device.</p>
                     <p class="status subscribed hidden">
@@ -372,17 +396,23 @@
                 (() => {
                     const root = document.querySelector('[data-rest-notifications]');
                     if (!root) return;
+                    // iOS Safari only exposes the Push API to home-screen installs (iOS 16.4+).
+                    // Detect iOS so we can prompt for "Add to Home Screen" rather than hiding
+                    // the section as unsupported. iPadOS reports as MacIntel — disambiguate
+                    // via maxTouchPoints.
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
                     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
                                          window.navigator.standalone === true;
                     const supported = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
-                    if (!supported) {
-                        root.style.display = 'none';
-                        return;
-                    }
                     const notStandaloneEl = root.querySelector('.not-standalone');
                     const standaloneEl = root.querySelector('.standalone');
-                    if (!isStandalone) {
+                    if (isIOS && !isStandalone) {
                         notStandaloneEl.classList.remove('hidden');
+                        return;
+                    }
+                    if (!supported) {
+                        root.style.display = 'none';
                         return;
                     }
                     standaloneEl.classList.remove('hidden');
