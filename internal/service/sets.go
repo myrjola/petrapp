@@ -59,6 +59,7 @@ func (s *Service) RecordSet(
 		wasComplete        bool
 		exercise           domain.Exercise
 		periodization      domain.PeriodizationType
+		sessionIsDeload    bool
 		completedSetNumber int
 		setsTotal          int
 		hasMoreAfter       bool
@@ -80,6 +81,7 @@ func (s *Service) RecordSet(
 			break
 		}
 		periodization = sess.PeriodizationType
+		sessionIsDeload = sess.IsDeload
 
 		if recErr := sess.RecordSet(workoutExerciseID, setIndex, signal, weightKg, completedValue, now); recErr != nil {
 			// Domain sentinels propagate unchanged so callers can errors.Is at the call site;
@@ -94,7 +96,7 @@ func (s *Service) RecordSet(
 	}
 
 	if !wasComplete && hasMoreAfter {
-		s.maybeSchedulePush(ctx, workoutExerciseID, exercise, periodization, completedSetNumber, setsTotal, now)
+		s.maybeSchedulePush(ctx, workoutExerciseID, exercise, periodization, sessionIsDeload, completedSetNumber, setsTotal, now)
 	}
 	return nil
 }
@@ -108,13 +110,14 @@ func (s *Service) maybeSchedulePush(
 	workoutExerciseID int,
 	exercise domain.Exercise,
 	periodization domain.PeriodizationType,
+	isDeload bool,
 	completedSetNumber, setsTotal int,
 	completedAt time.Time,
 ) {
 	if s.scheduler == nil {
 		return
 	}
-	restSeconds := domain.RestSecondsFor(exercise, periodization, false)
+	restSeconds := domain.RestSecondsFor(exercise, periodization, isDeload)
 	if restSeconds <= 0 {
 		return
 	}
