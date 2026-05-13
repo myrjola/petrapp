@@ -95,7 +95,6 @@ async function finishRegistration(attestationResponse) {
  * @param form {HTMLFormElement}
  */
 function resetFormState(form) {
-  form.classList.remove('submitting')
   const submitButton = form.querySelector("button[type=submit]")
   if (submitButton) {
     submitButton.disabled = false
