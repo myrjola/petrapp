@@ -82,7 +82,10 @@ const sameUrl = (a, b) =>
  *
  * For successful navigations the old document is destroyed on commit and
  * no cleanup is needed in that document — clearLoad on bfcache restore
- * handles the snapshot case.
+ * handles the snapshot case. The bar and announce region activate
+ * synchronously; an earlier 300ms-gated reveal was scrapped because the
+ * old document tends to be torn down before the timer fires on this
+ * codebase (Speculation Rules prefetch on every link).
  */
 let activeLoad = null
 
@@ -99,17 +102,14 @@ function startLoad(el) {
         target.textContent = 'Loading…'
     }
 
-    const barTimer = setTimeout(() => {
-        document.getElementById('loading-bar').classList.add('active')
-        document.getElementById('loading-announce').textContent = 'Loading…'
-    }, 300)
+    document.getElementById('loading-bar').classList.add('active')
+    document.getElementById('loading-announce').textContent = 'Loading…'
 
-    activeLoad = { target, originalText, barTimer }
+    activeLoad = { target, originalText }
 }
 
 function clearLoad() {
     if (!activeLoad) return
-    clearTimeout(activeLoad.barTimer)
     if (activeLoad.target && activeLoad.target.isConnected) {
         activeLoad.target.textContent = activeLoad.originalText
     }
