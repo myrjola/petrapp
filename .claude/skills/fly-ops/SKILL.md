@@ -101,8 +101,9 @@ SQL
 make fly-sql-readonly SCRIPT=/tmp/q.sql FLY_APP=petra
 ```
 
-For writes, the `fly-sql-write` target snapshots the DB on the machine first, uploads the script
-via `fly sftp`, runs it, and removes the script:
+For writes, the `fly-sql-write` target snapshots the DB on the machine first, then pipes the
+script via SSH stdin into `sqlite3` — same pattern as `fly-sql-readonly`, so nothing is written
+to disk on the remote:
 
 ```bash
 cat > /tmp/migration.sql <<'SQL'
