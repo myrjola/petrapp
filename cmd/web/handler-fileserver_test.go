@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -44,9 +45,11 @@ func Test_fileServer_missingFileReturnsCustom404(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("Expected 404 for missing static file, got %d", resp.StatusCode)
 	}
-	body := make([]byte, 4096)
-	n, _ := resp.Body.Read(body)
-	bodyStr := string(body[:n])
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read response body: %v", err)
+	}
+	bodyStr := string(body)
 	if strings.Contains(bodyStr, "404 page not found") && !strings.Contains(bodyStr, "Page Not Found") {
 		t.Errorf("Expected custom 404 page (containing 'Page Not Found'), got default Go file-server body")
 	}
