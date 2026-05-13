@@ -117,19 +117,33 @@ function clearLoad() {
 
 if ('navigation' in window) {
     navigation.addEventListener('navigate', async (e) => {
-        if (!e.formData) return
-        if (!e.canIntercept || e.hashChange || e.downloadRequest) return
+        if (e.hashChange || e.downloadRequest) return
         if (new URL(e.destination.url).origin !== location.origin) return
-        for (const [, v] of e.formData) {
-            if (v instanceof File) return
+
+        if (e.formData) {
+            if (!e.canIntercept) return
+            for (const [, v] of e.formData) {
+                if (v instanceof File) return
+            }
+            // TODO: when precommitHandler works in iOS, it might be an even better
+            //       way to handle this since we can pass e.signal and also reject inside the handler
+            //       to have centralised error handling.
+            //       https://bugs.webkit.org/show_bug.cgi?id=293952
+            startLoad(e.sourceElement)
+            e.preventDefault()
+            await submitForm(e)
+            return
         }
-        // TODO: when precommitHandler works in iOS, it might be an even better
-        //       way to handle this since we can pass e.signal and also reject inside the handler
-        //       to have centralised error handling.
-        //       https://bugs.webkit.org/show_bug.cgi?id=293952
-        e.preventDefault()
-        await submitForm(e)
+
+        // GET navigations (link clicks, back/forward). We do not intercept;
+        // the browser handles the fetch. e.userInitiated filters out the
+        // programmatic navigation.navigate() calls that popOrPushTo makes
+        // after a successful form submit — without this guard those would
+        // overwrite the in-flight form-submit feedback state.
+        if (e.userInitiated) startLoad(e.sourceElement)
     })
+
+    navigation.addEventListener('navigateerror', clearLoad)
 }
 
 async function submitForm(e) {
