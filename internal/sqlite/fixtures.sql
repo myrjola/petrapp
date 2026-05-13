@@ -1,3 +1,10 @@
+-- Idempotent renames: applied before the main INSERT so prod rows match the new
+-- names before the INSERT's ON CONFLICT(name) clause has to resolve them. Pure
+-- (id,name) renames can't go through ON CONFLICT directly because the conflict
+-- would be on the PK, not on name.
+UPDATE exercises SET name = 'One-Arm Dumbbell Row' WHERE name = 'One-Arm Dumbell Row';
+UPDATE exercises SET name = 'Push-Up'              WHERE name = 'Push-up';
+
 INSERT INTO muscle_groups (name)
 VALUES
 -- Upper Body
@@ -190,7 +197,7 @@ VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
 ## Resources
 - [Video tutorial](https://www.youtube.com/watch?v=UCXxvVItLoM)
 - [Form guide](https://www.verywellfit.com/how-to-do-the-cable-row-3498605)', 5, 10),
-       (12, 'One-Arm Dumbell Row', 'upper', 'weighted', '## Instructions
+       (12, 'One-Arm Dumbbell Row', 'upper', 'weighted', '## Instructions
 1. **Start Position:** Stand with feet shoulder-width apart. Place your left knee and hand on a bench, your back parallel to the floor. Hold the dumbbell in your right hand, arm extended down.
 2. **Grip & Alignment:** Keep your elbow slightly bent, align your wrists with your forearms, and square your shoulders.
 3. **Row Motion:** Pull the dumbbell towards your hip, keeping the elbow close. Squeeze your shoulder blades at the top. Pause and lower it back down slowly.
@@ -296,7 +303,7 @@ VALUES (1, 'Deadlift', 'full_body', 'weighted', '## Instructions
 - [Video tutorial](https://www.youtube.com/watch?v=ENXyYltB7CM)
 - [Form guide](https://www.healthline.com/health/back-extension-exercise#with-weight)
 ', 8, 20),
-       (19, 'Push-up', 'upper', 'bodyweight', '## Instructions
+       (19, 'Push-Up', 'upper', 'bodyweight', '## Instructions
 1. Start in a plank position with hands placed slightly wider than shoulder-width apart, arms straight.
 2. Keep your body in a straight line from head to heels, engaging your core throughout the movement.
 3. Lower your body by bending your elbows until your chest nearly touches the floor.
@@ -388,7 +395,10 @@ VALUES (1, 'Forearms', 0),
        (2, 'Forearms', 0),
        (2, 'Shoulders', 0),
        (2, 'Triceps', 1),
-       (2, 'Upper Back', 0),
+       -- Note: 'Upper Back' was previously listed as a Bench Press secondary, but
+       -- the upper back acts as an isometric stabilizer in scapular retraction, not
+       -- as a worked muscle. Removed here; prod rows are deleted via the companion
+       -- one-shot in docs/.
        (3, 'Shoulders', 0),
        (3, 'Triceps', 1),
        (4, 'Biceps', 1),
@@ -437,22 +447,46 @@ VALUES (1, 'Forearms', 0),
        (18, 'Hamstrings', 0),
        (18, 'Lower Back', 1),
 -- Bodyweight exercises
+       -- Push-Up: chest + triceps are the prime movers. Biceps and Lats were
+       -- previously listed as primary in some prod rows but are not movers (biceps
+       -- has no elbow-flexion load; lats only stabilize the trunk). Those extra
+       -- prod rows are deleted via the companion one-shot in docs/.
        (19, 'Chest', 1),
        (19, 'Triceps', 1),
        (19, 'Shoulders', 0),
        (19, 'Abs', 0),
+       (19, 'Forearms', 0),
+       (19, 'Upper Back', 0),
+       -- Ab Wheel Rollout: abs + obliques are the prime movers. Glutes and quads
+       -- engage isometrically to keep the body rigid; calves and hamstrings stabilize
+       -- the back leg/foot. Listing them as secondary captures the engagement
+       -- without inflating primary-set counts for those muscles. The ON CONFLICT
+       -- update will demote any rows in prod that were marked primary.
        (20, 'Abs', 1),
        (20, 'Obliques', 1),
        (20, 'Shoulders', 0),
        (20, 'Lats', 0),
+       (20, 'Glutes', 0),
+       (20, 'Quads', 0),
+       (20, 'Calves', 0),
+       (20, 'Hamstrings', 0),
+       -- Plank: abs are the prime mover; obliques + hip flexors + lower back +
+       -- glutes + quads all engage isometrically as stabilizers. Hip Flexors was
+       -- previously marked primary in prod; the ON CONFLICT update demotes it.
        (21, 'Abs', 1),
        (21, 'Obliques', 0),
        (21, 'Shoulders', 0),
        (21, 'Glutes', 0),
+       (21, 'Hip Flexors', 0),
+       (21, 'Lower Back', 0),
+       (21, 'Quads', 0),
 -- Assisted exercises
+       -- Assisted Pull-Up: lats + upper back are the prime movers (matches the
+       -- Pulldown classification). Biceps is a synergist, not a prime mover.
+       -- The ON CONFLICT update demotes Biceps and promotes Upper Back in prod.
        (24, 'Lats', 1),
-       (24, 'Biceps', 1),
-       (24, 'Upper Back', 0),
+       (24, 'Upper Back', 1),
+       (24, 'Biceps', 0),
        (24, 'Forearms', 0) ON CONFLICT(exercise_id, muscle_group_name) DO
 UPDATE SET is_primary = excluded.is_primary;
 
