@@ -71,6 +71,50 @@ function me() {
 const sameUrl = (a, b) =>
     a.origin === b.origin && a.pathname === b.pathname && a.search === b.search
 
+/**
+ * Navigation feedback state.
+ *
+ * `activeLoad` records the in-flight visual feedback so we can restore the
+ * source element's text and hide the bar when:
+ *   - bfcache restores a page that was mid-navigation (pageshow.persisted)
+ *   - the user cancels a navigation (navigateerror)
+ *   - a new navigation supersedes the current one
+ *
+ * For successful navigations the old document is destroyed on commit and
+ * no cleanup is needed in that document — clearLoad on bfcache restore
+ * handles the snapshot case.
+ */
+let activeLoad = null
+
+function startLoad(el) {
+    clearLoad()
+
+    const target = (el instanceof HTMLElement && el.textContent?.trim()) ? el : null
+    let originalText = null
+    if (target) {
+        originalText = target.textContent
+        target.textContent = 'Loading…'
+    }
+
+    const barTimer = setTimeout(() => {
+        document.getElementById('loading-bar').classList.add('active')
+        document.getElementById('loading-announce').textContent = 'Loading…'
+    }, 300)
+
+    activeLoad = { target, originalText, barTimer }
+}
+
+function clearLoad() {
+    if (!activeLoad) return
+    clearTimeout(activeLoad.barTimer)
+    if (activeLoad.target && activeLoad.target.isConnected) {
+        activeLoad.target.textContent = activeLoad.originalText
+    }
+    document.getElementById('loading-bar').classList.remove('active')
+    document.getElementById('loading-announce').textContent = ''
+    activeLoad = null
+}
+
 if ('navigation' in window) {
     navigation.addEventListener('navigate', async (e) => {
         if (!e.formData) return
