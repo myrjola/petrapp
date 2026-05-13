@@ -91,7 +91,6 @@ function startLoad(el) {
     if (target) {
         originalText = target.innerText
         target.innerText = 'Loading…'
-        target.setAttribute('aria-busy', 'true')
     }
 
     const barTimer = setTimeout(() => {
@@ -107,7 +106,6 @@ function clearLoad() {
     clearTimeout(activeLoad.barTimer)
     if (activeLoad.target && activeLoad.target.isConnected) {
         activeLoad.target.innerText = activeLoad.originalText
-        activeLoad.target.removeAttribute('aria-busy')
     }
     document.getElementById('loading-bar').classList.remove('active')
     document.getElementById('loading-announce').textContent = ''
@@ -214,14 +212,13 @@ transition (forward slide / backward grow).
 
 This section is the contract for assistive-tech behavior.
 
-**Click confirmation (`aria-busy` on source element).** When `startLoad`
-swaps the source element's `innerText`, it also sets `aria-busy="true"` on
-that element. Screen readers expose busy state, and changing the
-accessible name of the currently focused element typically triggers
-re-announcement on NVDA/JAWS/VoiceOver — so a sighted user sees `Loading…`
-and an SR user hears something like "Loading, button, busy". `clearLoad`
-removes the attribute (relevant only for the bfcache and error paths,
-since success destroys the document).
+**Two audiences, two channels.** The instant text-swap on the source
+element is a *sighted-user* affordance: changing `innerText` of an already-
+focused element is not a reliable SR re-announcement trigger across NVDA,
+JAWS, and VoiceOver, so we do not pretend it serves both audiences. SR
+feedback comes exclusively through the slow-path live region described
+below, deliberately silent on the fast paths to match what the bar does
+visually.
 
 **Slow-path announcement (`role="status"` live region).** The hidden
 `#loading-announce` div is `aria-live="polite"` with `role="status"`. It is
@@ -231,10 +228,26 @@ avoiding the noise that an always-on live region would generate. Polite
 (not assertive) so it does not interrupt other speech; this is a
 non-critical status update.
 
+This earns its place specifically because of the MPA lifecycle: during the
+fetch window before commit, browser/SR loading announcements are
+inconsistent across combinations (some announce "loading", some are
+silent, prefetched pages skip the window entirely). The reliable
+cross-platform announcement is the new page's title on commit. Without
+this live region, an SR user on a slow navigation has no proactive signal
+that their activation took effect — they sit in dead air until the new
+page loads. The 300 ms gate keeps that signal from firing for the fast
+common case.
+
+**No `aria-busy` on the source element.** `aria-busy` exists for regions
+whose contents are updating in place (SPA partial swaps), not for elements
+that are about to be destroyed by an MPA commit. Setting it for the
+duration of the fetch buys at most a mid-announcement state suffix on
+inconsistent SR/browser combinations, on an element that disappears within
+milliseconds. Not worth the attribute.
+
 **Hidden visual indicator.** `#loading-bar` carries `aria-hidden="true"` so
 assistive tech ignores it entirely; all SR information comes through
-`#loading-announce` and the source element's `aria-busy` state. The bar is
-decoration.
+`#loading-announce`. The bar is decoration.
 
 **Reduced motion.** Under `prefers-reduced-motion: reduce` the bar's
 sliding gradient is replaced with a static `var(--sky-5)` block, and the
@@ -259,8 +272,7 @@ provide the same information through other means.
 **Focus retention.** Swapping `innerText` on a focused button keeps focus
 on the same element node — no focus loss. We deliberately do **not** set
 the `disabled` attribute, which would move focus away and break the
-"button now reads Loading…" confirmation. `aria-busy` communicates the same
-state to assistive tech without the focus side effect.
+"button now reads Loading…" confirmation for sighted users.
 
 **Keyboard equivalence.** All entry points (mouse click, Enter, Space)
 flow through the same `navigate` event, so keyboard users see identical
@@ -278,9 +290,8 @@ data attribute on `#loading-announce`. Not solved in this change.
 ## Failure modes
 
 - **Network failure / unexpected status.** Existing code calls
-  `location.reload()`. A hard reload tears down the DOM, so the bar, text
-  swap, and `aria-busy` state are all wiped cleanly. No manual cleanup
-  needed.
+  `location.reload()`. A hard reload tears down the DOM, so the bar and
+  text swap are wiped cleanly. No manual cleanup needed.
 - **User-cancelled navigation (Stop button, supersession).** The
   Navigation API fires `navigateerror` in the surviving document. Our
   listener calls `clearLoad`, restoring text and hiding the bar.
@@ -311,7 +322,7 @@ data attribute on `#loading-announce`. Not solved in this change.
   sibling is more controllable and quieter for SR users than indeterminate
   `<progress>`, which announces on every appearance.
 - **Disabling the source element.** Would steal focus and break the
-  `Loading…` confirmation. `aria-busy` carries the busy state instead.
+  `Loading…` confirmation.
 - **Queueing / cancellation of concurrent submits.** `clearLoad` at the
   start of `startLoad` is sufficient; we trust the Navigation API to
   serialize.
@@ -338,8 +349,8 @@ client JS). Manual verification at implementation time:
 - Forced colors: enable Windows High Contrast / forced-colors emulation in
   DevTools; confirm bar uses `Highlight` color.
 - Screen reader: with VoiceOver/NVDA active, submit a slow form; confirm
-  `Loading…` is announced once via the live region, and the focused
-  button is re-announced as busy.
+  `Loading…` is announced once via the live region. Then submit a fast
+  form and confirm there is no spurious announcement.
 
 ## Open questions
 
