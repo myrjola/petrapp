@@ -144,19 +144,16 @@ fly-backup: fly-wake
 	  echo "  snapshot at $$REMOTE"
 
 # fly-sql-write runs a SQL script that may mutate the database. Always takes a backup first.
-# Pass SCRIPT=path/to/migration.sql.
+# The script is piped via SSH stdin (same pattern as fly-sql-readonly), so nothing is written
+# to disk on the remote and there's no cleanup to fail. Pass SCRIPT=path/to/migration.sql.
 .PHONY: fly-sql-write
 fly-sql-write: fly-wake fly-backup
 ifndef SCRIPT
 	$(error SCRIPT is required, e.g. make fly-sql-write SCRIPT=/tmp/migration.sql)
 endif
-	@TS=$$(date -u +%Y%m%dT%H%M%SZ) ; \
-	  REMOTE=/tmp/petrapp-write-$$TS.sql ; \
-	  echo "-> uploading $(SCRIPT) -> $$REMOTE on $(FLY_APP)" ; \
-	  printf 'put %s %s\n' "$(SCRIPT)" "$$REMOTE" | fly ssh sftp shell --app $(FLY_APP) --user petrapp ; \
-	  echo "-> executing on $(FLY_APP)..." ; \
-	  fly ssh console --app $(FLY_APP) --user petrapp \
-	    -C "/bin/sh -c '/usr/bin/sqlite3 $(FLY_DB_PATH) < $$REMOTE && rm -f $$REMOTE'"
+	@echo "-> executing $(SCRIPT) on $(FLY_APP)..."
+	@cat "$(SCRIPT)" | fly ssh console --app $(FLY_APP) --user petrapp \
+	    -C "/usr/bin/sqlite3 $(FLY_DB_PATH)"
 
 .PHONY: fly-logs
 fly-logs: fly-wake

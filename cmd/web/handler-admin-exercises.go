@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -32,6 +31,8 @@ type exerciseEditTemplateData struct {
 	SecondaryMuscleOptions      []MuscleGroupOption
 	ValidationError             string
 	DefaultStartingSecondsValue string
+	RepMinValue                 string
+	RepMaxValue                 string
 }
 
 // adminExercisesGET handles GET requests to the exercise admin page.
@@ -105,6 +106,14 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 	if exercise.DefaultStartingSeconds != nil {
 		defaultSecondsValue = strconv.Itoa(*exercise.DefaultStartingSeconds)
 	}
+	repMinValue := ""
+	if exercise.RepMin != nil {
+		repMinValue = strconv.Itoa(*exercise.RepMin)
+	}
+	repMaxValue := ""
+	if exercise.RepMax != nil {
+		repMaxValue = strconv.Itoa(*exercise.RepMax)
+	}
 
 	data := exerciseEditTemplateData{
 		BaseTemplateData:            newBaseTemplateData(r),
@@ -113,6 +122,8 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		SecondaryMuscleOptions:      secondaryMuscleOptions,
 		ValidationError:             app.popFlashError(r.Context()),
 		DefaultStartingSecondsValue: defaultSecondsValue,
+		RepMinValue:                 repMinValue,
+		RepMaxValue:                 repMaxValue,
 	}
 
 	app.render(w, r, http.StatusOK, "admin-exercise-edit", data)
@@ -184,9 +195,10 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	repMin, repMax, err := app.preserveRepWindow(r.Context(), id, exerciseType)
-	if err != nil {
-		app.serverError(w, r, err)
+	repMin, repMax, repErr := parseRepWindow(r.PostForm.Get("rep_min"), r.PostForm.Get("rep_max"), exerciseType)
+	if repErr != "" {
+		app.putFlashError(r.Context(), repErr)
+		redirect(w, r, editPath)
 		return
 	}
 
@@ -245,19 +257,27 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
 }
 
-// preserveRepWindow returns the rep_min / rep_max for an existing exercise so
-// that an admin update doesn't NULL them out. The admin edit form does not
-// surface these fields yet, so preservation is the only path. Returns
-// (nil, nil, nil) for time-based exercises, which don't carry a rep window.
-func (app *application) preserveRepWindow(
-	ctx context.Context, id int, exerciseType domain.ExerciseType,
-) (*int, *int, error) {
+// parseRepWindow validates and converts the rep_min/rep_max form fields.
+// Time-based exercises don't carry a rep window — both inputs are dropped
+// and the function returns (nil, nil, ""). For every other exercise type
+// both values must be present, parse as ints in [1, 50], and satisfy
+// min <= max. On validation failure the returned string is non-empty and
+// suitable to surface as a flash error.
+func parseRepWindow(rawMin, rawMax string, exerciseType domain.ExerciseType) (*int, *int, string) {
 	if exerciseType == domain.ExerciseTypeTime {
-		return nil, nil, nil
+		return nil, nil, ""
 	}
-	existing, err := app.service.GetExercise(ctx, id)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get exercise for rep window: %w", err)
+	const repBoundsError = "Min and max reps must be whole numbers between 1 and 50."
+	minVal, err := strconv.Atoi(rawMin)
+	if err != nil || minVal < 1 || minVal > 50 {
+		return nil, nil, repBoundsError
 	}
-	return existing.RepMin, existing.RepMax, nil
+	maxVal, err := strconv.Atoi(rawMax)
+	if err != nil || maxVal < 1 || maxVal > 50 {
+		return nil, nil, repBoundsError
+	}
+	if minVal > maxVal {
+		return nil, nil, "Min reps must be less than or equal to max reps."
+	}
+	return &minVal, &maxVal, ""
 }

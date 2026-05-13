@@ -47,16 +47,42 @@
                 <small>Number of seconds to hold on the first set for new users.</small>
             </div>
 
+            <div id="rep-window-field"{{ if eq .Exercise.ExerciseType "time_based" }} hidden{{ end }}>
+                <label for="rep_min">Min Reps:</label>
+                <input type="number"
+                       id="rep_min"
+                       name="rep_min"
+                       min="1"
+                       max="50"
+                       value="{{ .RepMinValue }}"
+                       {{ if ne .Exercise.ExerciseType "time_based" }}required{{ end }}>
+                <label for="rep_max">Max Reps:</label>
+                <input type="number"
+                       id="rep_max"
+                       name="rep_max"
+                       min="1"
+                       max="50"
+                       value="{{ .RepMaxValue }}"
+                       {{ if ne .Exercise.ExerciseType "time_based" }}required{{ end }}>
+                <small>Target rep range per set (1–50).</small>
+            </div>
+
             <script {{ nonce }}>
                 (function () {
                     const typeSelect = document.getElementById('exercise_type');
-                    const field = document.getElementById('default-starting-seconds-field');
-                    const input = document.getElementById('default_starting_seconds');
+                    const secondsField = document.getElementById('default-starting-seconds-field');
+                    const secondsInput = document.getElementById('default_starting_seconds');
+                    const repField = document.getElementById('rep-window-field');
+                    const repMinInput = document.getElementById('rep_min');
+                    const repMaxInput = document.getElementById('rep_max');
 
                     function update() {
                         const isTimed = typeSelect.value === 'time_based';
-                        field.hidden = !isTimed;
-                        input.required = isTimed;
+                        secondsField.hidden = !isTimed;
+                        secondsInput.required = isTimed;
+                        repField.hidden = isTimed;
+                        repMinInput.required = !isTimed;
+                        repMaxInput.required = !isTimed;
                     }
 
                     typeSelect.addEventListener('change', update);
