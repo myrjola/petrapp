@@ -89,7 +89,10 @@ let activeLoad = null
 function startLoad(el) {
     clearLoad()
 
-    const target = (el instanceof HTMLElement && el.textContent?.trim()) ? el : null
+    // Only buttons swap text — anchor labels are part of page content and
+    // changing them right before the browser tears down the document for a
+    // GET navigation is noisy without being reliably visible.
+    const target = (el instanceof HTMLButtonElement && el.textContent?.trim()) ? el : null
     let originalText = null
     if (target) {
         originalText = target.textContent
