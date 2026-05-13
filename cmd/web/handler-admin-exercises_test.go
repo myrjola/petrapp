@@ -130,6 +130,8 @@ func Test_application_adminExercises(t *testing.T) {
 			"Primary":     "Quads,Glutes",
 			"Secondary":   "Hamstrings,Calves,Abs,Lower Back",
 			"Description": "An updated test squat exercise description",
+			"rep_min":     "5",
+			"rep_max":     "10",
 		}
 
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
@@ -144,6 +146,17 @@ func Test_application_adminExercises(t *testing.T) {
 		// Check that our exercise was updated
 		if doc.Find("td:contains('Updated Test Squat')").Length() == 0 {
 			t.Error("Expected to find the updated exercise name in the table")
+		}
+
+		// Re-open the edit page and assert rep window round-tripped.
+		if doc, err = client.GetDoc(ctx, editURL); err != nil {
+			t.Fatalf("Failed to re-open exercise edit page: %v", err)
+		}
+		if got, _ := doc.Find("input[name='rep_min']").Attr("value"); got != "5" {
+			t.Errorf("expected rep_min='5', got %q", got)
+		}
+		if got, _ := doc.Find("input[name='rep_max']").Attr("value"); got != "10" {
+			t.Errorf("expected rep_max='10', got %q", got)
 		}
 	})
 
@@ -175,6 +188,8 @@ func Test_application_adminExercises(t *testing.T) {
 			"Primary":     "Quads,Glutes",
 			"Secondary":   "",
 			"Description": "",
+			"rep_min":     "5",
+			"rep_max":     "10",
 		}
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
 			t.Fatalf("Failed to submit empty-name update: %v", err)
@@ -224,6 +239,8 @@ func Test_application_adminExercises(t *testing.T) {
 			"Primary":     "Quads,Glutes",
 			"Secondary":   "Hamstrings,Calves,Abs,Lower Back",
 			"Description": largeDescription,
+			"rep_min":     "5",
+			"rep_max":     "10",
 		}
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
 			t.Fatalf("Failed to submit exercise update with large description: %v", err)
@@ -239,6 +256,48 @@ func Test_application_adminExercises(t *testing.T) {
 		got := doc.Find("textarea[name='description']").Text()
 		if len(got) != descriptionSize {
 			t.Errorf("expected description length %d, got %d", descriptionSize, len(got))
+		}
+	})
+
+	// Rep window is required for non-time-based exercises and must satisfy
+	// min <= max within [1, 50]. Validation errors surface via flash + redirect,
+	// matching the empty-name pattern.
+	t.Run("Invalid rep window shows validation error", func(t *testing.T) {
+		if doc, err = client.GetDoc(ctx, "/admin/exercises"); err != nil {
+			t.Fatalf("Failed to get admin exercises page: %v", err)
+		}
+		var editURL string
+		doc.Find("tr:contains('Updated Test Squat') td a:contains('Edit')").Each(
+			func(_ int, s *goquery.Selection) {
+				if href, exists := s.Attr("href"); exists {
+					editURL = href
+				}
+			})
+		if editURL == "" {
+			t.Fatalf("Edit link for Updated Test Squat not found")
+		}
+		if doc, err = client.GetDoc(ctx, editURL); err != nil {
+			t.Fatalf("Failed to get exercise edit page: %v", err)
+		}
+
+		formData := map[string]string{
+			"Name":        "Updated Test Squat",
+			"Category":    "lower",
+			"Type":        "weighted",
+			"Primary":     "Quads,Glutes",
+			"Secondary":   "",
+			"Description": "",
+			"rep_min":     "12",
+			"rep_max":     "8",
+		}
+		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
+			t.Fatalf("Failed to submit invalid rep window: %v", err)
+		}
+		if doc.Find("[role=alert]").Length() == 0 {
+			t.Errorf("Expected validation alert on the edit page")
+		}
+		if !strings.Contains(doc.Find("[role=alert]").Text(), "less than or equal to") {
+			t.Errorf("Expected min<=max message in alert, got: %s", doc.Find("[role=alert]").Text())
 		}
 	})
 }
