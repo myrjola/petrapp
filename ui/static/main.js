@@ -271,6 +271,11 @@ function registerServiceWorker() {
 
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
+        // Clear any in-flight navigation feedback that was captured in the
+        // bfcache snapshot — the navigation that triggered it has long
+        // since resolved (we are reading this snapshot from the cache).
+        clearLoad()
+
         // Reload if the invalidation cookie has changed since this page was rendered.
         // The render-time value is baked into a <meta> tag; a mismatch means a POST
         // ran while we were in bfcache and our state may be stale.
