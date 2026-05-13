@@ -371,3 +371,44 @@ html:active-view-transition-type(backward) {
         transform: translateY(-50%) rotate(360deg);
     }
 }
+
+#loading-bar {
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    height: 2px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out;
+    background: linear-gradient(90deg, transparent, var(--sky-5), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    background-position: -40% 0;
+}
+
+#loading-bar.active {
+    opacity: 1;
+    animation: loading-bar-slide 1.1s linear infinite;
+}
+
+@keyframes loading-bar-slide {
+    to { background-position: 140% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #loading-bar {
+        transition: none;
+    }
+    #loading-bar.active {
+        animation: none;
+        background: var(--sky-5);
+    }
+}
+
+@media (forced-colors: active) {
+    #loading-bar.active {
+        background: Highlight;
+        forced-color-adjust: none;
+    }
+}
