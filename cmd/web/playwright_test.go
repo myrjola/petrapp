@@ -271,7 +271,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 7: Navigate back to the workout overview.
-	backLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Back to workout"})
+	backLink := page.Locator("a[data-back-button]")
 	if err = backLink.Click(); err != nil {
 		t.Fatalf("click Back to workout: %v", err)
 	}
