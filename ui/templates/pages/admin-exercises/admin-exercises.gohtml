@@ -1,8 +1,10 @@
 {{- /* gotype: github.com/myrjola/petrapp/cmd/web.exerciseAdminTemplateData */ -}}
 {{ define "page" }}
-    <main>
-        <h1>Exercise Administration</h1>
-        <section>
+    <main class="stack">
+        {{ template "page-header" .Header }}
+        {{ template "banner" .Flash }}
+
+        <section class="stack">
             <h2>Exercises</h2>
             <table>
                 <thead>
@@ -20,19 +22,9 @@
                     <tr>
                         <td>{{ .ID }}</td>
                         <td>{{ .Name }}</td>
-                        <td>{{ .Category }}</td>
-                        <td>
-                            {{ range $index, $element := .PrimaryMuscleGroups}}
-                                {{if $index}},{{end}}
-                                {{$element}}
-                            {{end}}
-                        </td>
-                        <td>
-                            {{ range $index, $element := .SecondaryMuscleGroups}}
-                                {{if $index}},{{end}}
-                                {{$element}}
-                            {{end}}
-                        </td>
+                        <td>{{ .CategoryLabel }}</td>
+                        <td>{{ .PrimaryMuscles }}</td>
+                        <td>{{ .SecondaryMuscles }}</td>
                         <td>
                             <a href="/admin/exercises/{{ .ID }}">Edit</a>
                         </td>
@@ -42,14 +34,10 @@
             </table>
         </section>
 
-        <section>
+        <section class="card stack">
             <h2>Generate New Exercise</h2>
-            <form method="post" action="/admin/exercises/generate">
-                <div>
-                    <label for="name">Exercise Name:</label>
-                    <input type="text" id="name" name="name" required placeholder="e.g., Bench Press, Deadlift, Squat">
-                </div>
-
+            <form method="post" action="/admin/exercises/generate" class="stack">
+                {{ template "field" .NameField }}
                 <button type="submit">Generate Exercise</button>
             </form>
         </section>

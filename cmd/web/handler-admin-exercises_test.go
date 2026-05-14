@@ -300,4 +300,26 @@ func Test_application_adminExercises(t *testing.T) {
 			t.Errorf("Expected min<=max message in alert, got: %s", doc.Find("[role=alert]").Text())
 		}
 	})
+
+	// The generate form's empty-name case must surface as a flash banner on the
+	// admin page, not a 500. Today the handler returns serverError(w, r, nil).
+	t.Run("Generate with empty name shows validation error", func(t *testing.T) {
+		if doc, err = client.GetDoc(ctx, "/admin/exercises"); err != nil {
+			t.Fatalf("Failed to get admin exercises page: %v", err)
+		}
+		formData := map[string]string{"Name": ""}
+		if doc, err = client.SubmitForm(ctx, doc, "/admin/exercises/generate", formData); err != nil {
+			t.Fatalf("Failed to submit generate form with empty name: %v", err)
+		}
+		if doc.Find("h1").Text() != "Exercise Administration" {
+			t.Error("Expected to land back on the exercise admin page")
+		}
+		if doc.Find("[role=alert]").Length() == 0 {
+			t.Error("Expected a validation alert after submitting an empty exercise name")
+		}
+		if !strings.Contains(doc.Find("[role=alert]").Text(), "Exercise name is required") {
+			t.Errorf("Expected 'Exercise name is required' in alert, got: %s",
+				doc.Find("[role=alert]").Text())
+		}
+	})
 }

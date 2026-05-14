@@ -1,20 +1,34 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
+// adminExerciseRow is one row of the exercise admin table, with display
+// values (category label, comma-joined muscle lists) prepared by the handler.
+type adminExerciseRow struct {
+	ID               int
+	Name             string
+	CategoryLabel    string
+	PrimaryMuscles   string
+	SecondaryMuscles string
+}
+
 // exerciseAdminTemplateData contains data for the exercise admin template.
 type exerciseAdminTemplateData struct {
 	BaseTemplateData
-	Exercises    []domain.Exercise
-	MuscleGroups []string
+	Header    PageHeaderData
+	Flash     BannerData
+	Exercises []adminExerciseRow
+	NameField FieldData
 }
 
 // MuscleGroupOption represents a muscle group with a selection state.
@@ -37,24 +51,35 @@ type exerciseEditTemplateData struct {
 
 // adminExercisesGET handles GET requests to the exercise admin page.
 func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request) {
-	// Get all exercises from the workout service
 	exercises, err := app.service.List(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Get all muscle groups
-	muscleGroups, err := app.service.ListMuscleGroups(r.Context())
-	if err != nil {
-		app.serverError(w, r, err)
-		return
+	rows := make([]adminExerciseRow, 0, len(exercises))
+	for _, ex := range exercises {
+		rows = append(rows, adminExerciseRow{
+			ID:               ex.ID,
+			Name:             ex.Name,
+			CategoryLabel:    ex.Category.Label(),
+			PrimaryMuscles:   strings.Join(ex.PrimaryMuscleGroups, ", "),
+			SecondaryMuscles: strings.Join(ex.SecondaryMuscleGroups, ", "),
+		})
 	}
 
 	data := exerciseAdminTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
-		Exercises:        exercises,
-		MuscleGroups:     muscleGroups,
+		Header:           PageHeaderData{Title: "Exercise Administration", Subtitle: ""},
+		Flash:            BannerData{Variant: "error", Message: app.popFlashError(r.Context())},
+		Exercises:        rows,
+		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
+			Label:    "Exercise Name",
+			Name:     "name",
+			Type:     "text",
+			Required: true,
+			Hint:     "e.g., Bench Press, Deadlift, Squat",
+		},
 	}
 
 	app.render(w, r, http.StatusOK, "admin-exercises", data)
@@ -232,28 +257,25 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 
 // adminExerciseGeneratePOST handles POST requests to generate a new exercise.
 func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http.Request) {
-	// Parse form.
 	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
 	if err := r.ParseForm(); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Extract exercise name from form.
 	name := r.PostForm.Get("name")
-	if name == "" {
-		app.serverError(w, r, nil)
-		return
-	}
-
-	// Generate the exercise.
 	exercise, err := app.service.GenerateExercise(r.Context(), name)
 	if err != nil {
+		var ve domain.ValidationError
+		if errors.As(err, &ve) {
+			app.putFlashError(r.Context(), ve.Message)
+			redirect(w, r, "/admin/exercises")
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}
 
-	// Redirect to the newly created exercise.
 	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
 }
 
