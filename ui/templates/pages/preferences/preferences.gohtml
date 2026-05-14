@@ -1,34 +1,14 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.preferencesTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
+    <main class="center">
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    max-width: 32rem;
-                    margin: 0 auto;
                     padding: var(--size-6) var(--size-4);
                 }
 
-                h1 {
-                    font-size: var(--font-size-5);
-                    font-weight: var(--font-weight-6);
-                    margin-bottom: var(--size-3);
-                    color: var(--color-text-primary);
-                    text-align: center;
-                }
-
-                .subtitle {
-                    color: var(--color-text-secondary);
-                    text-align: center;
-                    margin-bottom: var(--size-7);
-                    font-size: var(--font-size-2);
-                }
-
                 .schedule-form {
-                    background: var(--color-surface-elevated);
-                    border: var(--border-size-1) solid var(--color-border);
-                    border-radius: var(--radius-3);
                     padding: var(--size-6);
                     margin-bottom: var(--size-6);
                     box-shadow: var(--shadow-2);
@@ -48,7 +28,6 @@
                 }
 
                 .weekdays-grid {
-                    display: grid;
                     gap: var(--size-2);
                     margin-bottom: var(--size-6);
                 }
@@ -141,9 +120,6 @@
                 .data-export-section {
                     margin-top: var(--size-8);
                     padding: var(--size-6);
-                    background: var(--color-surface-elevated);
-                    border: var(--border-size-1) solid var(--color-border);
-                    border-radius: var(--radius-3);
                     box-shadow: var(--shadow-2);
                 }
 
@@ -225,41 +201,13 @@
             }
         </style>
 
-        <header>
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        display: flex;
-                        align-items: center;
-                        gap: var(--size-3);
-                        margin-bottom: var(--size-4);
+        {{ template "back-link" "/" }}
+        {{ template "page-header" .Header }}
 
-                        a {
-                            color: var(--gray-7);
-                            text-decoration: none;
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-2);
-                            padding: var(--size-2);
-                            border-radius: var(--radius-2);
-
-                            &:hover {
-                                background: var(--gray-1);
-                            }
-                        }
-                    }
-                }
-            </style>
-            {{ template "back-link" "/" }}
-        </header>
-
-        <h1 id="schedule-heading">Weekly Schedule</h1>
-        <p class="subtitle">Select the days you're planning to go to the gym</p>
-
-        <form method="post" action="/preferences" class="schedule-form" aria-labelledby="schedule-heading">
+        <form method="post" action="/preferences" class="schedule-form card" aria-label="Weekly Schedule">
             <fieldset>
                 <legend>Workout duration per day</legend>
-                <div class="weekdays-grid">
+                <div class="weekdays-grid stack">
                     {{ range .Weekdays }}
                         <div class="weekday-item">
                             <div class="workout-duration">
@@ -282,13 +230,10 @@
             <button type="submit" class="save-button">Save Schedule</button>
         </form>
 
-        <div class="rest-notifications-section">
+        <div class="rest-notifications-section card">
             <style {{ nonce }}>
                 @scope (.rest-notifications-section) {
                     :scope {
-                        background: var(--color-surface-elevated);
-                        border: var(--border-size-1) solid var(--color-border);
-                        border-radius: var(--radius-3);
                         padding: var(--size-6);
                         margin-bottom: var(--size-6);
                         box-shadow: var(--shadow-2);
@@ -620,7 +565,7 @@
             </form>
         </section>
 
-        <div class="data-export-section">
+        <div class="data-export-section card">
             <h2>Export Your Data</h2>
             <p>Download all your workout data as an SQLite database file for your personal records or data
                 portability.</p>

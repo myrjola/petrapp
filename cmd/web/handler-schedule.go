@@ -7,9 +7,10 @@ import (
 
 type scheduleTemplateData struct {
 	BaseTemplateData
+	Header          PageHeaderData
 	Weekdays        []weekdayPreference
 	DurationOptions []workoutDurationOption
-	ValidationError string
+	Flash           BannerData
 }
 
 func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
@@ -22,9 +23,13 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 
 	data := scheduleTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
-		Weekdays:         preferencesToWeekdays(prefs),
-		DurationOptions:  getWorkoutDurationOptions(),
-		ValidationError:  app.popFlashError(ctx),
+		Header: PageHeaderData{
+			Title:    "Set Up Your Schedule",
+			Subtitle: "Choose which days you'll be going to the gym",
+		},
+		Weekdays:        preferencesToWeekdays(prefs),
+		DurationOptions: getWorkoutDurationOptions(),
+		Flash:           BannerData{Variant: "error", Message: app.popFlashError(ctx)},
 	}
 
 	app.render(w, r, http.StatusOK, "schedule", data)

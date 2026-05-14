@@ -36,6 +36,7 @@ type workoutDurationOption struct {
 
 type preferencesTemplateData struct {
 	BaseTemplateData
+	Header                   PageHeaderData
 	Weekdays                 []weekdayPreference
 	DurationOptions          []workoutDurationOption
 	VAPIDPublicKey           string
@@ -107,7 +108,11 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := preferencesTemplateData{
-		BaseTemplateData:         newBaseTemplateData(r),
+		BaseTemplateData: newBaseTemplateData(r),
+		Header: PageHeaderData{
+			Title:    "Weekly Schedule",
+			Subtitle: "Select the days you're planning to go to the gym",
+		},
 		Weekdays:                 preferencesToWeekdays(prefs),
 		DurationOptions:          getWorkoutDurationOptions(),
 		VAPIDPublicKey:           app.vapidPublicKey,

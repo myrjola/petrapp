@@ -1,34 +1,14 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.scheduleTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
+    <main class="center">
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    max-width: 32rem;
-                    margin: 0 auto;
                     padding: var(--size-6) var(--size-4);
                 }
 
-                h1 {
-                    font-size: var(--font-size-5);
-                    font-weight: var(--font-weight-6);
-                    margin-bottom: var(--size-3);
-                    color: var(--color-text-primary);
-                    text-align: center;
-                }
-
-                .subtitle {
-                    color: var(--color-text-secondary);
-                    text-align: center;
-                    margin-bottom: var(--size-7);
-                    font-size: var(--font-size-2);
-                }
-
                 .schedule-form {
-                    background: var(--color-surface-elevated);
-                    border: var(--border-size-1) solid var(--color-border);
-                    border-radius: var(--radius-3);
                     padding: var(--size-6);
                     margin-bottom: var(--size-6);
                     box-shadow: var(--shadow-2);
@@ -48,9 +28,12 @@
                 }
 
                 .weekdays-grid {
-                    display: grid;
                     gap: var(--size-2);
                     margin-bottom: var(--size-6);
+                }
+
+                .banner {
+                    margin-bottom: var(--size-4);
                 }
 
                 .weekday-item {
@@ -92,16 +75,6 @@
                     }
                 }
 
-                .validation-error {
-                    padding: var(--size-3) var(--size-4);
-                    background: var(--red-1);
-                    border: var(--border-size-1) solid var(--red-4);
-                    border-radius: var(--radius-2);
-                    color: var(--red-9);
-                    font-size: var(--font-size-1);
-                    margin-bottom: var(--size-4);
-                }
-
                 .save-button {
                     width: 100%;
                     padding: var(--size-4) var(--size-6);
@@ -125,13 +98,12 @@
             }
         </style>
 
-        <h1 id="schedule-heading">Set Up Your Schedule</h1>
-        <p class="subtitle">Choose which days you'll be going to the gym</p>
+        {{ template "page-header" .Header }}
 
-        <form method="post" action="/schedule" class="schedule-form" aria-labelledby="schedule-heading">
+        <form method="post" action="/schedule" class="schedule-form card" aria-label="Set Up Your Schedule">
             <fieldset>
                 <legend>Workout duration per day</legend>
-                <div class="weekdays-grid">
+                <div class="weekdays-grid stack">
                 {{ range .Weekdays }}
                     <div class="weekday-item">
                         <div class="workout-duration">
@@ -151,9 +123,7 @@
                 {{ end }}
                 </div>
             </fieldset>
-            {{ if .ValidationError }}
-                <p id="validation-error" class="validation-error" role="alert">{{ .ValidationError }}</p>
-            {{ end }}
+            {{ template "banner" .Flash }}
             <button type="submit" class="save-button">Start Tracking</button>
         </form>
     </main>
