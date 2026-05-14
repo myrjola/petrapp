@@ -9,7 +9,9 @@ only — no SQL, no HTTP, no logger, no third-party clients.
 - **Entities:** `Exercise`, `Session`, `ExerciseSet`, `Set`, `Preferences`,
   `FeatureFlag`, `MuscleGroupTarget`, `MuscleGroupVolume`.
 - **Value objects / enums:** `Category`, `ExerciseType`, `Signal`,
-  `PeriodizationType`, `MuscleGroupRegion`.
+  `PeriodizationType`, `MuscleGroupRegion`, `SessionStatus`,
+  `ExerciseSetState`. The last two are display-state enums whose string
+  values double as CSS state tokens on the workout page.
 - **Aggregate methods on `Session`:** `Start`, `Complete`,
   `SetDifficulty`, `MarkWarmupComplete`, `RecordSet`, `UpdateSetWeight`,
   `UpdateCompletedValue`, `AddExercise`, `SwapExerciseInSlot`. These
@@ -22,6 +24,12 @@ only — no SQL, no HTTP, no logger, no third-party clients.
 - **Sentinel errors:** `ErrNotFound`, `ErrAlreadyStarted`,
   `ErrNotStarted`, `ErrSlotNotFound`, `ErrSetIndexOutOfBounds`,
   `ErrExerciseAlreadyInSession`, `ErrInvalidDifficultyRating`.
+- **`ValidationError`:** a struct error carrying a user-facing message,
+  distinct from the sentinels above. `Exercise.Validate()` is the single
+  source of truth for exercise-form validation and returns one. Unlike a
+  sentinel (matched with `errors.Is`), callers detect it with `errors.As`
+  and surface the message through the flash + banner flow — see
+  `cmd/web/CLAUDE.md`.
 
 ## What does NOT live here
 
