@@ -490,7 +490,9 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = exerciseLink.Click(); err != nil {
 		t.Fatalf("click exercise link: %v", err)
 	}
-	if err = page.WaitForURL(fmt.Sprintf("%s%s", serverURL, exerciseHref)); err != nil {
+	wantDetailURL := fmt.Sprintf("%s%s", serverURL, exerciseHref)
+	if err = page.WaitForURL(wantDetailURL); err != nil {
+		dumpNavDiagnostics(t, page, "workout-to-detail link click", wantDetailURL)
 		t.Fatalf("expect %s: %v", exerciseHref, err)
 	}
 	detailURL := page.URL()
