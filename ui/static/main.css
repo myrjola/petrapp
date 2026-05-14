@@ -213,6 +213,32 @@
     }
 }
 
+@layer layout {
+    .stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--size-4);
+    }
+
+    .cluster {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--size-2);
+        align-items: center;
+    }
+
+    .grid-auto {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+        gap: var(--size-3);
+    }
+
+    .center {
+        max-width: 32rem;
+        margin-inline: auto;
+    }
+}
+
 @layer components {
     button, .btn {
         position: relative;
@@ -252,6 +278,50 @@
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border: 0;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--size-1);
+        padding: var(--size-1) var(--size-2);
+        border-radius: var(--radius-2);
+        font-family: var(--font-sans);
+        font-size: var(--font-size-0);
+        font-weight: var(--font-weight-6);
+        text-transform: uppercase;
+        letter-spacing: var(--font-letterspacing-2);
+        background: var(--gray-2);
+        color: var(--gray-9);
+    }
+
+    .badge--success {
+        background: var(--lime-2);
+        color: var(--lime-9);
+    }
+
+    .badge--warning {
+        background: var(--yellow-2);
+        color: var(--yellow-11);
+    }
+
+    .badge--neutral {
+        background: var(--gray-2);
+        color: var(--gray-9);
+    }
+
+    .badge--info {
+        background: var(--sky-1);
+        color: var(--sky-9);
+    }
+
+    .card {
+        display: block;
+        padding: var(--size-3);
+        background: var(--color-surface-elevated);
+        border: var(--border-size-1) solid var(--color-border);
+        border-radius: var(--radius-3);
+        box-shadow: var(--shadow-1);
     }
 }
 
