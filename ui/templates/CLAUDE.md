@@ -193,7 +193,7 @@ The "JavaScript in Templates" guidance above is unchanged. The nonce on `<script
                 
                 .exercise {
                     padding: var(--size-3);
-                    background: var(--gray-1);
+                    background: var(--color-surface-elevated);
                 }
             }
         }
@@ -221,12 +221,23 @@ Always verify these exist in `main.css` before using:
 
 #### Color System
 
-- **Gray colors**: `--gray-0` through `--gray-10` (light to dark)
-- **Success colors**: `--lime-0` through `--lime-10` (light to dark)
-- **Warning colors**: `--yellow-0` through `--yellow-12`
-- **Error colors**: `--red-0` through `--red-12`
-- **Info/Accent colors**: `--sky-0` through `--sky-10`
-- **Semantic colors**: `--color-success`, `--color-success-bg`, etc.
+The app is on the warm "Stone" palette. **Reach for semantic tokens first**, then
+the Stone/Clay ramps; the raw Tailwind-style ramps are legacy holdouts being
+retired page-by-page.
+
+- **Semantic colors** (prefer these): `--color-surface`, `--color-surface-elevated`,
+  `--color-surface-active`, `--color-surface-completed`, `--color-border`,
+  `--color-border-focus`, `--color-text-primary` / `-secondary` / `-muted`,
+  `--color-success` / `-bg`, `--color-warning` / `-bg`, `--color-error` / `-bg`,
+  `--color-info` / `-bg`
+- **Stone**: `--stone-0` through `--stone-10` (warm neutral ramp — surfaces, borders, text)
+- **Clay**: `--clay-0` through `--clay-6` (primary accent — buttons, links, active state)
+- **Ember**: `--ember` (single bright accent, reserved for Focus-mode CTAs)
+- **Gray colors**: `--gray-0` through `--gray-10` — transitional aliases onto Stone.
+  Don't reach for these in new code; use `--stone-*`. Existing `--gray-*` call sites
+  are renamed to `--stone-*` as each page is polished.
+- **Raw ramps** (`--sky-*`, `--lime-*`, `--yellow-*`, `--red-*`) — legacy; still defined
+  but being replaced by the semantic tokens above. Don't introduce new uses.
 
 #### Border & Typography
 
@@ -240,7 +251,7 @@ Always verify these exist in `main.css` before using:
 ### Color Usage Patterns
 
 - Use proper contrast ratios by pairing light backgrounds with dark text
-- Map semantic intentions to available tokens (e.g., success state → `--lime-2` background, `--lime-9` text)
+- Map semantic intentions to the semantic tokens (e.g., success state → `--color-success-bg` background, `--color-success` text; neutral surface → `--color-surface` / `--stone-*`)
 - **NEVER use undefined color tokens** - always verify they exist in main.css first
 
 ## CSS Layer System
