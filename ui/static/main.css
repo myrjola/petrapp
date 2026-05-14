@@ -274,8 +274,8 @@
     button, .btn {
         position: relative;
         display: inline-flex;
-        border-radius: var(--radius-2);
-        background-color: var(--sky-10);
+        border-radius: var(--radius-3);
+        background-color: var(--clay-4);
         color: var(--white);
         font-family: var(--font-sans);
         font-size: var(--font-size-1);
@@ -289,11 +289,11 @@
 
         &:hover {
             cursor: pointer;
-            background-color: var(--sky-7);
+            background-color: var(--clay-5);
         }
 
         &:focus-visible {
-            outline: var(--sky-4) solid 2px;
+            outline: var(--clay-3) solid 2px;
         }
     }
 
