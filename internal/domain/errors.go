@@ -18,3 +18,16 @@ var (
 	ErrExerciseAlreadyInSession = errors.New("exercise already in session")
 	ErrInvalidDifficultyRating  = errors.New("difficulty rating must be 1-5")
 )
+
+// ValidationError is a domain validation failure carrying a message that is
+// safe to surface directly to the end user. Handlers detect it with
+// errors.As and surface it via putFlashError + redirect-to-form; see
+// cmd/web/CLAUDE.md for the full flow.
+type ValidationError struct {
+	Message string
+}
+
+// Error implements the error interface.
+func (e ValidationError) Error() string {
+	return e.Message
+}
