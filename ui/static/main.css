@@ -83,10 +83,10 @@
         --radius-6: 8rem;
         --radius-round: 9999px;
 
-        /* Shadows (elevation) */
-        --shadow-1: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-        --shadow-2: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-        --shadow-3: 0 2px 4px 0 rgb(0 0 0 / 0.1);
+        /* Shadows (elevation) — warm-tinted for the Stone palette */
+        --shadow-1: 0 1px 2px 0 rgb(120 90 60 / 0.10);
+        --shadow-2: 0 2px 8px 0 rgb(120 90 60 / 0.12), 0 1px 2px -1px rgb(120 90 60 / 0.10);
+        --shadow-3: 0 4px 14px 0 rgb(120 90 60 / 0.14);
 
         /* Fonts */
         --font-system-ui: system-ui, sans-serif;
@@ -136,17 +136,32 @@
         /* Colors */
         --white: #fff;
         --black: #000;
-        --gray-0: #f9fafb;
-        --gray-1: #f3f4f6;
-        --gray-2: #e5e7eb;
-        --gray-3: #d1d5db;
-        --gray-4: #9ca3af;
-        --gray-5: #6b7280;
-        --gray-6: #4b5563;
-        --gray-7: #374151;
-        --gray-8: #1f2937;
-        --gray-9: #111827;
-        --gray-10: #030712;
+        /* Stone — warm neutral ramp (surfaces, borders, text) */
+        --stone-0: #faf7f2;
+        --stone-1: #f4efe6;
+        --stone-2: #ece4d9;
+        --stone-3: #ddd2c1;
+        --stone-4: #c3b5a0;
+        --stone-5: #9b8e7d;
+        --stone-6: #766b5c;
+        --stone-7: #574e42;
+        --stone-8: #3d342b;
+        --stone-9: #2e2620;
+        --stone-10: #1c1813;
+        /* Gray — transitional aliases onto Stone. Per-page references are
+           renamed to --stone-* as pages are polished; the --gray-* names are
+           removed in the final increment of this redesign. */
+        --gray-0: var(--stone-0);
+        --gray-1: var(--stone-1);
+        --gray-2: var(--stone-2);
+        --gray-3: var(--stone-3);
+        --gray-4: var(--stone-4);
+        --gray-5: var(--stone-5);
+        --gray-6: var(--stone-6);
+        --gray-7: var(--stone-7);
+        --gray-8: var(--stone-8);
+        --gray-9: var(--stone-9);
+        --gray-10: var(--stone-10);
         --sky-0: #f0f9ff;
         --sky-1: #e0f2fe;
         --sky-2: #bae6fd;
@@ -196,20 +211,36 @@
         --yellow-11: #804200;
         --yellow-12: #663500;
 
-        /* Semantic colors for exercise sets */
-        --color-surface: var(--gray-0);
-        --color-surface-elevated: var(--white);
-        --color-surface-active: var(--sky-0);
-        --color-surface-completed: var(--lime-0);
-        --color-border: var(--gray-3);
-        --color-border-focus: var(--sky-4);
-        --color-text-primary: var(--gray-9);
-        --color-text-secondary: var(--gray-6);
-        --color-text-muted: var(--gray-5);
-        --color-success: var(--lime-7);
-        --color-success-bg: var(--lime-0);
-        --color-info: var(--sky-7);
-        --color-info-bg: var(--sky-0);
+        /* Clay — primary accent (buttons, links, active state) */
+        --clay-0: #fbf1e8;
+        --clay-1: #f0d9c4;
+        --clay-2: #e0b48a;
+        --clay-3: #c98a55;
+        --clay-4: #a8643c;
+        --clay-5: #8a4f2e;
+        --clay-6: #6b3c22;
+
+        /* Ember — Focus-mode highlight accent */
+        --ember: #e08a4c;
+
+        /* Semantic colors */
+        --color-surface: var(--stone-1);
+        --color-surface-elevated: var(--stone-0);
+        --color-surface-active: var(--clay-0);
+        --color-surface-completed: #eef1e2;
+        --color-border: var(--stone-3);
+        --color-border-focus: var(--clay-3);
+        --color-text-primary: var(--stone-9);
+        --color-text-secondary: var(--stone-6);
+        --color-text-muted: var(--stone-5);
+        --color-success: #5c6b38;
+        --color-success-bg: #e8ecd9;
+        --color-warning: #8a5a17;
+        --color-warning-bg: #f6e6c8;
+        --color-error: #8a2f1c;
+        --color-error-bg: #f6dcd4;
+        --color-info: #3f5a68;
+        --color-info-bg: #dde8ec;
     }
 }
 
