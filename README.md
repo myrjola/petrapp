@@ -65,7 +65,7 @@ make fly-wake FLY_APP=petra-staging
 
 This project uses [Fly.io](https://fly.io/) for infrastructure and [Litestream](https://litestream.io/)
 for [SQLite](https://www.sqlite.org/) database backups. It's a single instance Dockerized application with a persistent
-volume. Try `fly launch` to configure your own. You might also need to add some secrets to with `fly secrets`.
+volume. Try `fly launch` to configure your own. You might also need to add some secrets with `fly secrets`.
 
 ### Database access
 
