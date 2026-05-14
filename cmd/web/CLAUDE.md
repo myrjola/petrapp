@@ -112,6 +112,10 @@ if fieldValue == "" {
 
 ### User-facing validation errors
 
+> **Go-forward convention for new and migrating forms.** Existing handlers predate this
+> pattern and still validate inline with hand-written messages — don't expect to find
+> `errors.As` call sites or a `.Flash` field on every existing form struct yet.
+
 Validation failures that should be shown to the user (not 500s) flow through
 `domain.ValidationError`:
 
@@ -121,7 +125,8 @@ Validation failures that should be shown to the user (not 500s) flow through
    `app.putFlashError(r.Context(), ve.Message)`, and redirects to the form
    with `redirect(w, r, formPath)`.
 3. The form's GET handler pops the flash with `app.popFlashError(...)` and
-   passes it to the template as a `BannerData{Variant: "error", Message: ...}`.
+   passes it to the template as a `BannerData` field (conventionally named `.Flash`)
+   with `BannerData{Variant: "error", Message: ...}`.
 4. The form template renders it with `{{ template "banner" .Flash }}`.
 
 This keeps the stack-navigator wire protocol uniform (a `200 + X-Location`
