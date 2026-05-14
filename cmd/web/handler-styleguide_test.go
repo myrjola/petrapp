@@ -41,4 +41,18 @@ func Test_application_styleguide(t *testing.T) {
 	if doc.Find(".card").Length() == 0 {
 		t.Error("expected a .card example on the styleguide")
 	}
+
+	// Banner component.
+	if doc.Find("h2:contains('Banner')").Length() == 0 {
+		t.Error("expected a 'Banner' section")
+	}
+	if doc.Find(".banner.banner--error").Length() == 0 {
+		t.Error("expected a .banner--error example on the styleguide")
+	}
+	if doc.Find(".banner.banner--error[role='alert']").Length() == 0 {
+		t.Error("expected the error banner to carry role=alert")
+	}
+	if doc.Find(".banner.banner--success").Length() == 0 {
+		t.Error("expected a .banner--success example on the styleguide")
+	}
 }

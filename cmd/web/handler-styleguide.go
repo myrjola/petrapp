@@ -38,6 +38,8 @@ type styleguideTemplateData struct {
 	FluidFontSizes []string
 	FontWeights    []string
 	Radii          []string
+	// BannerExamples drives the Banner section of the styleguide.
+	BannerExamples []BannerData
 }
 
 // styleguideGET renders the design-token reference page.
@@ -98,6 +100,11 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		FluidFontSizes:   rangeNames("font-size-fluid", 0, scaleFluidFontMax),
 		FontWeights:      rangeNames("font-weight", 1, scaleFontWeightMax),
 		Radii:            append(rangeNames("radius", 1, scaleRadiusMax), "radius-round"),
+		BannerExamples: []BannerData{
+			{Variant: "error", Message: "Something went wrong. Please try again."},
+			{Variant: "success", Message: "Your changes have been saved."},
+			{Variant: "info", Message: "Heads up — this is informational."},
+		},
 	}
 	app.render(w, r, http.StatusOK, "styleguide", data)
 }

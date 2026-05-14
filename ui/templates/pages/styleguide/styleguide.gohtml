@@ -345,6 +345,17 @@
         </section>
 
         <section>
+            <h2>Banner</h2>
+            <div class="component-sample">
+                <div class="stack">
+                    {{ range .BannerExamples }}
+                        {{ template "banner" . }}
+                    {{ end }}
+                </div>
+            </div>
+        </section>
+
+        <section>
             <h2>Components</h2>
 
             <h3>Buttons</h3>

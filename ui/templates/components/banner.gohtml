@@ -1,0 +1,41 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.BannerData*/ -}}
+{{- /*
+    banner: server-message display for flash errors and inline notices.
+    Dot: cmd/web.BannerData. Renders nothing when Message is empty.
+    role="alert" for the error variant, role="status" otherwise.
+
+    Usage:
+        {{ template "banner" .Flash }}
+*/ -}}
+{{- define "banner" -}}
+    {{- if .Message -}}
+        <style {{ nonce }}>
+            @scope (.banner) {
+                :scope {
+                    padding: var(--size-2) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-weight: var(--font-weight-5);
+                }
+
+                :scope.banner--error {
+                    background: var(--red-1);
+                    color: var(--red-12);
+                }
+
+                :scope.banner--success {
+                    background: var(--lime-1);
+                    color: var(--lime-9);
+                }
+
+                :scope.banner--info {
+                    background: var(--sky-1);
+                    color: var(--sky-9);
+                }
+            }
+        </style>
+        <div class="banner banner--{{ .Variant }}"
+             {{ if eq .Variant "error" }}role="alert"{{ else }}role="status"{{ end }}>
+            {{ .Message }}
+        </div>
+    {{- end -}}
+{{- end }}
