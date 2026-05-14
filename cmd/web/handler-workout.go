@@ -14,8 +14,11 @@ import (
 
 type workoutTemplateData struct {
 	BaseTemplateData
-	Date    time.Time
-	Session domain.Session
+	Date          time.Time
+	Session       domain.Session
+	Header        PageHeaderData
+	StatusLabel   string
+	StatusVariant string
 }
 
 type workoutCompletionTemplateData struct {
@@ -129,10 +132,27 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var statusLabel, statusVariant string
+	switch session.Status() {
+	case domain.SessionCompleted:
+		statusLabel, statusVariant = "Completed", "success"
+	case domain.SessionInProgress:
+		statusLabel, statusVariant = "In Progress", "warning"
+	case domain.SessionNotStarted:
+		statusLabel, statusVariant = "Not Started", "neutral"
+	}
+
 	data := workoutTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
 		Session:          session,
+		Header: PageHeaderData{
+			Title: fmt.Sprintf("%s Workout — %s",
+				session.WorkoutType().Label(), date.Format("Monday, January 2, 2006")),
+			Subtitle: "",
+		},
+		StatusLabel:   statusLabel,
+		StatusVariant: statusVariant,
 	}
 
 	app.render(w, r, http.StatusOK, "workout", data)

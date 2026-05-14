@@ -1,198 +1,94 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.workoutTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
+    <main class="stack">
         <style {{ nonce }}>
             @scope {
                 :scope {
                     margin: var(--size-4);
-                    display: flex;
-                    flex-direction: column;
-                    gap: var(--size-4);
                 }
             }
         </style>
 
-        <header class="workout-header">
+        {{ template "page-header" .Header }}
+
+        <div class="workout-meta cluster">
             <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        display: flex;
-                        flex-direction: column;
-                        gap: var(--size-2);
-                        margin-bottom: var(--size-2);
-                    }
-
-                    h1 {
-                        font-size: var(--font-size-6);
-                        font-weight: var(--font-weight-7);
-                        color: var(--gray-9);
-                        margin: 0;
-                    }
-
-                    .workout-meta {
-                        display: flex;
-                        gap: var(--size-3);
-                        align-items: center;
-                        flex-wrap: wrap;
-                    }
-
-                    .status-badge {
-                        display: inline-flex;
-                        align-items: center;
-                        gap: var(--size-1);
-                        padding: var(--size-1) var(--size-2);
-                        border-radius: var(--radius-2);
-                        font-size: var(--font-size-0);
-                        font-weight: var(--font-weight-6);
-                        text-transform: uppercase;
-                        letter-spacing: 0.05em;
-                    }
-
-                    .status-badge.completed {
-                        background: var(--lime-2);
-                        color: var(--lime-9);
-                    }
-
-                    .status-badge.in-progress {
-                        background: var(--yellow-2);
-                        color: var(--yellow-11);
-                    }
-
-                    .status-badge.not-started {
-                        background: var(--gray-2);
-                        color: var(--gray-9);
-                    }
-
+                @scope (.workout-meta) {
                     .progress-summary {
                         color: var(--gray-7);
                         font-size: var(--font-size-1);
                     }
                 }
             </style>
+            <span class="badge badge--{{ .StatusVariant }}">{{ .StatusLabel }}</span>
+            <span class="progress-summary">{{ len .Session.ExerciseSets }} exercises</span>
+        </div>
 
-            {{ $hasUpper := false }}
-            {{ $hasLower := false }}
-            {{ $hasFullBody := false }}
-            {{ range .Session.ExerciseSets }}
-                {{ if eq .Exercise.Category "upper" }}
-                    {{ $hasUpper = true }}
-                {{ else if eq .Exercise.Category "lower" }}
-                    {{ $hasLower = true }}
-                {{ else if eq .Exercise.Category "full_body" }}
-                    {{ $hasFullBody = true }}
-                {{ end }}
-            {{ end }}
-
-            {{ $workoutType := "Full Body" }}
-            {{ if $hasFullBody }}
-                {{ $workoutType = "Full Body" }}
-            {{ else if and $hasUpper $hasLower }}
-                {{ $workoutType = "Full Body" }}
-            {{ else if $hasUpper }}
-                {{ $workoutType = "Upper Body" }}
-            {{ else if $hasLower }}
-                {{ $workoutType = "Lower Body" }}
-            {{ end }}
-
-            <h1>{{ $workoutType }} Workout - {{ .Date.Format "Monday, January 2, 2006" }}</h1>
-
-            <div class="workout-meta">
-                {{ if not .Session.CompletedAt.IsZero }}
-                    <span class="status-badge completed">Completed</span>
-                {{ else if not .Session.StartedAt.IsZero }}
-                    <span class="status-badge in-progress">In Progress</span>
-                {{ else }}
-                    <span class="status-badge not-started">Not Started</span>
-                {{ end }}
-
-                <span class="progress-summary">
-                    {{ len .Session.ExerciseSets }} exercises
-                </span>
-            </div>
-        </header>
-
-        <div class="exercise-list">
+        <div class="exercise-list stack">
             <style {{ nonce }}>
-                @scope {
+                @scope (.exercise-list) {
                     :scope {
-                        display: flex;
-                        flex-direction: column;
                         gap: var(--size-3);
+                    }
 
-                        .exercise {
-                            display: flex;
-                            align-items: center;
-                            padding: var(--size-3);
-                            text-decoration: line-through;
-                            color: var(--gray-5);
-                        }
+                    .exercise {
+                        display: flex;
+                        align-items: center;
+                        text-decoration: line-through;
+                        color: var(--gray-5);
+                    }
 
-                        .exercise.active {
-                            text-decoration: none;
-                            color: var(--gray-9);
-                            font-weight: var(--font-weight-6);
-                        }
+                    a.exercise {
+                        text-decoration: none;
+                        transition: background-color 0.2s;
+                    }
 
-                        .exercise.completed {
-                            background-color: var(--lime-2);
-                            color: var(--lime-9);
-                        }
+                    a.exercise:hover {
+                        background: var(--gray-1);
+                    }
 
-                        .exercise.started {
-                            background-color: var(--yellow-2);
-                            color: var(--yellow-11);
-                        }
+                    .exercise.active {
+                        text-decoration: none;
+                        color: var(--gray-9);
+                        font-weight: var(--font-weight-6);
+                    }
 
-                        a.exercise {
-                            text-decoration: none;
-                            background: var(--gray-1);
-                            border-radius: var(--radius-2);
-                            transition: background-color 0.2s;
+                    .exercise.completed {
+                        background-color: var(--lime-2);
+                        color: var(--lime-9);
+                    }
 
-                            &:hover {
-                                background: var(--gray-2);
-                            }
-                        }
+                    .exercise.started {
+                        background-color: var(--yellow-2);
+                        color: var(--yellow-11);
+                    }
 
-                        .add-exercise {
-                            display: flex;
-                            justify-content: center;
-                            margin-top: var(--size-2);
-                        }
+                    .add-exercise {
+                        display: flex;
+                        justify-content: center;
+                        margin-top: var(--size-2);
+                    }
 
-                        .add-exercise-button {
-                            background-color: var(--lime-2);
-                            color: var(--lime-9);
-                            border: none;
-                            border-radius: var(--radius-2);
-                            padding: var(--size-2) var(--size-3);
-                            font-weight: var(--font-weight-6);
-                            cursor: pointer;
-                            text-decoration: none;
-                            display: inline-block;
+                    .add-exercise-button {
+                        background-color: var(--lime-2);
+                        color: var(--lime-9);
+                        border-radius: var(--radius-2);
+                        padding: var(--size-2) var(--size-3);
+                        font-weight: var(--font-weight-6);
+                        text-decoration: none;
+                        display: inline-block;
+                    }
 
-                            &:hover {
-                                background-color: var(--lime-3);
-                            }
-                        }
+                    .add-exercise-button:hover {
+                        background-color: var(--lime-3);
                     }
                 }
             </style>
 
             {{ range .Session.ExerciseSets }}
-                {{ $allSetsCompleted := true }}
-                {{ $hasSomeCompleted := false }}
-                {{ range .Sets }}
-                    {{ if eq .CompletedValue nil }}
-                        {{ $allSetsCompleted = false }}
-                    {{ else }}
-                        {{ $hasSomeCompleted = true }}
-                    {{ end }}
-                {{ end }}
-                {{ $isStarted := and $hasSomeCompleted (not $allSetsCompleted) }}
                 <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
-                   class="exercise{{ if not $.Session.CompletedAt }} active{{ end }}{{ if $allSetsCompleted }} completed{{ else if $isStarted }} started{{ end }}"
+                   class="exercise card{{ if not $.Session.CompletedAt }} active{{ end }} {{ .CompletionState }}"
                    data-workout-exercise-id="{{ .ID }}">
                     <span>{{ .Exercise.Name }}</span>
                 </a>
@@ -251,25 +147,24 @@
                     Add Exercise
                 </a>
             </div>
-
         </div>
 
         <div class="complete-workout">
             <style {{ nonce }}>
-                @scope {
+                @scope (.complete-workout) {
                     :scope {
                         padding: var(--size-4);
                         position: sticky;
                         bottom: 0;
                         background: var(--white);
                         box-shadow: 0 -1px 2px 0 rgb(0 0 0 / 0.05);
+                    }
 
-                        button {
-                            width: 100%;
-                            justify-content: center;
-                            font-size: var(--font-size-2);
-                            padding: var(--size-3);
-                        }
+                    button {
+                        width: 100%;
+                        justify-content: center;
+                        font-size: var(--font-size-2);
+                        padding: var(--size-3);
                     }
                 }
             </style>
