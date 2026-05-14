@@ -12,6 +12,15 @@ const (
 	PeriodizationHypertrophy PeriodizationType = "hypertrophy"
 )
 
+// SessionStatus is the lifecycle state of a workout session, for display.
+type SessionStatus string
+
+const (
+	SessionNotStarted SessionStatus = "not_started"
+	SessionInProgress SessionStatus = "in_progress"
+	SessionCompleted  SessionStatus = "completed"
+)
+
 // ExerciseSet groups all sets for a specific exercise in a workout.
 type ExerciseSet struct {
 	// ID is the stable identifier of this exercise slot within the workout. It survives
@@ -20,6 +29,38 @@ type ExerciseSet struct {
 	Exercise          Exercise
 	Sets              []Set
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
+}
+
+// ExerciseSetState is the completion state of an exercise slot, for display.
+type ExerciseSetState string
+
+const (
+	ExerciseSetNotStarted ExerciseSetState = "not-started"
+	ExerciseSetStarted    ExerciseSetState = "started"
+	ExerciseSetCompleted  ExerciseSetState = "completed"
+)
+
+// CompletionState reports whether none, some, or all of the slot's sets have
+// been completed. A slot with no sets is reported as not started. The string
+// values double as CSS state tokens used by the workout page.
+func (es ExerciseSet) CompletionState() ExerciseSetState {
+	if len(es.Sets) == 0 {
+		return ExerciseSetNotStarted
+	}
+	completed := 0
+	for i := range es.Sets {
+		if es.Sets[i].CompletedAt != nil {
+			completed++
+		}
+	}
+	switch completed {
+	case 0:
+		return ExerciseSetNotStarted
+	case len(es.Sets):
+		return ExerciseSetCompleted
+	default:
+		return ExerciseSetStarted
+	}
 }
 
 // ExerciseProgressEntry represents the sets performed for an exercise on a specific date.
@@ -234,6 +275,17 @@ func (s Session) WorkoutType() Category {
 		return CategoryLower
 	}
 	return CategoryFullBody
+}
+
+// Status reports the session's lifecycle state from its timestamps.
+func (s Session) Status() SessionStatus {
+	if !s.CompletedAt.IsZero() {
+		return SessionCompleted
+	}
+	if !s.StartedAt.IsZero() {
+		return SessionInProgress
+	}
+	return SessionNotStarted
 }
 
 // HasIncompleteSets reports whether any set across any exercise slot in the

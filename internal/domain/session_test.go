@@ -473,6 +473,63 @@ func TestSession_RecordSet_NilSignalIsAllowed(t *testing.T) {
 	}
 }
 
+func Test_Session_Status(t *testing.T) {
+	past := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		sess domain.Session
+		want domain.SessionStatus
+	}{
+		{
+			"not started",
+			domain.Session{}, //nolint:exhaustruct // Test sessions omit irrelevant fields.
+			domain.SessionNotStarted,
+		},
+		{
+			"in progress",
+			domain.Session{StartedAt: past}, //nolint:exhaustruct // Test sessions omit irrelevant fields.
+			domain.SessionInProgress,
+		},
+		{
+			"completed",
+			domain.Session{StartedAt: past, CompletedAt: later}, //nolint:exhaustruct // Test sessions omit irrelevant fields.
+			domain.SessionCompleted,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.sess.Status(); got != tt.want {
+				t.Errorf("Status() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_ExerciseSet_CompletionState(t *testing.T) {
+	now := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
+	completed := domain.Set{CompletedAt: &now} //nolint:exhaustruct // Other Set fields nil.
+	pending := domain.Set{}                    //nolint:exhaustruct // All fields nil — represents an unfinished set.
+	tests := []struct {
+		name string
+		sets []domain.Set
+		want domain.ExerciseSetState
+	}{
+		{"no sets is not started", nil, domain.ExerciseSetNotStarted},
+		{"all pending is not started", []domain.Set{pending, pending}, domain.ExerciseSetNotStarted},
+		{"some completed is started", []domain.Set{completed, pending}, domain.ExerciseSetStarted},
+		{"all completed is completed", []domain.Set{completed, completed}, domain.ExerciseSetCompleted},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			es := domain.ExerciseSet{Sets: tt.sets} //nolint:exhaustruct // Only Sets is relevant here.
+			if got := es.CompletionState(); got != tt.want {
+				t.Errorf("CompletionState() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSessionHasIncompleteSets(t *testing.T) {
 	t.Parallel()
 
