@@ -1,69 +1,37 @@
 {{- /* gotype: github.com/myrjola/petrapp/cmd/web.exerciseEditTemplateData */ -}}
 {{ define "page" }}
-    <main>
-        <h1>Edit Exercise: {{ .Exercise.Name }}</h1>
-        {{ if .ValidationError }}<p role="alert">{{ .ValidationError }}</p>{{ end }}
-        <form method="post" action="/admin/exercises/{{ .Exercise.ID }}">
-            <div>
-                <label for="name">Name:</label>
-                <input type="text" id="name" name="name" value="{{ .Exercise.Name }}" required>
-            </div>
+    <main class="stack">
+        {{ template "page-header" .Header }}
+        {{ template "banner" .Flash }}
+
+        <form method="post" action="/admin/exercises/{{ .Exercise.ID }}" class="card stack">
+            {{ template "field" .NameField }}
 
             <div>
                 <label for="category">Category:</label>
                 <select id="category" name="category" required>
-                    <option value="full_body" {{ if eq .Exercise.Category "full_body" }}selected{{ end }}>Full Body
-                    </option>
-                    <option value="upper" {{ if eq .Exercise.Category "upper" }}selected{{ end }}>Upper Body</option>
-                    <option value="lower" {{ if eq .Exercise.Category "lower" }}selected{{ end }}>Lower Body</option>
+                    {{ range .CategoryOptions }}
+                        <option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>
+                    {{ end }}
                 </select>
             </div>
 
             <div>
                 <label for="exercise_type">Exercise Type:</label>
                 <select id="exercise_type" name="exercise_type" required>
-                    <option value="weighted" {{ if eq .Exercise.ExerciseType "weighted" }}selected{{ end }}>Weighted
-                    </option>
-                    <option value="bodyweight" {{ if eq .Exercise.ExerciseType "bodyweight" }}selected{{ end }}>
-                        Bodyweight
-                    </option>
-                    <option value="assisted" {{ if eq .Exercise.ExerciseType "assisted" }}selected{{ end }}>
-                        Assisted
-                    </option>
-                    <option value="time_based" {{ if eq .Exercise.ExerciseType "time_based" }}selected{{ end }}>
-                        Time-based
-                    </option>
+                    {{ range .TypeOptions }}
+                        <option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>
+                    {{ end }}
                 </select>
             </div>
 
-            <div id="default-starting-seconds-field"{{ if ne .Exercise.ExerciseType "time_based" }} hidden{{ end }}>
-                <label for="default_starting_seconds">Default Starting Seconds:</label>
-                <input type="number"
-                       id="default_starting_seconds"
-                       name="default_starting_seconds"
-                       min="1"
-                       value="{{ .DefaultStartingSecondsValue }}"
-                       {{ if eq .Exercise.ExerciseType "time_based" }}required{{ end }}>
-                <small>Number of seconds to hold on the first set for new users.</small>
+            <div id="default-starting-seconds-field"{{ if not .Exercise.IsTimed }} hidden{{ end }}>
+                {{ template "field" .SecondsField }}
             </div>
 
-            <div id="rep-window-field"{{ if eq .Exercise.ExerciseType "time_based" }} hidden{{ end }}>
-                <label for="rep_min">Min Reps:</label>
-                <input type="number"
-                       id="rep_min"
-                       name="rep_min"
-                       min="1"
-                       max="50"
-                       value="{{ .RepMinValue }}"
-                       {{ if ne .Exercise.ExerciseType "time_based" }}required{{ end }}>
-                <label for="rep_max">Max Reps:</label>
-                <input type="number"
-                       id="rep_max"
-                       name="rep_max"
-                       min="1"
-                       max="50"
-                       value="{{ .RepMaxValue }}"
-                       {{ if ne .Exercise.ExerciseType "time_based" }}required{{ end }}>
+            <div id="rep-window-field"{{ if .Exercise.IsTimed }} hidden{{ end }}>
+                {{ template "field" .RepMinField }}
+                {{ template "field" .RepMaxField }}
                 <small>Target rep range per set (1–50).</small>
             </div>
 
