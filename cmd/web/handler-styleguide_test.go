@@ -55,4 +55,15 @@ func Test_application_styleguide(t *testing.T) {
 	if doc.Find(".banner.banner--success").Length() == 0 {
 		t.Error("expected a .banner--success example on the styleguide")
 	}
+
+	// Page-header component.
+	if doc.Find("h2:contains('Page header')").Length() == 0 {
+		t.Error("expected a 'Page header' section")
+	}
+	if doc.Find(".page-header h1").Length() == 0 {
+		t.Error("expected the page-header example to contain an h1")
+	}
+	if doc.Find(".page-header .page-header-subtitle").Length() == 0 {
+		t.Error("expected the page-header example to contain a subtitle")
+	}
 }

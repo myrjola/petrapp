@@ -1,0 +1,37 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.PageHeaderData*/ -}}
+{{- /*
+    page-header: a page's single <h1> block with an optional subtitle.
+    Dot: cmd/web.PageHeaderData. Pages render any meta or badges as
+    siblings after this component, not inside it.
+
+    Usage:
+        {{ template "page-header" .Header }}
+*/ -}}
+{{- define "page-header" -}}
+    <style {{ nonce }}>
+        @scope (.page-header) {
+            :scope {
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-1);
+            }
+
+            h1 {
+                font-size: var(--font-size-5);
+                font-weight: var(--font-weight-7);
+                color: var(--color-text-primary);
+            }
+
+            .page-header-subtitle {
+                color: var(--color-text-secondary);
+                font-size: var(--font-size-2);
+            }
+        }
+    </style>
+    <header class="page-header">
+        <h1>{{ .Title }}</h1>
+        {{- if .Subtitle }}
+            <p class="page-header-subtitle">{{ .Subtitle }}</p>
+        {{- end }}
+    </header>
+{{- end }}

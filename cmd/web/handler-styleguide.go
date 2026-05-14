@@ -40,6 +40,8 @@ type styleguideTemplateData struct {
 	Radii          []string
 	// BannerExamples drives the Banner section of the styleguide.
 	BannerExamples []BannerData
+	// PageHeaderExample drives the Page header section of the styleguide.
+	PageHeaderExample PageHeaderData
 }
 
 // styleguideGET renders the design-token reference page.
@@ -104,6 +106,10 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 			{Variant: "error", Message: "Something went wrong. Please try again."},
 			{Variant: "success", Message: "Your changes have been saved."},
 			{Variant: "info", Message: "Heads up — this is informational."},
+		},
+		PageHeaderExample: PageHeaderData{
+			Title:    "Page title",
+			Subtitle: "An optional subtitle that explains the page.",
 		},
 	}
 	app.render(w, r, http.StatusOK, "styleguide", data)
