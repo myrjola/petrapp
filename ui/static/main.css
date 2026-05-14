@@ -13,14 +13,14 @@
 
     html, body {
         height: 100%;
-        color: var(--gray-9);
-        background: var(--white)
+        color: var(--color-text-primary);
+        background: var(--color-surface);
     }
 
     body {
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
-        font-family: var(--font-serif);
+        font-family: var(--font-sans);
     }
 
     img, picture, video, canvas, svg {
