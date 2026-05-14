@@ -363,6 +363,17 @@
         </section>
 
         <section>
+            <h2>Field</h2>
+            <div class="component-sample">
+                <div class="stack">
+                    {{ range .FieldExamples }}
+                        {{ template "field" . }}
+                    {{ end }}
+                </div>
+            </div>
+        </section>
+
+        <section>
             <h2>Components</h2>
 
             <h3>Buttons</h3>

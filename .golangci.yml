@@ -120,6 +120,7 @@ linters:
         - ^github.com/playwright-community/playwright-go\..+Options$
         - ^github.com/playwright-community/playwright-go\..+Values$
         - ^github.com/openai/openai-go/v3.ChatCompletionNewParams$
+        - ^github.com/myrjola/petrapp/cmd/web.FieldData$
     funlen:
       lines: 100
       statements: 50

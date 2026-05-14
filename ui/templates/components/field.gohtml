@@ -1,0 +1,60 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.FieldData*/ -}}
+{{- /*
+    field: a labelled single text input with native-validation passthrough.
+    Dot: cmd/web.FieldData. Guarantees the <label for> ↔ <input id> binding
+    and the aria-describedby → hint wiring so callers cannot forget them.
+    Covers single <input> fields only; <select>, <textarea> and checkbox or
+    radio groups stay as inline markup.
+
+    Usage:
+        {{ template "field" .NameField }}
+*/ -}}
+{{- define "field" -}}
+    <style {{ nonce }}>
+        @scope (.field) {
+            :scope {
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-1);
+            }
+
+            label {
+                font-weight: var(--font-weight-6);
+                color: var(--color-text-primary);
+            }
+
+            input {
+                padding: var(--size-2);
+                border: var(--border-size-1) solid var(--color-border);
+                border-radius: var(--radius-2);
+                background: var(--color-surface-elevated);
+            }
+
+            input:focus-visible {
+                outline: var(--color-border-focus) solid 2px;
+                outline-offset: 1px;
+            }
+
+            .field-hint {
+                font-size: var(--font-size-0);
+                color: var(--color-text-secondary);
+            }
+        }
+    </style>
+    <div class="field">
+        <label for="{{ .Name }}">{{ .Label }}</label>
+        <input id="{{ .Name }}"
+               name="{{ .Name }}"
+               type="{{ .Type }}"
+               value="{{ .Value }}"
+               {{- if .Required }} required{{ end }}
+               {{- if .Hint }} aria-describedby="{{ .Name }}-hint"{{ end }}
+               {{- if .Min }} min="{{ .Min }}"{{ end }}
+               {{- if .Max }} max="{{ .Max }}"{{ end }}
+               {{- if .Step }} step="{{ .Step }}"{{ end }}
+               {{- if .Pattern }} pattern="{{ .Pattern }}"{{ end }}/>
+        {{- if .Hint }}
+            <span id="{{ .Name }}-hint" class="field-hint">{{ .Hint }}</span>
+        {{- end }}
+    </div>
+{{- end }}

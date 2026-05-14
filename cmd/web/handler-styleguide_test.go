@@ -66,4 +66,27 @@ func Test_application_styleguide(t *testing.T) {
 	if doc.Find(".page-header .page-header-subtitle").Length() == 0 {
 		t.Error("expected the page-header example to contain a subtitle")
 	}
+
+	// Field component — the label/input binding is the guarantee under test.
+	if doc.Find("h2:contains('Field')").Length() == 0 {
+		t.Error("expected a 'Field' section")
+	}
+	fieldInput := doc.Find(".field input").First()
+	if fieldInput.Length() == 0 {
+		t.Fatal("expected the field example to contain an input")
+	}
+	inputID, _ := fieldInput.Attr("id")
+	if inputID == "" {
+		t.Error("expected the field input to have an id")
+	}
+	if doc.Find(".field label[for='"+inputID+"']").Length() == 0 {
+		t.Errorf("expected a label bound to the input id %q", inputID)
+	}
+	describedBy, hasDescribedBy := fieldInput.Attr("aria-describedby")
+	if !hasDescribedBy {
+		t.Error("expected the field input to have aria-describedby (example has a hint)")
+	}
+	if describedBy != "" && doc.Find("#"+describedBy).Length() == 0 {
+		t.Errorf("expected an element with id %q for aria-describedby", describedBy)
+	}
 }

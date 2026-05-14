@@ -42,6 +42,8 @@ type styleguideTemplateData struct {
 	BannerExamples []BannerData
 	// PageHeaderExample drives the Page header section of the styleguide.
 	PageHeaderExample PageHeaderData
+	// FieldExamples drives the Field section of the styleguide.
+	FieldExamples []FieldData
 }
 
 // styleguideGET renders the design-token reference page.
@@ -110,6 +112,24 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		PageHeaderExample: PageHeaderData{
 			Title:    "Page title",
 			Subtitle: "An optional subtitle that explains the page.",
+		},
+		FieldExamples: []FieldData{
+			{
+				Label:    "Exercise name",
+				Name:     "styleguide-name",
+				Type:     "text",
+				Required: true,
+				Hint:     "Shown to you when picking exercises.",
+			},
+			{
+				Label: "Target reps",
+				Name:  "styleguide-reps",
+				Type:  "number",
+				Value: "8",
+				Min:   "1",
+				Max:   "30",
+				Step:  "1",
+			},
 		},
 	}
 	app.render(w, r, http.StatusOK, "styleguide", data)
