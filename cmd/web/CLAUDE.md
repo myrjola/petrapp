@@ -110,6 +110,26 @@ if fieldValue == "" {
 - Handle business errors with appropriate user-facing responses
 - Let service layer handle business validation, handlers handle HTTP concerns
 
+### User-facing validation errors
+
+Validation failures that should be shown to the user (not 500s) flow through
+`domain.ValidationError`:
+
+1. Domain/service code returns a `domain.ValidationError{Message: "..."}` —
+   the `Message` is safe to display verbatim.
+2. The handler detects it with `errors.As`, calls
+   `app.putFlashError(r.Context(), ve.Message)`, and redirects to the form
+   with `redirect(w, r, formPath)`.
+3. The form's GET handler pops the flash with `app.popFlashError(...)` and
+   passes it to the template as a `BannerData{Variant: "error", Message: ...}`.
+4. The form template renders it with `{{ template "banner" .Flash }}`.
+
+This keeps the stack-navigator wire protocol uniform (a `200 + X-Location`
+back to the form URL) — see `docs/superpowers/specs/2026-05-14-frontend-foundation-design.md`.
+Native HTML validation attributes (`required`, `min`, `pattern`, …) handle the
+client-side field UX; the `field` component passes them through. There is no
+per-field server-side error channel and no submitted-value preservation.
+
 ## Redirects and Navigation
 
 ### Using redirect() and redirectReplace()

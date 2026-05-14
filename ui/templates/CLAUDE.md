@@ -55,14 +55,53 @@ Guidelines for working with Go templates, CSS architecture, and design systems i
 - Prefer small, presentational components (anchors, buttons, banners) over wrappers that try to capture layout
 - If two candidate usages differ in more than trivial attributes (label wording, icon presence), consider whether they're really the same component or just look similar
 
-### Current Components
+### Component delivery — the guarantee-based split
 
-- `back-link` — canonical "← Back" anchor wired into the Navigation API via `data-back-button`. Takes an href string as the dot.
+A component's delivery mechanism is decided by what it must *guarantee*:
+
+- **Go partial** (`components/*.gohtml`, colocated `@scope` `<style>`) — for
+  pieces that enforce accessibility or structure: `field`, `banner`,
+  `page-header`, `back-link`. The caller passes a small dot and cannot forget
+  the a11y wiring. Dot structs live in `cmd/web/components.go`.
+- **CSS class** (`main.css @layer components`) — for pure-paint pieces on a
+  semantic element: `button`/`.btn`, `.badge`, `.card`. These compose freely
+  and have zero per-render cost.
+- **Layout primitive class** (`main.css @layer layout`) — `.stack`, `.cluster`,
+  `.grid-auto`, `.center`. Reach for these before writing
+  `display:flex; gap:…` in a scoped block.
+- **Inline scoped `<style>`** — the escape hatch for genuinely page-specific
+  composition. Still fine; just not the first reach for layout or for the
+  pieces above.
+
+### Current components
+
+**Partials** (call via `{{ template "name" <dot> }}`):
+
+- `back-link` — "← Back" anchor wired to the Navigation API. Dot: an href
+  string.
   ```gohtml
   {{ template "back-link" "/" }}
   {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
   ```
-  Self-contained: styles live in the component file as a scoped `<style {{ nonce }}>` block.
+- `banner` — server-message display (flash errors, notices). Dot:
+  `cmd/web.BannerData` (`Variant` ∈ `error`/`success`/`info`, `Message`).
+  Renders nothing when `Message` is empty.
+- `page-header` — a page's single `<h1>` with optional subtitle. Dot:
+  `cmd/web.PageHeaderData` (`Title`, `Subtitle`). Render meta/badges as
+  siblings after it, not inside it.
+- `field` — a labelled single text input; guarantees the `<label for>` ↔
+  `<input id>` binding and `aria-describedby` → hint wiring. Dot:
+  `cmd/web.FieldData`. Covers `<input>` only — `<select>`, `<textarea>` and
+  checkbox/radio groups stay as inline markup.
+
+**Class-components** (`main.css @layer components`): `.btn`/`button`,
+`.badge` (+ `--success`/`--warning`/`--neutral`/`--info`), `.card`.
+
+**Layout primitives** (`main.css @layer layout`): `.stack`, `.cluster`,
+`.grid-auto`, `.center`.
+
+The `/dev/styleguide` page is the living catalog — add an entry there for any
+new component, and assert it in `cmd/web/handler-styleguide_test.go`.
 
 ### Styling Components
 
