@@ -322,28 +322,28 @@
         font-weight: var(--font-weight-6);
         text-transform: uppercase;
         letter-spacing: var(--font-letterspacing-2);
-        background: var(--gray-2);
-        color: var(--gray-9);
+        background: var(--stone-2);
+        color: var(--stone-9);
     }
 
     .badge--success {
-        background: var(--lime-2);
-        color: var(--lime-9);
+        background: var(--color-success-bg);
+        color: var(--color-success);
     }
 
     .badge--warning {
-        background: var(--yellow-2);
-        color: var(--yellow-11);
+        background: var(--color-warning-bg);
+        color: var(--color-warning);
     }
 
     .badge--neutral {
-        background: var(--gray-2);
-        color: var(--gray-9);
+        background: var(--stone-2);
+        color: var(--stone-8);
     }
 
     .badge--info {
-        background: var(--sky-1);
-        color: var(--sky-9);
+        background: var(--color-info-bg);
+        color: var(--color-info);
     }
 
     .card {
