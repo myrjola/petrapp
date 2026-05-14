@@ -1,80 +1,48 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseInfoTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
+    <main class="stack">
         <style {{ nonce }}>
             @scope {
                 :scope {
                     margin: var(--size-4);
-                    display: flex;
-                    flex-direction: column;
                     gap: var(--size-6);
+                }
+
+                .page-header h1 {
+                    view-transition-name: exercise-title-{{ .Exercise.ID }};
+                }
+
+                .admin-edit {
+                    align-self: flex-start;
+                    background: var(--yellow-2);
+                    color: var(--yellow-8);
+                    text-decoration: none;
+                    padding: var(--size-1) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-0);
+                    font-weight: var(--font-weight-6);
+                }
+
+                .admin-edit:hover {
+                    background: var(--yellow-3);
                 }
             }
         </style>
 
-        <header>
+        {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
+        {{ template "page-header" .Header }}
+        {{ if .IsAdmin }}
+            <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
+        {{ end }}
+
+        <div class="exercise-info stack">
             <style {{ nonce }}>
-                @scope {
+                @scope (.exercise-info) {
                     :scope {
-                        display: flex;
-                        gap: var(--size-3);
-                        align-items: center;
-
-                        a {
-                            color: var(--gray-7);
-                            text-decoration: none;
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-2);
-                            padding: var(--size-2);
-                            border-radius: var(--radius-2);
-
-                            &:hover {
-                                background: var(--gray-1);
-                            }
-                        }
-
-                        h1 {
-                            font-size: var(--font-size-4);
-                            font-weight: var(--font-weight-6);
-                            view-transition-name: exercise-title-{{ .Exercise.ID }};
-                        }
-
-                        .admin-edit {
-                            margin-left: auto;
-                            background: var(--yellow-2);
-                            color: var(--yellow-8);
-                            padding: var(--size-1) var(--size-3);
-                            border-radius: var(--radius-2);
-                            font-size: var(--font-size-0);
-                            font-weight: var(--font-weight-6);
-
-                            &:hover {
-                                background: var(--yellow-3);
-                            }
-                        }
-                    }
-                }
-            </style>
-            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
-            <h1>{{ .Exercise.Name }}</h1>
-            {{ if .IsAdmin }}
-                <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
-            {{ end }}
-        </header>
-
-        <div class="exercise-info">
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        display: flex;
-                        flex-direction: column;
                         gap: var(--size-5);
 
                         .section {
-                            display: flex;
-                            flex-direction: column;
                             gap: var(--size-2);
                         }
 
@@ -82,12 +50,6 @@
                             font-weight: var(--font-weight-6);
                             color: var(--gray-8);
                             font-size: var(--font-size-2);
-                        }
-
-                        .muscle-groups {
-                            display: flex;
-                            flex-wrap: wrap;
-                            gap: var(--size-2);
                         }
 
                         .muscle-group {
@@ -119,24 +81,14 @@
                 }
             </style>
 
-            <div class="section">
+            <div class="section stack">
                 <div class="section-title">Category</div>
-                <div class="category-badge">
-                    {{ if eq .Exercise.Category "full_body" }}
-                        Full Body
-                    {{ else if eq .Exercise.Category "upper" }}
-                        Upper Body
-                    {{ else if eq .Exercise.Category "lower" }}
-                        Lower Body
-                    {{ else }}
-                        {{ .Exercise.Category }}
-                    {{ end }}
-                </div>
+                <div class="category-badge">{{ .Exercise.Category.Label }}</div>
             </div>
 
-            <div class="section">
+            <div class="section stack">
                 <div class="section-title">Primary Muscle Groups</div>
-                <div class="muscle-groups">
+                <div class="muscle-groups cluster">
                     {{ range .Exercise.PrimaryMuscleGroups }}
                         <span class="muscle-group primary">{{ . }}</span>
                     {{ end }}
@@ -144,9 +96,9 @@
             </div>
 
             {{ if .Exercise.SecondaryMuscleGroups }}
-                <div class="section">
+                <div class="section stack">
                     <div class="section-title">Secondary Muscle Groups</div>
-                    <div class="muscle-groups">
+                    <div class="muscle-groups cluster">
                         {{ range .Exercise.SecondaryMuscleGroups }}
                             <span class="muscle-group">{{ . }}</span>
                         {{ end }}
@@ -154,7 +106,7 @@
                 </div>
             {{ end }}
 
-            <div class="section">
+            <div class="section stack">
                 {{ mdToHTML .Exercise.DescriptionMarkdown }}
             </div>
         </div>

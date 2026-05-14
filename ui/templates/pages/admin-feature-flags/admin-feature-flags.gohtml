@@ -1,7 +1,7 @@
 {{- /* gotype: github.com/myrjola/petrapp/cmd/web.featureFlagsAdminTemplateData */ -}}
 {{ define "page" }}
-    <main>
-        <h1>Feature Flags Administration</h1>
+    <main class="stack">
+        {{ template "page-header" .Header }}
         {{ if not .Authenticated }}
             <section>
                 <p>You need to be signed in as an administrator to manage feature flags.</p>
@@ -38,9 +38,9 @@
                             <td>{{ .Name }}</td>
                             <td>
                                 {{ if .Enabled }}
-                                    <span>Enabled</span>
+                                    <span class="badge badge--success">Enabled</span>
                                 {{ else }}
-                                    <span>Disabled</span>
+                                    <span class="badge badge--neutral">Disabled</span>
                                 {{ end }}
                             </td>
                             <td>

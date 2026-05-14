@@ -253,6 +253,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	data := exerciseSwapTemplateData{
 		BaseTemplateData:    newBaseTemplateData(r),
 		Date:                date,
+		Header:              PageHeaderData{Title: "Swap Exercise", Subtitle: ""},
 		WorkoutExerciseID:   workoutExerciseID,
 		CurrentExercise:     currentSlot.Exercise,
 		CompatibleExercises: compatibleExercises,
@@ -305,6 +306,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 type exerciseSwapTemplateData struct {
 	BaseTemplateData
 	Date                time.Time
+	Header              PageHeaderData
 	WorkoutExerciseID   int
 	CurrentExercise     domain.Exercise
 	CompatibleExercises []domain.Exercise
@@ -315,6 +317,7 @@ type exerciseSwapTemplateData struct {
 type exerciseAddTemplateData struct {
 	BaseTemplateData
 	Date      time.Time
+	Header    PageHeaderData
 	Exercises []domain.Exercise
 	Query     string
 }
@@ -365,8 +368,12 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	data := exerciseAddTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
-		Exercises:        availableExercises, // Use filtered exercises instead of all exercises
-		Query:            query,
+		Header: PageHeaderData{
+			Title:    "Add Exercise",
+			Subtitle: "",
+		},
+		Exercises: availableExercises, // Use filtered exercises instead of all exercises
+		Query:     query,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-add", data)

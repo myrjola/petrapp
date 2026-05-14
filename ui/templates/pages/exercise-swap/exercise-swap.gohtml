@@ -1,54 +1,22 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSwapTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
+    <main class="stack">
         <style {{ nonce }}>
             @scope {
                 :scope {
                     margin: var(--size-4);
-                    display: flex;
-                    flex-direction: column;
                     gap: var(--size-6);
                 }
             }
         </style>
 
-        <header>
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        display: flex;
-                        gap: var(--size-3);
-                        align-items: center;
-
-                        a {
-                            color: var(--gray-7);
-                            text-decoration: none;
-                            display: flex;
-                            align-items: center;
-                            gap: var(--size-2);
-                            padding: var(--size-2);
-                            border-radius: var(--radius-2);
-
-                            &:hover {
-                                background: var(--gray-1);
-                            }
-                        }
-
-                        h1 {
-                            font-size: var(--font-size-4);
-                            font-weight: var(--font-weight-6);
-                        }
-                    }
-                }
-            </style>
-            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
-            <h1>Swap Exercise</h1>
-        </header>
+        {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
+        {{ template "page-header" .Header }}
 
         <section class="current-exercise">
             <style {{ nonce }}>
-                @scope {
+                @scope (.current-exercise) {
                     :scope {
                         background: var(--gray-1);
                         padding: var(--size-3);
@@ -60,8 +28,6 @@
                         }
 
                         .exercise-details {
-                            display: flex;
-                            flex-direction: column;
                             gap: var(--size-1);
                         }
 
@@ -78,13 +44,9 @@
                 }
             </style>
             <h2>Current Exercise</h2>
-            <div class="exercise-details">
+            <div class="exercise-details stack">
                 <div class="name">{{ .CurrentExercise.Name }}</div>
-                <div class="category">
-                    {{ if eq .CurrentExercise.Category "full_body" }}Full Body{{ end }}
-                    {{ if eq .CurrentExercise.Category "upper" }}Upper Body{{ end }}
-                    {{ if eq .CurrentExercise.Category "lower" }}Lower Body{{ end }}
-                </div>
+                <div class="category">{{ .CurrentExercise.Category.Label }}</div>
                 <div class="muscle-groups">
                     Primary: {{ range $i, $g := .CurrentExercise.PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
                 </div>
@@ -93,25 +55,18 @@
 
         <section class="exercise-search">
             <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        form {
-                            display: flex;
-                            gap: var(--size-2);
-                        }
-
-                        input[type="search"] {
-                            flex: 1;
-                            padding: var(--size-2) var(--size-3);
-                            border: 1px solid var(--gray-3);
-                            border-radius: var(--radius-2);
-                            font-size: var(--font-size-1);
-                            background: var(--white);
-                        }
+                @scope (.exercise-search) {
+                    input[type="search"] {
+                        flex: 1;
+                        padding: var(--size-2) var(--size-3);
+                        border: 1px solid var(--gray-3);
+                        border-radius: var(--radius-2);
+                        font-size: var(--font-size-1);
+                        background: var(--white);
                     }
                 }
             </style>
-            <form method="get" role="search">
+            <form method="get" role="search" class="cluster">
                 <label for="exercise-search-q" class="sr-only">Search exercises</label>
                 <input id="exercise-search-q"
                        type="search"
@@ -126,7 +81,7 @@
 
         <section class="alternative-exercises">
             <style {{ nonce }}>
-                @scope {
+                @scope (.alternative-exercises) {
                     :scope {
                         h2 {
                             font-size: var(--font-size-2);
@@ -134,16 +89,7 @@
                         }
 
                         .alternatives-list {
-                            display: flex;
-                            flex-direction: column;
                             gap: var(--size-3);
-                        }
-
-                        .exercise-option {
-                            background: var(--white);
-                            border: 1px solid var(--gray-3);
-                            border-radius: var(--radius-2);
-                            padding: var(--size-3);
                         }
 
                         .exercise-name {
@@ -186,17 +132,13 @@
             </style>
             <h2>Choose Alternative Exercise</h2>
 
-            <div class="alternatives-list">
+            <div class="alternatives-list stack">
                 {{ if .CompatibleExercises }}
                 {{ range .CompatibleExercises }}
-                    <div class="exercise-option">
+                    <div class="exercise-option card">
                         <div class="exercise-name">{{ .Name }}</div>
                         <div class="option-details">
-                            <div class="category">
-                                {{ if eq .Category "full_body" }}Full Body{{ end }}
-                                {{ if eq .Category "upper" }}Upper Body{{ end }}
-                                {{ if eq .Category "lower" }}Lower Body{{ end }}
-                            </div>
+                            <div class="category">{{ .Category.Label }}</div>
                             <div class="muscle-groups">
                                 Primary: {{ range $i, $g := .PrimaryMuscleGroups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}
                             </div>

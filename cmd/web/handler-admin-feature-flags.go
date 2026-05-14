@@ -10,6 +10,7 @@ import (
 // featureFlagsAdminTemplateData contains data for the feature flags admin template.
 type featureFlagsAdminTemplateData struct {
 	BaseTemplateData
+	Header       PageHeaderData
 	FeatureFlags []domain.FeatureFlag
 }
 
@@ -24,7 +25,11 @@ func (app *application) adminFeatureFlagsGET(w http.ResponseWriter, r *http.Requ
 
 	data := featureFlagsAdminTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
-		FeatureFlags:     flags,
+		Header: PageHeaderData{
+			Title:    "Feature Flags Administration",
+			Subtitle: "",
+		},
+		FeatureFlags: flags,
 	}
 
 	app.render(w, r, http.StatusOK, "admin-feature-flags", data)

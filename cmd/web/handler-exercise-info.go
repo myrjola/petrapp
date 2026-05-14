@@ -20,6 +20,7 @@ import (
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
 	Date              time.Time
+	Header            PageHeaderData
 	WorkoutExerciseID int
 	Exercise          domain.Exercise
 	IsAdmin           bool
@@ -70,8 +71,12 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	isAdmin := contexthelpers.IsAdmin(r.Context())
 
 	data := exerciseInfoTemplateData{
-		BaseTemplateData:  newBaseTemplateData(r),
-		Date:              date,
+		BaseTemplateData: newBaseTemplateData(r),
+		Date:             date,
+		Header: PageHeaderData{
+			Title:    exercise.Name,
+			Subtitle: "",
+		},
 		WorkoutExerciseID: workoutExerciseID,
 		Exercise:          exercise,
 		IsAdmin:           isAdmin,
