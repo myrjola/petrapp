@@ -10,6 +10,8 @@ import (
 // `mnd` (magic-number-detector) doesn't flag them as bare literals.
 const (
 	scaleGrayMax       = 10
+	scaleStoneMax      = 10
+	scaleClayMax       = 6
 	scaleSkyMax        = 10
 	scaleLimeMax       = 10
 	scaleRedMax        = 12
@@ -24,6 +26,8 @@ const (
 type styleguideTemplateData struct {
 	BaseTemplateData
 	Grays          []string
+	Stones         []string
+	Clays          []string
 	Skies          []string
 	Limes          []string
 	Reds           []string
@@ -63,6 +67,8 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	grays := rangeNames("gray", 0, scaleGrayMax)
+	stones := rangeNames("stone", 0, scaleStoneMax)
+	clays := rangeNames("clay", 0, scaleClayMax)
 	skies := rangeNames("sky", 0, scaleSkyMax)
 	limes := rangeNames("lime", 0, scaleLimeMax)
 	reds := rangeNames("red", 0, scaleRedMax)
@@ -79,11 +85,19 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		"color-text-muted",
 		"color-success",
 		"color-success-bg",
+		"color-warning",
+		"color-warning-bg",
+		"color-error",
+		"color-error-bg",
 		"color-info",
 		"color-info-bg",
+		"ember",
 	}
-	colorTokens := make([]string, 0, len(grays)+len(skies)+len(limes)+len(reds)+len(yellows)+len(semantics))
+	colorTokens := make([]string, 0,
+		len(grays)+len(stones)+len(clays)+len(skies)+len(limes)+len(reds)+len(yellows)+len(semantics))
 	colorTokens = append(colorTokens, grays...)
+	colorTokens = append(colorTokens, stones...)
+	colorTokens = append(colorTokens, clays...)
 	colorTokens = append(colorTokens, skies...)
 	colorTokens = append(colorTokens, limes...)
 	colorTokens = append(colorTokens, reds...)
@@ -93,6 +107,8 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 	data := styleguideTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Grays:            grays,
+		Stones:           stones,
+		Clays:            clays,
 		Skies:            skies,
 		Limes:            limes,
 		Reds:             reds,

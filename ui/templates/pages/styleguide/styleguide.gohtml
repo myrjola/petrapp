@@ -180,7 +180,27 @@
         <section>
             <h2>Colors</h2>
 
-            <h3>Gray</h3>
+            <h3>Stone</h3>
+            <div class="color-grid">
+                {{ range $name := .Stones }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Clay (primary accent)</h3>
+            <div class="color-grid">
+                {{ range $name := .Clays }}
+                    <div class="swatch">
+                        <div class="swatch-color bg-{{ $name }}"></div>
+                        <div class="swatch-label">--{{ $name }}</div>
+                    </div>
+                {{ end }}
+            </div>
+
+            <h3>Gray (transitional — aliased onto Stone, removed in a later increment)</h3>
             <div class="color-grid">
                 {{ range $name := .Grays }}
                     <div class="swatch">
