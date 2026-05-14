@@ -154,3 +154,46 @@ func (e Exercise) FormatSetDescription(set Set) string {
 		return ""
 	}
 }
+
+// Validate reports whether the exercise's fields form a persistable record.
+// It returns a ValidationError carrying a user-facing message on the first
+// rule it fails, and nil when every rule passes. It is the single source of
+// truth for exercise-form validation; handlers detect the ValidationError
+// with errors.As and surface it via the flash + banner flow. Validate checks
+// only that the populated fields are valid and that the fields required for
+// the exercise type are present — it does not cross-check that a timed
+// exercise lacks a rep window, because handler struct-shaping guarantees it.
+func (e Exercise) Validate() error {
+	const (
+		repBoundMin = 1
+		repBoundMax = 50
+	)
+	if e.Name == "" {
+		return ValidationError{Message: "Name is required."}
+	}
+	if !e.Category.IsValid() {
+		return ValidationError{Message: "Category must be one of full body, upper, or lower."}
+	}
+	if !e.ExerciseType.IsValid() {
+		return ValidationError{Message: "Exercise type must be weighted, bodyweight, assisted, or time_based."}
+	}
+	if e.IsTimed() && (e.DefaultStartingSeconds == nil || *e.DefaultStartingSeconds <= 0) {
+		return ValidationError{
+			Message: "Default starting seconds must be a positive integer for time-based exercises.",
+		}
+	}
+	if len(e.PrimaryMuscleGroups) == 0 {
+		return ValidationError{Message: "At least one primary muscle group is required."}
+	}
+	if !e.IsTimed() {
+		if e.RepMin == nil || e.RepMax == nil ||
+			*e.RepMin < repBoundMin || *e.RepMin > repBoundMax ||
+			*e.RepMax < repBoundMin || *e.RepMax > repBoundMax {
+			return ValidationError{Message: "Min and max reps must be whole numbers between 1 and 50."}
+		}
+		if *e.RepMin > *e.RepMax {
+			return ValidationError{Message: "Min reps must be less than or equal to max reps."}
+		}
+	}
+	return nil
+}

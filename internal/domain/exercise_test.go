@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -254,6 +255,106 @@ func Test_Exercise_SetValueUnit(t *testing.T) {
 			if got != tc.want {
 				t.Errorf("Exercise{%s}.SetValueUnit() = %q, want %q",
 					tc.exercise.ExerciseType, got, tc.want)
+			}
+		})
+	}
+}
+
+func Test_Exercise_Validate(t *testing.T) {
+	intPtr := func(n int) *int { return &n }
+	validWeighted := func() domain.Exercise {
+		return domain.Exercise{ //nolint:exhaustruct // test builder sets only the validated fields.
+			Name:                "Bench Press",
+			Category:            domain.CategoryUpper,
+			ExerciseType:        domain.ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"},
+			RepMin:              intPtr(5),
+			RepMax:              intPtr(10),
+		}
+	}
+	validTimed := func() domain.Exercise {
+		return domain.Exercise{ //nolint:exhaustruct // test builder sets only the validated fields.
+			Name:                   "Plank",
+			Category:               domain.CategoryFullBody,
+			ExerciseType:           domain.ExerciseTypeTime,
+			PrimaryMuscleGroups:    []string{"Core"},
+			DefaultStartingSeconds: intPtr(30),
+		}
+	}
+
+	cases := []struct {
+		name        string
+		exercise    domain.Exercise
+		wantErr     bool
+		wantMessage string
+	}{
+		{"valid weighted", validWeighted(), false, ""},
+		{"valid timed", validTimed(), false, ""},
+		{
+			"empty name",
+			func() domain.Exercise { e := validWeighted(); e.Name = ""; return e }(),
+			true, "Name is required.",
+		},
+		{
+			"invalid category",
+			func() domain.Exercise { e := validWeighted(); e.Category = domain.Category("bogus"); return e }(),
+			true, "Category must be one of full body, upper, or lower.",
+		},
+		{
+			"invalid type",
+			func() domain.Exercise { e := validWeighted(); e.ExerciseType = domain.ExerciseType("bogus"); return e }(),
+			true, "Exercise type must be weighted, bodyweight, assisted, or time_based.",
+		},
+		{
+			"timed without seconds",
+			func() domain.Exercise { e := validTimed(); e.DefaultStartingSeconds = nil; return e }(),
+			true, "Default starting seconds must be a positive integer for time-based exercises.",
+		},
+		{
+			"timed with zero seconds",
+			func() domain.Exercise { e := validTimed(); e.DefaultStartingSeconds = intPtr(0); return e }(),
+			true, "Default starting seconds must be a positive integer for time-based exercises.",
+		},
+		{
+			"no primary muscles",
+			func() domain.Exercise { e := validWeighted(); e.PrimaryMuscleGroups = nil; return e }(),
+			true, "At least one primary muscle group is required.",
+		},
+		{
+			"missing rep window",
+			func() domain.Exercise { e := validWeighted(); e.RepMin = nil; e.RepMax = nil; return e }(),
+			true, "Min and max reps must be whole numbers between 1 and 50.",
+		},
+		{
+			"rep window out of range",
+			func() domain.Exercise { e := validWeighted(); e.RepMax = intPtr(99); return e }(),
+			true, "Min and max reps must be whole numbers between 1 and 50.",
+		},
+		{
+			"rep min greater than max",
+			func() domain.Exercise { e := validWeighted(); e.RepMin = intPtr(12); e.RepMax = intPtr(8); return e }(),
+			true, "Min reps must be less than or equal to max reps.",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.exercise.Validate()
+			if !tc.wantErr {
+				if err != nil {
+					t.Errorf("Validate() = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("Validate() = nil, want error %q", tc.wantMessage)
+			}
+			var ve domain.ValidationError
+			if !errors.As(err, &ve) {
+				t.Fatalf("Validate() error is not a ValidationError: %v", err)
+			}
+			if ve.Message != tc.wantMessage {
+				t.Errorf("Validate() message = %q, want %q", ve.Message, tc.wantMessage)
 			}
 		})
 	}
