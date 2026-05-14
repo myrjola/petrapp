@@ -146,7 +146,17 @@ if ('navigation' in window) {
         if (e.userInitiated) startLoad(e.sourceElement)
     })
 
-    navigation.addEventListener('navigateerror', clearLoad)
+    navigation.addEventListener('navigateerror', (e) => {
+        // Our own form-submit handling calls preventDefault() on the navigate
+        // event, which aborts that navigation and fires navigateerror with an
+        // AbortError. That is expected — submitForm is about to drive the real
+        // navigation, so the feedback must stay up. A superseding navigation
+        // likewise aborts the one it replaces, but its startLoad() has already
+        // reset the state. Only a genuine failure, where we stay on the current
+        // document, should tear the feedback down.
+        if (e.error?.name === 'AbortError' || /abort/i.test(e.message || '')) return
+        clearLoad()
+    })
 }
 
 async function submitForm(e) {

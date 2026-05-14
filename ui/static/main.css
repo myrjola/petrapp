@@ -356,7 +356,7 @@ html:active-view-transition-type(backward) {
     background: linear-gradient(90deg, transparent, var(--sky-5), transparent);
     background-size: 40% 100%;
     background-repeat: no-repeat;
-    background-position: -40% 0;
+    background-position: -67% 0;
 }
 
 #loading-bar.active {
@@ -365,7 +365,7 @@ html:active-view-transition-type(backward) {
 }
 
 @keyframes loading-bar-slide {
-    to { background-position: 140% 0; }
+    to { background-position: 167% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
