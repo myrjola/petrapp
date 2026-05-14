@@ -17,9 +17,6 @@
             .not-found-content {
                 max-width: var(--size-15);
                 padding: var(--size-8) var(--size-6);
-                background: var(--white);
-                border-radius: var(--radius-3);
-                border: var(--border-size-1) solid var(--gray-3);
             }
 
             .not-found-title {
@@ -46,10 +43,8 @@
             }
 
             .not-found-actions {
-                display: flex;
                 gap: var(--size-3);
                 justify-content: center;
-                flex-wrap: wrap;
             }
 
             .home-link {
@@ -73,14 +68,14 @@
     </style>
 
     <div class="not-found-container">
-        <div class="not-found-content">
+        <div class="not-found-content card">
             <h1 class="not-found-title">404</h1>
             <h2 class="not-found-subtitle">Page Not Found</h2>
             <p class="not-found-message">
                 The page you're looking for doesn't exist or has been moved.
                 You can go back to the previous page or return to the home page.
             </p>
-            <div class="not-found-actions">
+            <div class="not-found-actions cluster">
                 <a href="/" class="btn home-link">Go Home</a>
                 <button type="button" class="btn back-link">
                     <span>Go Back</span>

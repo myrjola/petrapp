@@ -15,9 +15,6 @@
             .error-content {
                 max-width: var(--size-15);
                 padding: var(--size-8) var(--size-6);
-                background: var(--white);
-                border-radius: var(--radius-3);
-                border: var(--border-size-1) solid var(--gray-3);
             }
 
             .error-title {
@@ -36,10 +33,8 @@
             }
 
             .error-actions {
-                display: flex;
                 gap: var(--size-3);
                 justify-content: center;
-                flex-wrap: wrap;
             }
 
             .home-link {
@@ -54,13 +49,13 @@
     </style>
 
     <div class="error-container">
-        <div class="error-content">
+        <div class="error-content card">
             <h1 class="error-title">Something went wrong</h1>
             <p class="error-message">
                 We encountered an unexpected error while processing your request.
                 Please try again or return to the home page.
             </p>
-            <div class="error-actions">
+            <div class="error-actions cluster">
                 <button type="button">
                     <span>Retry</span>
                     <script {{ nonce }}>

@@ -1,21 +1,13 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.privacyTemplateData*/ -}}
 
 {{ define "page" }}
-    <main>
+    <main class="center">
         <style {{ nonce }}>
             @scope {
                 :scope {
                     padding: var(--size-8) var(--size-5);
                     max-width: 50rem;
-                    margin: 0 auto;
                     line-height: var(--font-lineheight-3);
-                }
-
-                h1 {
-                    font-size: var(--font-size-5);
-                    font-weight: var(--font-weight-4);
-                    margin-bottom: var(--size-6);
-                    color: var(--gray-9);
                 }
 
                 h2 {
@@ -64,7 +56,7 @@
 
         <a href="/" class="back-link">← Back to Home</a>
 
-        <h1>Privacy & Security</h1>
+        {{ template "page-header" .Header }}
 
         <h2>Authentication & Privacy</h2>
         <p>

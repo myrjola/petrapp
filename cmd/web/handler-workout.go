@@ -29,7 +29,20 @@ type workoutCompletionTemplateData struct {
 
 type workoutNotFoundTemplateData struct {
 	BaseTemplateData
-	Date time.Time
+	Date   time.Time
+	Header PageHeaderData
+}
+
+// newWorkoutNotFoundTemplateData builds the data for the workout-not-found page.
+func newWorkoutNotFoundTemplateData(r *http.Request, date time.Time) workoutNotFoundTemplateData {
+	return workoutNotFoundTemplateData{
+		BaseTemplateData: newBaseTemplateData(r),
+		Date:             date,
+		Header: PageHeaderData{
+			Title:    "Not in This Week's Plan",
+			Subtitle: "",
+		},
+	}
 }
 
 type difficultyOption struct {
@@ -94,10 +107,7 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	// Start the workout session
 	if err := app.service.StartSession(r.Context(), date); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			data := workoutNotFoundTemplateData{
-				BaseTemplateData: newBaseTemplateData(r),
-				Date:             date,
-			}
+			data := newWorkoutNotFoundTemplateData(r, date)
 			app.render(w, r, http.StatusNotFound, "workout-not-found", data)
 			return
 		}
@@ -121,10 +131,7 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Check if the workout doesn't exist
 		if errors.Is(err, domain.ErrNotFound) {
-			data := workoutNotFoundTemplateData{
-				BaseTemplateData: newBaseTemplateData(r),
-				Date:             date,
-			}
+			data := newWorkoutNotFoundTemplateData(r, date)
 			app.render(w, r, http.StatusNotFound, "workout-not-found", data)
 			return
 		}

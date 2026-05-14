@@ -110,11 +110,16 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 
 type privacyTemplateData struct {
 	BaseTemplateData
+	Header PageHeaderData
 }
 
 func (app *application) privacy(w http.ResponseWriter, r *http.Request) {
 	data := privacyTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
+		Header: PageHeaderData{
+			Title:    "Privacy & Security",
+			Subtitle: "",
+		},
 	}
 
 	app.render(w, r, http.StatusOK, "privacy", data)
