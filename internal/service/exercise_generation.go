@@ -365,6 +365,9 @@ func (eg *exerciseGenerator) validateMuscleGroups(groups []string) error {
 // In case of errors, it persists a minimal exercise that the user can fill in later.
 // The returned exercise is guaranteed to have at least Name and ID fields set.
 func (s *Service) GenerateExercise(ctx context.Context, name string) (domain.Exercise, error) {
+	if name == "" {
+		return domain.Exercise{}, domain.ValidationError{Message: "Exercise name is required."}
+	}
 	exercise := s.generateExerciseContent(ctx, name)
 
 	persisted, err := s.repos.Exercises.Create(ctx, exercise)

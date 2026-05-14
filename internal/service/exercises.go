@@ -28,8 +28,11 @@ func (s *Service) GetExercise(ctx context.Context, id int) (domain.Exercise, err
 	return exercise, nil
 }
 
-// UpdateExercise updates an existing exercise.
+// UpdateExercise validates an exercise and updates the existing record.
 func (s *Service) UpdateExercise(ctx context.Context, ex domain.Exercise) error {
+	if err := ex.Validate(); err != nil {
+		return fmt.Errorf("validate exercise: %w", err)
+	}
 	if err := s.repos.Exercises.Update(ctx, ex.ID, func(oldEx *domain.Exercise) error {
 		*oldEx = ex
 		return nil

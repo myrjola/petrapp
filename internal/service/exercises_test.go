@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -144,6 +145,56 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 
 	if countAfter != countBefore {
 		t.Errorf("Expected %d exercise sets after update, got %d", countBefore, countAfter)
+	}
+}
+
+func Test_UpdateExercise_RejectsInvalidExercise(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create test database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	svc := service.NewService(db, logger, "")
+
+	invalid := domain.Exercise{ //nolint:exhaustruct // intentionally invalid: empty name.
+		ID:           1,
+		Category:     domain.CategoryUpper,
+		ExerciseType: domain.ExerciseTypeWeighted,
+	}
+	err = svc.UpdateExercise(ctx, invalid)
+	if err == nil {
+		t.Fatal("UpdateExercise() = nil, want ValidationError")
+	}
+	var ve domain.ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("UpdateExercise() error is not a ValidationError: %v", err)
+	}
+	if ve.Message != "Name is required." {
+		t.Errorf("message = %q, want %q", ve.Message, "Name is required.")
+	}
+}
+
+func Test_GenerateExercise_RejectsEmptyName(t *testing.T) {
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create test database: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	svc := service.NewService(db, logger, "")
+
+	_, err = svc.GenerateExercise(ctx, "")
+	if err == nil {
+		t.Fatal("GenerateExercise(\"\") = nil, want ValidationError")
+	}
+	var ve domain.ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("GenerateExercise(\"\") error is not a ValidationError: %v", err)
 	}
 }
 
