@@ -1,4 +1,4 @@
-{{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.dayData*/ -}}
 
 {{ define "day-cards" }}
     <style {{ nonce }}>
@@ -7,10 +7,6 @@
                 display: flex;
                 flex-direction: column;
                 gap: var(--size-2);
-                border: 1px solid var(--gray-3);
-                border-radius: var(--radius-3);
-                padding: var(--size-4);
-                background: var(--gray-0);
                 transition: all 0.2s ease;
 
                 &[data-status="today"] {
@@ -107,16 +103,11 @@
                     font-weight: var(--font-weight-6);
                 }
             }
-
-            .workout-actions {
-                display: flex;
-                gap: var(--size-2);
-            }
         }
     </style>
 
     {{ range .Days }}
-        <div class="day-card" data-status="{{ .Status }}">
+        <div class="day-card card" data-status="{{ .Status }}">
             <div class="day-header">
                 <div>
                     <div class="day-title">
@@ -131,12 +122,11 @@
 
             {{ template "progress-bar" . }}
 
-            <div class="workout-actions">
+            <div class="workout-actions cluster">
                 {{ if .Action }}
                     {{ if .Action.StartWorkout }}
                         <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                            <button type="submit"
-                                    class="{{ if eq .Status "unscheduled" }}btn-secondary{{ else }}btn-primary{{ end }}">
+                            <button type="submit">
                                 {{ .Action.Label }}
                             </button>
                         </form>
