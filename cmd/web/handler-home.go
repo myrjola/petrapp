@@ -48,6 +48,8 @@ func isWorkoutScheduled(date time.Time, preferences domain.Preferences) bool {
 
 type homeTemplateData struct {
 	BaseTemplateData
+	// Header is the page-header dot for the authenticated view.
+	Header PageHeaderData
 	// Days contains the workout sessions for the current week.
 	Days []dayView
 	// MuscleBalance summarises weekly volume per muscle group, grouped by region.
@@ -393,6 +395,7 @@ func muscleStatus(planned float64, target int) string {
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	data := homeTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
+		Header:           PageHeaderData{Title: "This Week", Subtitle: ""},
 		Days:             nil,
 		MuscleBalance:    muscleBalanceView{Regions: nil},
 		WeekInBlock:      0,
