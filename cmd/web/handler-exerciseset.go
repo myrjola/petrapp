@@ -18,6 +18,7 @@ type setDisplay struct {
 	CompletedStr string // Pre-formatted completed string, same unit as TargetStr.
 	Unit         string // "reps" or "seconds" — for input labels.
 	Number       int    // 1-based set number for display.
+	IsActive     bool   // Whether this row renders the completion form.
 }
 
 type exerciseSetTemplateData struct {
@@ -50,6 +51,7 @@ func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDispla
 			CompletedStr: completedStr,
 			Unit:         unit,
 			Number:       i + 1,
+			IsActive:     false, // Populated by the caller after firstIncompleteIndex is known.
 		}
 	}
 	return displays
@@ -74,6 +76,51 @@ func getLastCompletedAt(sets []domain.Set) *time.Time {
 		}
 	}
 	return latest
+}
+
+// buildProgressionTargets returns the current set target and timed target seconds for the
+// given exercise on the given date. Both are zero-valued when not applicable.
+func (app *application) buildProgressionTargets(
+	r *http.Request,
+	date time.Time,
+	exercise domain.Exercise,
+) (domain.SetTarget, int, error) {
+	var currentSetTarget domain.SetTarget
+	var currentSetTimedTarget int
+	switch exercise.ExerciseType {
+	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
+		progression, err := app.service.BuildProgression(r.Context(), date, exercise.ID)
+		if err != nil {
+			return domain.SetTarget{}, 0, fmt.Errorf("build progression: %w", err)
+		}
+		currentSetTarget = progression.CurrentSet()
+	case domain.ExerciseTypeTime:
+		progression, err := app.service.BuildTimedProgression(r.Context(), date, exercise.ID)
+		if err != nil {
+			return domain.SetTarget{}, 0, fmt.Errorf("build timed progression: %w", err)
+		}
+		currentSetTimedTarget = progression.CurrentSet().TargetSeconds
+	case domain.ExerciseTypeBodyweight:
+		// No progression engine for bodyweight — uses the stored target as-is.
+	}
+	return currentSetTarget, currentSetTimedTarget, nil
+}
+
+// computeSetActive reports whether a set row should render its completion form.
+// A row is active when the warmup is done and it is either the first incomplete
+// set or the set explicitly being edited. This is a multi-field derived value, so
+// it lives in the handler rather than the template.
+func computeSetActive(
+	warmupComplete, completed bool,
+	index, firstIncompleteIndex, editingIndex int,
+	isEditing bool,
+) bool {
+	if !warmupComplete {
+		return false
+	}
+	isCurrentTarget := !completed && firstIncompleteIndex == index
+	isEditingThis := isEditing && editingIndex == index
+	return isCurrentTarget || isEditingThis
 }
 
 func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
@@ -114,25 +161,10 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currentSetTarget domain.SetTarget
-	var currentSetTimedTarget int
-	switch exerciseSet.Exercise.ExerciseType {
-	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
-		progression, progressionErr := app.service.BuildProgression(r.Context(), date, exerciseSet.Exercise.ID)
-		if progressionErr != nil {
-			app.serverError(w, r, progressionErr)
-			return
-		}
-		currentSetTarget = progression.CurrentSet()
-	case domain.ExerciseTypeTime:
-		progression, progressionErr := app.service.BuildTimedProgression(r.Context(), date, exerciseSet.Exercise.ID)
-		if progressionErr != nil {
-			app.serverError(w, r, progressionErr)
-			return
-		}
-		currentSetTimedTarget = progression.CurrentSet().TargetSeconds
-	case domain.ExerciseTypeBodyweight:
-		// No progression engine for bodyweight — uses the stored target as-is.
+	currentSetTarget, currentSetTimedTarget, err := app.buildProgressionTargets(r, date, exerciseSet.Exercise)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
 	}
 
 	lastCompletedAt := getLastCompletedAt(exerciseSet.Sets)
@@ -162,6 +194,17 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		CurrentSetTimedTarget: currentSetTimedTarget,
 		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
 		RestEndAtMs:           restEndAtMs,
+	}
+
+	for i := range data.SetsDisplay {
+		data.SetsDisplay[i].IsActive = computeSetActive(
+			exerciseSet.WarmupCompletedAt != nil,
+			data.SetsDisplay[i].Set.CompletedValue != nil,
+			i,
+			data.FirstIncompleteIndex,
+			data.EditingIndex,
+			data.IsEditing,
+		)
 	}
 
 	app.render(w, r, http.StatusOK, "exerciseset", data)

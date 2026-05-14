@@ -1117,3 +1117,87 @@ func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {
 		t.Error("Done button not rendered on deload session")
 	}
 }
+
+func Test_computeSetActive(t *testing.T) {
+	tests := []struct {
+		name                 string
+		warmupComplete       bool
+		completed            bool
+		index                int
+		firstIncompleteIndex int
+		editingIndex         int
+		isEditing            bool
+		want                 bool
+	}{
+		{
+			name:                 "warmup not complete is never active",
+			warmupComplete:       false,
+			completed:            false,
+			index:                0,
+			firstIncompleteIndex: 0,
+			editingIndex:         -1,
+			isEditing:            false,
+			want:                 false,
+		},
+		{
+			name:                 "first incomplete set is active",
+			warmupComplete:       true,
+			completed:            false,
+			index:                2,
+			firstIncompleteIndex: 2,
+			editingIndex:         -1,
+			isEditing:            false,
+			want:                 true,
+		},
+		{
+			name:                 "a later incomplete set is not active",
+			warmupComplete:       true,
+			completed:            false,
+			index:                3,
+			firstIncompleteIndex: 2,
+			editingIndex:         -1,
+			isEditing:            false,
+			want:                 false,
+		},
+		{
+			name:                 "completed set at the first-incomplete index is not active",
+			warmupComplete:       true,
+			completed:            true,
+			index:                2,
+			firstIncompleteIndex: 2,
+			editingIndex:         -1,
+			isEditing:            false,
+			want:                 false,
+		},
+		{
+			name:                 "the set being edited is active even though completed",
+			warmupComplete:       true,
+			completed:            true,
+			index:                1,
+			firstIncompleteIndex: 4,
+			editingIndex:         1,
+			isEditing:            true,
+			want:                 true,
+		},
+		{
+			name:                 "editing mode does not activate a non-edited set",
+			warmupComplete:       true,
+			completed:            true,
+			index:                0,
+			firstIncompleteIndex: 4,
+			editingIndex:         1,
+			isEditing:            true,
+			want:                 false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeSetActive(
+				tt.warmupComplete, tt.completed, tt.index, tt.firstIncompleteIndex, tt.editingIndex, tt.isEditing)
+			if got != tt.want {
+				t.Errorf("computeSetActive() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
