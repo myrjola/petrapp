@@ -11,27 +11,6 @@
                     gap: var(--size-3);
                 }
 
-                .back-link {
-                    color: var(--color-text-secondary);
-                    text-decoration: none;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: var(--size-1);
-                    padding: var(--size-2) var(--size-3);
-                    border-radius: var(--radius-2);
-                    font-weight: var(--font-weight-5);
-                    transition: background-color 0.2s ease;
-
-                    &:hover {
-                        background: var(--color-surface);
-                    }
-
-                    &:focus-visible {
-                        outline: 2px solid var(--color-border-focus);
-                        outline-offset: 2px;
-                    }
-                }
-
                 .exercise-title {
                     font-size: var(--font-size-4);
                     font-weight: var(--font-weight-7);
@@ -42,8 +21,6 @@
                 }
 
                 .header-actions {
-                    display: flex;
-                    gap: var(--size-2);
                     justify-content: flex-end;
                 }
 
@@ -92,14 +69,10 @@
                 }
             }
         </style>
-        <a href="/workouts/{{ .Date.Format "2006-01-02" }}" data-back-button class="back-link"
-           aria-label="Back to workout">
-            <span aria-hidden="true">←</span>
-            <span>Back</span>
-        </a>
+        {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
         <h1 class="exercise-title"
             data-workout-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
-        <div class="header-actions">
+        <div class="header-actions cluster">
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/info"
                class="action-button info-button" aria-label="View exercise information">Info</a>
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/swap"
