@@ -114,14 +114,14 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 			Subtitle: "An optional subtitle that explains the page.",
 		},
 		FieldExamples: []FieldData{
-			{
+			{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
 				Label:    "Exercise name",
 				Name:     "styleguide-name",
 				Type:     "text",
 				Required: true,
 				Hint:     "Shown to you when picking exercises.",
 			},
-			{
+			{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
 				Label: "Target reps",
 				Name:  "styleguide-reps",
 				Type:  "number",
