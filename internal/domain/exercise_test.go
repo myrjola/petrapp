@@ -192,6 +192,25 @@ func Test_Exercise_FormatSetDescription(t *testing.T) {
 	}
 }
 
+func Test_Category_Label(t *testing.T) {
+	cases := []struct {
+		name     string
+		category domain.Category
+		want     string
+	}{
+		{"upper", domain.CategoryUpper, "Upper Body"},
+		{"lower", domain.CategoryLower, "Lower Body"},
+		{"full body", domain.CategoryFullBody, "Full Body"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.category.Label(); got != tc.want {
+				t.Errorf("Label() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func Test_SetTarget_AbsWeightKg(t *testing.T) {
 	cases := []struct {
 		name string

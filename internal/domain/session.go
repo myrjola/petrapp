@@ -35,6 +35,8 @@ type ExerciseProgress struct {
 }
 
 // Session represents a complete workout session including all exercises and their sets.
+//
+//nolint:recvcheck // WorkoutType uses a value receiver so templates can call it on non-addressable Session values.
 type Session struct {
 	Date              time.Time
 	DifficultyRating  *int
@@ -204,6 +206,34 @@ func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error 
 		return nil
 	}
 	return ErrSlotNotFound
+}
+
+// WorkoutType derives the muscle-split category for the session from the
+// categories of its exercise slots: full body if any full-body exercise is
+// present or both upper and lower are represented, otherwise whichever of
+// upper or lower is present. An empty session defaults to full body.
+func (s Session) WorkoutType() Category {
+	hasUpper, hasLower := false, false
+	for i := range s.ExerciseSets {
+		switch s.ExerciseSets[i].Exercise.Category {
+		case CategoryFullBody:
+			return CategoryFullBody
+		case CategoryUpper:
+			hasUpper = true
+		case CategoryLower:
+			hasLower = true
+		}
+	}
+	if hasUpper && hasLower {
+		return CategoryFullBody
+	}
+	if hasUpper {
+		return CategoryUpper
+	}
+	if hasLower {
+		return CategoryLower
+	}
+	return CategoryFullBody
 }
 
 // HasIncompleteSets reports whether any set across any exercise slot in the

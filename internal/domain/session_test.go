@@ -412,6 +412,41 @@ func Test_Session_SwapExerciseInSlot_UnknownSlot(t *testing.T) {
 	}
 }
 
+func Test_Session_WorkoutType(t *testing.T) {
+	sessionWith := func(cats ...domain.Category) domain.Session {
+		sets := make([]domain.ExerciseSet, 0, len(cats))
+		for i, c := range cats {
+			sets = append(sets, domain.ExerciseSet{ //nolint:exhaustruct // Test sets omit irrelevant fields.
+				ID: i + 1,
+				Exercise: domain.Exercise{ //nolint:exhaustruct // Only Category is read.
+					Category: c,
+				},
+			})
+		}
+		return domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
+			ExerciseSets: sets,
+		}
+	}
+	tests := []struct {
+		name string
+		sess domain.Session
+		want domain.Category
+	}{
+		{"empty defaults to full body", sessionWith(), domain.CategoryFullBody},
+		{"only upper", sessionWith(domain.CategoryUpper, domain.CategoryUpper), domain.CategoryUpper},
+		{"only lower", sessionWith(domain.CategoryLower), domain.CategoryLower},
+		{"upper and lower is full body", sessionWith(domain.CategoryUpper, domain.CategoryLower), domain.CategoryFullBody},
+		{"any full body is full body", sessionWith(domain.CategoryUpper, domain.CategoryFullBody), domain.CategoryFullBody},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.sess.WorkoutType(); got != tt.want {
+				t.Errorf("WorkoutType() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSession_RecordSet_NilSignalIsAllowed(t *testing.T) {
 	now := time.Date(2026, time.May, 4, 10, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // only fields used by RecordSet

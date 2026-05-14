@@ -32,6 +32,20 @@ func (c Category) IsValid() bool {
 	}
 }
 
+// Label returns the human-readable workout-split name for display.
+func (c Category) Label() string {
+	switch c {
+	case CategoryUpper:
+		return "Upper Body"
+	case CategoryLower:
+		return "Lower Body"
+	case CategoryFullBody:
+		return "Full Body"
+	default:
+		return "Full Body"
+	}
+}
+
 // ExerciseType distinguishes the load model used by an exercise.
 type ExerciseType string
 
