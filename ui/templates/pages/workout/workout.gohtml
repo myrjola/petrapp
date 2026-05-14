@@ -12,6 +12,8 @@
 
         {{ template "page-header" .Header }}
 
+        {{ template "banner" .Flash }}
+
         <div class="workout-meta cluster">
             <style {{ nonce }}>
                 @scope (.workout-meta) {
