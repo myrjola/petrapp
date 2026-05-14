@@ -71,20 +71,91 @@ function me() {
 const sameUrl = (a, b) =>
     a.origin === b.origin && a.pathname === b.pathname && a.search === b.search
 
+/**
+ * Navigation feedback state.
+ *
+ * `activeLoad` records the in-flight visual feedback so we can restore the
+ * source element's text and hide the bar when:
+ *   - bfcache restores a page that was mid-navigation (pageshow.persisted)
+ *   - the user cancels a navigation (navigateerror)
+ *   - a new navigation supersedes the current one
+ *
+ * For successful navigations the old document is destroyed on commit and
+ * no cleanup is needed in that document — clearLoad on bfcache restore
+ * handles the snapshot case. The bar and announce region activate
+ * synchronously; an earlier 300ms-gated reveal was scrapped because the
+ * old document tends to be torn down before the timer fires on this
+ * codebase (Speculation Rules prefetch on every link).
+ */
+let activeLoad = null
+
+function startLoad(el) {
+    clearLoad()
+
+    // Only buttons swap text — anchor labels are part of page content and
+    // changing them right before the browser tears down the document for a
+    // GET navigation is noisy without being reliably visible.
+    const target = (el instanceof HTMLButtonElement && el.textContent?.trim()) ? el : null
+    let originalText = null
+    if (target) {
+        originalText = target.textContent
+        target.textContent = 'Loading…'
+    }
+
+    document.getElementById('loading-bar').classList.add('active')
+    document.getElementById('loading-announce').textContent = 'Loading…'
+
+    activeLoad = { target, originalText }
+}
+
+function clearLoad() {
+    if (!activeLoad) return
+    if (activeLoad.target && activeLoad.target.isConnected) {
+        activeLoad.target.textContent = activeLoad.originalText
+    }
+    document.getElementById('loading-bar').classList.remove('active')
+    document.getElementById('loading-announce').textContent = ''
+    activeLoad = null
+}
+
 if ('navigation' in window) {
     navigation.addEventListener('navigate', async (e) => {
-        if (!e.formData) return
-        if (!e.canIntercept || e.hashChange || e.downloadRequest) return
+        if (e.hashChange || e.downloadRequest) return
         if (new URL(e.destination.url).origin !== location.origin) return
-        for (const [, v] of e.formData) {
-            if (v instanceof File) return
+
+        if (e.formData) {
+            if (!e.canIntercept) return
+            for (const [, v] of e.formData) {
+                if (v instanceof File) return
+            }
+            // TODO: when precommitHandler works in iOS, it might be an even better
+            //       way to handle this since we can pass e.signal and also reject inside the handler
+            //       to have centralised error handling.
+            //       https://bugs.webkit.org/show_bug.cgi?id=293952
+            startLoad(e.sourceElement)
+            e.preventDefault()
+            await submitForm(e)
+            return
         }
-        // TODO: when precommitHandler works in iOS, it might be an even better
-        //       way to handle this since we can pass e.signal and also reject inside the handler
-        //       to have centralised error handling.
-        //       https://bugs.webkit.org/show_bug.cgi?id=293952
-        e.preventDefault()
-        await submitForm(e)
+
+        // GET navigations (link clicks, back/forward). We do not intercept;
+        // the browser handles the fetch. e.userInitiated filters out the
+        // programmatic navigation.navigate() calls that popOrPushTo makes
+        // after a successful form submit — without this guard those would
+        // overwrite the in-flight form-submit feedback state.
+        if (e.userInitiated) startLoad(e.sourceElement)
+    })
+
+    navigation.addEventListener('navigateerror', (e) => {
+        // Our own form-submit handling calls preventDefault() on the navigate
+        // event, which aborts that navigation and fires navigateerror with an
+        // AbortError. That is expected — submitForm is about to drive the real
+        // navigation, so the feedback must stay up. A superseding navigation
+        // likewise aborts the one it replaces, but its startLoad() has already
+        // reset the state. Only a genuine failure, where we stay on the current
+        // document, should tear the feedback down.
+        if (e.error?.name === 'AbortError' || /abort/i.test(e.message || '')) return
+        clearLoad()
     })
 }
 
@@ -213,6 +284,11 @@ function registerServiceWorker() {
 
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
+        // Clear any in-flight navigation feedback that was captured in the
+        // bfcache snapshot — the navigation that triggered it has long
+        // since resolved (we are reading this snapshot from the cache).
+        clearLoad()
+
         // Reload if the invalidation cookie has changed since this page was rendered.
         // The render-time value is baked into a <meta> tag; a mismatch means a POST
         // ran while we were in bfcache and our state may be stale.
