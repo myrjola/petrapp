@@ -21,6 +21,20 @@ func Test_application_styleguide(t *testing.T) {
 		t.Fatalf("Failed to get styleguide: %v", err)
 	}
 
+	// Stone and Clay ramps — the core of the Stone design direction.
+	if doc.Find("h3:contains('Stone')").Length() == 0 {
+		t.Error("expected a 'Stone' colour section on the styleguide")
+	}
+	if doc.Find(".bg-stone-5").Length() == 0 {
+		t.Error("expected a --stone-5 swatch on the styleguide")
+	}
+	if doc.Find("h3:contains('Clay')").Length() == 0 {
+		t.Error("expected a 'Clay' colour section on the styleguide")
+	}
+	if doc.Find(".bg-clay-4").Length() == 0 {
+		t.Error("expected a --clay-4 swatch on the styleguide")
+	}
+
 	// Layout primitives.
 	if doc.Find("h2:contains('Layout primitives')").Length() == 0 {
 		t.Error("expected a 'Layout primitives' section")
