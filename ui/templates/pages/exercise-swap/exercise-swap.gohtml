@@ -18,7 +18,7 @@
             <style {{ nonce }}>
                 @scope (.current-exercise) {
                     :scope {
-                        background: var(--gray-1);
+                        background: var(--stone-1);
                         padding: var(--size-3);
                         border-radius: var(--radius-2);
 
@@ -33,12 +33,12 @@
 
                         .category {
                             font-size: var(--font-size-0);
-                            color: var(--gray-5);
+                            color: var(--color-text-secondary);
                         }
 
                         .muscle-groups {
                             font-size: var(--font-size-0);
-                            color: var(--gray-6);
+                            color: var(--color-text-secondary);
                         }
                     }
                 }
@@ -59,10 +59,10 @@
                     input[type="search"] {
                         flex: 1;
                         padding: var(--size-2) var(--size-3);
-                        border: 1px solid var(--gray-3);
+                        border: 1px solid var(--color-border);
                         border-radius: var(--radius-2);
                         font-size: var(--font-size-1);
-                        background: var(--white);
+                        background: var(--color-surface-elevated);
                     }
                 }
             </style>
@@ -99,7 +99,7 @@
 
                         .option-details {
                             font-size: var(--font-size-0);
-                            color: var(--gray-6);
+                            color: var(--color-text-secondary);
                             margin-bottom: var(--size-3);
                         }
 
@@ -108,8 +108,8 @@
                         }
 
                         .swap-button {
-                            background-color: var(--lime-2);
-                            color: var(--lime-9);
+                            background-color: var(--color-success-bg);
+                            color: var(--color-success);
                             border: none;
                             border-radius: var(--radius-2);
                             padding: var(--size-2) var(--size-3);
@@ -118,12 +118,12 @@
                             width: 100%;
 
                             &:hover {
-                                background-color: var(--lime-3);
+                                background-color: color-mix(in oklab, var(--color-success-bg) 92%, black);
                             }
                         }
 
                         .no-results {
-                            color: var(--gray-6);
+                            color: var(--color-text-secondary);
                             padding: var(--size-4) 0;
                             text-align: center;
                         }
