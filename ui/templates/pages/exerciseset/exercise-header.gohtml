@@ -8,16 +8,32 @@
                     display: grid;
                     grid-template-columns: auto 1fr auto;
                     align-items: center;
-                    gap: var(--size-3);
+                    gap: var(--size-2) var(--size-3);
                 }
 
                 .exercise-title {
+                    grid-column: 1 / -1;
+                    grid-row: 2;
                     font-size: var(--font-size-4);
                     font-weight: var(--font-weight-7);
                     color: var(--color-text-primary);
                     text-align: center;
                     margin: 0;
                     view-transition-name: exercise-title-{{ .ExerciseSet.ID }};
+                }
+
+                .timer {
+                    justify-self: center;
+                    background: var(--color-surface);
+                    color: var(--color-text-primary);
+                    padding: var(--size-1) var(--size-3);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                    font-weight: var(--font-weight-6);
+                    font-family: var(--font-mono);
+                    border: 1px solid var(--color-border);
+                    min-width: 4rem;
+                    text-align: center;
                 }
 
                 .header-actions {
@@ -55,23 +71,12 @@
                         }
                     }
                 }
-
-                @media (max-width: 480px) {
-                    :scope {
-                        grid-template-columns: auto 1fr;
-                        row-gap: var(--size-2);
-                    }
-
-                    .header-actions {
-                        grid-column: 1 / -1;
-                        justify-content: center;
-                    }
-                }
             }
         </style>
         {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
         <h1 class="exercise-title"
             data-workout-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+        <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
         <div class="header-actions cluster">
             <a href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/info"
                class="action-button info-button" aria-label="View exercise information">Info</a>
