@@ -133,9 +133,6 @@
         --font-size-fluid-2: clamp(1.5rem, 6vw, 2.5rem);
         --font-size-fluid-3: clamp(2rem, 9vw, 3.5rem);
 
-        /* Colors */
-        --white: #fff;
-        --black: #000;
         /* Stone — warm neutral ramp (surfaces, borders, text) */
         --stone-0: #faf7f2;
         --stone-1: #f4efe6;
@@ -148,20 +145,6 @@
         --stone-8: #3d342b;
         --stone-9: #2e2620;
         --stone-10: #1c1813;
-        /* Gray — transitional aliases onto Stone. Per-page references are
-           renamed to --stone-* as pages are polished; the --gray-* names are
-           removed in the final increment of this redesign. */
-        --gray-0: var(--stone-0);
-        --gray-1: var(--stone-1);
-        --gray-2: var(--stone-2);
-        --gray-3: var(--stone-3);
-        --gray-4: var(--stone-4);
-        --gray-5: var(--stone-5);
-        --gray-6: var(--stone-6);
-        --gray-7: var(--stone-7);
-        --gray-8: var(--stone-8);
-        --gray-9: var(--stone-9);
-        --gray-10: var(--stone-10);
         --sky-0: #f0f9ff;
         --sky-1: #e0f2fe;
         --sky-2: #bae6fd;
@@ -276,7 +259,7 @@
         display: inline-flex;
         border-radius: var(--radius-3);
         background-color: var(--clay-4);
-        color: var(--white);
+        color: var(--color-surface-elevated);
         font-family: var(--font-sans);
         font-size: var(--font-size-1);
         font-weight: var(--font-weight-7);

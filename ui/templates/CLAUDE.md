@@ -233,9 +233,6 @@ retired page-by-page.
 - **Stone**: `--stone-0` through `--stone-10` (warm neutral ramp — surfaces, borders, text)
 - **Clay**: `--clay-0` through `--clay-6` (primary accent — buttons, links, active state)
 - **Ember**: `--ember` (single bright accent, reserved for Focus-mode CTAs)
-- **Gray colors**: `--gray-0` through `--gray-10` — transitional aliases onto Stone.
-  Don't reach for these in new code; use `--stone-*`. Existing `--gray-*` call sites
-  are renamed to `--stone-*` as each page is polished.
 - **Raw ramps** (`--sky-*`, `--lime-*`, `--yellow-*`, `--red-*`) — legacy; still defined
   but being replaced by the semantic tokens above. Don't introduce new uses.
 
