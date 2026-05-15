@@ -279,6 +279,32 @@
         &:focus-visible {
             outline: var(--clay-3) solid 2px;
         }
+
+        /*
+         * Loading state. The label stays in the DOM (just visually hidden via
+         * transparent text) so the button keeps its exact width and height —
+         * swapping the textContent would reflow the button and cause a flicker.
+         * The live region in base.gohtml carries the "Loading…" announcement
+         * for screen readers; aria-busy here signals the busy state on the
+         * control itself.
+         */
+        &[aria-busy="true"] {
+            color: transparent;
+            cursor: wait;
+        }
+
+        &[aria-busy="true"]::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            width: 1em;
+            height: 1em;
+            border: 2px solid color-mix(in oklab, var(--color-surface-elevated) 35%, transparent);
+            border-top-color: var(--color-surface-elevated);
+            border-radius: 50%;
+            animation: button-spinner 0.8s linear infinite;
+        }
     }
 
 
@@ -453,6 +479,10 @@ html:active-view-transition-type(backward) {
     to { background-position: 167% 0; }
 }
 
+@keyframes button-spinner {
+    to { transform: rotate(1turn); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     #loading-bar {
         transition: none;
@@ -461,11 +491,21 @@ html:active-view-transition-type(backward) {
         animation: none;
         background: var(--clay-3);
     }
+    button[aria-busy="true"]::after,
+    .btn[aria-busy="true"]::after {
+        animation: none;
+    }
 }
 
 @media (forced-colors: active) {
     #loading-bar.active {
         background: Highlight;
+        forced-color-adjust: none;
+    }
+    button[aria-busy="true"]::after,
+    .btn[aria-busy="true"]::after {
+        border-color: CanvasText;
+        border-top-color: Highlight;
         forced-color-adjust: none;
     }
 }
