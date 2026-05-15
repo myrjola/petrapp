@@ -271,57 +271,23 @@ The project uses CSS layers defined in main.css:
 
 ## Template Data Preparation
 
-### Data-First Approach
+Templates should range, format primitives, and conditionally render — nothing
+more. Anything that branches on multiple fields, builds a collection, or
+derives a value belongs in the handler. The full rule + worked examples live
+in [`cmd/web/CLAUDE.md`](../../cmd/web/CLAUDE.md) under "Data Transformation
+Patterns"; the domain-rule escalation lives in
+[`internal/domain/CLAUDE.md`](../../internal/domain/CLAUDE.md) under "Display
+derivations belong on domain types."
 
-- **STRONGLY PREFER preparing data in Go handlers** rather than complex template logic
-- Transform indices, format dates, compute derived values in handlers before passing to templates
-- Use simple iteration and display in templates - avoid complex conditionals
-- When templates need computed values, transform the data structure in the handler
+Inline `printf` for one-off URL construction is idiomatic:
+`{{ printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .Exercise.ID }}`.
+Pre-build URLs in the handler only when the same URL appears in several places
+on the page or the path depends on non-trivial logic.
 
-### Template Logic Guidelines
-
-- Keep templates simple and logic-free
-- Use range loops for iteration, basic if/else for display logic
-- For complex formatting or calculations, prepare data in handlers
-- Avoid nested template logic - flatten data structures in Go code instead
-
-### URL Construction
-
-- Inline `printf` for URL formatting is fine and idiomatic here: `{{ printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .Exercise.ID }}`
-- Only pre-build URLs in the handler when the same URL is used in several places on the page, or the path depends on non-trivial logic
-
-### Common Transformation Examples
-
-```go
-// Handler: Transform enum to display options
-Difficulties: []difficultyOption{
-{Value: difficultyTooEasy, Label: "Too easy"},
-{Value: difficultyICouldDoMore, Label: "I could do more"},
-}
-
-// Handler: Filter and prepare collections
-var availableExercises []workout.Exercise
-for _, exercise := range allExercises {
-if !existingExerciseIDs[exercise.ID] {
-availableExercises = append(availableExercises, exercise)
-}
-}
-```
-
-## Error Recovery Patterns
-
-### When Templates Fail to Render
-
-1. **Check missing template functions** - verify functions exist in handlers.go
-2. **Fix data preparation** - don't add template complexity, transform data in handlers
-3. **Validate template syntax** - check for unclosed blocks, typos in function names
-4. **Check data structure mismatches** - ensure template expects correct data types
-
-### Common Template Errors
-
-- "function not defined" → Check if logic belongs in handler data preparation
-- "nil pointer" → Validate data structure in handler before passing to template
-- "unexpected token" → Check template syntax, especially in scoped CSS blocks
+When a template fails to render: missing function ⇒ check `contextTemplateFuncs`
+in `cmd/web/handlers.go` and consider moving the logic to data preparation; nil
+pointer ⇒ validate the data shape in the handler; unexpected-token ⇒ check
+scoped CSS blocks for unclosed braces.
 
 ## View Transitions and Progressive Enhancement
 
@@ -339,15 +305,9 @@ availableExercises = append(availableExercises, exercise)
 
 ## Template Testing Considerations
 
-### DOM Structure for Tests
-
-- Use semantic HTML elements and meaningful CSS classes
-- Include data attributes for test targeting when needed
-- Ensure form actions and button text are descriptive for test reliability
-- Structure templates so e2e tests can find elements consistently
-
-### Test-Friendly Patterns
-
-- Use unique button text and headings for test selectors
-- Include CSS classes that won't change frequently
-- Structure forms with clear action attributes and consistent field names
+Templates are exercised through `e2etest`-driven handler tests that submit
+real HTML and assert against goquery selections — see
+[`cmd/web/CLAUDE.md`](../../cmd/web/CLAUDE.md) "Testing with e2etest" for the
+canonical patterns. When authoring markup: prefer semantic elements, give
+forms descriptive `action` attributes, and keep button/heading text stable so
+selectors stay resilient.

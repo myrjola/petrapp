@@ -74,26 +74,45 @@ Difficulties: []difficultyOption{
 
 ### Form Processing Pattern
 
+Parse, build a domain value, hand it to the service. Validation lives on the
+domain type (`Exercise.Validate()` and friends) and surfaces as a
+`domain.ValidationError` — see "User-facing validation errors" below for the
+flash/redirect plumbing. The handler's only job is to detect `ValidationError`
+with `errors.As` and route it to the form; everything else is a
+`serverError`.
+
 ```go
-// Parse form data
 if err = r.ParseForm(); err != nil {
   app.serverError(w, r, fmt.Errorf("parse form: %w", err))
   return
 }
 
-// Extract form fields
-fieldValue := r.PostForm.Get("field_name")
-if fieldValue == "" {
-  app.serverError(w, r, errors.New("field not provided"))
+exercise := domain.Exercise{
+  ID:       id,
+  Name:     r.PostForm.Get("name"),
+  Category: domain.Category(r.PostForm.Get("category")),
+  // ...
+}
+
+editPath := fmt.Sprintf("/admin/exercises/%d", id)
+if err = app.service.UpdateExercise(r.Context(), exercise); err != nil {
+  var ve domain.ValidationError
+  if errors.As(err, &ve) {
+    app.putFlashError(r.Context(), ve.Message)
+    redirect(w, r, editPath)
+    return
+  }
+  app.serverError(w, r, err)
   return
 }
+
+redirect(w, r, "/admin/exercises")
 ```
 
-### Validation and Conversion
-
-- Validate required form fields immediately after parsing
-- Use `strconv` functions for type conversion with proper error handling
-- Call service layer methods for business logic validation
+`r.PostForm.Get` returns `""` for missing fields — let the domain's
+`Validate()` reject empties, don't pre-check with `serverError`. Use
+`strconv` (or `optionalInt`-style helpers) for numeric conversions; reach
+for `serverError` only on parser/IO failures the user cannot fix.
 
 ## Error Handling
 

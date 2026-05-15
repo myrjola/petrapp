@@ -33,13 +33,13 @@ only — no SQL, no HTTP, no logger, no third-party clients.
 
 ## What does NOT live here
 
-- SQL, query strings, transactions — those live in
-  `internal/repository` (Phase 2+).
+- SQL, query strings, transactions — those live in `internal/repository`
+  (see `internal/repository/CLAUDE.md`).
 - HTTP handlers, template data shaping — `cmd/web`.
-- Service orchestration that touches multiple aggregates or
-  external systems (OpenAI) — `internal/service` (Phase 3+).
-- `sql.ErrNoRows` aliasing — `domain.ErrNotFound` is its own
-  sentinel; the repository translates at the boundary.
+- Service orchestration that touches multiple aggregates or external systems
+  (OpenAI) — `internal/service` (see `internal/service/CLAUDE.md`).
+- `sql.ErrNoRows` aliasing — `domain.ErrNotFound` is its own sentinel; the
+  repository translates at the boundary.
 
 ## Display derivations belong on domain types
 
@@ -61,4 +61,4 @@ method on the aggregate over a free function in service code. The
 method enforces invariants in one place and returns a sentinel error
 when violated; the service layer calls the method inside a repository
 Update closure (the closure pattern is what gives us atomicity — see
-`internal/repository/CLAUDE.md` once Phase 2 lands).
+`internal/repository/CLAUDE.md`).

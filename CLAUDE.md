@@ -33,43 +33,22 @@ path, not from `docs/`. Examples: `docs/2026-05-02-code-review-cleanup.md`,
 ## Build & Run Commands
 
 ```bash
-make init         # Initializes the development environment - run once after cloning
-make lint-fix     # Run golangci-lint checks with automatic fixing enabled - use before committing changes
-make test         # Run all tests - use after functionality changes
-make ci           # Run init, build, lint, test, sec - use for comprehensive verification
+make init         # One-time setup after cloning
+make test         # `go test --race --shuffle=on ./...`
+make lint-fix     # golangci-lint with --fix; run before committing
+make ci           # init + build + lint-fix + test + sec; full validation
 ```
 
-**When to use specific commands:**
-
-- Use `make build` after adding new files or significant code changes
-- Use `make test` after implementing new features or modifying existing functionality
-- Use `make lint` before committing to catch style and complexity issues
-- Use `make ci` for complex changes requiring full validation (database changes, major refactoring)
-- Always run `make ci` when making significant architectural changes
-
-## Testing
-
-- Run single test: `go test -v ./path/to/package -run TestName`
-- Table-driven tests with clear assertions
-- Run tests after UI changes to catch compatibility issues early
-
-### Maintaining Test Compatibility
-
-When making UI changes:
-
-- Consider impact on existing tests that rely on DOM structure
-- Use specific selectors instead of generic ones (e.g., `.Find("form").FilterFunction()` instead of
-  `.Find("form").First()`)
-- Look for unique identifiers like button text, form actions, or data attributes for reliable test selectors
-- When tests break due to DOM changes, update selectors to be more specific and resilient
+Run a single test: `go test -v ./path/to/package -run TestName`.
 
 ## Code Style
 
-- Standard Go formatting with 100-line function limit
+- Standard Go formatting with 100-line function limit (`.golangci.yml` funlen)
 - Error types must be suffixed with "Error", sentinel errors with "Err" prefix
 - Strongly typed with exhaustive enum checking
 - No global loggers or init functions
 - Comments must end with a period
+- govet shadow is usually fixed by reusing the earlier `err` variable instead of introducing a new name
 
 ## Security Guidelines
 
@@ -88,11 +67,6 @@ When making changes to files, first understand the file's code conventions:
 - Always look at the surrounding context (especially imports) to understand framework choices
 - Make changes in the most idiomatic way for the existing codebase
 
-## Fixing linter complaints
-
-- govet shadow is often fixed by reusing the earlier `err` variable instead of using different variable name.
-
-## Debugging Test Failures
-
-- For template-related errors, check for missing functions, syntax errors, or data structure mismatches
-- When tests fail after UI changes, update DOM selectors to be more specific and resilient
+Test-selector resilience (goquery patterns, `SubmitForm`, etc.) lives in
+[Web Guidelines](cmd/web/CLAUDE.md) under "Testing with e2etest" — consult it
+when UI changes break handler tests.
