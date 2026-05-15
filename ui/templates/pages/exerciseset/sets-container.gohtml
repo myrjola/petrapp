@@ -30,9 +30,53 @@
                     }
 
                     &.active {
-                        background: var(--color-surface-active);
-                        border-color: var(--color-info);
+                        background: var(--stone-9);
+                        color: var(--stone-1);
+                        border-color: var(--stone-7);
                         box-shadow: var(--shadow-2);
+                        padding: var(--size-4);
+
+                        &:not(.completed) .set-info {
+                            display: grid;
+                            grid-template-columns: 1fr 1fr;
+                            gap: var(--size-4);
+                            align-items: center;
+                            justify-items: center;
+                            padding: var(--size-2) 0;
+
+                            @media (max-width: 380px) {
+                                grid-template-columns: 1fr;
+                                gap: var(--size-3);
+                            }
+
+                            .weight,
+                            .reps {
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                gap: var(--size-1);
+                                color: var(--stone-4);
+                                font-size: var(--font-size-0);
+                                font-weight: var(--font-weight-6);
+                                text-transform: uppercase;
+                                letter-spacing: var(--font-letterspacing-3);
+                            }
+
+                            .weight::before { content: "Weight"; }
+                            .reps::before { content: "Reps"; }
+
+                            .weight .value,
+                            .reps .value {
+                                display: block;
+                                font-size: var(--font-size-fluid-3);
+                                font-family: var(--font-mono);
+                                font-weight: var(--font-weight-7);
+                                color: var(--stone-0);
+                                line-height: 1;
+                                letter-spacing: -0.02em;
+                                text-transform: none;
+                            }
+                        }
                     }
 
                     .set-info {
@@ -387,11 +431,11 @@
                             {{ end }}
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else if and $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
-                            <span class="weight" aria-label="Recommended weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
-                            <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
+                            <span class="weight" aria-label="Recommended weight"><span class="value">{{ formatFloat $.CurrentSetTarget.WeightKg }}</span> kg</span>
+                            <span class="reps" aria-label="Target reps"><span class="value">{{ $.CurrentSetTarget.TargetReps }}</span> reps</span>
                         {{ else }}
-                            <span class="weight" aria-label="Target weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
-                            <span class="reps" aria-label="Target reps">{{ $.CurrentSetTarget.TargetReps }} reps</span>
+                            <span class="weight" aria-label="Target weight"><span class="value">{{ formatFloat $.CurrentSetTarget.WeightKg }}</span> kg</span>
+                            <span class="reps" aria-label="Target reps"><span class="value">{{ $.CurrentSetTarget.TargetReps }}</span> reps</span>
                         {{ end }}
                     {{ else }}
                         {{ if $set.CompletedValue }}
@@ -399,9 +443,9 @@
                             <span class="reps" aria-label="Completed value">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else if and (eq $.ExerciseSet.Exercise.ExerciseType "time_based") $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
-                            <span class="reps" aria-label="Recommended target">{{ $.CurrentSetTimedTarget }}s</span>
+                            <span class="reps" aria-label="Recommended target"><span class="value">{{ $.CurrentSetTimedTarget }}</span>s</span>
                         {{ else }}
-                            <span class="reps" aria-label="Target value">{{ $setDisplay.TargetStr }} {{ $setDisplay.Unit }}</span>
+                            <span class="reps" aria-label="Target value"><span class="value">{{ $setDisplay.TargetStr }}</span> {{ $setDisplay.Unit }}</span>
                         {{ end }}
                     {{ end }}
                 </div>
