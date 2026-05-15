@@ -40,21 +40,10 @@
                     font-family: monospace;
                     font-size: var(--font-size-1);
                 }
-
-                .back-link {
-                    display: inline-block;
-                    margin-bottom: var(--size-4);
-                    color: var(--clay-4);
-                    text-decoration: underline;
-                }
-
-                .back-link:hover {
-                    color: color-mix(in oklab, var(--clay-4) 88%, black);
-                }
             }
         </style>
 
-        <a href="/" class="back-link">← Back to Home</a>
+        {{ template "back-link" "/" }}
 
         {{ template "page-header" .Header }}
 
