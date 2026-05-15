@@ -251,6 +251,45 @@ retired page-by-page.
 - Map semantic intentions to the semantic tokens (e.g., success state → `--color-success-bg` background, `--color-success` text; neutral surface → `--color-surface` / `--stone-*`)
 - **NEVER use undefined color tokens** - always verify they exist in main.css first
 
+### Hover / active darkening — named-ramp step vs `color-mix`
+
+There are two ways to nudge a token a shade darker for `:hover`/`:active`:
+a named ramp step (e.g. `var(--clay-5)` for hover on a `--clay-4` base), or
+`color-mix(in oklab, var(--BASE) NN%, black)`. The decision is mechanical:
+
+- **Use the ramp step when one exists.** Clay primaries hover on
+  `var(--clay-5)` and depress on `var(--clay-6)`. This is the convention
+  for the global `.btn:hover` (`main.css`) and every Clay CTA. Terse,
+  responds to ramp retunes, no perceptual math at the call site.
+- **Use `color-mix(... black)` when no darker ramp step exists.** Applies
+  to `--color-error`, `--color-info`, `--color-info-bg`,
+  `--color-success-bg`, and `--ember` — none have a `*-darker` companion,
+  so mixing toward black is the way.
+- **Use `color-mix(... white)` to *lighten* a saturated base.** `--ember`
+  hovers brighter (`color-mix(... --ember 90%, white)`) because the base
+  is already near peak saturation; mixing toward black would mute the
+  brand-accent feel.
+- **Tinted borders use `color-mix(... transparent)`.** A 30%-opacity
+  border on top of a tinted-background card (e.g. `.push-button.danger`
+  in `preferences.gohtml`) reads as a translucent kin to the fill
+  without introducing a new token.
+
+#### `color-mix` percentage convention
+
+Picked perceptually in oklab — lighter bases need less black to register
+the state change, so the percentages slide toward 100%:
+
+| Base lightness            | Hover  | Active | Example                                     |
+|---------------------------|--------|--------|---------------------------------------------|
+| Mid (saturated, e.g. `--color-error`) | `88%, black` | `78%, black` | `.delete-button` in `preferences.gohtml`     |
+| Light pastel (e.g. `--color-success-bg`, `--color-info-bg`) | `90–92%, black` | — | `.exercise-swap` add/swap buttons            |
+| Already-light surface (e.g. `--clay-1`) | `92%, black` | — | `.exercise-info` cards                       |
+| Bright accent (`--ember`) — hover lightens | `90%, white` | `85%, black` | Focus-mode CTA in `sets-container.gohtml`    |
+| Transparent border tint   | `30%, transparent` | — | `.push-button.danger` border in `preferences.gohtml` |
+
+If you reach for `color-mix(... var(--clay-N) NN%, black)` you're
+probably reinventing `var(--clay-N+1)` — use the ramp step instead.
+
 ## CSS Layer System
 
 The project uses CSS layers defined in main.css:
