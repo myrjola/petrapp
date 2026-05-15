@@ -78,8 +78,8 @@
                 .save-button {
                     width: 100%;
                     padding: var(--size-4) var(--size-6);
-                    background: var(--sky-6);
-                    color: var(--white);
+                    background: var(--clay-4);
+                    color: var(--color-surface-elevated);
                     border: none;
                     border-radius: var(--radius-2);
                     font-weight: var(--font-weight-6);
@@ -88,11 +88,11 @@
                     transition: background-color 0.2s ease;
 
                     &:hover {
-                        background: var(--sky-7);
+                        background: color-mix(in oklab, var(--clay-4) 88%, black);
                     }
 
                     &:active {
-                        background: var(--sky-8);
+                        background: color-mix(in oklab, var(--clay-4) 78%, black);
                     }
                 }
             }
