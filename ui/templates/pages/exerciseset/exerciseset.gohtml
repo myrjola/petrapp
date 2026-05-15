@@ -16,23 +16,6 @@
                         gap: var(--size-4);
                     }
                 }
-
-                .timer {
-                    position: fixed;
-                    top: var(--size-2);
-                    right: var(--size-2);
-                    isolation: isolate;
-                    background: var(--color-surface);
-                    color: var(--color-text-primary);
-                    padding: var(--size-2) var(--size-3);
-                    border-radius: var(--radius-2);
-                    font-size: var(--font-size-1);
-                    font-weight: var(--font-weight-6);
-                    font-family: var(--font-mono);
-                    border: 1px solid var(--color-border);
-                    min-width: 4rem;
-                    text-align: center;
-                }
             }
         </style>
 
@@ -101,6 +84,5 @@
         {{ template "exercise-header" . }}
         {{ template "warmup" . }}
         {{ template "sets-container" . }}
-        <div class="timer" id="workout-timer" aria-live="polite" aria-label="Workout timer">0:00</div>
     </main>
 {{ end }}
