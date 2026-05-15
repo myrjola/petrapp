@@ -32,7 +32,7 @@
                     &.active {
                         background: var(--color-surface-active);
                         border-color: var(--color-info);
-                        box-shadow: 0 0 0 2px var(--sky-1);
+                        box-shadow: var(--shadow-2);
                     }
 
                     .set-info {
@@ -60,7 +60,7 @@
                             height: 1.5rem;
                             border-radius: var(--radius-round);
                             background: var(--color-success);
-                            color: var(--white);
+                            color: var(--stone-0);
                             font-size: var(--font-size-0);
                             font-weight: var(--font-weight-7);
                             flex-shrink: 0;
@@ -80,8 +80,8 @@
                             transition: background-color 0.2s ease, border-color 0.2s ease;
 
                             &:hover {
-                                background: var(--gray-1);
-                                border-color: var(--gray-4);
+                                background: var(--stone-1);
+                                border-color: var(--stone-4);
                             }
 
                             &:focus-visible {
@@ -303,9 +303,9 @@
                 :scope {
                     margin: var(--size-3) 0;
                     padding: var(--size-3) var(--size-4);
-                    background: var(--sky-1);
-                    color: var(--sky-10);
-                    border-left: var(--border-size-3) solid var(--sky-7);
+                    background: var(--color-info-bg);
+                    color: var(--color-info);
+                    border-left: var(--border-size-3) solid var(--color-info);
                     border-radius: var(--radius-2);
                     font-size: var(--font-size-1);
                 }
