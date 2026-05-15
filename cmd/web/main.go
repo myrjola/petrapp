@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -199,14 +200,16 @@ const (
 	sessionLifetime = 7 * 24 * time.Hour
 )
 
-// ensureVAPIDKeys validates the VAPID config: production requires both keys
-// to be set via Fly secrets; dev generates an ephemeral pair on each start
-// and logs the public key.
+// ensureVAPIDKeys validates the VAPID config: petra and petra-staging require
+// both keys to be set via Fly secrets; dev and pr-* review apps generate an
+// ephemeral pair on each start and log the public key. Review-app push delivery
+// won't actually reach real browsers (the public key rotates per boot), but the
+// app boots and the UI renders.
 func ensureVAPIDKeys(ctx context.Context, cfg *config, logger *slog.Logger) error {
 	if cfg.VAPIDPublic != "" && cfg.VAPIDPrivate != "" {
 		return nil
 	}
-	if cfg.FlyAppName != "" {
+	if cfg.FlyAppName != "" && !strings.HasPrefix(cfg.FlyAppName, "pr-") {
 		return errors.New("PETRAPP_VAPID_PUBLIC and PETRAPP_VAPID_PRIVATE must be set in production")
 	}
 	priv, pub, err := webpush.GenerateVAPIDKeys()
@@ -214,7 +217,7 @@ func ensureVAPIDKeys(ctx context.Context, cfg *config, logger *slog.Logger) erro
 		return fmt.Errorf("generate dev vapid keys: %w", err)
 	}
 	cfg.VAPIDPrivate, cfg.VAPIDPublic = priv, pub
-	logger.LogAttrs(ctx, slog.LevelWarn, "generated ephemeral VAPID keys for dev",
+	logger.LogAttrs(ctx, slog.LevelWarn, "generated ephemeral VAPID keys",
 		slog.String("public", pub))
 	return nil
 }
