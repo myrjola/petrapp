@@ -464,7 +464,7 @@
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else if and $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
                             <span class="weight" aria-label="Recommended weight"><span class="value">{{ formatFloat $.CurrentSetTarget.WeightKg }}</span> kg</span>
-                            <span class="reps" aria-label="Target reps"><span class="value">{{ $.CurrentSetTarget.TargetReps }}</span> reps</span>
+                            <span class="reps" aria-label="Target reps"><span class="value">{{ $.CurrentSetTarget.TargetReps }}</span></span>
                         {{ else }}
                             <span class="weight" aria-label="Target weight"><span class="value">{{ formatFloat $.CurrentSetTarget.WeightKg }}</span> kg</span>
                             <span class="reps" aria-label="Target reps"><span class="value">{{ $.CurrentSetTarget.TargetReps }}</span> reps</span>
