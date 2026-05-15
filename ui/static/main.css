@@ -438,7 +438,7 @@ html:active-view-transition-type(backward) {
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease-out;
-    background: linear-gradient(90deg, transparent, var(--sky-5), transparent);
+    background: linear-gradient(90deg, transparent, var(--clay-3), transparent);
     background-size: 40% 100%;
     background-repeat: no-repeat;
     background-position: -67% 0;
@@ -459,7 +459,7 @@ html:active-view-transition-type(backward) {
     }
     #loading-bar.active {
         animation: none;
-        background: var(--sky-5);
+        background: var(--clay-3);
     }
 }
 
