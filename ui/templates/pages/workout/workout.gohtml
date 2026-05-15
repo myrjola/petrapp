@@ -18,7 +18,7 @@
             <style {{ nonce }}>
                 @scope (.workout-meta) {
                     .progress-summary {
-                        color: var(--gray-7);
+                        color: var(--color-text-secondary);
                         font-size: var(--font-size-1);
                     }
                 }
@@ -38,7 +38,7 @@
                         display: flex;
                         align-items: center;
                         text-decoration: line-through;
-                        color: var(--gray-5);
+                        color: var(--color-text-muted);
                     }
 
                     a.exercise {
@@ -47,23 +47,23 @@
                     }
 
                     a.exercise:hover {
-                        background: var(--gray-1);
+                        background: var(--stone-1);
                     }
 
                     .exercise.active {
                         text-decoration: none;
-                        color: var(--gray-9);
+                        color: var(--color-text-primary);
                         font-weight: var(--font-weight-6);
                     }
 
                     .exercise.completed {
-                        background-color: var(--lime-2);
-                        color: var(--lime-9);
+                        background-color: var(--color-success-bg);
+                        color: var(--color-success);
                     }
 
                     .exercise.started {
-                        background-color: var(--yellow-2);
-                        color: var(--yellow-11);
+                        background-color: var(--color-warning-bg);
+                        color: var(--color-warning);
                     }
 
                     .add-exercise {
