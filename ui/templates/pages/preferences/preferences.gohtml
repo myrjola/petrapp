@@ -1,224 +1,410 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.preferencesTemplateData*/ -}}
 
 {{ define "page" }}
-    <main class="center">
+    <main class="prefs">
         <style {{ nonce }}>
-            @scope {
+            @scope (.prefs) {
                 :scope {
-                    padding: var(--size-6) var(--size-4);
+                    max-width: 32rem;
+                    margin-inline: auto;
+                    padding: var(--size-4) var(--size-4) var(--size-9);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-5);
                 }
 
-                .schedule-form {
-                    padding: var(--size-6);
-                    margin-bottom: var(--size-6);
-                    box-shadow: var(--shadow-2);
+                /* Each settings block is a panel: same card chrome, same rhythm. */
+                .panel {
+                    background: var(--color-surface-elevated);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-3);
+                    padding: var(--size-5);
+                    box-shadow: var(--shadow-1);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
                 }
 
-                fieldset {
-                    border: none;
+                .panel-head {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-1);
+                }
+
+                .panel-eyebrow {
+                    display: inline-flex;
+                    align-items: baseline;
+                    gap: var(--size-2);
+                    color: var(--clay-4);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-4);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-7);
+                }
+
+                .panel-eyebrow-num {
+                    font-family: 'Iowan Old Style', 'Palatino Linotype', 'Palatino',
+                                 'Book Antiqua', Georgia, serif;
+                    font-style: italic;
+                    font-weight: var(--font-weight-5);
+                    text-transform: none;
+                    letter-spacing: 0;
+                    color: var(--clay-3);
+                    font-size: var(--font-size-2);
+                    line-height: 1;
+                }
+
+                .panel-title {
+                    font-family: 'Iowan Old Style', 'Palatino Linotype', 'Palatino',
+                                 'Book Antiqua', Georgia, serif;
+                    font-weight: var(--font-weight-7);
+                    font-size: var(--font-size-4);
+                    line-height: 1.15;
+                    color: var(--color-text-primary);
+                    letter-spacing: -0.005em;
+                }
+
+                .panel-blurb {
+                    color: var(--color-text-secondary);
+                    font-size: var(--font-size-1);
+                    line-height: 1.55;
+                }
+
+                .panel-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--size-3);
+                }
+
+                /* One select style for the entire page. Native control,
+                   custom caret painted via background-image so it stays
+                   tappable on mobile and obeys forced-colors. */
+                .prefs-select {
+                    appearance: none;
+                    -webkit-appearance: none;
+                    min-height: 2.5rem;
+                    padding: var(--size-2) calc(var(--size-7) + 2px) var(--size-2) var(--size-3);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    background-color: var(--stone-0);
+                    background-image:
+                        linear-gradient(45deg, transparent 50%, var(--clay-4) 50%),
+                        linear-gradient(135deg, var(--clay-4) 50%, transparent 50%);
+                    background-position:
+                        calc(100% - 18px) 55%,
+                        calc(100% - 12px) 55%;
+                    background-size: 6px 6px, 6px 6px;
+                    background-repeat: no-repeat;
+                    color: var(--color-text-primary);
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-1);
+                    line-height: 1.2;
+                    cursor: pointer;
+                    transition: border-color var(--duration-2) var(--ease-out-quiet),
+                                box-shadow var(--duration-2) var(--ease-out-quiet);
+                }
+
+                .prefs-select:hover {
+                    border-color: var(--clay-3);
+                }
+
+                .prefs-select:focus-visible {
+                    outline: none;
+                    border-color: var(--color-border-focus);
+                    box-shadow: 0 0 0 3px color-mix(in oklab, var(--clay-3) 28%, transparent);
+                }
+
+                /* Schedule day list: tight segmented column. */
+                .day-list {
+                    list-style: none;
                     padding: 0;
                     margin: 0;
-
-                    legend {
-                        font-weight: var(--font-weight-6);
-                        color: var(--color-text-primary);
-                        font-size: var(--font-size-2);
-                        margin-bottom: var(--size-4);
-                    }
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    overflow: hidden;
+                    background: var(--stone-0);
                 }
 
-                .weekdays-grid {
-                    gap: var(--size-2);
-                    margin-bottom: var(--size-6);
+                .day-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: var(--size-3);
+                    padding: var(--size-2) var(--size-3);
                 }
 
-                .weekday-item {
+                .day-row + .day-row {
+                    border-top: var(--border-size-1) solid var(--color-border);
+                }
+
+                .day-row--rest {
+                    background: color-mix(in oklab, var(--stone-1) 50%, var(--stone-0));
+                }
+
+                .day-name {
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    font-size: var(--font-size-1);
+                    letter-spacing: var(--font-letterspacing-1);
+                }
+
+                .day-row--rest .day-name {
+                    color: var(--color-text-secondary);
+                }
+
+                /* Deload controls */
+                .toggle-card {
                     display: flex;
                     align-items: center;
                     gap: var(--size-3);
-                    padding: var(--size-4);
+                    padding: var(--size-3);
+                    background: var(--stone-0);
+                    border: var(--border-size-1) solid var(--color-border);
                     border-radius: var(--radius-2);
-                    transition: all 0.2s ease;
-
-                    .workout-duration {
-                        display: flex;
-                        align-items: center;
-                        gap: var(--size-3);
-                        width: 100%;
-
-                        .weekday-label {
-                            font-weight: var(--font-weight-5);
-                            color: var(--color-text-primary);
-                            font-size: var(--font-size-2);
-                            flex: 1;
-                        }
-
-                        select {
-                            padding: var(--size-2) var(--size-3);
-                            border: var(--border-size-1) solid var(--color-border);
-                            border-radius: var(--radius-2);
-                            background: var(--color-surface);
-                            color: var(--color-text-primary);
-                            font-size: var(--font-size-1);
-                            cursor: pointer;
-                            min-width: 8rem;
-
-                            &:focus {
-                                outline: 2px solid var(--color-border-focus);
-                                outline-offset: 2px;
-                            }
-                        }
-                    }
-                }
-
-                .footer-section {
-                    margin-top: var(--size-8);
-                    padding-top: var(--size-6);
-                    border-top: var(--border-size-1) solid var(--color-border);
-                    display: flex;
-                    justify-content: center;
-                }
-
-                .data-export-section {
-                    margin-top: var(--size-8);
-                    padding: var(--size-6);
-                    box-shadow: var(--shadow-2);
-                }
-
-                .data-export-section h2 {
-                    font-size: var(--font-size-3);
+                    cursor: pointer;
+                    transition: background var(--duration-2) var(--ease-out-quiet),
+                                border-color var(--duration-2) var(--ease-out-quiet);
                     font-weight: var(--font-weight-6);
                     color: var(--color-text-primary);
-                    margin: 0 0 var(--size-3) 0;
                 }
 
-                .data-export-section p {
+                .toggle-card:hover {
+                    border-color: var(--clay-3);
+                }
+
+                .toggle-card:has(input:checked) {
+                    background: var(--color-surface-active);
+                    border-color: var(--clay-3);
+                }
+
+                .toggle-card input[type="checkbox"] {
+                    accent-color: var(--clay-4);
+                    width: 1.15rem;
+                    height: 1.15rem;
+                    flex-shrink: 0;
+                    cursor: pointer;
+                }
+
+                .toggle-card-text {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .toggle-card-hint {
+                    font-weight: var(--font-weight-4);
                     color: var(--color-text-secondary);
-                    margin-bottom: var(--size-4);
+                    font-size: var(--font-size-0);
+                }
+
+                .field-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: var(--size-3);
+                    padding: var(--size-3);
+                    background: var(--stone-0);
+                    border: var(--border-size-1) solid var(--color-border);
+                    border-radius: var(--radius-2);
+                }
+
+                .field-row-label {
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    white-space: nowrap;
+                }
+
+                .anchor-note {
+                    font-size: var(--font-size-0);
+                    color: var(--color-text-secondary);
+                    font-style: italic;
+                    line-height: 1.5;
+                }
+
+                /* Notifications status text inherits panel spacing; just
+                   normalize the inline-script-driven nodes. */
+                .notif-status {
+                    color: var(--color-text-secondary);
                     font-size: var(--font-size-1);
                     line-height: 1.5;
                 }
 
+                .notif-status strong {
+                    color: var(--color-text-primary);
+                }
+
+                .install-steps {
+                    margin: 0;
+                    padding-left: var(--size-5);
+                    color: var(--color-text-secondary);
+                    font-size: var(--font-size-1);
+                    line-height: 1.6;
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-2);
+                }
+
+                .notif-toggle {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    margin: 0;
+                    font-size: var(--font-size-1);
+                    color: var(--color-text-primary);
+                }
+
+                .notif-toggle input {
+                    accent-color: var(--clay-4);
+                    width: 1.1rem;
+                    height: 1.1rem;
+                }
+
+                .notif-error {
+                    color: var(--color-error);
+                    font-size: var(--font-size-0);
+                }
+
+                .notif-stack {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                }
+
+                .notif-stack.hidden { display: none; }
+
+                /* Account block: one card, internal dividers. */
+                .util-list {
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .util-row {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-2);
+                    padding: var(--size-4) 0;
+                }
+
+                .util-row:first-child { padding-top: 0; }
+                .util-row:last-child  { padding-bottom: 0; }
+
+                .util-row + .util-row {
+                    border-top: var(--border-size-1) solid var(--color-border);
+                }
+
+                .util-row-head {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .util-row-title {
+                    font-weight: var(--font-weight-7);
+                    color: var(--color-text-primary);
+                    font-size: var(--font-size-2);
+                }
+
+                .util-row-desc {
+                    color: var(--color-text-secondary);
+                    font-size: var(--font-size-0);
+                    line-height: 1.55;
+                }
+
+                /* Danger zone keeps its class name (tests) but gets the
+                   warm Stone palette treatment to match the rest. */
                 .danger-zone {
-                    margin-top: var(--size-8);
-                    padding: var(--size-6);
                     background: var(--color-error-bg);
-                    border: var(--border-size-1) solid var(--color-error);
+                    border: var(--border-size-1) solid color-mix(in oklab, var(--color-error) 35%, transparent);
                     border-radius: var(--radius-3);
+                    padding: var(--size-5);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
                 }
 
                 .danger-zone h2 {
-                    font-size: var(--font-size-3);
-                    font-weight: var(--font-weight-6);
-                    color: var(--color-text-primary);
-                    margin: 0 0 var(--size-3) 0;
+                    font-family: 'Iowan Old Style', 'Palatino Linotype', 'Palatino',
+                                 'Book Antiqua', Georgia, serif;
+                    font-size: var(--font-size-4);
+                    font-weight: var(--font-weight-7);
+                    color: var(--color-error);
+                    letter-spacing: -0.005em;
                 }
 
                 .danger-zone p {
                     color: var(--color-text-primary);
-                    margin-bottom: var(--size-4);
                     font-size: var(--font-size-1);
-                    line-height: 1.5;
+                    line-height: 1.55;
                 }
 
+                .hidden { display: none; }
+
+                /* Page-load reveal: each panel slides up a hair, staggered. */
+                @media (prefers-reduced-motion: no-preference) {
+                    .panel, .danger-zone {
+                        animation: panel-rise var(--duration-4) var(--ease-out-quiet) both;
+                    }
+                    .prefs > :nth-child(2) { animation-delay: 40ms; }
+                    .prefs > :nth-child(3) { animation-delay: 80ms; }
+                    .prefs > :nth-child(4) { animation-delay: 120ms; }
+                    .prefs > :nth-child(5) { animation-delay: 160ms; }
+                    .prefs > :nth-child(6) { animation-delay: 200ms; }
+                    .prefs > :nth-child(7) { animation-delay: 240ms; }
+                }
+
+                @keyframes panel-rise {
+                    from { opacity: 0; transform: translateY(6px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
             }
         </style>
 
         {{ template "back-link" "/" }}
         {{ template "page-header" .Header }}
 
-        <form method="post" action="/preferences" class="schedule-form card" aria-label="Weekly Schedule">
-            <fieldset>
-                <legend>Workout duration per day</legend>
-                <div class="weekdays-grid stack">
-                    {{ range .Weekdays }}
-                        <div class="weekday-item">
-                            <div class="workout-duration">
-                                <label for="{{ .ID }}_minutes_select" class="weekday-label">{{ .Name }}</label>
-                                <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select"
-                                        aria-label="{{ .Name }} workout duration">
-                                    {{ $weekdayMinutes := .Minutes }}
-                                    {{ range $.DurationOptions }}
-                                        <option value="{{ .Value }}"
-                                                {{ if eq .Value $weekdayMinutes }}selected{{ end }}>
-                                            {{ .Label }}
-                                        </option>
-                                    {{ end }}
-                                </select>
-                            </div>
-                        </div>
-                    {{ end }}
-                </div>
-            </fieldset>
-            <button type="submit" class="btn btn--block">Save Schedule</button>
+        <form method="post" action="/preferences" class="panel" aria-labelledby="schedule-title">
+            <header class="panel-head">
+                <span class="panel-eyebrow"><span class="panel-eyebrow-num">01</span> Training week</span>
+                <h2 class="panel-title" id="schedule-title">When are you in the gym?</h2>
+                <p class="panel-blurb">Pick a session length for each day. Rest days are honored — no plan, no nag.</p>
+            </header>
+
+            <ul class="day-list">
+                {{ range .Weekdays }}
+                    <li class="day-row {{ if eq .Minutes 0 }}day-row--rest{{ end }}">
+                        <label for="{{ .ID }}_minutes_select" class="day-name">{{ .Name }}</label>
+                        <select name="{{ .ID }}_minutes" id="{{ .ID }}_minutes_select"
+                                class="prefs-select"
+                                aria-label="{{ .Name }} workout duration">
+                            {{ $weekdayMinutes := .Minutes }}
+                            {{ range $.DurationOptions }}
+                                <option value="{{ .Value }}"
+                                        {{ if eq .Value $weekdayMinutes }}selected{{ end }}>
+                                    {{ .Label }}
+                                </option>
+                            {{ end }}
+                        </select>
+                    </li>
+                {{ end }}
+            </ul>
+
+            <div class="panel-actions">
+                <button type="submit" class="btn btn--block">Save week</button>
+            </div>
         </form>
 
-        <div class="rest-notifications-section card">
-            <style {{ nonce }}>
-                @scope (.rest-notifications-section) {
-                    :scope {
-                        padding: var(--size-6);
-                        margin-bottom: var(--size-6);
-                        box-shadow: var(--shadow-2);
-                    }
-
-                    h2 {
-                        font-size: var(--font-size-3);
-                        font-weight: var(--font-weight-6);
-                        color: var(--color-text-primary);
-                        margin-bottom: var(--size-3);
-                    }
-
-                    .status {
-                        font-size: var(--font-size-1);
-                        color: var(--color-text-secondary);
-                        margin-bottom: var(--size-3);
-                    }
-
-                    .install-steps {
-                        margin: var(--size-3) 0 0;
-                        padding-left: var(--size-5);
-                        color: var(--color-text-secondary);
-                        font-size: var(--font-size-1);
-                        line-height: 1.6;
-
-                        li {
-                            margin-bottom: var(--size-2);
-                        }
-
-                        strong {
-                            color: var(--color-text-primary);
-                            font-weight: var(--font-weight-6);
-                        }
-                    }
-
-                    .toggle-row {
-                        display: flex;
-                        align-items: center;
-                        gap: var(--size-2);
-                        margin-top: var(--size-3);
-                        font-size: var(--font-size-1);
-                    }
-
-                    .error {
-                        color: var(--color-error);
-                        font-size: var(--font-size-1);
-                        margin-top: var(--size-2);
-                    }
-
-                    .hidden {
-                        display: none;
-                    }
-                }
-            </style>
-
-            <h2>Rest notifications</h2>
+        <section class="panel" aria-labelledby="notif-title">
+            <header class="panel-head">
+                <span class="panel-eyebrow"><span class="panel-eyebrow-num">02</span> Notifications</span>
+                <h2 class="panel-title" id="notif-title">Rest timer pings</h2>
+                <p class="panel-blurb">Get a push when each set's rest period ends, so you can stay off your screen between sets.</p>
+            </header>
 
             <div data-rest-notifications data-vapid-key="{{ .VAPIDPublicKey }}"
                  data-sub-count="{{ .PushSubscriptionCount }}">
                 <div class="not-standalone hidden">
-                    <p class="status">
-                        Rest notifications need Petra installed to your Home Screen on iOS.
+                    <p class="notif-status">
+                        Rest pings need Petra installed to your Home Screen on iOS.
                     </p>
                     <ol class="install-steps">
                         <li>Tap the <strong>Share</strong> button in Safari's toolbar.</li>
@@ -226,24 +412,26 @@
                         <li>Open Petra from the Home Screen and come back to this page.</li>
                     </ol>
                 </div>
-                <p class="status unsupported hidden">
+                <p class="notif-status unsupported hidden">
                     This browser doesn't support web push notifications.
                 </p>
-                <div class="standalone hidden">
-                    <p class="status not-subscribed hidden">Not enabled on this device.</p>
-                    <p class="status subscribed hidden">
-                        Enabled — you'll be pinged when each rest is up.
+                <div class="standalone notif-stack hidden">
+                    <p class="notif-status not-subscribed hidden">Not enabled on this device.</p>
+                    <p class="notif-status subscribed hidden">
+                        <strong>Enabled.</strong> You'll be pinged when each rest is up.
                     </p>
-                    <button type="button" class="btn btn--ghost enable-btn hidden">Enable rest notifications</button>
-                    <button type="button" class="btn btn--danger btn--sm disable-btn hidden">Disable on this device</button>
-                    <p class="error hidden"></p>
+                    <div class="panel-actions">
+                        <button type="button" class="btn enable-btn hidden">Enable on this device</button>
+                        <button type="button" class="btn btn--ghost btn--sm disable-btn hidden">Disable on this device</button>
+                    </div>
+                    <p class="notif-error error hidden"></p>
                     <form method="post" action="/preferences/rest-notifications-toggle"
-                          class="toggle-row subscribed hidden">
+                          class="notif-toggle subscribed hidden">
                         <label>
                             <input type="checkbox" name="rest_notifications_enabled"
                                    {{ if .RestNotificationsEnabled }}checked{{ end }}
                                    onchange="this.form.submit()">
-                            Send notifications when rest is over
+                            Send pings when rest is over
                         </label>
                     </form>
                 </div>
@@ -280,11 +468,11 @@
                     standaloneEl.classList.remove('hidden');
 
                     const notSubEl = root.querySelector('.not-subscribed');
-                    const subEl = root.querySelector('.status.subscribed');
+                    const subEl = root.querySelector('.notif-status.subscribed');
                     const enableBtn = root.querySelector('.enable-btn');
                     const disableBtn = root.querySelector('.disable-btn');
-                    const toggleForm = root.querySelector('.toggle-row.subscribed');
-                    const errorEl = root.querySelector('.error');
+                    const toggleForm = root.querySelector('.notif-toggle.subscribed');
+                    const errorEl = root.querySelector('.notif-error');
                     const vapidKey = root.dataset.vapidKey;
 
                     // Show the Enable button immediately. We deliberately do NOT wait on
@@ -406,48 +594,27 @@
                     refreshUI();
                 })();
             </script>
-        </div>
+        </section>
 
-        <section class="deload-section" aria-labelledby="deload-heading">
-            <style {{ nonce }}>
-                @scope (.deload-section) {
-                    :scope {
-                        margin-top: var(--size-5);
-                        padding: var(--size-4);
-                        background: var(--color-surface);
-                        border-radius: var(--radius-2);
+        <section class="panel" aria-labelledby="deload-title">
+            <header class="panel-head">
+                <span class="panel-eyebrow"><span class="panel-eyebrow-num">03</span> Recovery</span>
+                <h2 class="panel-title" id="deload-title">Deload cycles</h2>
+                <p class="panel-blurb">Planned recovery weeks back off intensity and volume so the next block starts fresh — the goal is recovery, not progress.</p>
+            </header>
 
-                        h2 {
-                            margin-top: 0;
-                        }
-
-                        .deload-controls {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--size-3);
-                        }
-
-                        .anchor-line {
-                            font-size: var(--font-size-0);
-                            color: var(--color-text-secondary);
-                        }
-                    }
-                }
-            </style>
-
-            <h2 id="deload-heading">Deload</h2>
-            <p>Planned deload weeks give your body time to recover. On a deload week, every session
-               runs lighter and shorter — the goal is recovery, not progress.</p>
-
-            <form method="post" action="/preferences" class="deload-controls">
-                <label>
+            <form method="post" action="/preferences" class="stack">
+                <label class="toggle-card">
                     <input type="checkbox" name="deload_enabled" {{ if .DeloadEnabled }}checked{{ end }}>
-                    Enable planned deloads
+                    <span class="toggle-card-text">
+                        <span>Schedule recovery weeks</span>
+                        <span class="toggle-card-hint">Last week of each block runs light.</span>
+                    </span>
                 </label>
 
-                <label>
-                    Block length
-                    <select name="mesocycle_length">
+                <label class="field-row">
+                    <span class="field-row-label">Cycle length</span>
+                    <select name="mesocycle_length" class="prefs-select">
                         {{ range .MesocycleLengthOptions }}
                             <option value="{{ . }}" {{ if eq . $.MesocycleLength }}selected{{ end }}>
                                 {{ . }} weeks ({{ printf "%d+1" (sub . 1) }})
@@ -460,46 +627,67 @@
                     <input type="hidden" name="{{ .ID }}_minutes" value="{{ .Minutes }}">
                 {{ end }}
 
-                <button type="submit" class="btn btn--block">Save deload settings</button>
+                <div class="panel-actions">
+                    <button type="submit" class="btn btn--block">Save recovery settings</button>
+                </div>
             </form>
 
             {{ if and .DeloadEnabled (not .MesocycleAnchor.IsZero) }}
-                <p class="anchor-line">Current cycle starts on {{ .MesocycleAnchor.Format "Mon 2 Jan 2006" }}.</p>
+                <p class="anchor-note">Current cycle started {{ .MesocycleAnchor.Format "Mon 2 Jan 2006" }}.</p>
             {{ end }}
 
-            <form method="post" action="/preferences/mesocycle/restart">
-                <button type="submit" class="btn btn--ghost" {{ if not .DeloadEnabled }}disabled{{ end }}>
-                    Restart cycle from next Monday
+            <form method="post" action="/preferences/mesocycle/restart" class="panel-actions">
+                <button type="submit" class="btn btn--ghost btn--block" {{ if not .DeloadEnabled }}disabled{{ end }}>
+                    Restart cycle next Monday
                 </button>
             </form>
         </section>
 
-        <div class="data-export-section card">
-            <h2>Export Your Data</h2>
-            <p>Download all your workout data as an SQLite database file for your personal records or data
-                portability.</p>
-            <a href="/preferences/export-data" class="btn" download>
-                Download My Data
-            </a>
-        </div>
+        <section class="panel" aria-labelledby="account-title">
+            <header class="panel-head">
+                <span class="panel-eyebrow"><span class="panel-eyebrow-num">04</span> Your account</span>
+                <h2 class="panel-title" id="account-title">Data &amp; session</h2>
+            </header>
 
-        <div class="danger-zone">
-            <h2>Danger Zone</h2>
-            <p>Permanently delete your account and all your workout data. This action cannot be undone.</p>
+            <div class="util-list">
+                <div class="util-row">
+                    <div class="util-row-head">
+                        <span class="util-row-title">Export everything</span>
+                        <span class="util-row-desc">Download every workout, set, and exercise note as an SQLite file. Yours to keep, inspect, or hand off.</span>
+                    </div>
+                    <div class="panel-actions">
+                        <a href="/preferences/export-data" class="btn btn--ghost" download>
+                            Download SQLite
+                        </a>
+                    </div>
+                </div>
+
+                <div class="util-row">
+                    <div class="util-row-head">
+                        <span class="util-row-title">Sign out</span>
+                        <span class="util-row-desc">Ends this session on this device. Your data stays put.</span>
+                    </div>
+                    <div class="panel-actions">
+                        <form action="/api/logout" method="post">
+                            <button type="submit" class="btn btn--ghost">
+                                Log out
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="danger-zone" aria-labelledby="danger-title">
+            <h2 id="danger-title">Danger Zone</h2>
+            <p>Permanently delete your account and every workout you've logged. This action cannot be undone.</p>
             <form action="/preferences/delete-user" method="post"
+                  class="panel-actions"
                   onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your workout data.')">
                 <button type="submit" class="btn btn--danger">
                     Delete my data
                 </button>
             </form>
-        </div>
-
-        <footer class="footer-section">
-            <form action="/api/logout" method="post">
-                <button type="submit" class="btn btn--ghost btn--sm">
-                    Log out
-                </button>
-            </form>
-        </footer>
+        </section>
     </main>
 {{ end }}
