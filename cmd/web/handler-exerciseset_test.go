@@ -1291,3 +1291,99 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 		t.Errorf("active time-based row should not render a .weight cell")
 	}
 }
+
+// Test_application_exerciseSet_time_based_active_timer_markup verifies that
+// the active set card for a time-based exercise (Plank) emits the JS hooks
+// that the inline timed-runner script needs: a [data-timed-runner] container
+// carrying [data-target-seconds] and [hidden], a [data-timed-runner-start]
+// button (also [hidden] — JS reveals it), and a [data-cancel] button inside
+// the runner. Non-active and non-time-based cards do not match this branch
+// of the template, so the negative case is enforced structurally.
+func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	db := server.DB()
+	var plankID int
+	if err = db.QueryRowContext(ctx,
+		`SELECT id FROM exercises WHERE name = 'Plank'`).Scan(&plankID); err != nil {
+		t.Fatalf("get Plank id: %v", err)
+	}
+
+	var slotID int
+	if err = db.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+            warmup_completed_at)
+         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions WHERE workout_date = ?
+         RETURNING id`, plankID, today).Scan(&slotID); err != nil {
+		t.Fatalf("insert plank slot: %v", err)
+	}
+
+	if _, err = db.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+            weight_kg, target_value)
+         VALUES (?, 1, 0.0, 30)`, slotID); err != nil {
+		t.Fatalf("insert plank set: %v", err)
+	}
+
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
+		t.Fatalf("get exercise set page: %v", err)
+	}
+
+	activeCard := doc.Find(".exercise-set.active").First()
+	if activeCard.Length() == 0 {
+		t.Fatalf("expected an active .exercise-set on the Plank page")
+	}
+
+	runner := activeCard.Find("[data-timed-runner]")
+	if runner.Length() != 1 {
+		t.Errorf("active card: [data-timed-runner] count = %d, want 1", runner.Length())
+	}
+	if target, ok := runner.Attr("data-target-seconds"); !ok || target != "30" {
+		t.Errorf("[data-timed-runner] data-target-seconds = %q (present=%v), want %q",
+			target, ok, "30")
+	}
+	if _, hasHidden := runner.Attr("hidden"); !hasHidden {
+		t.Errorf("[data-timed-runner] must be server-rendered with [hidden]")
+	}
+
+	startBtn := activeCard.Find("[data-timed-runner-start]")
+	if startBtn.Length() != 1 {
+		t.Errorf("active card: [data-timed-runner-start] count = %d, want 1", startBtn.Length())
+	}
+	if _, hasHidden := startBtn.Attr("hidden"); !hasHidden {
+		t.Errorf("[data-timed-runner-start] must be server-rendered with [hidden]")
+	}
+
+	cancelBtn := runner.Find("[data-cancel]")
+	if cancelBtn.Length() != 1 {
+		t.Errorf("[data-cancel] count inside runner = %d, want 1", cancelBtn.Length())
+	}
+}
