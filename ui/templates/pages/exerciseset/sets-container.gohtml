@@ -563,11 +563,10 @@
                     {{ else if eq $.ExerciseSet.Exercise.ExerciseType "time_based" }}
                         <div class="timed-runner" data-timed-runner
                              data-target-seconds="{{ $.CurrentSetTimedTarget }}"
-                             aria-live="polite"
                              hidden>
                             <div class="timed-runner-display" data-phase="idle">
-                                <span class="timed-runner-label" data-label>Get ready</span>
-                                <span class="timed-runner-time" data-time>0:10</span>
+                                <span class="timed-runner-label" data-label aria-live="polite">Get ready</span>
+                                <span class="timed-runner-time" data-time aria-hidden="true">0:10</span>
                             </div>
                             <button type="button" class="timed-runner-cancel" data-cancel>Cancel</button>
                         </div>
@@ -685,7 +684,15 @@
                                 async function acquireWakeLock() {
                                     if (!('wakeLock' in navigator)) return;
                                     try {
-                                        wakeLock = await navigator.wakeLock.request('screen');
+                                        const sentinel = await navigator.wakeLock.request('screen');
+                                        if (phase === 'idle') {
+                                            sentinel.release().catch((err) => console.debug('wake lock release failed', err));
+                                            return;
+                                        }
+                                        sentinel.addEventListener('release', () => {
+                                            if (wakeLock === sentinel) wakeLock = null;
+                                        });
+                                        wakeLock = sentinel;
                                     } catch (err) {
                                         console.debug('wake lock request failed', err);
                                     }
