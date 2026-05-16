@@ -122,7 +122,7 @@ func Test_application_exerciseSet(t *testing.T) {
 
 	// Complete the warmup first
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+		return s.Find("button:contains('Mark done')").Length() > 0
 	}).First()
 
 	if warmupForm.Length() > 0 {
@@ -317,7 +317,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 		t.Fatalf("Get slot page: %v", err)
 	}
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+		return s.Find("button:contains('Mark done')").Length() > 0
 	}).First()
 	if warmupForm.Length() > 0 {
 		action, _ := warmupForm.Attr("action")
@@ -977,7 +977,7 @@ func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
 
 	// Complete warmup.
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+		return s.Find("button:contains('Mark done')").Length() > 0
 	}).First()
 	if warmupForm.Length() == 0 {
 		t.Fatal("warmup form not found")
@@ -1120,7 +1120,7 @@ func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {
 
 	// Complete the warmup so the set form becomes active.
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button:contains('Mark Warmup Complete')").Length() > 0
+		return s.Find("button:contains('Mark done')").Length() > 0
 	}).First()
 	if warmupForm.Length() == 0 {
 		t.Fatal("warmup form not found on deload exercise-set page")
