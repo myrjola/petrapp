@@ -85,7 +85,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Check for weight and reps information
-	if doc.Find(".weight").Length() == 0 || doc.Find(".reps").Length() == 0 {
+	if doc.Find(".set-weight").Length() == 0 || doc.Find(".set-reps").Length() == 0 {
 		t.Error("Expected to find weight and reps information")
 	}
 
@@ -193,7 +193,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Find the "Edit" link in the first completed set
-	editLink := doc.Find(".exercise-set.completed .edit-link").First()
+	editLink := doc.Find(".exercise-set.completed .set-edit").First()
 	if editLink.Length() == 0 {
 		t.Fatalf("No edit button found for completed set")
 	}
@@ -248,13 +248,13 @@ func Test_application_exerciseSet(t *testing.T) {
 
 	// Verify the updated values are shown
 	// Extract the first completed set's weight
-	setWeight := doc.Find(".exercise-set.completed .weight").First().Text()
+	setWeight := doc.Find(".exercise-set.completed .set-weight").First().Text()
 	if setWeight == "" {
 		t.Error("Expected to find weight in completed set")
 	}
 
 	// Extract the reps value
-	setReps := doc.Find(".exercise-set.completed .reps").First().Text()
+	setReps := doc.Find(".exercise-set.completed .set-reps").First().Text()
 	if setReps == "" {
 		t.Error("Expected to find reps in completed set")
 	}
@@ -1227,11 +1227,11 @@ func Test_computeSetActive(t *testing.T) {
 }
 
 // Test_application_exerciseSet_time_based_active_oversized_layout verifies that
-// the active oversized treatment for a time-based exercise (Plank) renders as a
-// single-column .time cell (not the two-column .weight + .reps grid used for
-// weighted exercises) and that the column-header label reads "Time" via the
-// .time::before pseudo-element. Locks Increment 4.2's :has(.weight)-driven
-// single-column switch in against regression.
+// the active hero treatment for a time-based exercise (Plank) renders a single
+// figure with the seconds unit (not the weight × reps hero used for weighted
+// exercises). The hero is the .active-hero element inside the active card; for
+// time-based it carries one figure span with the target value and a .unit span
+// reading "sec", with no weight span anywhere on the card.
 func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.T) {
 	var (
 		ctx = t.Context()
@@ -1296,23 +1296,39 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 		t.Fatalf("get exercise set page: %v", err)
 	}
 
-	activeRow := doc.Find(".exercise-set.active .set-info").First()
-	if activeRow.Length() == 0 {
-		t.Fatalf("expected an active .set-info row on the Plank page")
+	activeCard := doc.Find(".exercise-set.active").First()
+	if activeCard.Length() == 0 {
+		t.Fatalf("expected an active .exercise-set card on the Plank page")
 	}
 
-	timeCell := activeRow.Find(".time")
-	if timeCell.Length() == 0 {
-		t.Errorf("expected .time cell on active time-based row, got none")
-	}
-	if v := strings.TrimSpace(timeCell.Find(".value").Text()); v != "30" {
-		t.Errorf("active .time .value = %q, want %q (no trailing 's' suffix)", v, "30")
+	hero := activeCard.Find(".active-hero")
+	if hero.Length() == 0 {
+		t.Fatalf("expected .active-hero inside the active time-based card")
 	}
 
-	// Single-column condition: no .weight cell renders alongside .time, which
-	// is what triggers the :not(:has(.weight)) → 1-col layout switch.
-	if activeRow.Find(".weight").Length() != 0 {
-		t.Errorf("active time-based row should not render a .weight cell")
+	// The hero for time-based renders exactly one figure span containing the
+	// target value followed by a .unit span. Extract the figure text minus the
+	// unit to get the bare value.
+	figure := hero.Children().First()
+	if figure.Length() == 0 {
+		t.Fatalf("expected a figure span inside .active-hero")
+	}
+	unit := figure.Find(".unit")
+	if v := strings.TrimSpace(unit.Text()); v != "sec" {
+		t.Errorf("active hero .unit text = %q, want %q", v, "sec")
+	}
+	if v := strings.TrimSpace(strings.Replace(figure.Text(), unit.Text(), "", 1)); v != "30" {
+		t.Errorf("active hero figure value = %q, want %q (no trailing 's' suffix)", v, "30")
+	}
+
+	// Time-based heroes carry a single figure: no weight/reps grid, and no
+	// .set-weight cell from the planned-row markup either.
+	if activeCard.Find(".set-weight").Length() != 0 {
+		t.Errorf("active time-based card should not render a .set-weight cell")
+	}
+	if hero.Children().Length() != 1 {
+		t.Errorf("active time-based hero should have exactly 1 child span, got %d",
+			hero.Children().Length())
 	}
 }
 

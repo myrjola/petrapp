@@ -515,14 +515,14 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Fatalf("expect load after warmup complete: %v", err)
 	}
 
-	// Submit the first set via the "No" (too-heavy) signal submit button. The
-	// reps input is pre-filled with the target; we override it before clicking
-	// the named submit button, which sends signal=too_heavy along with the form.
+	// Submit the first set via the "too heavy" signal submit button. The reps
+	// input is pre-filled with the target; we override it before clicking the
+	// named submit button, which sends signal=too_heavy along with the form.
 	if err = page.GetByLabel("Actual reps").First().Fill("8"); err != nil {
 		t.Fatalf("fill actual reps: %v", err)
 	}
 	if err = page.Locator("button.too-heavy-btn").First().Click(); err != nil {
-		t.Fatalf("click No (too-heavy) signal: %v", err)
+		t.Fatalf("click too-heavy signal: %v", err)
 	}
 	// After the set update, navigation.navigate(target, {history: 'replace'})
 	// fires (target equals current URL → client auto-replaces). Wait for the
