@@ -95,24 +95,36 @@ function startLoad(el) {
     // Only buttons show the inline spinner — anchor labels are part of page
     // content and overlaying a spinner right before the browser tears down
     // the document for a GET navigation is noisy without being reliably
-    // visible. The button keeps its label in the DOM; CSS hides the text
-    // (preserving the button's width and height) and paints the spinner via
-    // ::after, which is why we do not swap textContent.
+    // visible. We wrap the button's children in a .btn-loading-label span
+    // and hide it with visibility:hidden; the span still participates in
+    // layout, so the button keeps its exact width and height while the
+    // ::after spinner replaces the visible label. Stashing the original
+    // child nodes lets clearLoad — including the bfcache pageshow.persisted
+    // path — restore the button to its pre-click DOM.
     const target = (el instanceof HTMLButtonElement && el.textContent?.trim()) ? el : null
+    let originalChildren = null
     if (target) {
+        originalChildren = Array.from(target.childNodes)
+        const label = document.createElement('span')
+        label.className = 'btn-loading-label'
+        label.append(...originalChildren)
+        target.appendChild(label)
         target.setAttribute('aria-busy', 'true')
     }
 
     document.getElementById('loading-bar').classList.add('active')
     document.getElementById('loading-announce').textContent = 'Loading…'
 
-    activeLoad = { target }
+    activeLoad = { target, originalChildren }
 }
 
 function clearLoad() {
     if (!activeLoad) return
     if (activeLoad.target && activeLoad.target.isConnected) {
         activeLoad.target.removeAttribute('aria-busy')
+        if (activeLoad.originalChildren) {
+            activeLoad.target.replaceChildren(...activeLoad.originalChildren)
+        }
     }
     document.getElementById('loading-bar').classList.remove('active')
     document.getElementById('loading-announce').textContent = ''
