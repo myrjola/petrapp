@@ -573,6 +573,54 @@
                         </div>
                         <button type="button" class="submit-button timed-runner-start"
                                 data-timed-runner-start hidden>Start timer</button>
+                        <style {{ nonce }}>
+                            @scope (.timed-runner) {
+                                :scope {
+                                    display: flex;
+                                    flex-direction: column;
+                                    align-items: center;
+                                    gap: var(--size-3);
+                                    padding: var(--size-4);
+                                    margin-bottom: var(--size-3);
+                                    background: var(--color-info-bg);
+                                    color: var(--color-info);
+                                    border-radius: var(--radius-3);
+                                }
+                                .timed-runner-display {
+                                    display: flex;
+                                    flex-direction: column;
+                                    align-items: center;
+                                    gap: var(--size-1);
+                                }
+                                .timed-runner-label {
+                                    font-size: var(--font-size-0);
+                                    text-transform: uppercase;
+                                    letter-spacing: var(--font-letterspacing-3);
+                                    font-weight: var(--font-weight-7);
+                                }
+                                .timed-runner-time {
+                                    font-family: var(--font-mono);
+                                    font-size: var(--font-size-7);
+                                    font-weight: var(--font-weight-8);
+                                    line-height: 1;
+                                    font-variant-numeric: tabular-nums;
+                                }
+                                .timed-runner-display[data-phase="exercise"] {
+                                    color: var(--color-success);
+                                }
+                                .timed-runner-cancel {
+                                    padding: var(--size-1) var(--size-3);
+                                    background: transparent;
+                                    color: inherit;
+                                    border: var(--border-size-1) solid currentColor;
+                                    border-radius: var(--radius-2);
+                                    font-size: var(--font-size-0);
+                                    text-transform: uppercase;
+                                    letter-spacing: var(--font-letterspacing-3);
+                                    cursor: pointer;
+                                }
+                            }
+                        </style>
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
