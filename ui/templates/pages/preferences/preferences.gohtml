@@ -64,7 +64,7 @@
                             min-width: 8rem;
 
                             &:focus {
-                                outline: 2px solid var(--color-success);
+                                outline: 2px solid var(--color-border-focus);
                                 outline-offset: 2px;
                             }
                         }
@@ -460,7 +460,7 @@
                     <input type="hidden" name="{{ .ID }}_minutes" value="{{ .Minutes }}">
                 {{ end }}
 
-                <button type="submit">Save deload settings</button>
+                <button type="submit" class="btn btn--block">Save deload settings</button>
             </form>
 
             {{ if and .DeloadEnabled (not .MesocycleAnchor.IsZero) }}
@@ -468,7 +468,7 @@
             {{ end }}
 
             <form method="post" action="/preferences/mesocycle/restart">
-                <button type="submit" {{ if not .DeloadEnabled }}disabled{{ end }}>
+                <button type="submit" class="btn btn--ghost" {{ if not .DeloadEnabled }}disabled{{ end }}>
                     Restart cycle from next Monday
                 </button>
             </form>
