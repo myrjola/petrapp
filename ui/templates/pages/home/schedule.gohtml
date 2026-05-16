@@ -1,58 +1,101 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
 
 {{ define "schedule" }}
-    <main class="stack">
+    <main class="week-page">
         <style {{ nonce }}>
-            @scope {
+            @scope (.week-page) {
                 :scope {
-                    padding: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-5);
+                    max-width: 640px;
+                    margin-inline: auto;
+                    padding: var(--size-4) var(--size-4) var(--size-9);
                 }
 
-                .menu-button {
-                    margin-left: auto;
+                .week-head {
+                    padding-top: var(--size-3);
                 }
 
-                .weekly-schedule {
-                    gap: var(--size-3);
+                .week-eyebrow {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    margin-bottom: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-6);
+                    color: var(--clay-4);
+                }
+
+                .week-eyebrow .dot {
+                    color: var(--stone-4);
+                }
+
+                .week-eyebrow .deload {
+                    color: var(--ember);
+                    font-weight: var(--font-weight-7);
+                }
+
+                .week-eyebrow .eyebrow-rule {
+                    flex: 1;
+                    height: 1px;
+                    background: linear-gradient(to right, var(--stone-3), transparent);
+                }
+
+                .week-eyebrow .settings-link {
+                    color: var(--color-text-secondary);
+                    text-decoration: none;
+                    padding: var(--size-1) var(--size-2);
+                    border-radius: var(--radius-2);
+                    transition:
+                        color var(--duration-2) var(--ease-out-quiet),
+                        background var(--duration-2) var(--ease-out-quiet);
+                }
+
+                .week-eyebrow .settings-link:hover {
+                    color: var(--color-text-primary);
+                    background: var(--color-surface-elevated);
+                }
+
+                .week-eyebrow .settings-link:focus-visible {
+                    outline: 2px solid var(--color-border-focus);
+                    outline-offset: 2px;
+                }
+
+                .week-title {
+                    font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
+                    font-weight: var(--font-weight-6);
+                    font-size: clamp(2.25rem, 9vw, 3rem);
+                    line-height: 0.95;
+                    letter-spacing: -0.025em;
+                    color: var(--color-text-primary);
                 }
             }
         </style>
 
-        {{ template "page-header" .Header }}
-
-        <header class="menu-button">
-            <a href="/preferences" class="btn btn--ghost btn--sm">
-                Menu
-            </a>
+        <header class="week-head">
+            <div class="week-eyebrow">
+                {{ if .Days }}
+                    <span>{{ (index .Days 0).Date.Format "Jan 2" }} — {{ (index .Days 6).Date.Format "Jan 2" }}</span>
+                {{ end }}
+                {{ if .DeloadEnabled }}
+                    <span class="dot">·</span>
+                    <span>Week {{ .WeekInBlock }}/{{ .MesocycleLength }}</span>
+                    {{ if .IsDeloadWeek }}
+                        <span class="dot">·</span>
+                        <span class="deload">Deload</span>
+                    {{ end }}
+                {{ end }}
+                <span class="eyebrow-rule" aria-hidden="true"></span>
+                <a href="/preferences" class="settings-link">Settings</a>
+            </div>
+            <h1 class="week-title">{{ .Header.Title }}</h1>
         </header>
 
-        {{ if .DeloadEnabled }}
-            <style {{ nonce }}>
-                @scope (.week-chip) {
-                    :scope {
-                        display: inline-block;
-                        padding: var(--size-1) var(--size-2);
-                        border-radius: var(--radius-2);
-                        background: var(--stone-1);
-                        color: var(--color-text-primary);
-                        font-size: var(--font-size-0);
-
-                        &.week-chip--deload {
-                            background: var(--clay-1);
-                            color: var(--clay-6);
-                            font-weight: var(--font-weight-7);
-                        }
-                    }
-                }
-            </style>
-            <span class="week-chip{{ if .IsDeloadWeek }} week-chip--deload{{ end }}">
-                Week {{ .WeekInBlock }} of {{ .MesocycleLength }}{{ if .IsDeloadWeek }} · Deload{{ end }}
-            </span>
-        {{ end }}
-
-        <div class="weekly-schedule stack">
-            {{ template "day-cards" . }}
-        </div>
+        {{ template "day-cards" . }}
 
         {{ template "muscle-balance" . }}
     </main>
