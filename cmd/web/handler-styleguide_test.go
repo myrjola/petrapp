@@ -103,4 +103,29 @@ func Test_application_styleguide(t *testing.T) {
 	if describedBy != "" && doc.Find("#"+describedBy).Length() == 0 {
 		t.Errorf("expected an element with id %q for aria-describedby", describedBy)
 	}
+
+	// Button variants — every variant + modifier renders on the styleguide.
+	if doc.Find("h3:contains('Button variants')").Length() == 0 {
+		t.Error("expected a 'Button variants' section on the styleguide")
+	}
+	for _, cls := range []string{
+		".btn",
+		".btn.btn--quiet",
+		".btn.btn--ghost",
+		".btn.btn--danger",
+		".btn.btn--focus",
+		".btn.btn--sm",
+		".btn.btn--block",
+	} {
+		if doc.Find(cls).Length() == 0 {
+			t.Errorf("expected a %s example on the styleguide", cls)
+		}
+	}
+	// Disabled and aria-busy examples too, so the rule visibly covers them.
+	if doc.Find(".btn:disabled, button.btn[disabled]").Length() == 0 {
+		t.Error("expected a disabled button example on the styleguide")
+	}
+	if doc.Find(`.btn[aria-busy="true"]`).Length() == 0 {
+		t.Error("expected an aria-busy button example on the styleguide")
+	}
 }

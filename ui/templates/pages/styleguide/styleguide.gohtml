@@ -396,11 +396,31 @@
         <section>
             <h2>Components</h2>
 
-            <h3>Buttons</h3>
+            <h3>Button variants</h3>
             <div class="component-sample">
-                <button type="button">Default</button>
-                <a class="btn" href="#">Anchor as button</a>
-                <button type="button" aria-busy="true">Loading</button>
+                <button type="button" class="btn">Primary</button>
+                <button type="button" class="btn btn--quiet">Quiet</button>
+                <button type="button" class="btn btn--ghost">Ghost</button>
+                <button type="button" class="btn btn--danger">Danger</button>
+                <button type="button" class="btn btn--focus">Focus</button>
+                <a class="btn" href="#">Anchor as primary</a>
+            </div>
+
+            <h3>Button modifiers</h3>
+            <div class="component-sample">
+                <button type="button" class="btn btn--sm">Small primary</button>
+                <button type="button" class="btn btn--ghost btn--sm">Small ghost</button>
+                <button type="button" class="btn btn--danger btn--sm">Small danger</button>
+            </div>
+            <div class="component-sample">
+                <button type="button" class="btn btn--block">Block primary</button>
+            </div>
+
+            <h3>Button states</h3>
+            <div class="component-sample">
+                <button type="button" class="btn" disabled>Disabled</button>
+                <button type="button" class="btn btn--danger" disabled>Disabled danger</button>
+                <button type="button" class="btn" aria-busy="true">Loading</button>
             </div>
 
             <h3>Back link</h3>
