@@ -44,13 +44,18 @@
                             justify-items: center;
                             padding: var(--size-2) 0;
 
+                            &:not(:has(.weight)) {
+                                grid-template-columns: 1fr;
+                            }
+
                             @media (max-width: 380px) {
                                 grid-template-columns: 1fr;
                                 gap: var(--size-3);
                             }
 
                             .weight,
-                            .reps {
+                            .reps,
+                            .time {
                                 display: flex;
                                 flex-direction: column;
                                 align-items: center;
@@ -64,9 +69,11 @@
 
                             .weight::before { content: "Weight"; }
                             .reps::before { content: "Reps"; }
+                            .time::before { content: "Time"; }
 
                             .weight .value,
-                            .reps .value {
+                            .reps .value,
+                            .time .value {
                                 display: block;
                                 font-size: var(--font-size-fluid-3);
                                 font-family: var(--font-mono);
@@ -475,7 +482,7 @@
                             <span class="reps" aria-label="Completed value">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
                             <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else if and (eq $.ExerciseSet.Exercise.ExerciseType "time_based") $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
-                            <span class="reps" aria-label="Recommended target"><span class="value">{{ $.CurrentSetTimedTarget }}</span>s</span>
+                            <span class="time" aria-label="Target time in seconds"><span class="value">{{ $.CurrentSetTimedTarget }}</span></span>
                         {{ else }}
                             <span class="reps" aria-label="Target value"><span class="value">{{ $setDisplay.TargetStr }}</span> {{ $setDisplay.Unit }}</span>
                         {{ end }}
