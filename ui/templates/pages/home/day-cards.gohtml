@@ -1,142 +1,317 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
 
 {{ define "day-cards" }}
-    <style {{ nonce }}>
-        @scope {
-            .day-card {
-                display: flex;
-                flex-direction: column;
-                gap: var(--size-2);
-                transition: all 0.2s ease;
-
-                &[data-status="today"] {
-                    border-color: var(--clay-3);
-                    background: var(--color-surface-active);
-                    box-shadow: var(--shadow-2);
+    <section class="weekly-schedule" aria-label="Weekly schedule">
+        <style {{ nonce }}>
+            @scope (.weekly-schedule) {
+                :scope {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-2);
                 }
 
-                &[data-status="completed"] {
-                    border-color: var(--color-success);
-                    background: var(--color-success-bg);
-                }
-
-                &[data-status="in_progress"] {
-                    border-color: var(--color-warning);
-                    background: var(--color-warning-bg);
-                }
-
-                &[data-status="past-incomplete"] {
-                    border-color: var(--color-error);
-                    background: var(--color-error-bg);
-                }
-
-                &[data-status="unscheduled"] {
-                    border-color: var(--stone-4);
-                    background: var(--stone-1);
-                    border-style: dashed;
-                    border-width: 1px;
-                    opacity: 0.7;
-                }
-
-                &[data-status="upcoming"] {
-                    border-color: var(--color-border);
+                .day {
+                    position: relative;
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    column-gap: var(--size-3);
+                    row-gap: var(--size-2);
+                    padding: var(--size-4);
+                    border-radius: var(--radius-3);
                     background: var(--color-surface-elevated);
-                }
-            }
-
-            .day-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            .day-title {
-                font-weight: var(--font-weight-6);
-                font-size: var(--font-size-4);
-            }
-
-            .day-date {
-                color: var(--color-text-secondary);
-                font-size: var(--font-size-0);
-            }
-
-            .status-indicator {
-                display: inline-flex;
-                align-items: center;
-                gap: var(--size-1);
-                padding: var(--size-1) var(--size-2);
-                border-radius: var(--radius-2);
-                font-size: var(--font-size-1);
-                font-weight: var(--font-weight-5);
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-
-                &[data-status="completed"] {
-                    background: var(--color-success-bg);
-                    color: var(--color-success);
+                    border: var(--border-size-1) solid transparent;
+                    box-shadow: var(--shadow-1);
+                    transition:
+                        box-shadow var(--duration-2) var(--ease-out-quiet),
+                        border-color var(--duration-2) var(--ease-out-quiet);
                 }
 
-                &[data-status="in_progress"] {
-                    background: var(--color-warning-bg);
-                    color: var(--color-warning);
-                }
-
-                &[data-status="upcoming"] {
-                    background: var(--stone-2);
-                    color: var(--color-text-primary);
-                }
-
-                &[data-status="past-incomplete"] {
-                    background: var(--color-error-bg);
-                    color: var(--color-error);
-                }
-
-                &[data-status="unscheduled"] {
-                    background: var(--stone-2);
-                    color: var(--color-text-primary);
-                    border: 1px dashed var(--stone-5);
-                }
-
-                &[data-status="today"] {
-                    background: var(--clay-1);
-                    color: var(--clay-6);
+                /* Top row: mono date overline + right-aligned status meta. Spans full width. */
+                .day-overline {
+                    grid-column: 1 / -1;
+                    display: flex;
+                    align-items: baseline;
+                    gap: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    color: var(--color-text-secondary);
                     font-weight: var(--font-weight-6);
                 }
+
+                .day-overline .day-status {
+                    margin-left: auto;
+                    font-weight: var(--font-weight-7);
+                    color: var(--color-text-secondary);
+                }
+
+                /* Serif day name — the editorial anchor. */
+                .day-name {
+                    grid-column: 1;
+                    align-self: center;
+                    margin: 0;
+                    font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-5);
+                    line-height: 1;
+                    letter-spacing: -0.02em;
+                    color: var(--color-text-primary);
+                }
+
+                .day-action {
+                    grid-column: 2;
+                    align-self: center;
+                    justify-self: end;
+                }
+
+                .day-action form {
+                    margin: 0;
+                }
+
+                /* Slim sub-row: 3px rule + tiny mono caption. Spans full width. */
+                .day-progress {
+                    grid-column: 1 / -1;
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-3);
+                    padding-top: var(--size-1);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-1);
+                    color: var(--color-text-secondary);
+                }
+
+                .day-progress .progress-rule {
+                    flex: 1;
+                    height: 3px;
+                    background: var(--stone-2);
+                    border-radius: var(--radius-round);
+                    overflow: hidden;
+                }
+
+                .day-progress .progress-fill {
+                    height: 100%;
+                    background: var(--stone-5);
+                    transition: width var(--duration-3) var(--ease-out-quiet);
+                }
+
+                /* Quiet text action — used for every non-today action.
+                   Works as both <a> and <button> because we explicitly
+                   reset button defaults (background, border, font). */
+                .day-text-action {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: var(--size-1);
+                    min-height: 2rem;
+                    padding: var(--size-1) var(--size-2);
+                    margin: 0;
+                    background: transparent;
+                    border: none;
+                    border-radius: var(--radius-2);
+                    color: var(--clay-5);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    font-weight: var(--font-weight-7);
+                    letter-spacing: var(--font-letterspacing-2);
+                    text-transform: uppercase;
+                    text-decoration: none;
+                    cursor: pointer;
+                    transition:
+                        background var(--duration-2) var(--ease-out-quiet),
+                        color var(--duration-2) var(--ease-out-quiet);
+                }
+
+                .day-text-action:hover {
+                    background: color-mix(in oklab, var(--clay-1) 60%, transparent);
+                    color: var(--clay-6);
+                }
+
+                .day-text-action:focus-visible {
+                    outline: 2px solid var(--color-border-focus);
+                    outline-offset: 2px;
+                }
+
+                .day-text-action .arrow {
+                    display: inline-block;
+                    transition: transform var(--duration-2) var(--ease-out-quiet);
+                }
+
+                .day-text-action:hover .arrow {
+                    transform: translateX(2px);
+                }
+
+                /* Today's primary CTA — keep the brown button only here, where the
+                   warm clay wash makes the pairing read as intentional, not loud. */
+                .day-cta {
+                    min-height: 2.5rem;
+                    padding: var(--size-2) var(--size-5);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--clay-6) 50%, transparent);
+                }
+
+                /* Shared left ribbon for active states (today / in-progress / completed). */
+                .day[data-ribbon]::before {
+                    content: "";
+                    position: absolute;
+                    left: 0;
+                    top: var(--size-3);
+                    bottom: var(--size-3);
+                    width: 3px;
+                    border-radius: 0 3px 3px 0;
+                }
+
+                /* ──── Status variants ──── */
+
+                /* Today — warm clay wash, clay ribbon, brown CTA. */
+                .day[data-status="today"] {
+                    background: var(--clay-0);
+                    border-color: color-mix(in oklab, var(--clay-3) 45%, transparent);
+                    box-shadow: var(--shadow-2);
+                }
+                .day[data-status="today"]::before { background: var(--clay-4); }
+                .day[data-status="today"] .day-status { color: var(--clay-5); }
+                .day[data-status="today"] .progress-fill { background: var(--clay-4); }
+
+                /* In-progress — amber wash, warning ribbon. */
+                .day[data-status="in_progress"] {
+                    background: var(--color-warning-bg);
+                }
+                .day[data-status="in_progress"]::before { background: var(--color-warning); }
+                .day[data-status="in_progress"] .day-status { color: var(--color-warning); }
+                .day[data-status="in_progress"] .progress-fill { background: var(--color-warning); }
+                .day[data-status="in_progress"] .day-text-action {
+                    color: var(--color-warning);
+                }
+                .day[data-status="in_progress"] .day-text-action:hover {
+                    background: color-mix(in oklab, var(--color-warning) 12%, transparent);
+                    color: color-mix(in oklab, var(--color-warning) 80%, black);
+                }
+
+                /* Completed — sage wash, success ribbon, struck-through day name. */
+                .day[data-status="completed"] {
+                    background: var(--color-success-bg);
+                }
+                .day[data-status="completed"]::before { background: var(--color-success); }
+                .day[data-status="completed"] .day-name {
+                    color: var(--color-success);
+                    text-decoration: line-through;
+                    text-decoration-color: color-mix(in oklab, var(--color-success) 35%, transparent);
+                    text-decoration-thickness: 2px;
+                }
+                .day[data-status="completed"] .day-status { color: var(--color-success); }
+                .day[data-status="completed"] .progress-fill { background: var(--color-success); }
+                .day[data-status="completed"] .day-text-action {
+                    color: var(--color-success);
+                }
+                .day[data-status="completed"] .day-text-action:hover {
+                    background: color-mix(in oklab, var(--color-success) 12%, transparent);
+                    color: color-mix(in oklab, var(--color-success) 80%, black);
+                }
+
+                /* Missed — warm ochre wash (NOT red), dimmed warning ribbon. */
+                .day[data-status="past-incomplete"] {
+                    background: color-mix(in oklab, var(--color-warning-bg) 55%, var(--stone-1));
+                }
+                .day[data-status="past-incomplete"]::before {
+                    background: color-mix(in oklab, var(--color-warning) 75%, var(--stone-5));
+                }
+                .day[data-status="past-incomplete"] .day-name { color: var(--stone-7); }
+                .day[data-status="past-incomplete"] .day-status { color: var(--color-warning); }
+                .day[data-status="past-incomplete"] .progress-fill { background: var(--stone-5); }
+                .day[data-status="past-incomplete"] .day-text-action {
+                    color: var(--color-warning);
+                }
+                .day[data-status="past-incomplete"] .day-text-action:hover {
+                    background: color-mix(in oklab, var(--color-warning) 12%, transparent);
+                    color: color-mix(in oklab, var(--color-warning) 80%, black);
+                }
+
+                /* Upcoming — clean elevated surface, quiet meta. */
+                .day[data-status="upcoming"] {
+                    background: var(--color-surface-elevated);
+                }
+                .day[data-status="upcoming"] .day-status {
+                    color: var(--color-text-secondary);
+                }
+
+                /* Unscheduled — barely-there dashed hairline, no ribbon. */
+                .day[data-status="unscheduled"] {
+                    background: transparent;
+                    border: var(--border-size-1) dashed var(--stone-4);
+                    box-shadow: none;
+                }
+                .day[data-status="unscheduled"] .day-name {
+                    color: var(--color-text-secondary);
+                    font-weight: var(--font-weight-5);
+                }
+                .day[data-status="unscheduled"] .day-status {
+                    color: var(--color-text-muted);
+                    font-weight: var(--font-weight-5);
+                }
+                .day[data-status="unscheduled"] .day-overline {
+                    color: var(--color-text-muted);
+                }
             }
-        }
-    </style>
+        </style>
 
-    {{ range .Days }}
-        <div class="day-card card" data-status="{{ .Status }}">
-            <div class="day-header">
-                <div>
-                    <div class="day-title">
-                        {{ .Name }}
-                    </div>
-                    <div class="day-date">{{ .Date.Format "Jan 2, 2006" }}</div>
+        {{ range .Days }}
+            <article class="day"
+                     data-status="{{ .Status }}"
+                     data-day="{{ .Date.Format "2006-01-02" }}"
+                     {{ if or (eq .Status "today") (eq .Status "in_progress") (eq .Status "completed") (eq .Status "past-incomplete") }}data-ribbon{{ end }}>
+
+                <div class="day-overline">
+                    <span>{{ .Date.Format "Jan 2" }}</span>
+                    <span class="day-status">{{ .StatusLabel }}</span>
                 </div>
-                <div class="status-indicator" data-status="{{ .Status }}">
-                    {{ .StatusLabel }}
-                </div>
-            </div>
 
-            {{ template "progress-bar" . }}
+                <h2 class="day-name">{{ .Name }}</h2>
 
-            <div class="workout-actions cluster">
                 {{ if .Action }}
-                    {{ if .Action.StartWorkout }}
-                        <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                            <button type="submit">
-                                {{ .Action.Label }}
-                            </button>
-                        </form>
-                    {{ else }}
-                        <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="btn">
-                            {{ .Action.Label }}
-                        </a>
+                    <div class="day-action">
+                        {{ if eq .Status "today" }}
+                            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                                <button type="submit" class="btn day-cta">{{ .Action.Label }}</button>
+                            </form>
+                        {{ else if .Action.StartWorkout }}
+                            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                                <button type="submit" class="day-text-action">
+                                    {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
+                                </button>
+                            </form>
+                        {{ else }}
+                            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="day-text-action">
+                                {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
+                            </a>
+                        {{ end }}
+                    </div>
+                {{ end }}
+
+                {{ if .ShouldShowProgress }}
+                    <div class="day-progress">
+                        <div class="progress-rule" aria-hidden="true">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <span>{{ .CompletedSets }} / {{ .TotalSets }} sets</span>
+                    </div>
+                {{ end }}
+            </article>
+        {{ end }}
+
+        {{- /* Per-day progress widths — emitted from a nonce'd <style> so CSP is happy. */ -}}
+        <style {{ nonce }}>
+            @scope (.weekly-schedule) {
+                {{ range .Days }}
+                    {{ if .ShouldShowProgress }}
+                        .day[data-day="{{ .Date.Format "2006-01-02" }}"] .progress-fill {
+                            width: {{ .ProgressPercent }}%;
+                        }
                     {{ end }}
                 {{ end }}
-            </div>
-        </div>
-    {{ end }}
+            }
+        </style>
+    </section>
 {{ end }}

@@ -299,9 +299,9 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 10: Logout.
-	menuLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Menu"})
-	if err = menuLink.Click(); err != nil {
-		t.Fatalf("click Menu link: %v", err)
+	settingsLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Settings"})
+	if err = settingsLink.Click(); err != nil {
+		t.Fatalf("click Settings link: %v", err)
 	}
 	if err = logOutBtn.Click(); err != nil {
 		t.Fatalf("logout click: %v", err)
