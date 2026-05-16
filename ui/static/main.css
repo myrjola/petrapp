@@ -474,6 +474,27 @@
         color: var(--clay-6);
     }
 
+    .sheet-dialog {
+        padding: var(--size-3);
+        border: none;
+        position: fixed;
+        inset: 0;
+        transform: translateY(100%);
+        animation: sheet-dialog-slide-up 0.3s ease-in-out forwards;
+        transition-behavior: allow-discrete;
+    }
+
+    .sheet-dialog::backdrop {
+        background-color: rgba(0, 0, 0, 0.5);
+        animation: fade-in 0.3s ease-out forwards;
+    }
+
+    .sheet-dialog__close {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: var(--size-3);
+    }
+
     .card {
         display: block;
         padding: var(--size-3);
@@ -549,6 +570,11 @@
     to {
         opacity: 0;
     }
+}
+
+@keyframes sheet-dialog-slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
 }
 
 @view-transition {
