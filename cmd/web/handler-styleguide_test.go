@@ -56,6 +56,17 @@ func Test_application_styleguide(t *testing.T) {
 		t.Error("expected a .card example on the styleguide")
 	}
 
+	// Muscle-chip — pill used by exercise-info / -add / -swap pages.
+	if doc.Find("h2:contains('Muscle chip')").Length() == 0 {
+		t.Error("expected a 'Muscle chip' section on the styleguide")
+	}
+	if doc.Find(".muscle-chip").Length() == 0 {
+		t.Error("expected a .muscle-chip example on the styleguide")
+	}
+	if doc.Find(".muscle-chip.muscle-chip--primary").Length() == 0 {
+		t.Error("expected a .muscle-chip--primary example on the styleguide")
+	}
+
 	// Banner component.
 	if doc.Find("h2:contains('Banner')").Length() == 0 {
 		t.Error("expected a 'Banner' section")

@@ -458,6 +458,22 @@
         color: var(--color-info);
     }
 
+    .muscle-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: var(--size-1) var(--size-2);
+        border-radius: var(--radius-2);
+        font-size: var(--font-size-0);
+        font-weight: var(--font-weight-6);
+        background: var(--stone-2);
+        color: var(--stone-8);
+    }
+
+    .muscle-chip--primary {
+        background: var(--clay-1);
+        color: var(--clay-6);
+    }
+
     .card {
         display: block;
         padding: var(--size-3);
