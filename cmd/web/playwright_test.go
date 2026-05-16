@@ -199,9 +199,9 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 5: Complete the warmup.
-	warmupBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Mark Warmup Complete"})
+	warmupBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Mark done"})
 	if err = warmupBtn.Click(); err != nil {
-		t.Fatalf("click Mark Warmup Complete: %v", err)
+		t.Fatalf("click Mark done: %v", err)
 	}
 	// The warmup status indicator replaces the banner once complete.
 	if err = page.GetByText("Warmup complete").WaitFor(); err != nil {
@@ -503,7 +503,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	// back to the same DETAIL URL, and the client auto-detects same-URL and
 	// replaces in place — so history does not grow on either submit.
 	warmupBtn := page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Mark Warmup Complete"})
+		playwright.PageGetByRoleOptions{Name: "Mark done"})
 	if err = warmupBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for warmup button: %v", err)
 	}
@@ -515,14 +515,14 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Fatalf("expect load after warmup complete: %v", err)
 	}
 
-	// Submit the first set via the "No" (too-heavy) signal submit button. The
-	// reps input is pre-filled with the target; we override it before clicking
-	// the named submit button, which sends signal=too_heavy along with the form.
+	// Submit the first set via the "too heavy" signal submit button. The reps
+	// input is pre-filled with the target; we override it before clicking the
+	// named submit button, which sends signal=too_heavy along with the form.
 	if err = page.GetByLabel("Actual reps").First().Fill("8"); err != nil {
 		t.Fatalf("fill actual reps: %v", err)
 	}
 	if err = page.Locator("button.too-heavy-btn").First().Click(); err != nil {
-		t.Fatalf("click No (too-heavy) signal: %v", err)
+		t.Fatalf("click too-heavy signal: %v", err)
 	}
 	// After the set update, navigation.navigate(target, {history: 'replace'})
 	// fires (target equals current URL → client auto-replaces). Wait for the
@@ -811,9 +811,9 @@ func Test_playwright_rest_chip(t *testing.T) {
 	if err = page.WaitForURL(exerciseURLPattern); err != nil {
 		t.Fatalf("expect navigation to exercise page: %v", err)
 	}
-	warmupBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Mark Warmup Complete"})
+	warmupBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Mark done"})
 	if err = warmupBtn.Click(); err != nil {
-		t.Fatalf("click Mark Warmup Complete: %v", err)
+		t.Fatalf("click Mark done: %v", err)
 	}
 	if err = page.GetByText("Warmup complete").WaitFor(); err != nil {
 		t.Fatalf("wait for warmup completion: %v", err)

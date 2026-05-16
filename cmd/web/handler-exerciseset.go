@@ -19,6 +19,8 @@ type setDisplay struct {
 	Unit         string // "reps" or "seconds" — for input labels.
 	Number       int    // 1-based set number for display.
 	IsActive     bool   // Whether this row renders the completion form.
+	SignalLabel  string // Human label ("too heavy"/"too light"/""). "" hides the badge.
+	SignalGlyph  string // Direction glyph ("↓"/"↑"/""). Empty when Label is empty.
 }
 
 type exerciseSetTemplateData struct {
@@ -30,11 +32,12 @@ type exerciseSetTemplateData struct {
 	EditingIndex          int              // Index of the set being edited
 	IsEditing             bool             // Whether we're in edit mode
 	IsDeload              bool             // Whether this session is a deload week.
-	LastCompletedAt       *time.Time       // Timestamp of most recently completed set
 	CurrentSetTarget      domain.SetTarget // Recommended weight and reps from progression
 	CurrentSetTimedTarget int              // Recommended seconds for time_based exercises; 0 for others.
 	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
 	RestEndAtMs           int64            // 0 when no rest chip should be shown.
+	CurrentSetNumber      int              // 1-based number of the first incomplete set (or len+1 when all done).
+	TotalSetCount         int              // len(ExerciseSet.Sets), for the "Set N of M" overline.
 }
 
 func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDisplay {
@@ -45,6 +48,11 @@ func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDispla
 		if set.CompletedValue != nil {
 			completedStr = exercise.FormatSetValue(*set.CompletedValue)
 		}
+		signalLabel, signalGlyph := "", ""
+		if set.Signal != nil {
+			signalLabel = set.Signal.Label()
+			signalGlyph = set.Signal.Glyph()
+		}
 		displays[i] = setDisplay{
 			Set:          set,
 			TargetStr:    exercise.FormatSetValue(set.TargetValue),
@@ -52,6 +60,8 @@ func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDispla
 			Unit:         unit,
 			Number:       i + 1,
 			IsActive:     false, // Populated by the caller after firstIncompleteIndex is known.
+			SignalLabel:  signalLabel,
+			SignalGlyph:  signalGlyph,
 		}
 	}
 	return displays
@@ -189,11 +199,12 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		EditingIndex:          editingIndex,
 		IsEditing:             isEditing,
 		IsDeload:              session.IsDeload,
-		LastCompletedAt:       lastCompletedAt,
 		CurrentSetTarget:      currentSetTarget,
 		CurrentSetTimedTarget: currentSetTimedTarget,
 		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
 		RestEndAtMs:           restEndAtMs,
+		CurrentSetNumber:      getFirstIncompleteIndex(exerciseSet.Sets) + 1,
+		TotalSetCount:         len(exerciseSet.Sets),
 	}
 
 	for i := range data.SetsDisplay {

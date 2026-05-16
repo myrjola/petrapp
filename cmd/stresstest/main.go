@@ -316,7 +316,7 @@ func completeExerciseSets(ctx context.Context, client *e2etest.Client, dateStr, 
 
 	// Complete warmup if present
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button[type=submit]:contains('Mark Warmup Complete')").Length() > 0
+		return s.Find("button[type=submit]:contains('Mark done')").Length() > 0
 	}).First()
 
 	if warmupForm.Length() > 0 {
@@ -471,7 +471,7 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 
 	// Complete warmup first if present
 	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
-		return s.Find("button[type=submit]:contains('Mark Warmup Complete')").Length() > 0
+		return s.Find("button[type=submit]:contains('Mark done')").Length() > 0
 	}).First()
 
 	if warmupForm.Length() > 0 {
