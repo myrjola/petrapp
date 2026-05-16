@@ -68,21 +68,6 @@
                             margin-bottom: var(--size-1);
                         }
 
-                        .add-button {
-                            background-color: var(--color-success-bg);
-                            color: var(--color-success);
-                            border: none;
-                            border-radius: var(--radius-2);
-                            padding: var(--size-2) var(--size-3);
-                            font-weight: var(--font-weight-6);
-                            cursor: pointer;
-                            width: 100%;
-
-                            &:hover {
-                                background-color: color-mix(in oklab, var(--color-success-bg) 92%, black);
-                            }
-                        }
-
                         .no-results {
                             color: var(--color-text-secondary);
                             padding: var(--size-4) 0;
@@ -106,7 +91,7 @@
                         </div>
                         <form method="post" action="/workouts/{{ $.Date.Format "2006-01-02" }}/add-exercise">
                             <input type="hidden" name="exercise_id" value="{{ .ID }}">
-                            <button type="submit" class="add-button">Add this exercise</button>
+                            <button type="submit" class="btn btn--quiet btn--block">Add this exercise</button>
                         </form>
                         <dialog id="dialog-exercise-{{ .ID }}" class="full-width-dialog">
                             <style {{ nonce }}>
