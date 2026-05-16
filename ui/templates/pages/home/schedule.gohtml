@@ -12,33 +12,6 @@
                     margin-left: auto;
                 }
 
-                .menu-button a {
-                    display: inline-flex;
-                    align-items: center;
-                    padding: var(--size-2) var(--size-3);
-                    background: var(--color-surface-elevated);
-                    color: var(--color-text-primary);
-                    text-decoration: none;
-                    border-radius: var(--radius-2);
-                    border: 1px solid var(--color-border);
-                    font-weight: var(--font-weight-5);
-                    font-size: var(--font-size-1);
-                    transition: all 0.2s ease;
-                    box-shadow: var(--shadow-1);
-                }
-
-                .menu-button a:hover {
-                    background: var(--stone-1);
-                    border-color: var(--stone-4);
-                    box-shadow: var(--shadow-3);
-                    transform: translateY(-1px);
-                }
-
-                .menu-button a:active {
-                    transform: translateY(0);
-                    box-shadow: var(--shadow-1);
-                }
-
                 .weekly-schedule {
                     gap: var(--size-3);
                 }
@@ -48,7 +21,7 @@
         {{ template "page-header" .Header }}
 
         <header class="menu-button">
-            <a href="/preferences">
+            <a href="/preferences" class="btn btn--ghost btn--sm">
                 Menu
             </a>
         </header>
