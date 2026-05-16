@@ -428,7 +428,7 @@
                     {{/* Active card ---------------------------------- */}}
                     <div class="active-head">
                         <span class="set-index">Set {{ $setDisplay.Number }}</span>
-                        {{ if gt $.RestEndAtMs 0 }}
+                        {{ if and (gt $.RestEndAtMs 0) (eq $index $.FirstIncompleteIndex) }}
                             <div class="rest-chip" data-rest-end-at-ms="{{ $.RestEndAtMs }}" aria-live="polite">
                                 <span>Rest</span>
                                 <span data-rest-time>—:—</span>
@@ -821,7 +821,7 @@
             </div>
 
             {{ if $isActive }}
-                {{ if gt $.RestEndAtMs 0 }}
+                {{ if and (gt $.RestEndAtMs 0) (eq $index $.FirstIncompleteIndex) }}
                 <script {{ nonce }}>
                     (() => {
                         const chips = document.querySelectorAll('.exercise-set.active .rest-chip[data-rest-end-at-ms]');
