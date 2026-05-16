@@ -46,24 +46,6 @@
                 gap: var(--size-3);
                 justify-content: center;
             }
-
-            .home-link {
-                background-color: var(--clay-4);
-                text-decoration: none;
-
-                &:hover {
-                    background-color: var(--clay-5);
-                }
-            }
-
-            .back-link {
-                background-color: var(--stone-6);
-                text-decoration: none;
-
-                &:hover {
-                    background-color: var(--stone-7);
-                }
-            }
         }
     </style>
 
@@ -76,8 +58,8 @@
                 You can go back to the previous page or return to the home page.
             </p>
             <div class="not-found-actions cluster">
-                <a href="/" class="btn home-link">Go Home</a>
-                <button type="button" class="btn back-link">
+                <a href="/" class="btn">Go Home</a>
+                <button type="button" class="btn btn--ghost">
                     <span>Go Back</span>
                     <script {{ nonce }}>
                       document.currentScript.parentElement.addEventListener('click', function () {
