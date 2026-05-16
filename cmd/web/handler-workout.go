@@ -14,12 +14,36 @@ import (
 
 type workoutTemplateData struct {
 	BaseTemplateData
-	Date          time.Time
-	Session       domain.Session
-	Header        PageHeaderData
-	StatusLabel   string
-	StatusVariant string
-	Flash         BannerData
+	Date            time.Time
+	WorkoutTypeName string
+	StatusLabel     string
+	StatusVariant   string
+	FinishNote      string
+	Exercises       []workoutExerciseView
+	CompletedCount  int
+	TotalCount      int
+	ProgressPercent int
+	ProgressState   string
+	Flash           BannerData
+}
+
+// workoutExerciseView is the per-exercise row rendered on the workout overview.
+// Pre-shaped in the handler so the template can range without arithmetic.
+type workoutExerciseView struct {
+	ID                int
+	Index             int // 1-based position label ("01", "02", …)
+	Name              string
+	State             domain.ExerciseSetState
+	SetCount          int
+	CompletedSetCount int
+	TargetText        string
+	SubLine           string
+	Dots              []workoutExerciseDot
+}
+
+// workoutExerciseDot represents one set's done/not-done state for the dot indicator.
+type workoutExerciseDot struct {
+	Done bool
 }
 
 type workoutCompletionTemplateData struct {
@@ -146,31 +170,112 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	data := newWorkoutTemplateData(r, date, session, app.popFlashError(r.Context()))
+
+	app.render(w, r, http.StatusOK, "workout", data)
+}
+
+// percentBase is the multiplier for converting a 0..1 ratio into a 0..100 percent.
+const percentBase = 100
+
+// newWorkoutTemplateData shapes a fetched session into the per-row view structs
+// the workout-overview template renders. All derivations (progress, status,
+// finish-note copy, sub-line) happen here so the template stays declarative.
+func newWorkoutTemplateData(
+	r *http.Request,
+	date time.Time,
+	session domain.Session,
+	flashMessage string,
+) workoutTemplateData {
 	var statusLabel, statusVariant string
 	switch session.Status() {
 	case domain.SessionCompleted:
 		statusLabel, statusVariant = "Completed", "success"
 	case domain.SessionInProgress:
-		statusLabel, statusVariant = "In Progress", "warning"
+		statusLabel, statusVariant = "In progress", "warning"
 	case domain.SessionNotStarted:
-		statusLabel, statusVariant = "Not Started", "neutral"
+		statusLabel, statusVariant = "Ready", "neutral"
 	}
 
-	data := workoutTemplateData{
+	completed := session.CompletedExerciseCount()
+	total := len(session.ExerciseSets)
+	progressPercent := 0
+	progressState := ""
+	if total > 0 {
+		progressPercent = completed * percentBase / total
+		switch {
+		case completed == total:
+			progressState = "completed"
+		case completed > 0:
+			progressState = "in-progress"
+		}
+	}
+
+	exerciseViews := make([]workoutExerciseView, 0, total)
+	for i, es := range session.ExerciseSets {
+		exerciseViews = append(exerciseViews, newWorkoutExerciseView(i+1, es))
+	}
+
+	return workoutTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
-		Session:          session,
-		Header: PageHeaderData{
-			Title: fmt.Sprintf("%s Workout — %s",
-				session.WorkoutType().Label(), date.Format("Monday, January 2, 2006")),
-			Subtitle: "",
-		},
-		StatusLabel:   statusLabel,
-		StatusVariant: statusVariant,
-		Flash:         BannerData{Variant: "error", Message: app.popFlashError(r.Context())},
+		WorkoutTypeName:  session.WorkoutType().Label(),
+		StatusLabel:      statusLabel,
+		StatusVariant:    statusVariant,
+		FinishNote:       finishNoteFor(session.IncompleteExerciseCount()),
+		Exercises:        exerciseViews,
+		CompletedCount:   completed,
+		TotalCount:       total,
+		ProgressPercent:  progressPercent,
+		ProgressState:    progressState,
+		Flash:            BannerData{Variant: "error", Message: flashMessage},
 	}
+}
 
-	app.render(w, r, http.StatusOK, "workout", data)
+// finishNoteFor returns the copy shown under the Finish-workout button.
+// It encourages early finish when slots remain and celebrates a clean sweep.
+func finishNoteFor(incomplete int) string {
+	switch incomplete {
+	case 0:
+		return "You rock!"
+	case 1:
+		return "1 exercise remains · you can finish anyway"
+	default:
+		return fmt.Sprintf("%d exercises remain · you can finish anyway", incomplete)
+	}
+}
+
+// newWorkoutExerciseView shapes one ExerciseSet into a workoutExerciseView,
+// including the sub-line copy and the per-set dot indicator.
+func newWorkoutExerciseView(index int, es domain.ExerciseSet) workoutExerciseView {
+	dots := make([]workoutExerciseDot, len(es.Sets))
+	for j, s := range es.Sets {
+		dots[j] = workoutExerciseDot{Done: s.CompletedAt != nil}
+	}
+	completedSets := es.CompletedSetCount()
+	var subLine string
+	switch {
+	case len(es.Sets) == 0:
+		subLine = "no sets planned"
+	case completedSets == 0:
+		subLine = fmt.Sprintf("%d sets", len(es.Sets))
+		if target := es.Exercise.TargetRangeText(); target != "" {
+			subLine = subLine + " · " + target
+		}
+	default:
+		subLine = fmt.Sprintf("%d / %d sets done", completedSets, len(es.Sets))
+	}
+	return workoutExerciseView{
+		ID:                es.ID,
+		Index:             index,
+		Name:              es.Exercise.Name,
+		State:             es.CompletionState(),
+		SetCount:          len(es.Sets),
+		CompletedSetCount: completedSets,
+		TargetText:        es.Exercise.TargetRangeText(),
+		SubLine:           subLine,
+		Dots:              dots,
+	}
 }
 
 func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Request) {

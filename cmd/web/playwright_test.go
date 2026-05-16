@@ -280,9 +280,9 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 8: Complete the workout.
-	completeWorkoutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Complete workout"})
+	completeWorkoutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Finish workout"})
 	if err = completeWorkoutBtn.Click(); err != nil {
-		t.Fatalf("click Complete workout: %v", err)
+		t.Fatalf("click Finish workout: %v", err)
 	}
 	completionURL := fmt.Sprintf("%s/workouts/%s/complete", serverURL, today)
 	if err = page.WaitForURL(completionURL); err != nil {

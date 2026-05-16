@@ -1,164 +1,430 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.workoutTemplateData*/ -}}
 
 {{ define "page" }}
-    <main class="stack">
+    <main class="workout">
         <style {{ nonce }}>
-            @scope {
+            @scope (.workout) {
                 :scope {
-                    margin: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    min-height: 100dvh;
+                }
+
+                .workout-body {
+                    padding: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                    flex: 1;
+                }
+
+                .workout-header {
+                    padding-top: var(--size-3);
+                }
+
+                .workout-overline {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    color: var(--clay-4);
+                    font-weight: var(--font-weight-6);
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    margin-bottom: var(--size-2);
+                }
+
+                .workout-overline::after {
+                    content: "";
+                    flex: 1;
+                    height: 1px;
+                    background: linear-gradient(to right, var(--stone-3), transparent);
+                }
+
+                .workout-title {
+                    font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
+                    font-weight: var(--font-weight-6);
+                    font-size: clamp(2.25rem, 9vw, 3rem);
+                    line-height: 0.95;
+                    letter-spacing: -0.025em;
+                    color: var(--color-text-primary);
+                }
+
+                .workout-meta {
+                    margin-top: var(--size-3);
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-3);
+                    flex-wrap: wrap;
+                }
+
+                .workout-progress {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    font-family: var(--font-mono);
+                    color: var(--color-text-secondary);
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-0);
+                }
+
+                .workout-progress-bar {
+                    width: 80px;
+                    height: 4px;
+                    border-radius: var(--radius-round);
+                    background: var(--stone-2);
+                    overflow: hidden;
+                }
+
+                .workout-progress-fill {
+                    height: 100%;
+                    background: var(--clay-3);
+                    transition: width var(--duration-3) var(--ease-out-quiet);
+                }
+
+                .workout-progress-fill[data-state="completed"] {
+                    background: var(--color-success);
+                }
+
+                .workout-progress-fill[data-state="in-progress"] {
+                    background: var(--color-warning);
+                }
+
+                .workout-status {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-1);
+                    color: var(--color-text-secondary);
+                }
+
+                .workout-status[data-variant="warning"] {
+                    color: var(--color-warning);
+                    font-weight: var(--font-weight-7);
+                }
+
+                .workout-status[data-variant="success"] {
+                    color: var(--color-success);
+                    font-weight: var(--font-weight-7);
+                }
+
+                .exercise-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-2);
                 }
             }
         </style>
 
-        {{ template "page-header" .Header }}
+        <div class="workout-body">
+            <header class="workout-header">
+                <div class="workout-overline">{{ .Date.Format "Mon · Jan 2" }}</div>
+                <h1 class="workout-title">{{ .WorkoutTypeName }}</h1>
+                <div class="workout-meta">
+                    <div class="workout-progress">
+                        <div class="workout-progress-bar">
+                            <style {{ nonce }}>
+                                @scope (.workout-progress-bar) {
+                                    .workout-progress-fill { width: {{ .ProgressPercent }}%; }
+                                }
+                            </style>
+                            <div class="workout-progress-fill" data-state="{{ .ProgressState }}"></div>
+                        </div>
+                        <span>{{ .CompletedCount }} / {{ .TotalCount }}</span>
+                    </div>
+                    <span class="workout-status" data-variant="{{ .StatusVariant }}">·  {{ .StatusLabel }}</span>
+                </div>
+            </header>
 
-        {{ template "banner" .Flash }}
+            {{ template "banner" .Flash }}
 
-        <div class="workout-meta cluster">
-            <style {{ nonce }}>
-                @scope (.workout-meta) {
-                    .progress-summary {
-                        color: var(--color-text-secondary);
-                        font-size: var(--font-size-1);
+            <div class="exercise-list">
+                <style {{ nonce }}>
+                    @scope (.exercise-list) {
+                        .exercise {
+                            display: grid;
+                            grid-template-columns: 2.25rem 1fr auto;
+                            align-items: center;
+                            gap: var(--size-3);
+                            padding: var(--size-3);
+                            border-radius: var(--radius-3);
+                            background: var(--color-surface-elevated);
+                            border: var(--border-size-1) solid transparent;
+                            text-decoration: none;
+                            color: var(--color-text-primary);
+                            position: relative;
+                            box-shadow: var(--shadow-1);
+                            transition:
+                                transform var(--duration-2) var(--ease-out-quiet),
+                                box-shadow var(--duration-2) var(--ease-out-quiet),
+                                background var(--duration-2) var(--ease-out-quiet);
+                        }
+
+                        a.exercise:hover {
+                            transform: translateY(-1px);
+                            box-shadow: var(--shadow-2);
+                        }
+
+                        a.exercise:active {
+                            transform: translateY(0);
+                            box-shadow: var(--shadow-1);
+                        }
+
+                        .exercise-num {
+                            font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
+                            font-weight: var(--font-weight-5);
+                            font-size: var(--font-size-4);
+                            color: var(--stone-4);
+                            line-height: 1;
+                        }
+
+                        .exercise-name {
+                            font-weight: var(--font-weight-6);
+                            font-size: var(--font-size-2);
+                            color: var(--color-text-primary);
+                            line-height: 1.2;
+                        }
+
+                        .exercise-sub {
+                            margin-top: 2px;
+                            font-family: var(--font-mono);
+                            font-size: var(--font-size-0);
+                            letter-spacing: var(--font-letterspacing-1);
+                            color: var(--color-text-secondary);
+                        }
+
+                        .exercise-dots {
+                            display: inline-flex;
+                            gap: 4px;
+                            flex-shrink: 0;
+                        }
+
+                        .exercise-dot {
+                            width: 7px;
+                            height: 7px;
+                            border-radius: 50%;
+                            background: var(--stone-3);
+                        }
+
+                        .exercise-dot--done {
+                            background: var(--clay-4);
+                        }
+
+                        /* In-progress slot — warm amber accent */
+                        .exercise.started {
+                            background: var(--color-warning-bg);
+                        }
+
+                        .exercise.started .exercise-num {
+                            color: var(--color-warning);
+                            font-weight: var(--font-weight-7);
+                        }
+
+                        .exercise.started::before {
+                            content: "";
+                            position: absolute;
+                            left: 0;
+                            top: var(--size-3);
+                            bottom: var(--size-3);
+                            width: 3px;
+                            background: var(--color-warning);
+                            border-radius: 0 3px 3px 0;
+                        }
+
+                        .exercise.started .exercise-dot--done {
+                            background: var(--color-warning);
+                        }
+
+                        /* Completed slot — soft green wash */
+                        .exercise.completed {
+                            background: var(--color-success-bg);
+                        }
+
+                        .exercise.completed .exercise-name {
+                            color: var(--color-success);
+                            text-decoration: line-through;
+                            text-decoration-color: color-mix(in oklab, var(--color-success) 40%, transparent);
+                        }
+
+                        .exercise.completed .exercise-num,
+                        .exercise.completed .exercise-sub {
+                            color: var(--color-success);
+                        }
+
+                        .exercise.completed .exercise-dot--done {
+                            background: var(--color-success);
+                        }
+
+                        /* Add-exercise card — dashed placeholder */
+                        .add-exercise-link {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: var(--size-2);
+                            min-height: 2.75rem;
+                            padding: var(--size-3);
+                            border-radius: var(--radius-3);
+                            border: 1.5px dashed var(--stone-4);
+                            background: transparent;
+                            color: var(--color-text-secondary);
+                            font-weight: var(--font-weight-6);
+                            font-size: var(--font-size-1);
+                            letter-spacing: var(--font-letterspacing-1);
+                            text-decoration: none;
+                            transition:
+                                background var(--duration-2) var(--ease-out-quiet),
+                                border-color var(--duration-2) var(--ease-out-quiet),
+                                color var(--duration-2) var(--ease-out-quiet);
+                        }
+
+                        .add-exercise-link:hover {
+                            background: var(--color-surface-elevated);
+                            border-color: var(--stone-6);
+                            color: var(--color-text-primary);
+                        }
+
+                        .add-exercise-link .plus {
+                            display: inline-block;
+                            width: 1rem;
+                            height: 1rem;
+                            position: relative;
+                        }
+
+                        .add-exercise-link .plus::before,
+                        .add-exercise-link .plus::after {
+                            content: "";
+                            position: absolute;
+                            background: currentColor;
+                            border-radius: 1px;
+                        }
+
+                        .add-exercise-link .plus::before {
+                            left: 50%;
+                            top: 0;
+                            bottom: 0;
+                            width: 2px;
+                            transform: translateX(-50%);
+                        }
+
+                        .add-exercise-link .plus::after {
+                            top: 50%;
+                            left: 0;
+                            right: 0;
+                            height: 2px;
+                            transform: translateY(-50%);
+                        }
                     }
-                }
-            </style>
-            <span class="badge badge--{{ .StatusVariant }}">{{ .StatusLabel }}</span>
-            <span class="progress-summary">{{ len .Session.ExerciseSets }} exercises</span>
-        </div>
+                </style>
 
-        <div class="exercise-list stack">
-            <style {{ nonce }}>
-                @scope (.exercise-list) {
-                    :scope {
-                        gap: var(--size-3);
-                    }
+                {{ range .Exercises }}
+                    <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
+                       class="exercise {{ .State }}"
+                       data-workout-exercise-id="{{ .ID }}">
+                        <span class="exercise-num">{{ printf "%02d" .Index }}</span>
+                        <div>
+                            <span class="exercise-name">{{ .Name }}</span>
+                            <div class="exercise-sub">{{ .SubLine }}</div>
+                        </div>
+                        {{ if .Dots }}
+                            <span class="exercise-dots" aria-hidden="true">
+                                {{ range .Dots }}
+                                    <span class="exercise-dot{{ if .Done }} exercise-dot--done{{ end }}"></span>
+                                {{ end }}
+                            </span>
+                        {{ end }}
+                    </a>
+                {{ end }}
 
-                    .exercise {
-                        display: flex;
-                        align-items: center;
-                        text-decoration: line-through;
-                        color: var(--color-text-muted);
-                    }
-
-                    a.exercise {
-                        text-decoration: none;
-                        transition: background-color 0.2s;
-                    }
-
-                    a.exercise:hover {
-                        background: var(--stone-1);
-                    }
-
-                    .exercise.active {
-                        text-decoration: none;
-                        color: var(--color-text-primary);
-                        font-weight: var(--font-weight-6);
-                    }
-
-                    .exercise.completed {
-                        background-color: var(--color-success-bg);
-                        color: var(--color-success);
-                    }
-
-                    .exercise.started {
-                        background-color: var(--color-warning-bg);
-                        color: var(--color-warning);
-                    }
-
-                    .add-exercise {
-                        display: flex;
-                        justify-content: center;
-                        margin-top: var(--size-2);
-                    }
-                }
-            </style>
-
-            {{ range .Session.ExerciseSets }}
-                <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
-                   class="exercise card{{ if not $.Session.CompletedAt }} active{{ end }} {{ .CompletionState }}"
-                   data-workout-exercise-id="{{ .ID }}">
-                    <span>{{ .Exercise.Name }}</span>
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/add-exercise" class="add-exercise-link">
+                    <span class="plus" aria-hidden="true"></span>
+                    Add exercise
                 </a>
-            {{ end }}
 
-            <script {{ nonce }}>
-              const exercisePagePattern = new URLPattern(`/workouts/:date/exercises/:exerciseId`, window.origin)
+                <script {{ nonce }}>
+                  const exercisePagePattern = new URLPattern(`/workouts/:date/exercises/:exerciseId`, window.origin)
 
-              const extractWorkoutExerciseIdFromUrl = (url) => {
-                const match = exercisePagePattern.exec(url)
-                return match?.pathname.groups.exerciseId
-              }
+                  const extractWorkoutExerciseIdFromUrl = (url) => {
+                    const match = exercisePagePattern.exec(url)
+                    return match?.pathname.groups.exerciseId
+                  }
 
-              // When going to an exercise page, set the exercise title view transition name on the relevant exercise.
-              window.addEventListener('pageswap', async (e) => {
-                if (!e.viewTransition) return
-                const entry = e.activation?.entry
-                if (!entry) return
-                const targetUrl = new URL(entry.url)
-                const exercise = extractWorkoutExerciseIdFromUrl(targetUrl)
-                if (!exercise) return
-                const element = document.querySelector(`a.exercise[data-workout-exercise-id="${exercise}"] span`)
-                if (!element) return
-                element.style.viewTransitionName = `exercise-title-${exercise}`
-                try {
-                  await e.viewTransition.finished
-                } catch (_) {
-                  // Transition may be aborted; ignore.
-                }
-                element.style.viewTransitionName = ''
-              })
+                  // When going to an exercise page, set the exercise title view transition name on the relevant exercise.
+                  window.addEventListener('pageswap', async (e) => {
+                    if (!e.viewTransition) return
+                    const entry = e.activation?.entry
+                    if (!entry) return
+                    const targetUrl = new URL(entry.url)
+                    const exercise = extractWorkoutExerciseIdFromUrl(targetUrl)
+                    if (!exercise) return
+                    const element = document.querySelector(`a.exercise[data-workout-exercise-id="${exercise}"] .exercise-name`)
+                    if (!element) return
+                    element.style.viewTransitionName = `exercise-title-${exercise}`
+                    try {
+                      await e.viewTransition.finished
+                    } catch (_) {
+                      // Transition may be aborted; ignore.
+                    }
+                    element.style.viewTransitionName = ''
+                  })
 
-              // When going from an exercise page to the workout page, set view transition names on the relevant
-              // exercise in the list.
-              window.addEventListener('pagereveal', async (e) => {
-                if (!e.viewTransition) return
-                const from = navigation.activation?.from
-                if (!from) return
-                const fromUrl = new URL(from.url)
-                const workoutExerciseId = extractWorkoutExerciseIdFromUrl(fromUrl)
-                if (!workoutExerciseId) return
-                const element = document.querySelector(`a.exercise[data-workout-exercise-id="${workoutExerciseId}"] span`)
-                if (!element) return
-                element.style.viewTransitionName = `exercise-title-${workoutExerciseId}`
-                try {
-                  await e.viewTransition.finished
-                } catch (_) {
-                  // Transition may be aborted if a new navigation starts; ignore.
-                }
-                element.style.viewTransitionName = ''
-              })
-            </script>
-
-            <div class="add-exercise">
-                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/add-exercise" class="btn btn--quiet add-exercise-link">
-                    Add Exercise
-                </a>
+                  // When going from an exercise page to the workout page, set view transition names on the relevant
+                  // exercise in the list.
+                  window.addEventListener('pagereveal', async (e) => {
+                    if (!e.viewTransition) return
+                    const from = navigation.activation?.from
+                    if (!from) return
+                    const fromUrl = new URL(from.url)
+                    const workoutExerciseId = extractWorkoutExerciseIdFromUrl(fromUrl)
+                    if (!workoutExerciseId) return
+                    const element = document.querySelector(`a.exercise[data-workout-exercise-id="${workoutExerciseId}"] .exercise-name`)
+                    if (!element) return
+                    element.style.viewTransitionName = `exercise-title-${workoutExerciseId}`
+                    try {
+                      await e.viewTransition.finished
+                    } catch (_) {
+                      // Transition may be aborted if a new navigation starts; ignore.
+                    }
+                    element.style.viewTransitionName = ''
+                  })
+                </script>
             </div>
         </div>
 
-        <div class="complete-workout">
+        <footer class="workout-finish">
             <style {{ nonce }}>
-                @scope (.complete-workout) {
+                @scope (.workout-finish) {
                     :scope {
-                        padding: var(--size-4);
-                        position: sticky;
-                        bottom: 0;
-                        background: var(--color-surface-elevated);
-                        box-shadow: 0 -1px 2px 0 rgb(120 90 60 / 0.10);
+                        margin-top: auto;
+                        padding: var(--size-5) var(--size-4) var(--size-6);
+                        background:
+                            radial-gradient(120% 80% at 50% 100%, color-mix(in oklab, var(--clay-4) 8%, transparent), transparent 70%),
+                            var(--color-surface);
+                        border-top: 1px solid color-mix(in oklab, var(--stone-3) 60%, transparent);
                     }
+
+                    form { margin: 0; }
 
                     button {
                         width: 100%;
-                        justify-content: center;
                         font-size: var(--font-size-2);
                         padding: var(--size-3);
+                        box-shadow: 0 8px 24px -8px color-mix(in oklab, var(--clay-6) 45%, transparent);
+                    }
+
+                    .workout-finish-note {
+                        text-align: center;
+                        margin-top: var(--size-2);
+                        font-family: var(--font-mono);
+                        font-size: var(--font-size-0);
+                        letter-spacing: var(--font-letterspacing-1);
+                        color: var(--color-text-secondary);
                     }
                 }
             </style>
             <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/complete">
-                <button type="submit">Complete workout</button>
+                <button type="submit">Finish workout</button>
             </form>
-        </div>
+            <div class="workout-finish-note">{{ .FinishNote }}</div>
+        </footer>
     </main>
 {{ end }}

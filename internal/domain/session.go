@@ -44,14 +44,9 @@ const (
 // been completed. A slot with no sets is reported as not started. The string
 // values double as CSS state tokens used by the workout page.
 func (es ExerciseSet) CompletionState() ExerciseSetState {
+	completed := es.CompletedSetCount()
 	if len(es.Sets) == 0 {
 		return ExerciseSetNotStarted
-	}
-	completed := 0
-	for i := range es.Sets {
-		if es.Sets[i].CompletedAt != nil {
-			completed++
-		}
 	}
 	switch completed {
 	case 0:
@@ -61,6 +56,17 @@ func (es ExerciseSet) CompletionState() ExerciseSetState {
 	default:
 		return ExerciseSetStarted
 	}
+}
+
+// CompletedSetCount returns how many of the slot's sets have been completed.
+func (es ExerciseSet) CompletedSetCount() int {
+	n := 0
+	for i := range es.Sets {
+		if es.Sets[i].CompletedAt != nil {
+			n++
+		}
+	}
+	return n
 }
 
 // ExerciseProgressEntry represents the sets performed for an exercise on a specific date.
@@ -275,6 +281,24 @@ func (s Session) WorkoutType() Category {
 		return CategoryLower
 	}
 	return CategoryFullBody
+}
+
+// CompletedExerciseCount returns how many of the session's exercise slots have
+// every set completed. Used by the workout overview to show progress.
+func (s Session) CompletedExerciseCount() int {
+	n := 0
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].CompletionState() == ExerciseSetCompleted {
+			n++
+		}
+	}
+	return n
+}
+
+// IncompleteExerciseCount returns how many of the session's exercise slots
+// still have at least one set to complete (including slots not started).
+func (s Session) IncompleteExerciseCount() int {
+	return len(s.ExerciseSets) - s.CompletedExerciseCount()
 }
 
 // Status reports the session's lifecycle state from its timestamps.

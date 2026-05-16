@@ -118,6 +118,26 @@ func (e Exercise) SetValueUnit() string {
 	return "reps"
 }
 
+// TargetRangeText renders the planned per-set target for sub-line display
+// on the workout overview: "8–12 reps" for weighted/bodyweight/assisted (when
+// RepMin/RepMax are set), "30s" for time-based (when DefaultStartingSeconds is
+// set), or "" when the data is missing so callers can drop the line.
+func (e Exercise) TargetRangeText() string {
+	if e.IsTimed() {
+		if e.DefaultStartingSeconds == nil {
+			return ""
+		}
+		return fmt.Sprintf("%ds", *e.DefaultStartingSeconds)
+	}
+	if e.RepMin == nil || e.RepMax == nil {
+		return ""
+	}
+	if *e.RepMin == *e.RepMax {
+		return fmt.Sprintf("%d reps", *e.RepMin)
+	}
+	return fmt.Sprintf("%d–%d reps", *e.RepMin, *e.RepMax)
+}
+
 // EncodeFormWeight applies the assisted-exercise sign convention to a weight
 // value parsed from the per-set form. For ExerciseTypeAssisted with the
 // "assisted" flag set, the stored value is the negative magnitude of the
