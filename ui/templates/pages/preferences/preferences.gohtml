@@ -71,50 +71,12 @@
                     }
                 }
 
-                .save-button {
-                    width: 100%;
-                    padding: var(--size-4) var(--size-6);
-                    background: var(--clay-4);
-                    color: var(--color-surface-elevated);
-                    border: none;
-                    border-radius: var(--radius-2);
-                    font-weight: var(--font-weight-6);
-                    font-size: var(--font-size-2);
-                    cursor: pointer;
-                    transition: background-color 0.2s ease;
-
-                    &:hover {
-                        background: var(--clay-5);
-                    }
-
-                    &:active {
-                        background: var(--clay-6);
-                    }
-                }
-
                 .footer-section {
                     margin-top: var(--size-8);
                     padding-top: var(--size-6);
                     border-top: var(--border-size-1) solid var(--color-border);
                     display: flex;
                     justify-content: center;
-                }
-
-                .logout-button {
-                    padding: var(--size-3) var(--size-5);
-                    background: transparent;
-                    color: var(--color-text-secondary);
-                    border: var(--border-size-1) solid var(--color-border);
-                    border-radius: var(--radius-2);
-                    font-size: var(--font-size-1);
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-
-                    &:hover {
-                        background: var(--stone-1);
-                        color: var(--color-text-primary);
-                        border-color: var(--stone-4);
-                    }
                 }
 
                 .data-export-section {
@@ -135,26 +97,6 @@
                     margin-bottom: var(--size-4);
                     font-size: var(--font-size-1);
                     line-height: 1.5;
-                }
-
-                .export-button {
-                    display: inline-block;
-                    padding: var(--size-3) var(--size-5);
-                    background: var(--clay-4);
-                    color: var(--color-surface-elevated);
-                    text-decoration: none;
-                    border-radius: var(--radius-2);
-                    font-weight: var(--font-weight-5);
-                    font-size: var(--font-size-1);
-                    transition: background-color 0.2s ease;
-
-                    &:hover {
-                        background: var(--clay-5);
-                    }
-
-                    &:active {
-                        background: var(--clay-6);
-                    }
                 }
 
                 .danger-zone {
@@ -179,25 +121,6 @@
                     line-height: 1.5;
                 }
 
-                .delete-button {
-                    padding: var(--size-3) var(--size-5);
-                    background: var(--color-error);
-                    color: var(--color-surface-elevated);
-                    border: none;
-                    border-radius: var(--radius-2);
-                    font-weight: var(--font-weight-5);
-                    font-size: var(--font-size-1);
-                    cursor: pointer;
-                    transition: background-color 0.2s ease;
-
-                    &:hover {
-                        background: color-mix(in oklab, var(--color-error) 88%, black);
-                    }
-
-                    &:active {
-                        background: color-mix(in oklab, var(--color-error) 78%, black);
-                    }
-                }
             }
         </style>
 
@@ -227,7 +150,7 @@
                     {{ end }}
                 </div>
             </fieldset>
-            <button type="submit" class="save-button">Save Schedule</button>
+            <button type="submit" class="btn btn--block">Save Schedule</button>
         </form>
 
         <div class="rest-notifications-section card">
@@ -569,7 +492,7 @@
             <h2>Export Your Data</h2>
             <p>Download all your workout data as an SQLite database file for your personal records or data
                 portability.</p>
-            <a href="/preferences/export-data" class="export-button" download>
+            <a href="/preferences/export-data" class="btn" download>
                 Download My Data
             </a>
         </div>
@@ -579,7 +502,7 @@
             <p>Permanently delete your account and all your workout data. This action cannot be undone.</p>
             <form action="/preferences/delete-user" method="post"
                   onsubmit="return confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your workout data.')">
-                <button type="submit" class="delete-button">
+                <button type="submit" class="btn btn--danger">
                     Delete my data
                 </button>
             </form>
@@ -587,7 +510,7 @@
 
         <footer class="footer-section">
             <form action="/api/logout" method="post">
-                <button type="submit" class="logout-button">
+                <button type="submit" class="btn btn--ghost btn--sm">
                     Log out
                 </button>
             </form>
