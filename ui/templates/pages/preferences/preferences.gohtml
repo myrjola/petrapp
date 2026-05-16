@@ -200,20 +200,6 @@
                         font-size: var(--font-size-1);
                     }
 
-                    .push-button {
-                        padding: var(--size-2) var(--size-4);
-                        border-radius: var(--radius-2);
-                        border: var(--border-size-1) solid var(--color-border);
-                        background: var(--color-surface);
-                        font-weight: var(--font-weight-5);
-                        cursor: pointer;
-                    }
-
-                    .push-button.danger {
-                        color: var(--color-error);
-                        border-color: color-mix(in oklab, var(--color-error) 30%, transparent);
-                    }
-
                     .error {
                         color: var(--color-error);
                         font-size: var(--font-size-1);
@@ -248,8 +234,8 @@
                     <p class="status subscribed hidden">
                         Enabled — you'll be pinged when each rest is up.
                     </p>
-                    <button type="button" class="push-button enable-btn hidden">Enable rest notifications</button>
-                    <button type="button" class="push-button danger disable-btn hidden">Disable on this device</button>
+                    <button type="button" class="btn btn--ghost enable-btn hidden">Enable rest notifications</button>
+                    <button type="button" class="btn btn--danger btn--sm disable-btn hidden">Disable on this device</button>
                     <p class="error hidden"></p>
                     <form method="post" action="/preferences/rest-notifications-toggle"
                           class="toggle-row subscribed hidden">
