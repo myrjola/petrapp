@@ -122,30 +122,6 @@
                             flex-shrink: 0;
                         }
 
-                        .edit-button {
-                            margin-left: auto;
-                            padding: var(--size-1) var(--size-3);
-                            background: var(--color-surface-elevated);
-                            border: 1px solid var(--color-border);
-                            border-radius: var(--radius-2);
-                            font-size: var(--font-size-0);
-                            font-weight: var(--font-weight-5);
-                            cursor: pointer;
-                            text-decoration: none;
-                            color: var(--color-text-secondary);
-                            transition: background-color 0.2s ease, border-color 0.2s ease;
-
-                            &:hover {
-                                background: var(--stone-1);
-                                border-color: var(--stone-4);
-                            }
-
-                            &:focus-visible {
-                                outline: 2px solid var(--color-border-focus);
-                                outline-offset: 2px;
-                            }
-                        }
-
                         .signal-badge {
                             font-size: var(--font-size-0);
                             color: var(--color-text-secondary);
@@ -346,35 +322,6 @@
                             }
                         }
 
-                        .submit-button {
-                            padding: var(--size-3) var(--size-5);
-                            background: var(--ember);
-                            color: var(--stone-10);
-                            border: none;
-                            border-radius: var(--radius-2);
-                            font-weight: var(--font-weight-8);
-                            font-size: var(--font-size-2);
-                            text-transform: uppercase;
-                            letter-spacing: var(--font-letterspacing-3);
-                            cursor: pointer;
-                            min-height: 3.5rem;
-                            transition: background-color 0.2s ease, transform 0.1s ease;
-
-                            &:hover {
-                                background: color-mix(in oklab, var(--ember) 90%, white);
-                                transform: translateY(-1px);
-                            }
-
-                            &:active {
-                                background: color-mix(in oklab, var(--ember) 85%, black);
-                                transform: translateY(0);
-                            }
-
-                            &:focus-visible {
-                                outline: 3px solid var(--ember);
-                                outline-offset: 2px;
-                            }
-                        }
                     }
                 }
             }
@@ -469,7 +416,7 @@
                             {{ if $set.Signal }}
                                 <span class="signal-badge" aria-label="Signal">{{ $set.Signal }}</span>
                             {{ end }}
-                            <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
+                            <a href="?edit={{ $index }}" class="btn btn--ghost btn--sm edit-link" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else if and $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
                             <span class="weight" aria-label="Recommended weight"><span class="value">{{ formatFloat $.CurrentSetTarget.WeightKg }}</span> kg</span>
                             <span class="reps" aria-label="Target reps"><span class="value">{{ $.CurrentSetTarget.TargetReps }}</span></span>
@@ -481,7 +428,7 @@
                         {{ if $set.CompletedValue }}
                             <span class="status-icon" aria-hidden="true">✓</span>
                             <span class="reps" aria-label="Completed value">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
-                            <a href="?edit={{ $index }}" class="edit-button" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
+                            <a href="?edit={{ $index }}" class="btn btn--ghost btn--sm edit-link" aria-label="Edit set {{ $setDisplay.Number }}">Edit</a>
                         {{ else if and (eq $.ExerciseSet.Exercise.ExerciseType "time_based") $.ExerciseSet.WarmupCompletedAt (eq $.FirstIncompleteIndex $index) }}
                             <span class="time" aria-label="Target time in seconds"><span class="value">{{ $.CurrentSetTimedTarget }}</span></span>
                         {{ else }}
@@ -542,7 +489,7 @@
                             </div>
                             {{ end }}
                             {{ if $.IsDeload }}
-                                <button type="submit" class="submit-button" aria-label="Complete set">Done!</button>
+                                <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                             {{ else }}
                                 <fieldset class="signal-group">
                                     <legend>Did you reach {{ $.CurrentSetTarget.TargetReps }} reps?</legend>
@@ -570,7 +517,7 @@
                             </div>
                             <button type="button" class="timed-runner-cancel" data-cancel>Cancel</button>
                         </div>
-                        <button type="button" class="submit-button timed-runner-start"
+                        <button type="button" class="btn btn--focus btn--block timed-runner-start"
                                 data-timed-runner-start hidden>Start timer</button>
                         <style {{ nonce }}>
                             @scope (.timed-runner) {
@@ -794,7 +741,7 @@
                                 >
                             </div>
                             {{ if $.IsDeload }}
-                                <button type="submit" class="submit-button" aria-label="Complete set">Done!</button>
+                                <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                             {{ else }}
                                 <fieldset class="signal-group">
                                     <legend>Did you reach {{ $.CurrentSetTimedTarget }}s?</legend>
@@ -832,7 +779,7 @@
                                         class="reps-input"
                                 >
                             </div>
-                            <button type="submit" class="submit-button" aria-label="Complete set">Done!</button>
+                            <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                         </form>
                     {{ end }}
                 {{ end }}

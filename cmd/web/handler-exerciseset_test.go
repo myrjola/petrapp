@@ -193,7 +193,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	}
 
 	// Find the "Edit" link in the first completed set
-	editLink := doc.Find(".exercise-set.completed .edit-button").First()
+	editLink := doc.Find(".exercise-set.completed .edit-link").First()
 	if editLink.Length() == 0 {
 		t.Fatalf("No edit button found for completed set")
 	}
