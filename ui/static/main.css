@@ -281,16 +281,25 @@
         }
 
         /*
-         * Loading state. The label stays in the DOM (just visually hidden via
-         * transparent text) so the button keeps its exact width and height —
-         * swapping the textContent would reflow the button and cause a flicker.
-         * The live region in base.gohtml carries the "Loading…" announcement
-         * for screen readers; aria-busy here signals the busy state on the
+         * Loading state. JS wraps the button's children in a
+         * .btn-loading-label span and we hide that span with
+         * visibility:hidden — the span still participates in layout, so the
+         * button keeps its exact width and height while the ::after spinner
+         * replaces the visible label cleanly (no transparent-text artefacts
+         * like selection highlight or stray antialiasing). The fallback
+         * color:transparent on the button itself covers static-HTML aria-busy
+         * examples (e.g. the styleguide) that aren't wrapped by JS. The live
+         * region in base.gohtml carries the "Loading…" announcement for
+         * screen readers; aria-busy here signals the busy state on the
          * control itself.
          */
         &[aria-busy="true"] {
             color: transparent;
             cursor: wait;
+        }
+
+        &[aria-busy="true"] > .btn-loading-label {
+            visibility: hidden;
         }
 
         &[aria-busy="true"]::after {
