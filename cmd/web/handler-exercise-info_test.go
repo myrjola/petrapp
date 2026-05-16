@@ -87,8 +87,8 @@ func Test_application_exerciseInfo(t *testing.T) {
 			t.Error("Expected exercise name heading")
 		}
 
-		// Check for muscle groups
-		if doc.Find(".muscle-group").Length() == 0 {
+		// Check for muscle groups (rendered as .muscle-chip elements).
+		if doc.Find(".muscle-chip").Length() == 0 {
 			t.Error("Expected to find muscle groups")
 		}
 

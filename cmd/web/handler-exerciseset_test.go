@@ -498,6 +498,30 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 	if !strings.Contains(emptyState.Text(), noMatch) {
 		t.Errorf("Empty state %q should echo the query %q", strings.TrimSpace(emptyState.Text()), noMatch)
 	}
+
+	// Lock in the new swap-card structure.
+	if doc, err = client.GetDoc(ctx, slotURL+"/swap"); err != nil {
+		t.Fatalf("Get swap page for structure assertions: %v", err)
+	}
+	swapCard := doc.Find(".exercise-option").First()
+	if swapCard.Length() == 0 {
+		t.Fatal("expected at least one .exercise-option on the swap page")
+	}
+	if swapCard.Find(".badge").Length() == 0 {
+		t.Error("expected category badge inside the swap card")
+	}
+	if swapCard.Find(".muscle-chip.muscle-chip--primary").Length() == 0 {
+		t.Error("expected at least one .muscle-chip--primary in the swap card")
+	}
+	if swapCard.Find(".actions .btn.btn--quiet[type='submit']").Length() == 0 {
+		t.Error("expected the primary Swap action as .btn.btn--quiet submit inside .actions")
+	}
+	if swapCard.Find(".actions .btn.btn--ghost.btn--sm").Length() == 0 {
+		t.Error("expected the secondary Info action as .btn.btn--ghost.btn--sm inside .actions")
+	}
+	if swapCard.Find("dialog.sheet-dialog").Length() == 0 {
+		t.Error("expected the per-card info dialog as dialog.sheet-dialog")
+	}
 }
 
 func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *testing.T) {

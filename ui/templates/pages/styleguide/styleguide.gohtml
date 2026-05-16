@@ -358,6 +358,35 @@
         </section>
 
         <section>
+            <h2>Muscle chip</h2>
+            <div class="component-sample">
+                <span class="muscle-chip">Triceps</span>
+                <span class="muscle-chip muscle-chip--primary">Chest</span>
+                <span class="muscle-chip muscle-chip--primary">Shoulders</span>
+            </div>
+        </section>
+
+        <section>
+            <h2>Sheet dialog</h2>
+            <div class="component-sample">
+                <button type="button" class="btn btn--ghost btn--sm">
+                    <script {{ nonce }}>
+                      me().addEventListener('click', () => {
+                        document.getElementById('styleguide-sheet-dialog').showModal()
+                      })
+                    </script>
+                    Open sheet
+                </button>
+                <dialog id="styleguide-sheet-dialog" class="sheet-dialog">
+                    <form method="dialog" class="sheet-dialog__close">
+                        <button class="btn btn--ghost btn--sm">Close</button>
+                    </form>
+                    <p>Example sheet-dialog content. Slides up from the bottom on open.</p>
+                </dialog>
+            </div>
+        </section>
+
+        <section>
             <h2>Card</h2>
             <div class="component-sample">
                 <div class="card">A card is a surface with padding, border, radius and a subtle shadow. It composes with any children.</div>

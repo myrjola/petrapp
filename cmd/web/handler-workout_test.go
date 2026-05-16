@@ -239,4 +239,30 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 	if !strings.Contains(emptyState.Text(), noMatch) {
 		t.Errorf("Empty state %q should echo the query %q", strings.TrimSpace(emptyState.Text()), noMatch)
 	}
+
+	// Re-fetch unfiltered page so the card structure assertions have exercises to inspect.
+	if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/add-exercise"); err != nil {
+		t.Fatalf("Get add-exercise page (card structure check): %v", err)
+	}
+
+	// Lock in the new card structure.
+	card := doc.Find(".exercise-option").First()
+	if card.Length() == 0 {
+		t.Fatal("expected at least one .exercise-option on the add page")
+	}
+	if card.Find(".badge").Length() == 0 {
+		t.Error("expected category badge inside the exercise card")
+	}
+	if card.Find(".muscle-chip.muscle-chip--primary").Length() == 0 {
+		t.Error("expected at least one .muscle-chip--primary in the card")
+	}
+	if card.Find(".actions .btn.btn--quiet[type='submit']").Length() == 0 {
+		t.Error("expected the primary Add action as .btn.btn--quiet submit inside .actions")
+	}
+	if card.Find(".actions .btn.btn--ghost.btn--sm").Length() == 0 {
+		t.Error("expected the secondary Info action as .btn.btn--ghost.btn--sm inside .actions")
+	}
+	if card.Find("dialog.sheet-dialog").Length() == 0 {
+		t.Error("expected the per-card info dialog as dialog.sheet-dialog")
+	}
 }

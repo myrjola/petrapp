@@ -56,6 +56,28 @@ func Test_application_styleguide(t *testing.T) {
 		t.Error("expected a .card example on the styleguide")
 	}
 
+	// Muscle-chip — pill used by exercise-info / -add / -swap pages.
+	if doc.Find("h2:contains('Muscle chip')").Length() == 0 {
+		t.Error("expected a 'Muscle chip' section on the styleguide")
+	}
+	if doc.Find(".muscle-chip").Length() == 0 {
+		t.Error("expected a .muscle-chip example on the styleguide")
+	}
+	if doc.Find(".muscle-chip.muscle-chip--primary").Length() == 0 {
+		t.Error("expected a .muscle-chip--primary example on the styleguide")
+	}
+
+	// Sheet-dialog — slide-up modal used by exercise-add / -swap.
+	if doc.Find("h2:contains('Sheet dialog')").Length() == 0 {
+		t.Error("expected a 'Sheet dialog' section on the styleguide")
+	}
+	if doc.Find("dialog.sheet-dialog").Length() == 0 {
+		t.Error("expected a dialog.sheet-dialog example on the styleguide")
+	}
+	if doc.Find("dialog.sheet-dialog .sheet-dialog__close").Length() == 0 {
+		t.Error("expected the sheet-dialog example to render a .sheet-dialog__close row")
+	}
+
 	// Banner component.
 	if doc.Find("h2:contains('Banner')").Length() == 0 {
 		t.Error("expected a 'Banner' section")
