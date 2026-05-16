@@ -341,7 +341,6 @@
     button:disabled:hover,
     .btn:disabled:hover,
     .btn[aria-disabled="true"]:hover {
-        background-color: var(--clay-4);
         transform: none;
     }
 
