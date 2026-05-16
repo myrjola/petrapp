@@ -621,6 +621,154 @@
                                 }
                             }
                         </style>
+                        <script {{ nonce }}>
+                            (() => {
+                                const root = document.querySelector('[data-timed-runner]');
+                                const startBtn = document.querySelector('[data-timed-runner-start]');
+                                if (!root || !startBtn) return;
+
+                                const targetSeconds = parseInt(root.dataset.targetSeconds, 10);
+                                if (!Number.isFinite(targetSeconds) || targetSeconds <= 0) return;
+
+                                const form = document.querySelector('.set-form.timed-form');
+                                if (!form) return;
+
+                                const display = root.querySelector('.timed-runner-display');
+                                const labelEl = root.querySelector('[data-label]');
+                                const timeEl = root.querySelector('[data-time]');
+                                const cancelBtn = root.querySelector('[data-cancel]');
+
+                                const PREP_SECONDS = 10;
+                                let intervalId = null;
+                                let phase = 'idle';
+                                let deadline = 0;
+                                let lastWhole = -1;
+                                let audioCtx = null;
+                                let wakeLock = null;
+
+                                // Progressive-enhancement gate: server emits hidden, JS reveals Start.
+                                startBtn.hidden = false;
+
+                                function fmt(seconds) {
+                                    const s = Math.max(0, Math.ceil(seconds));
+                                    const m = Math.floor(s / 60);
+                                    const r = s % 60;
+                                    return m + ':' + String(r).padStart(2, '0');
+                                }
+
+                                function ensureAudio() {
+                                    const Ctor = window.AudioContext || window.webkitAudioContext;
+                                    if (!Ctor) return null;
+                                    if (!audioCtx) audioCtx = new Ctor();
+                                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                                    return audioCtx;
+                                }
+
+                                function playBeep(freq, ms) {
+                                    const ctx = ensureAudio();
+                                    if (!ctx) return;
+                                    const t0 = ctx.currentTime;
+                                    const t1 = t0 + ms / 1000;
+                                    const osc = ctx.createOscillator();
+                                    const gain = ctx.createGain();
+                                    osc.type = 'sine';
+                                    osc.frequency.value = freq;
+                                    gain.gain.setValueAtTime(0, t0);
+                                    gain.gain.linearRampToValueAtTime(0.3, t0 + 0.01);
+                                    gain.gain.setValueAtTime(0.3, Math.max(t0 + 0.01, t1 - 0.01));
+                                    gain.gain.linearRampToValueAtTime(0, t1);
+                                    osc.connect(gain).connect(ctx.destination);
+                                    osc.start(t0);
+                                    osc.stop(t1);
+                                }
+
+                                async function acquireWakeLock() {
+                                    if (!('wakeLock' in navigator)) return;
+                                    try {
+                                        wakeLock = await navigator.wakeLock.request('screen');
+                                    } catch (err) {
+                                        console.debug('wake lock request failed', err);
+                                    }
+                                }
+
+                                function releaseWakeLock() {
+                                    if (!wakeLock) return;
+                                    const sentinel = wakeLock;
+                                    wakeLock = null;
+                                    sentinel.release().catch((err) => console.debug('wake lock release failed', err));
+                                }
+
+                                function tick() {
+                                    const remainingMs = deadline - Date.now();
+                                    const remainingSec = remainingMs / 1000;
+                                    timeEl.textContent = fmt(remainingSec);
+                                    if (phase === 'prep') {
+                                        const whole = Math.ceil(remainingSec);
+                                        if (whole !== lastWhole && whole >= 1 && whole <= 3) {
+                                            playBeep(800, 120);
+                                        }
+                                        lastWhole = whole;
+                                        if (remainingMs <= 0) beginExercise();
+                                    } else if (phase === 'exercise') {
+                                        if (remainingMs <= 0) finishExercise();
+                                    }
+                                }
+
+                                function beginPrep() {
+                                    ensureAudio();
+                                    acquireWakeLock();
+                                    form.hidden = true;
+                                    startBtn.hidden = true;
+                                    root.hidden = false;
+                                    labelEl.textContent = 'Get ready';
+                                    display.dataset.phase = 'prep';
+                                    phase = 'prep';
+                                    deadline = Date.now() + PREP_SECONDS * 1000;
+                                    lastWhole = -1;
+                                    timeEl.textContent = fmt(PREP_SECONDS);
+                                    intervalId = setInterval(tick, 100);
+                                }
+
+                                function beginExercise() {
+                                    playBeep(1200, 250);
+                                    labelEl.textContent = 'Hold';
+                                    display.dataset.phase = 'exercise';
+                                    phase = 'exercise';
+                                    deadline = Date.now() + targetSeconds * 1000;
+                                    timeEl.textContent = fmt(targetSeconds);
+                                }
+
+                                function finishExercise() {
+                                    playBeep(440, 600);
+                                    teardown();
+                                }
+
+                                function teardown() {
+                                    if (intervalId !== null) {
+                                        clearInterval(intervalId);
+                                        intervalId = null;
+                                    }
+                                    phase = 'idle';
+                                    releaseWakeLock();
+                                    root.hidden = true;
+                                    display.dataset.phase = 'idle';
+                                    form.hidden = false;
+                                    startBtn.hidden = false;
+                                }
+
+                                startBtn.addEventListener('click', beginPrep);
+                                cancelBtn.addEventListener('click', teardown);
+
+                                document.addEventListener('visibilitychange', () => {
+                                    if (document.visibilityState === 'visible'
+                                            && phase !== 'idle' && !wakeLock) {
+                                        acquireWakeLock();
+                                    }
+                                });
+
+                                window.addEventListener('beforeunload', releaseWakeLock);
+                            })();
+                        </script>
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
