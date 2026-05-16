@@ -26,33 +26,6 @@
                     max-width: 500px;
                     line-height: 1.5;
                 }
-
-                .warmup-complete-button {
-                    padding: var(--size-3) var(--size-6);
-                    background: var(--color-info);
-                    color: var(--stone-0);
-                    border: none;
-                    border-radius: var(--radius-2);
-                    font-size: var(--font-size-2);
-                    font-weight: var(--font-weight-6);
-                    cursor: pointer;
-                    transition: background-color 0.2s ease, transform 0.1s ease;
-                    min-width: 200px;
-
-                    &:hover {
-                        background: color-mix(in oklab, var(--color-info) 85%, black);
-                        transform: translateY(-1px);
-                    }
-
-                    &:active {
-                        transform: translateY(0);
-                    }
-
-                    &:focus-visible {
-                        outline: 3px solid var(--color-border-focus);
-                        outline-offset: 2px;
-                    }
-                }
             }
 
             .warmup-status {
@@ -94,7 +67,7 @@
             </div>
             <form method="post"
                   action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/warmup/complete">
-                <button type="submit" class="warmup-complete-button">
+                <button type="submit" class="btn btn--focus btn--block">
                     ✓ Mark Warmup Complete
                 </button>
             </form>
