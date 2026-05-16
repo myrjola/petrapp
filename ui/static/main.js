@@ -74,8 +74,8 @@ const sameUrl = (a, b) =>
 /**
  * Navigation feedback state.
  *
- * `activeLoad` records the in-flight visual feedback so we can restore the
- * source element's text and hide the bar when:
+ * `activeLoad` records the in-flight visual feedback so we can clear the
+ * source element's busy state and hide the bar when:
  *   - bfcache restores a page that was mid-navigation (pageshow.persisted)
  *   - the user cancels a navigation (navigateerror)
  *   - a new navigation supersedes the current one
@@ -92,26 +92,27 @@ let activeLoad = null
 function startLoad(el) {
     clearLoad()
 
-    // Only buttons swap text — anchor labels are part of page content and
-    // changing them right before the browser tears down the document for a
-    // GET navigation is noisy without being reliably visible.
+    // Only buttons show the inline spinner — anchor labels are part of page
+    // content and overlaying a spinner right before the browser tears down
+    // the document for a GET navigation is noisy without being reliably
+    // visible. The button keeps its label in the DOM; CSS hides the text
+    // (preserving the button's width and height) and paints the spinner via
+    // ::after, which is why we do not swap textContent.
     const target = (el instanceof HTMLButtonElement && el.textContent?.trim()) ? el : null
-    let originalText = null
     if (target) {
-        originalText = target.textContent
-        target.textContent = 'Loading…'
+        target.setAttribute('aria-busy', 'true')
     }
 
     document.getElementById('loading-bar').classList.add('active')
     document.getElementById('loading-announce').textContent = 'Loading…'
 
-    activeLoad = { target, originalText }
+    activeLoad = { target }
 }
 
 function clearLoad() {
     if (!activeLoad) return
     if (activeLoad.target && activeLoad.target.isConnected) {
-        activeLoad.target.textContent = activeLoad.originalText
+        activeLoad.target.removeAttribute('aria-busy')
     }
     document.getElementById('loading-bar').classList.remove('active')
     document.getElementById('loading-announce').textContent = ''
