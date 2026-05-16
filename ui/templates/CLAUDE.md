@@ -103,6 +103,12 @@ A component's delivery mechanism is decided by what it must *guarantee*:
   visible `:disabled` state. Every variant is in `/dev/styleguide`.
 - `.badge` (+ `--success`/`--warning`/`--neutral`/`--info`).
 - `.card`.
+- `.muscle-chip` (+ `--primary`) — pill for muscle-group labels on the
+  exercise-info / -add / -swap pages. `--primary` uses the Clay accent
+  for primary-muscle emphasis; the base uses Stone for secondary muscles.
+- `.sheet-dialog` (+ `__close` row) — slide-up modal sheet used for
+  per-card exercise info on the Add and Swap pages. The companion
+  `.sheet-dialog__close` element pins the close button to the top-right.
 
 **Layout primitives** (`main.css @layer layout`): `.stack`, `.cluster`,
 `.grid-auto`, `.center`.
