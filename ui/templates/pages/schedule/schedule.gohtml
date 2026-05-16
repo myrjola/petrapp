@@ -68,33 +68,13 @@
                             min-width: 8rem;
 
                             &:focus {
-                                outline: 2px solid var(--color-success);
+                                outline: 2px solid var(--color-border-focus);
                                 outline-offset: 2px;
                             }
                         }
                     }
                 }
 
-                .save-button {
-                    width: 100%;
-                    padding: var(--size-4) var(--size-6);
-                    background: var(--clay-4);
-                    color: var(--color-surface-elevated);
-                    border: none;
-                    border-radius: var(--radius-2);
-                    font-weight: var(--font-weight-6);
-                    font-size: var(--font-size-2);
-                    cursor: pointer;
-                    transition: background-color 0.2s ease;
-
-                    &:hover {
-                        background: var(--clay-5);
-                    }
-
-                    &:active {
-                        background: var(--clay-6);
-                    }
-                }
             }
         </style>
 
@@ -124,7 +104,7 @@
                 </div>
             </fieldset>
             {{ template "banner" .Flash }}
-            <button type="submit" class="save-button">Start Tracking</button>
+            <button type="submit" class="btn btn--block">Start Tracking</button>
         </form>
     </main>
 {{ end }}
