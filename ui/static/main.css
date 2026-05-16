@@ -277,6 +277,7 @@
         border: none;
         white-space: nowrap;
         text-decoration: none;
+        transition: background-color var(--duration-2) var(--ease-out-quiet), transform var(--duration-1) var(--ease-out-quiet);
 
         &:hover {
             cursor: pointer;
@@ -285,6 +286,10 @@
 
         &:focus-visible {
             outline: var(--clay-3) solid 2px;
+        }
+
+        &:active:not([aria-busy="true"]) {
+            transform: scale(0.97);
         }
 
         /*
@@ -510,6 +515,13 @@ html:active-view-transition-type(backward) {
     button[aria-busy="true"]::after,
     .btn[aria-busy="true"]::after {
         animation: none;
+    }
+    button, .btn {
+        transition: background-color var(--duration-2) var(--ease-out-quiet);
+    }
+    button:active:not([aria-busy="true"]),
+    .btn:active:not([aria-busy="true"]) {
+        transform: none;
     }
 }
 
