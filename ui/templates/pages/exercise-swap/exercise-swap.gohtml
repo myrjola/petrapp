@@ -107,21 +107,6 @@
                             margin-bottom: var(--size-1);
                         }
 
-                        .swap-button {
-                            background-color: var(--color-success-bg);
-                            color: var(--color-success);
-                            border: none;
-                            border-radius: var(--radius-2);
-                            padding: var(--size-2) var(--size-3);
-                            font-weight: var(--font-weight-6);
-                            cursor: pointer;
-                            width: 100%;
-
-                            &:hover {
-                                background-color: color-mix(in oklab, var(--color-success-bg) 92%, black);
-                            }
-                        }
-
                         .no-results {
                             color: var(--color-text-secondary);
                             padding: var(--size-4) 0;
@@ -146,7 +131,7 @@
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.WorkoutExerciseID }}/swap">
                             <input type="hidden" name="new_exercise_id" value="{{ .ID }}">
-                            <button type="submit" class="swap-button">Swap to this exercise</button>
+                            <button type="submit" class="btn btn--quiet btn--block">Swap to this exercise</button>
                         </form>
                         <dialog id="dialog-exercise-{{ .ID }}" class="full-width-dialog">
                             <style {{ nonce }}>
