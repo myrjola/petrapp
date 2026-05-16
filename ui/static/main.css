@@ -385,6 +385,23 @@
         border-radius: var(--radius-3);
         box-shadow: var(--shadow-1);
     }
+
+    a.card {
+        transition:
+            transform var(--duration-3) var(--ease-out-quiet),
+            box-shadow var(--duration-3) var(--ease-out-quiet),
+            border-color var(--duration-2) var(--ease-out-quiet);
+
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-2);
+        }
+
+        &:active {
+            transform: translateY(0);
+            box-shadow: var(--shadow-1);
+        }
+    }
 }
 
 @keyframes shrink {
@@ -521,6 +538,10 @@ html:active-view-transition-type(backward) {
     }
     button:active:not([aria-busy="true"]),
     .btn:active:not([aria-busy="true"]) {
+        transform: none;
+    }
+    a.card:hover,
+    a.card:active {
         transform: none;
     }
 }
