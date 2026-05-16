@@ -561,6 +561,18 @@
                             {{ end }}
                         </form>
                     {{ else if eq $.ExerciseSet.Exercise.ExerciseType "time_based" }}
+                        <div class="timed-runner" data-timed-runner
+                             data-target-seconds="{{ $.CurrentSetTimedTarget }}"
+                             aria-live="polite"
+                             hidden>
+                            <div class="timed-runner-display" data-phase="idle">
+                                <span class="timed-runner-label" data-label>Get ready</span>
+                                <span class="timed-runner-time" data-time>0:10</span>
+                            </div>
+                            <button type="button" class="timed-runner-cancel" data-cancel>Cancel</button>
+                        </div>
+                        <button type="button" class="submit-button timed-runner-start"
+                                data-timed-runner-start hidden>Start timer</button>
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
