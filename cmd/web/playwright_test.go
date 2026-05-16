@@ -635,7 +635,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	if _, err = page.Goto(workoutURL); err != nil {
 		t.Fatalf("Flow 6: goto workoutURL: %v", err)
 	}
-	addExerciseLink := page.Locator("a.add-exercise-button")
+	addExerciseLink := page.Locator("a.add-exercise-link")
 	if err = addExerciseLink.WaitFor(); err != nil {
 		t.Fatalf("Flow 6: wait for add-exercise link: %v", err)
 	}
@@ -725,7 +725,7 @@ func dumpNavDiagnostics(t *testing.T, page playwright.Page, where, wantURL strin
 func addExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string) {
 	t.Helper()
 	var err error
-	if err = page.Locator("a.add-exercise-button").Click(); err != nil {
+	if err = page.Locator("a.add-exercise-link").Click(); err != nil {
 		t.Fatalf("click Add Exercise link: %v", err)
 	}
 	if err = page.WaitForURL(func(u string) bool { return strings.Contains(u, "/add-exercise") }); err != nil {

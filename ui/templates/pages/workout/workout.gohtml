@@ -71,20 +71,6 @@
                         justify-content: center;
                         margin-top: var(--size-2);
                     }
-
-                    .add-exercise-button {
-                        background-color: var(--clay-1);
-                        color: var(--clay-6);
-                        border-radius: var(--radius-2);
-                        padding: var(--size-2) var(--size-3);
-                        font-weight: var(--font-weight-6);
-                        text-decoration: none;
-                        display: inline-block;
-                    }
-
-                    .add-exercise-button:hover {
-                        background-color: var(--clay-2);
-                    }
                 }
             </style>
 
@@ -145,7 +131,7 @@
             </script>
 
             <div class="add-exercise">
-                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/add-exercise" class="add-exercise-button">
+                <a href="/workouts/{{ .Date.Format "2006-01-02" }}/add-exercise" class="btn btn--quiet add-exercise-link">
                     Add Exercise
                 </a>
             </div>
