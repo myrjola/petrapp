@@ -225,6 +225,13 @@
         --color-error-bg: #f6dcd4;
         --color-info: #3f5a68;
         --color-info-bg: #dde8ec;
+
+        /* Motion */
+        --ease-out-quiet: cubic-bezier(0.2, 0, 0, 1);
+        --duration-1: 80ms;
+        --duration-2: 160ms;
+        --duration-3: 240ms;
+        --duration-4: 320ms;
     }
 }
 
