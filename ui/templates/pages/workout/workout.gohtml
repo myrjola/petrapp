@@ -180,6 +180,7 @@
                             font-size: var(--font-size-2);
                             color: var(--color-text-primary);
                             line-height: 1.2;
+                            position: relative;
                         }
 
                         .exercise-sub {
@@ -239,8 +240,26 @@
 
                         .exercise.completed .exercise-name {
                             color: var(--color-success);
-                            text-decoration: line-through;
-                            text-decoration-color: color-mix(in oklab, var(--color-success) 40%, transparent);
+                        }
+
+                        .exercise.completed .exercise-name::after {
+                            content: "";
+                            position: absolute;
+                            left: 0;
+                            right: 0;
+                            top: 50%;
+                            height: 1.5px;
+                            background: color-mix(in oklab, var(--color-success) 50%, transparent);
+                            transform: translateY(-50%) scaleX(1);
+                            transform-origin: left center;
+                            pointer-events: none;
+                        }
+
+                        @media (forced-colors: active) {
+                            .exercise.completed .exercise-name::after {
+                                background: CanvasText;
+                                forced-color-adjust: none;
+                            }
                         }
 
                         .exercise.completed .exercise-num,
@@ -309,6 +328,51 @@
                             right: 0;
                             height: 2px;
                             transform: translateY(-50%);
+                        }
+                    }
+                </style>
+
+                <style {{ nonce }}>
+                    /* Per-card view-transition-names are gated on the state-refresh
+                       context so cards stay part of the page snapshot during forward
+                       and backward navigations (where the existing title morph
+                       dominates). The page-local script below sets and clears
+                       body[data-vt="state-refresh"] around the replace navigation. */
+                    {{ range .Exercises }}
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .ID }}"] { view-transition-name: ex-card-{{ .ID }}; }
+                    {{ if eq .State "completed" }}
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .ID }}"] .exercise-name::after { view-transition-name: ex-strike-{{ .ID }}; }
+                    {{ end }}
+                    {{ end }}
+
+                    html:active-view-transition-type(state-refresh) {
+                        /* Suppress the global page slide so per-card snapshots dominate. */
+                        &::view-transition-old(page),
+                        &::view-transition-new(page) {
+                            animation: none;
+                        }
+                        /* Strike draw on newly-completed cards (asymmetric: line exists in
+                           new snapshot but not old). */
+                        {{ range .Exercises }}{{ if eq .State "completed" }}
+                        &::view-transition-new(ex-strike-{{ .ID }}) {
+                            animation: strike-draw 320ms cubic-bezier(.2, .7, .3, 1) both;
+                            transform-origin: left center;
+                        }
+                        {{ end }}{{ end }}
+                    }
+
+                    @keyframes strike-draw {
+                        from { transform: scaleX(0); }
+                        to   { transform: scaleX(1); }
+                    }
+
+                    @media (prefers-reduced-motion: reduce) {
+                        html:active-view-transition-type(state-refresh) {
+                            {{ range .Exercises }}{{ if eq .State "completed" }}
+                            &::view-transition-new(ex-strike-{{ .ID }}) {
+                                animation-duration: 0.001ms;
+                            }
+                            {{ end }}{{ end }}
                         }
                     }
                 </style>
@@ -382,6 +446,61 @@
                       // Transition may be aborted if a new navigation starts; ignore.
                     }
                     element.style.viewTransitionName = ''
+                  })
+                </script>
+                <script {{ nonce }}>
+                  // Opt out of main.js's global bfcache reload (ui/static/main.js:300+);
+                  // we handle invalidation here with a replace navigation that participates
+                  // in cross-document view transitions. The dataset write happens at parse
+                  // time, before pageshow fires.
+                  document.body.dataset.bfcacheHandler = 'page-local'
+
+                  // Cache-buster query used to keep navigation.navigate(SAME_URL, ...) from
+                  // being reclassified as 'reload' by Chromium when fired from a deferred
+                  // context (after `await viewTransition.finished`). Stripped on arrival.
+                  const STATE_REFRESH_QUERY = '?_inv=1'
+
+                  window.addEventListener('pagereveal', async (e) => {
+                    if (e.viewTransition && window.navigation?.activation?.navigationType === 'replace') {
+                      // Set the state-refresh context for this transition. The body
+                      // attribute activates the per-card view-transition-name rules in
+                      // the <style> above so the incoming snapshot captures the cards
+                      // as separate pseudos. The 'state-refresh' transition type gates
+                      // the CSS that suppresses the page slide and runs the per-card
+                      // animations. Both clear when the transition ends.
+                      e.viewTransition.types.add('state-refresh')
+                      document.body.dataset.vt = 'state-refresh'
+                      e.viewTransition.finished.finally(() => { delete document.body.dataset.vt })
+                    }
+
+                    // Clean the cache-buster from the URL on the arrival pagereveal.
+                    if (location.search === STATE_REFRESH_QUERY) {
+                      history.replaceState(null, '', location.pathname)
+                    }
+
+                    const meta = document.querySelector('meta[name="invalidation-token"]')
+                    const rendered = meta ? meta.content : ''
+                    const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
+                    const current = m ? m[1] : ''
+                    if (rendered === current) return
+
+                    if (e.viewTransition) {
+                      try { await e.viewTransition.finished } catch (_) { /* skipped */ }
+                    }
+
+                    // Set the outgoing state-refresh context so the soon-to-be-captured
+                    // outgoing snapshot has the per-card pseudos. The browser captures
+                    // the outgoing snapshot at the navigate() call; this attribute must
+                    // be set before that. The incoming pagereveal sets it again for the
+                    // incoming snapshot.
+                    document.body.dataset.vt = 'state-refresh'
+
+                    const target = location.pathname + STATE_REFRESH_QUERY
+                    if ('navigation' in window) {
+                      navigation.navigate(target, { history: 'replace' })
+                    } else {
+                      location.replace(target)
+                    }
                   })
                 </script>
             </div>

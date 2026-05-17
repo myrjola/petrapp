@@ -91,13 +91,21 @@
             Petra uses the following cookies to ensure security and functionality:
         </p>
         <ul>
-            <li><code>session</code> - Secure, HTTP-only session cookie that maintains your authenticated state. Expires
-                when you close your browser or after a period of inactivity.
+            <li><code>session</code> - HTTP-only session cookie that maintains your authenticated state. Persists
+                across browser restarts and expires up to 7 days after it is issued.
+            </li>
+            <li><code>inv_bfcache</code> - Short-lived (60 seconds) cookie set after each form submission. Browsers
+                may show a stale snapshot of a page from their back/forward cache when you navigate back after
+                submitting a form; comparing this cookie to a token rendered into the page lets the client detect
+                staleness and reload. It contains a random value that does not identify you and is readable by
+                client-side JavaScript by design.
             </li>
         </ul>
         <p>
-            All cookies are set with secure flags (Secure, HttpOnly, SameSite) to prevent unauthorized access and
-            ensure they're only transmitted over encrypted connections.
+            All cookies are set with the <code>Secure</code> and <code>SameSite=Lax</code> flags so they are only
+            transmitted over encrypted connections and are not sent on cross-site requests. The <code>session</code>
+            cookie is additionally <code>HttpOnly</code>; <code>inv_bfcache</code> is intentionally readable from
+            JavaScript so the page can detect back/forward cache staleness.
         </p>
 
         <h2>Data Security</h2>
