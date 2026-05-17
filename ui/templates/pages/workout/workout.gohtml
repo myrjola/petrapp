@@ -463,6 +463,12 @@
                       // Swap the global 'forward' type added by main.js for our custom
                       // type so the page-slide suppression and strike-draw rules apply
                       // only to this transition, not to regular forward navigations.
+                      // Relies on main.js running its pagereveal listener first; base.gohtml
+                      // loads main.js synchronously in <head>, so its registration precedes
+                      // this inline script's. A future defer/async/module load would flip
+                      // the order silently — the type-swap would then run before main.js
+                      // adds 'forward', leaving the state-refresh type unmatched by the
+                      // forward slide and the page-slide suppression rules inert.
                       e.viewTransition.types.delete('forward')
                       e.viewTransition.types.add('state-refresh')
                     }
