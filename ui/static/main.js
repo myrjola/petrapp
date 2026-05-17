@@ -247,11 +247,19 @@ window.addEventListener('pagereveal', (e) => {
         e.viewTransition.skipTransition()
         return
     }
-    let dir = 'forward'
+    // Replace navigations stay on the same logical position (no new history
+    // entry), so they don't get a slide direction. Pages that want a custom
+    // transition on a replace opt in via their own pagereveal handler (e.g.,
+    // workout.gohtml's 'state-refresh' type).
+    let dir
     if (act.navigationType === 'traverse' && act.from && act.entry) {
         dir = act.entry.index < act.from.index ? 'backward' : 'forward'
+    } else if (act.navigationType === 'push') {
+        dir = 'forward'
     }
-    e.viewTransition.types.add(dir)
+    if (dir) {
+        e.viewTransition.types.add(dir)
+    }
 })
 
 document.addEventListener('click', (e) => {
