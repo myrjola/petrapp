@@ -117,13 +117,13 @@ func Test_playwright_smoketest(t *testing.T) {
 	page, serverURL := setupPlaywrightPage(t)
 	var err error
 
-	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Register"})
+	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Begin training"})
 	signInBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Sign in"})
 	logOutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Log out"})
 
 	// Step 1: Verify unauthenticated state.
 	if err = registerBtn.WaitFor(); err != nil {
-		t.Fatalf("wait for Register button: %v", err)
+		t.Fatalf("wait for Begin training button: %v", err)
 	}
 	if err = signInBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for Sign in button: %v", err)
@@ -312,7 +312,7 @@ func Test_playwright_smoketest(t *testing.T) {
 
 	// Step 11: Verify unauthenticated state.
 	if err = registerBtn.WaitFor(); err != nil {
-		t.Fatalf("wait for Register button after logout: %v", err)
+		t.Fatalf("wait for Begin training button after logout: %v", err)
 	}
 
 	// Step 12: Login — JS calls window.location.reload() after finishing.
@@ -354,7 +354,7 @@ func Test_playwright_stacknav(t *testing.T) {
 
 	// Setup: register and configure all weekdays so today always has a workout.
 	if err = page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Register"}).Click(); err != nil {
+		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
@@ -764,7 +764,7 @@ func Test_playwright_rest_chip(t *testing.T) {
 	page, serverURL := setupPlaywrightPage(t)
 	var err error
 
-	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Register"})
+	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Begin training"})
 	if err = registerBtn.Click(); err != nil {
 		t.Fatalf("register click: %v", err)
 	}
