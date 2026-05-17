@@ -1,20 +1,44 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseInfoTemplateData*/ -}}
 
 {{ define "page" }}
-    <main class="stack">
+    <main class="exercise-info-page">
         <style {{ nonce }}>
-            @scope {
+            @scope (.exercise-info-page) {
                 :scope {
-                    margin: var(--size-4);
-                    gap: var(--size-6);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-7);
+                    max-width: 640px;
+                    margin: 0 auto;
+                    padding: var(--size-2) var(--size-4) var(--size-9);
+                    counter-reset: section;
+                    position: relative;
                 }
 
-                .page-header h1 {
-                    view-transition-name: exercise-title-{{ .Exercise.ID }};
+                /* Subtle paper grain — turbulence-based SVG, very soft */
+                :scope::before {
+                    content: "";
+                    position: fixed;
+                    inset: 0;
+                    pointer-events: none;
+                    z-index: -1;
+                    opacity: 0.4;
+                    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.46 0 0 0 0 0.39 0 0 0 0 0.32 0 0 0 0.22 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+                    mix-blend-mode: multiply;
+                }
+
+                .top-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: var(--size-2);
+                    margin-bottom: calc(-1 * var(--size-5));
                 }
 
                 .admin-edit {
-                    align-self: flex-start;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: var(--size-1);
                     background: var(--clay-1);
                     color: var(--clay-6);
                     text-decoration: none;
@@ -22,84 +46,353 @@
                     border-radius: var(--radius-2);
                     font-size: var(--font-size-0);
                     font-weight: var(--font-weight-6);
+                    letter-spacing: var(--font-letterspacing-1);
                 }
 
                 .admin-edit:hover {
                     background: color-mix(in oklab, var(--clay-1) 92%, black);
                 }
+
+                /* HERO */
+                .hero {
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    align-items: end;
+                    gap: var(--size-3) var(--size-3);
+                    padding-block: var(--size-3) var(--size-5);
+                    border-bottom: 1px solid var(--stone-3);
+                    position: relative;
+                }
+
+                .hero::after {
+                    content: "";
+                    position: absolute;
+                    left: 0;
+                    bottom: -3px;
+                    width: 4rem;
+                    height: 5px;
+                    background: var(--clay-3);
+                    border-radius: 0;
+                }
+
+                .hero-overline {
+                    grid-column: 1 / -1;
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-4);
+                    text-transform: uppercase;
+                    color: var(--clay-4);
+                    font-weight: var(--font-weight-6);
+                }
+
+                .hero-overline::after {
+                    content: "";
+                    flex: 1;
+                    height: 1px;
+                    background: linear-gradient(to right, var(--stone-3), transparent);
+                }
+
+                .hero-overline .pipe {
+                    color: var(--stone-4);
+                }
+
+                .hero-title {
+                    grid-column: 1;
+                    width: fit-content;
+                    font-family: ui-serif, serif;
+                    font-weight: var(--font-weight-6);
+                    font-size: clamp(2.75rem, 12vw, 4rem);
+                    line-height: 0.92;
+                    letter-spacing: -0.035em;
+                    color: var(--color-text-primary);
+                    view-transition-name: exercise-title-{{ .WorkoutExerciseID }};
+                }
+
+                .hero-catalog {
+                    grid-column: 2;
+                    align-self: end;
+                    justify-self: end;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: end;
+                    gap: 0.15rem;
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    color: var(--stone-6);
+                    text-align: right;
+                    line-height: 1.2;
+                    padding-bottom: 0.3rem;
+                }
+
+                .hero-catalog .label {
+                    text-transform: uppercase;
+                    letter-spacing: var(--font-letterspacing-3);
+                    font-size: 0.625rem;
+                    color: var(--stone-5);
+                }
+
+                .hero-catalog .value {
+                    font-weight: var(--font-weight-7);
+                    color: var(--stone-8);
+                    font-feature-settings: "tnum" 1, "lnum" 1;
+                }
+
+                /* TARGETS */
+                .targets {
+                    display: grid;
+                    grid-template-columns: max-content 1fr;
+                    column-gap: var(--size-5);
+                    row-gap: var(--size-3);
+                    align-items: start;
+                }
+
+                .targets-label {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    color: var(--stone-6);
+                    padding-top: 0.4rem;
+                    white-space: nowrap;
+                }
+
+                .targets-muscles {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--size-2);
+                }
+
+                @media (max-width: 480px) {
+                    .targets {
+                        grid-template-columns: 1fr;
+                        row-gap: var(--size-1);
+                    }
+
+                    .targets-label {
+                        padding-top: var(--size-2);
+                    }
+
+                    .targets-label:not(:first-child) {
+                        padding-top: var(--size-3);
+                    }
+                }
+
+                /* SECTION HEADINGS — applied to h2 in both .prose and .progress */
+                .prose h2,
+                .progress > h2 {
+                    counter-increment: section;
+                    font-family: ui-serif, serif;
+                    font-weight: var(--font-weight-6);
+                    font-size: clamp(1.625rem, 6.5vw, 2.125rem);
+                    letter-spacing: -0.025em;
+                    line-height: 1.05;
+                    color: var(--color-text-primary);
+                    margin-bottom: var(--size-4);
+                    display: flex;
+                    align-items: baseline;
+                    gap: var(--size-3);
+                }
+
+                .prose h2::before,
+                .progress > h2::before {
+                    content: counter(section, decimal-leading-zero);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    color: var(--clay-4);
+                    font-weight: var(--font-weight-7);
+                    font-feature-settings: "tnum" 1, "lnum" 1;
+                    padding: 0.25rem 0.5rem;
+                    border: 1px solid var(--clay-2);
+                    border-radius: var(--radius-1);
+                    background: var(--clay-0);
+                    line-height: 1;
+                    align-self: center;
+                    flex-shrink: 0;
+                }
+
+                /* MARKDOWN PROSE */
+                .prose {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-7);
+                }
+
+                /* Steps — large serif numerals in the margin */
+                .prose ol {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                    counter-reset: step;
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                }
+
+                .prose ol li {
+                    counter-increment: step;
+                    display: grid;
+                    grid-template-columns: 2.75rem 1fr;
+                    column-gap: var(--size-4);
+                    align-items: baseline;
+                    font-size: var(--font-size-2);
+                    line-height: 1.55;
+                    color: var(--color-text-primary);
+                }
+
+                .prose ol li::before {
+                    content: counter(step, decimal-leading-zero);
+                    font-family: ui-serif, serif;
+                    font-size: var(--font-size-5);
+                    font-weight: var(--font-weight-5);
+                    color: var(--clay-3);
+                    line-height: 0.9;
+                    font-feature-settings: "lnum" 1, "tnum" 1;
+                    text-align: right;
+                    font-style: italic;
+                }
+
+                /* Unordered lists */
+                .prose ul {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                }
+
+                /* Common-mistake cards */
+                .prose ul li:has(> strong) {
+                    background: var(--color-surface-elevated);
+                    border: 1px solid var(--stone-2);
+                    border-left: 3px solid var(--clay-3);
+                    border-radius: var(--radius-2);
+                    padding: var(--size-3) var(--size-4);
+                    font-size: var(--font-size-1);
+                    line-height: 1.55;
+                    color: var(--color-text-primary);
+                    box-shadow: var(--shadow-1);
+                    position: relative;
+                }
+
+                .prose ul li:has(> strong) > strong {
+                    display: block;
+                    font-weight: var(--font-weight-7);
+                    color: var(--stone-9);
+                    margin-bottom: var(--size-1);
+                    letter-spacing: -0.005em;
+                }
+
+                /* Resource pills */
+                .prose ul:has(> li > a:only-child) {
+                    flex-direction: row;
+                    flex-wrap: wrap;
+                    gap: var(--size-2);
+                }
+
+                .prose ul li:has(> a:only-child) {
+                    background: transparent;
+                    border: none;
+                    padding: 0;
+                }
+
+                .prose ul li > a:only-child {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    padding: var(--size-2) var(--size-4);
+                    background: var(--color-surface-elevated);
+                    border: 1px solid var(--color-border);
+                    border-radius: var(--radius-round);
+                    color: var(--clay-5);
+                    font-weight: var(--font-weight-6);
+                    font-size: var(--font-size-1);
+                    text-decoration: none;
+                    transition: background var(--duration-2) var(--ease-out-quiet),
+                                border-color var(--duration-2) var(--ease-out-quiet),
+                                transform var(--duration-2) var(--ease-out-quiet);
+                }
+
+                .prose ul li > a:only-child::after {
+                    content: "↗";
+                    font-size: 0.95em;
+                    color: var(--clay-3);
+                    transition: transform var(--duration-2) var(--ease-out-quiet);
+                }
+
+                .prose ul li > a:only-child:hover {
+                    background: var(--clay-0);
+                    border-color: var(--clay-2);
+                    transform: translateY(-1px);
+                }
+
+                .prose ul li > a:only-child:hover::after {
+                    transform: translate(2px, -2px);
+                }
+
+                .prose ul li > a:only-child:focus-visible {
+                    outline: 2px solid var(--color-border-focus);
+                    outline-offset: 2px;
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .prose ul li > a:only-child,
+                    .prose ul li > a:only-child::after {
+                        transition: none;
+                    }
+                }
             }
         </style>
 
-        {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
-        {{ template "page-header" .Header }}
-        {{ if .IsAdmin }}
-            <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
-        {{ end }}
+        <div class="top-row">
+            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
+            {{ if .IsAdmin }}
+                <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
+            {{ end }}
+        </div>
 
-        <div class="exercise-info stack">
-            <style {{ nonce }}>
-                @scope (.exercise-info) {
-                    :scope {
-                        gap: var(--size-5);
-
-                        .section {
-                            gap: var(--size-2);
-                        }
-
-                        .section-title {
-                            font-weight: var(--font-weight-6);
-                            color: var(--color-text-primary);
-                            font-size: var(--font-size-2);
-                        }
-
-                        .category-badge {
-                            display: inline-flex;
-                            align-items: center;
-                            justify-content: center;
-                            background: var(--color-success-bg);
-                            color: var(--color-success);
-                            border-radius: var(--radius-2);
-                            padding: var(--size-1) var(--size-2);
-                            font-size: var(--font-size-1);
-                            font-weight: var(--font-weight-5);
-                            align-self: flex-start;
-                        }
-                    }
-                }
-            </style>
-
-            <div class="section stack">
-                <div class="section-title">Category</div>
-                <div class="category-badge">{{ .Exercise.Category.Label }}</div>
+        <header class="hero">
+            <div class="hero-overline" aria-hidden="true">
+                <span>Exercise Guide</span>
+                <span class="pipe">·</span>
+                <span>{{ .Exercise.Category.Label }}</span>
             </div>
+            <h1 class="hero-title">{{ .Exercise.Name }}</h1>
+            <div class="hero-catalog" aria-hidden="true">
+                <span class="label">Entry</span>
+                <span class="value">№ {{ printf "%03d" .Exercise.ID }}</span>
+            </div>
+        </header>
 
-            <div class="section stack">
-                <div class="section-title">Primary Muscle Groups</div>
-                <div class="muscle-groups cluster">
-                    {{ range .Exercise.PrimaryMuscleGroups }}
-                        <span class="muscle-chip muscle-chip--primary">{{ . }}</span>
-                    {{ end }}
-                </div>
+        <section class="targets" aria-label="Muscle groups">
+            <span class="targets-label">Primary</span>
+            <div class="targets-muscles">
+                {{ range .Exercise.PrimaryMuscleGroups }}
+                    <span class="muscle-chip muscle-chip--primary">{{ . }}</span>
+                {{ end }}
             </div>
 
             {{ if .Exercise.SecondaryMuscleGroups }}
-                <div class="section stack">
-                    <div class="section-title">Secondary Muscle Groups</div>
-                    <div class="muscle-groups cluster">
-                        {{ range .Exercise.SecondaryMuscleGroups }}
-                            <span class="muscle-chip">{{ . }}</span>
-                        {{ end }}
-                    </div>
+                <span class="targets-label">Assists</span>
+                <div class="targets-muscles">
+                    {{ range .Exercise.SecondaryMuscleGroups }}
+                        <span class="muscle-chip">{{ . }}</span>
+                    {{ end }}
                 </div>
             {{ end }}
+        </section>
 
-            <div class="section stack">
-                {{ mdToHTML .Exercise.DescriptionMarkdown }}
-            </div>
-        </div>
+        <section class="prose">
+            {{ mdToHTML .Exercise.DescriptionMarkdown }}
+        </section>
 
-        <h2>Progress chart</h2>
-
-        {{ template "progress-chart" . }}
+        <section class="progress">
+            <h2>Progress</h2>
+            {{ template "progress-chart" . }}
+        </section>
     </main>
 {{ end }}

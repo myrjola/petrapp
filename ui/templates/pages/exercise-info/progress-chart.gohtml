@@ -1,25 +1,168 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseInfoTemplateData*/ -}}
 
 {{ define "progress-chart" }}
-    <div class="table-container" tabindex="0" role="group" aria-labelledby="caption">
-        <table>
-            <caption id="caption">Progress of {{ .Exercise.Name }}</caption>
-            <tbody>
-            <tr>
+    <div class="progress-timeline" aria-label="Progress of {{ .Exercise.Name }}">
+        <style {{ nonce }}>
+            @scope (.progress-timeline) {
+                :scope {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                }
+
+                .timeline-caption {
+                    display: flex;
+                    align-items: baseline;
+                    gap: var(--size-2);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    color: var(--stone-6);
+                    font-weight: var(--font-weight-6);
+                }
+
+                .timeline-caption .count {
+                    color: var(--clay-5);
+                    font-weight: var(--font-weight-7);
+                    font-feature-settings: "tnum" 1, "lnum" 1;
+                }
+
+                .empty {
+                    padding: var(--size-5) var(--size-4);
+                    text-align: center;
+                    color: var(--color-text-muted);
+                    background: var(--color-surface-elevated);
+                    border: 1px dashed var(--stone-3);
+                    border-radius: var(--radius-3);
+                    font-style: italic;
+                }
+
+                ol.timeline {
+                    list-style: none;
+                    margin: 0;
+                    padding: 0;
+                    position: relative;
+                }
+
+                ol.timeline::before {
+                    content: "";
+                    position: absolute;
+                    left: 0.45rem;
+                    top: 1.2rem;
+                    bottom: 1.2rem;
+                    width: 1px;
+                    background: linear-gradient(to bottom,
+                        var(--stone-3),
+                        var(--stone-3) 70%,
+                        transparent
+                    );
+                }
+
+                .entry {
+                    display: grid;
+                    grid-template-columns: 1.75rem 1fr;
+                    column-gap: var(--size-3);
+                    align-items: start;
+                    padding-block: var(--size-3);
+                    position: relative;
+                }
+
+                .entry + .entry {
+                    border-top: 1px dashed var(--stone-2);
+                }
+
+                .entry::before {
+                    content: "";
+                    position: absolute;
+                    left: 0.175rem;
+                    top: 1.45rem;
+                    width: 0.6rem;
+                    height: 0.6rem;
+                    border-radius: 50%;
+                    background: var(--clay-3);
+                    box-shadow: 0 0 0 3px var(--color-surface);
+                }
+
+                .entry:first-child::before {
+                    background: var(--clay-4);
+                    box-shadow: 0 0 0 3px var(--color-surface),
+                                0 0 0 5px var(--clay-1);
+                }
+
+                .entry-date {
+                    grid-column: 2;
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-2);
+                    text-transform: uppercase;
+                    color: var(--stone-6);
+                    font-weight: var(--font-weight-6);
+                    margin-bottom: var(--size-2);
+                }
+
+                .entry:first-child .entry-date {
+                    color: var(--clay-5);
+                }
+
+                .entry:first-child .entry-date::after {
+                    content: "latest";
+                    margin-left: var(--size-2);
+                    padding: 0.1rem 0.4rem;
+                    border-radius: var(--radius-1);
+                    background: var(--clay-1);
+                    color: var(--clay-6);
+                    font-size: 0.6rem;
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-7);
+                    vertical-align: 0.05em;
+                }
+
+                .entry-sets {
+                    grid-column: 2;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--size-2);
+                }
+
+                .set-chip {
+                    display: inline-flex;
+                    align-items: baseline;
+                    padding: var(--size-1) var(--size-3);
+                    border-radius: var(--radius-2);
+                    background: var(--clay-0);
+                    color: var(--clay-6);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    font-weight: var(--font-weight-6);
+                    letter-spacing: var(--font-letterspacing-1);
+                    border: 1px solid var(--clay-1);
+                }
+            }
+        </style>
+
+        {{ if .ProgressPoints }}
+            <div class="timeline-caption">
+                <span class="count">{{ printf "%02d" (len .ProgressPoints) }}</span>
+                <span>{{ if eq (len .ProgressPoints) 1 }}session logged{{ else }}sessions logged{{ end }}</span>
+            </div>
+            <ol class="timeline">
                 {{ range $p := .ProgressPoints }}
-                    <th role="columnheader" scope="col">{{ $p.Date.Format "2006-01-02" }}</th>
-                {{ end}}
-            </tr>
-            <tr>
-                {{ range $p := .ProgressPoints }}
-                    <td>
-                        {{ range $d := $p.SetDescriptions }}
-                            {{ $d }}<br>
-                        {{ end }}
-                    </td>
+                    <li class="entry">
+                        <time class="entry-date" datetime="{{ $p.Date.Format "2006-01-02" }}">
+                            {{ $p.Date.Format "Mon · Jan 2, 2006" }}
+                        </time>
+                        <div class="entry-sets">
+                            {{ range $d := $p.SetDescriptions }}
+                                <span class="set-chip">{{ $d }}</span>
+                            {{ end }}
+                        </div>
+                    </li>
                 {{ end }}
-            </tr>
-            </tbody>
-        </table>
+            </ol>
+        {{ else }}
+            <div class="empty">No sessions logged yet.</div>
+        {{ end }}
     </div>
 {{ end }}
