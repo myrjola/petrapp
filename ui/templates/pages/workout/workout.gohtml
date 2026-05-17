@@ -183,6 +183,7 @@
                             font-size: var(--font-size-2);
                             color: var(--color-text-primary);
                             line-height: 1.2;
+                            position: relative;
                         }
 
                         .exercise-sub {
@@ -242,8 +243,26 @@
 
                         .exercise.completed .exercise-name {
                             color: var(--color-success);
-                            text-decoration: line-through;
-                            text-decoration-color: color-mix(in oklab, var(--color-success) 40%, transparent);
+                        }
+
+                        .exercise.completed .exercise-name::after {
+                            content: "";
+                            position: absolute;
+                            left: 0;
+                            right: 0;
+                            top: 50%;
+                            height: 1.5px;
+                            background: color-mix(in oklab, var(--color-success) 50%, transparent);
+                            transform: scaleX(1);
+                            transform-origin: left center;
+                            pointer-events: none;
+                        }
+
+                        @media (forced-colors: active) {
+                            .exercise.completed .exercise-name::after {
+                                background: CanvasText;
+                                forced-color-adjust: none;
+                            }
                         }
 
                         .exercise.completed .exercise-num,
