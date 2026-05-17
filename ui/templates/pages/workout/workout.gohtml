@@ -338,7 +338,31 @@
                 <style {{ nonce }}>
                     {{ range .Exercises }}
                     .exercise[data-workout-exercise-id="{{ .ID }}"] { view-transition-name: ex-card-{{ .ID }}; }
+                    {{ if eq .State "completed" }}
+                    .exercise[data-workout-exercise-id="{{ .ID }}"] .exercise-name::after { view-transition-name: ex-strike-{{ .ID }}; }
                     {{ end }}
+                    {{ end }}
+
+                    html:active-view-transition-type(state-refresh) {
+                        /* Suppress the global page slide so per-card snapshots dominate. */
+                        &::view-transition-old(page),
+                        &::view-transition-new(page) {
+                            animation: none;
+                        }
+                        /* Strike draw on newly-completed cards (asymmetric: line exists in
+                           new snapshot but not old). */
+                        {{ range .Exercises }}{{ if eq .State "completed" }}
+                        &::view-transition-new(ex-strike-{{ .ID }}) {
+                            animation: strike-draw 320ms cubic-bezier(.2, .7, .3, 1) both;
+                            transform-origin: left center;
+                        }
+                        {{ end }}{{ end }}
+                    }
+
+                    @keyframes strike-draw {
+                        from { transform: scaleX(0); }
+                        to   { transform: scaleX(1); }
+                    }
                 </style>
 
                 {{ range .Exercises }}
