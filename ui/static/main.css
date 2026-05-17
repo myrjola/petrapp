@@ -267,7 +267,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 2.75rem;
+        min-height: 3rem;
         border-radius: var(--radius-2);
         background-color: var(--clay-4);
         color: var(--color-surface-elevated);

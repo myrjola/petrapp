@@ -419,10 +419,9 @@ The pseudo inherits pointer events from the parent link/button — no
 `pointer-events` override needed. **Never enlarge the visual chrome to
 satisfy the rule**; that breaks the editorial restraint.
 
-`.btn` base currently enforces `min-height: 2.75rem` (44 px, Apple HIG);
-the design-system target is `3rem` (48 px). Bump it during the next
-button refactor. `.btn--sm` (32 px) and any icon-only button must use
-the `::before` expansion above today.
+`.btn` base enforces `min-height: 3rem` (48 px). `.btn--sm` (32 px) and
+any icon-only button must use the `::before` expansion above to clear
+the same target.
 
 Densely-packed controls (rare) may rely on WCAG 2.2's spacing
 exception: visuals < 48 px are acceptable when no other target's
