@@ -2,6 +2,59 @@
 
 Guidelines for working with Go templates, CSS architecture, and design systems in `ui/templates/` and `ui/static/`.
 
+## Design Language
+
+The app's visual identity is an *editorial training logbook*, not a fitness
+SaaS. Closest references: field notebooks, atelier signage, small-press
+editorial design. Restrained, warm, intentional. Density is low — every
+element earns its space.
+
+### Identity rules
+
+- **Warm-only palette.** Stone neutrals + Clay terracotta accent + Ember
+  one-off pop. No cool grays anywhere; shadows are warm-tinted
+  (`rgb(120 90 60 / .10)`), never neutral black. The semantic-token
+  catalogue is documented under "Color System" below.
+- **Three type voices, system stacks only — zero web fonts.** Display =
+  serif (Charter → Iowan Old Style → Georgia → ui-serif), tight tracking
+  `-0.025em`, line-height `0.95`, weight 6. Body = `system-ui`. Mono =
+  the developer-font waterfall in `--font-monospace-code`, and it does
+  real work: overlines, dates, counters, status labels are all mono. Mono
+  is the "annotation" voice and a signature of the system.
+- **No `@font-face` rules. No font CDN requests.** Cross-platform
+  rendering variance is intentional — the system aims for *native craft*
+  per OS, not pixel-identical rendering. Don't propose a Google-fonted
+  look or introduce a custom face.
+- **Signature page-header motif.** Uppercase mono overline in
+  `--clay-4` → serif display title (`clamp(2.25rem, 9vw, 3rem)`,
+  line-height `0.95`, tracking `-0.025em`) → meta row. The overline ends
+  with a 1px hairline fading right via
+  `linear-gradient(to right, var(--stone-3), transparent)`. Worked
+  example in `pages/workout/workout.gohtml` and
+  `pages/exerciseset/exercise-header.gohtml`. Reuse this rhythm; don't
+  reinvent it.
+- **State is never colour-only.** Every state carries a non-colour
+  signal too: in-progress = amber wash *plus* a 3px left-edge tab;
+  completed = sage wash *plus* a drawn strike-through; default =
+  elevated paper. Required by WCAG SC 1.4.1 and by the visual identity.
+- **Motion: one curve, sparingly.** `cubic-bezier(0.2, 0, 0, 1)`
+  (`--ease-out-quiet`), `80–320ms`. The View Transitions API is
+  first-class — title morphs list ↔ detail, strike-through draws on
+  completion. No springs, no bounces, no scattered micro-interactions.
+
+### Anti-patterns
+
+Do not introduce: Inter / Space Grotesk / generic geometric sans; web
+fonts via Google or any CDN; purple gradients or neon accents;
+dashboard-style multi-column layouts or sidebars; card-on-card density;
+saturated status colours (use the muted sage / amber / terracotta
+washes); neutral-black drop shadows; springy or bouncy motion.
+
+### The one thing to keep
+
+Serif title + mono overline + fading hairline on a paper-warm surface,
+with terracotta as the only saturated voice. That's the brand.
+
 ## Template Structure
 
 ### Template Organization
@@ -267,6 +320,11 @@ retired page-by-page.
 - **Radius**: `--radius-1` through `--radius-6`, `--radius-round`
 - **Border sizes**: `--border-size-1` through `--border-size-5`
 - **Shadows (elevation)**: `--shadow-1` (subtle), `--shadow-2` (card), `--shadow-3` (raised). Use these instead of inline `box-shadow` values; reach for raw `box-shadow` only for color-tinted glows or focus rings.
+- **Font families**: `--font-sans` (system-ui), `--font-serif` (Charter
+  → Iowan Old Style → Georgia → ui-serif), `--font-mono` (the developer
+  waterfall in `--font-monospace-code`). Three roles — display serif,
+  body sans, mono annotation — documented under "Design Language"
+  above. Zero `@font-face` rules; do not add web-font loading.
 - **Font weights**: `--font-weight-1` through `--font-weight-9`
 - **Font sizes**: `--font-size-00` (0.5rem) and `--font-size-0` through `--font-size-8`
 - **Fluid font sizes**: `--font-size-fluid-0` through `--font-size-fluid-3` (responsive via `clamp()`)
@@ -325,6 +383,92 @@ The project uses CSS layers defined in main.css:
 - **props**: Design tokens and custom properties - verify before using
 - **layout**: Page-level layout styles - rare additions
 - **components**: Global reusable components - add only truly global styles
+
+## Accessibility
+
+Target: **WCAG 2.2 AA + 48×48 touch targets** (the stricter Material
+guideline, above WCAG 2.2's 24×24 SC 2.5.8 minimum).
+
+### Touch targets
+
+The canonical pattern is **make the whole semantic container the trigger**
+— a list row, a card, a panel header — with small visual ornaments
+inside. This removes the touch-target question for the common case
+(`workout.gohtml` exercise rows are ~70 px tall; the 7-px dots inside
+are `aria-hidden` ornaments).
+
+When a small, standalone trigger is unavoidable (icon buttons, inline
+text actions like the "Info" / "Swap" header links), keep the visual
+small and **expand the hit area with an invisible `::before`**:
+
+```css
+.brief-action {
+  position: relative;     /* visual stays small */
+}
+.brief-action::before {
+  content: "";
+  position: absolute;
+  inset: 50% 50% 50% 50%;
+  min-width: 48px;
+  min-height: 48px;
+  translate: -50% -50%;
+}
+```
+
+The pseudo inherits pointer events from the parent link/button — no
+`pointer-events` override needed. **Never enlarge the visual chrome to
+satisfy the rule**; that breaks the editorial restraint.
+
+`.btn` base currently enforces `min-height: 2.75rem` (44 px, Apple HIG);
+the design-system target is `3rem` (48 px). Bump it during the next
+button refactor. `.btn--sm` (32 px) and any icon-only button must use
+the `::before` expansion above today.
+
+Densely-packed controls (rare) may rely on WCAG 2.2's spacing
+exception: visuals < 48 px are acceptable when no other target's
+*centre* falls within a 48 px clearance circle. Document any such
+exception in `/dev/styleguide`.
+
+### Colour contrast
+
+Contrast is a property of **token pairs**, not tokens. Maintain a
+pairing matrix in `/dev/styleguide` that names every legal
+text-on-surface combination with its measured ratio (AA: 4.5:1 body,
+3:1 large text ≥ 18 pt or 14 pt bold). Pairings not in the matrix are
+forbidden by convention.
+
+Suspect pairings to audit before reuse:
+
+- `--color-text-muted` (`--stone-5`) on `--color-surface` — likely
+  borderline for body; reserve for large text or darken to `--stone-6`.
+- `--color-text-secondary` (`--stone-6`) on `--color-surface` — verify.
+- `--clay-4` overlines on `--stone-1` — verify; may need `--clay-5` for
+  body-sized usage.
+- Status text on its matching wash (`--color-success` on
+  `--color-success-bg`, warning on `-bg`, error on `-bg`) — these were
+  tuned muted; need empirical numbers before adding new usages.
+
+**Non-text contrast (SC 1.4.11) must clear 3:1**: form borders, focus
+rings, card boundaries, dividers, the strike-through line on completed
+cards. The current `.card` border (`--stone-3` on `--stone-1`) is below
+3:1 — when a card relies on its border for separation, use `--stone-4`
+or heavier; cards that read clearly via elevation + interior content
+can drop the border entirely.
+
+### Other standing requirements
+
+- **Information not by colour alone (SC 1.4.1)**: every state ships
+  with a shape / line / wash signal in addition to colour. See the
+  "Design Language" section.
+- **Reduced motion** (`prefers-reduced-motion: reduce`) is wired across
+  `main.css`; any new motion must add its own reduced-motion fallback.
+- **Forced colours** (`@media (forced-colors: active)`) is handled for
+  the strike-through and the loading bar; new graphical signals that
+  carry meaning (dots, bars, tabs) must add forced-colours fallbacks
+  too — see the `CanvasText` swap in `workout.gohtml`.
+- **Focus rings**: prefer `outline-offset: 2px` with a high-contrast
+  colour (`--stone-9` or a two-tone `outline` + `box-shadow`). Don't
+  rely on a light-tone outline against a similarly-toned background.
 
 ## Template Data Preparation
 
