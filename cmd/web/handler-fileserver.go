@@ -13,8 +13,8 @@ import (
 // previously used to make the same decision up-front.
 //
 // The interceptor buffers the WriteHeader call so headers set by upstream
-// middleware (e.g. Cache-Control: public from cacheForever) are not flushed
-// before we know the response is a 404.
+// middleware (Cache-Control from cacheForever in prod or noStore in dev)
+// are not flushed before we know the response is a 404.
 type notFoundInterceptor struct {
 	http.ResponseWriter
 	is404         bool
@@ -71,7 +71,15 @@ func (app *application) fileServerHandler() (http.Handler, error) {
 	fileServer := http.FileServer(http.Dir(fileRoot))
 	notFoundHandler := app.sessionDeltaStack(http.HandlerFunc(app.notFound))
 
-	return app.noAuthStack(cacheForever(
+	// In dev, disable browser caching so edits to ui/static/* are visible on
+	// refresh. In prod, main.css and main.js are md5-fingerprinted by the
+	// Dockerfile ui-builder stage so cacheForever (immutable) is safe.
+	cache := cacheForever
+	if app.devMode {
+		cache = noStore
+	}
+
+	return app.noAuthStack(cache(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			interceptor := &notFoundInterceptor{ResponseWriter: w, is404: false, headerWritten: false}
 			fileServer.ServeHTTP(interceptor, r)
