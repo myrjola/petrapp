@@ -459,7 +459,7 @@
                   const STATE_REFRESH_QUERY = '?_inv=1'
 
                   window.addEventListener('pagereveal', async (e) => {
-                    if (e.viewTransition && navigation.activation?.navigationType === 'replace') {
+                    if (e.viewTransition && window.navigation?.activation?.navigationType === 'replace') {
                       // Swap the global 'forward' type added by main.js for our custom
                       // type so the page-slide suppression and strike-draw rules apply
                       // only to this transition, not to regular forward navigations.
