@@ -467,17 +467,10 @@
                     if (e.viewTransition && window.navigation?.activation?.navigationType === 'replace') {
                       // Set the state-refresh context for this transition. The body
                       // attribute activates the per-card view-transition-name rules in
-                      // the <style> above, so the incoming snapshot captures the cards
+                      // the <style> above so the incoming snapshot captures the cards
                       // as separate pseudos. The 'state-refresh' transition type gates
                       // the CSS that suppresses the page slide and runs the per-card
-                      // animations. Both are cleared when the transition ends.
-                      // Relies on main.js running its pagereveal listener first; base.gohtml
-                      // loads main.js synchronously in <head>, so its registration precedes
-                      // this inline script's. A future defer/async/module load would flip
-                      // the order silently — the type-swap would then run before main.js
-                      // adds 'forward', leaving the state-refresh type unmatched by the
-                      // forward slide and the page-slide suppression rules inert.
-                      e.viewTransition.types.delete('forward')
+                      // animations. Both clear when the transition ends.
                       e.viewTransition.types.add('state-refresh')
                       document.body.dataset.vt = 'state-refresh'
                       e.viewTransition.finished.finally(() => { delete document.body.dataset.vt })
