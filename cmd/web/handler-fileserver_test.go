@@ -68,3 +68,28 @@ func Test_fileServer_missingFileReturnsCustom404(t *testing.T) {
 // alone makes traversal unobservable through the e2etest client, so an
 // HTTP-level test would either pass trivially (proving nothing) or
 // require a hand-crafted net.Conn to bypass URL normalization. Skipping.
+
+func Test_fileServer_devModeUsesNoStoreCacheControl(t *testing.T) {
+	// testLookupEnv does not set FLY_APP_NAME, so app.devMode is true.
+	// In dev the static file server must disable browser caching so that
+	// edits to ui/static/main.css and main.js are visible on refresh.
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	resp, err := server.Client().Get(t.Context(), "/main.css")
+	if err != nil {
+		t.Fatalf("Failed to GET /main.css: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 for existing static file, got %d", resp.StatusCode)
+	}
+	got := resp.Header.Get("Cache-Control")
+	want := "no-store, max-age=0, must-revalidate"
+	if got != want {
+		t.Errorf("Expected Cache-Control %q in dev mode, got %q", want, got)
+	}
+}
