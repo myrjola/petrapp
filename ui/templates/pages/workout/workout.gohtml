@@ -363,6 +363,16 @@
                         from { transform: scaleX(0); }
                         to   { transform: scaleX(1); }
                     }
+
+                    @media (prefers-reduced-motion: reduce) {
+                        html:active-view-transition-type(state-refresh) {
+                            {{ range .Exercises }}{{ if eq .State "completed" }}
+                            &::view-transition-new(ex-strike-{{ .ID }}) {
+                                animation-duration: 0.001ms;
+                            }
+                            {{ end }}{{ end }}
+                        }
+                    }
                 </style>
 
                 {{ range .Exercises }}
