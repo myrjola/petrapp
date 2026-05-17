@@ -336,10 +336,15 @@
                 </style>
 
                 <style {{ nonce }}>
+                    /* Per-card view-transition-names are gated on the state-refresh
+                       context so cards stay part of the page snapshot during forward
+                       and backward navigations (where the existing title morph
+                       dominates). The page-local script below sets and clears
+                       body[data-vt="state-refresh"] around the replace navigation. */
                     {{ range .Exercises }}
-                    .exercise[data-workout-exercise-id="{{ .ID }}"] { view-transition-name: ex-card-{{ .ID }}; }
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .ID }}"] { view-transition-name: ex-card-{{ .ID }}; }
                     {{ if eq .State "completed" }}
-                    .exercise[data-workout-exercise-id="{{ .ID }}"] .exercise-name::after { view-transition-name: ex-strike-{{ .ID }}; }
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .ID }}"] .exercise-name::after { view-transition-name: ex-strike-{{ .ID }}; }
                     {{ end }}
                     {{ end }}
 
@@ -460,9 +465,12 @@
 
                   window.addEventListener('pagereveal', async (e) => {
                     if (e.viewTransition && window.navigation?.activation?.navigationType === 'replace') {
-                      // Swap the global 'forward' type added by main.js for our custom
-                      // type so the page-slide suppression and strike-draw rules apply
-                      // only to this transition, not to regular forward navigations.
+                      // Set the state-refresh context for this transition. The body
+                      // attribute activates the per-card view-transition-name rules in
+                      // the <style> above, so the incoming snapshot captures the cards
+                      // as separate pseudos. The 'state-refresh' transition type gates
+                      // the CSS that suppresses the page slide and runs the per-card
+                      // animations. Both are cleared when the transition ends.
                       // Relies on main.js running its pagereveal listener first; base.gohtml
                       // loads main.js synchronously in <head>, so its registration precedes
                       // this inline script's. A future defer/async/module load would flip
@@ -471,6 +479,8 @@
                       // forward slide and the page-slide suppression rules inert.
                       e.viewTransition.types.delete('forward')
                       e.viewTransition.types.add('state-refresh')
+                      document.body.dataset.vt = 'state-refresh'
+                      e.viewTransition.finished.finally(() => { delete document.body.dataset.vt })
                     }
 
                     // Clean the cache-buster from the URL on the arrival pagereveal.
@@ -487,6 +497,13 @@
                     if (e.viewTransition) {
                       try { await e.viewTransition.finished } catch (_) { /* skipped */ }
                     }
+
+                    // Set the outgoing state-refresh context so the soon-to-be-captured
+                    // outgoing snapshot has the per-card pseudos. The browser captures
+                    // the outgoing snapshot at the navigate() call; this attribute must
+                    // be set before that. The incoming pagereveal sets it again for the
+                    // incoming snapshot.
+                    document.body.dataset.vt = 'state-refresh'
 
                     const target = location.pathname + STATE_REFRESH_QUERY
                     if ('navigation' in window) {
