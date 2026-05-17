@@ -206,16 +206,29 @@ fly-ops `make` targets work against them with `FLY_APP=pr-<N>-myrjola-petrapp`.
 
 #### Day-to-day flow
 
+Both paths below are valid — pick based on whether you want a production-like preview before
+merging. The `main.yml` pipeline (test → staging → smoke → prod) is the same safety net either
+way, and it's very good at catching regressions before they reach prod.
+
 ```sh
-# Routine change:
+# Option A — push straight to main:
+# Fine for most routine changes. CI runs make ci + make migratetest against prod data,
+# then deploys to staging, smoke-tests, and promotes to prod only if staging is healthy.
+git commit -am "my change"
+git push origin main
+
+# Option B — open a PR:
 git checkout -b my-change
 # ... commit, push, open PR. Wait for CI green and review app to come up.
 # Manually exercise https://pr-<N>-myrjola-petrapp.fly.dev. Merge to main when happy.
 # CI auto-deploys to staging then prod.
-
-# Hotfix straight to prod (rare):
-# Same as above — there is no manual override path.
 ```
+
+The PR flow's main benefit is the per-PR review app — a real Fly Machine with its own volume,
+Litestream replica, and wake-from-zero behavior. That makes it useful when a change touches the
+infrastructure layer (deploy config, migrations, Litestream, auth flows, anything that behaves
+differently outside a local `go run`) and you want to exercise it in a production-like setup
+before merging. For pure code changes inside the app, pushing to `main` is usually fine.
 
 ### Creating new deployment
 
