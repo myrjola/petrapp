@@ -4,136 +4,353 @@
     <style {{ nonce }}>
         @scope {
             :scope {
-                min-height: 100%;
-                display: flex;
-                flex-direction: column;
+                min-height: 100dvh;
+                display: grid;
+                grid-template-rows: 1fr auto;
                 overflow: hidden;
+                isolation: isolate;
+                position: relative;
+            }
+
+            /* Warm editorial atmosphere — replaces the generic blur blobs.
+               Two soft radial washes in the brand's own Clay/Ember tones,
+               layered over the Stone cream base. */
+            :scope::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background:
+                    radial-gradient(ellipse 70% 55% at 78% 8%,
+                        color-mix(in oklab, var(--clay-2) 60%, transparent) 0%,
+                        transparent 65%),
+                    radial-gradient(ellipse 90% 50% at 12% 105%,
+                        color-mix(in oklab, var(--ember) 30%, transparent) 0%,
+                        transparent 60%);
+                z-index: -1;
+                pointer-events: none;
+            }
+
+            @media (prefers-reduced-motion: no-preference) {
+                .reveal { animation: landing-rise 700ms var(--ease-out-quiet) both; }
+                .reveal-1 { animation-delay: 60ms; }
+                .reveal-2 { animation-delay: 180ms; }
+                .reveal-3 { animation-delay: 320ms; }
+                .reveal-4 { animation-delay: 460ms; }
+                .reveal-5 { animation-delay: 580ms; }
+            }
+
+            @keyframes landing-rise {
+                from { opacity: 0; transform: translate3d(0, 12px, 0); }
+                to   { opacity: 1; transform: none; }
             }
         }
     </style>
-    <main>
+
+    <main class="landing">
         <style {{ nonce }}>
-            @scope {
+            @scope (.landing) {
                 :scope {
                     position: relative;
-                    flex: 1;
+                    display: grid;
+                    grid-template-rows: auto 1fr auto;
+                    align-items: center;
+                    width: 100%;
+                    max-width: 30rem;
+                    margin-inline: auto;
+                    padding:
+                        max(env(safe-area-inset-top, 0), var(--size-4))
+                        var(--size-5)
+                        var(--size-5);
+                    gap: var(--size-5);
+                }
+
+                /* Editorial top stamp — tracked small caps with a single
+                   centered accent dot. Hairline rules are applied as a
+                   thin border above and below for editorial weight without
+                   the squeeze problem of flanking grid-line tricks. */
+                .stamp {
+                    text-align: center;
+                    color: var(--color-text-muted);
+                    font-size: 0.65rem;
+                    letter-spacing: var(--font-letterspacing-4);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-7);
+                    padding: var(--size-2) 0;
+                    border-block: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+                }
+                .stamp b {
+                    color: var(--color-text-secondary);
+                    font-weight: var(--font-weight-7);
+                }
+                .stamp .dot {
+                    display: inline-block;
+                    width: 3px;
+                    height: 3px;
+                    border-radius: 50%;
+                    background: var(--clay-4);
+                    margin: 0 0.6em;
+                    vertical-align: 2px;
+                }
+
+                /* Hero: kettlebell sitting inside a soft halo with two decorative
+                   concentric rings. The halo absorbs the warm gradient behind it,
+                   so the mascot reads cleanly without a hard plate. */
+                .hero {
+                    position: relative;
+                    display: grid;
+                    place-items: center;
+                    aspect-ratio: 1;
+                    width: min(72vw, 18rem);
+                    margin-inline: auto;
+                }
+                .hero__rings {
+                    position: absolute;
+                    inset: 0;
+                    color: var(--clay-3);
+                }
+                .hero__halo {
+                    position: absolute;
+                    inset: 12%;
+                    border-radius: 50%;
+                    background:
+                        radial-gradient(circle at 35% 30%,
+                            color-mix(in oklab, var(--clay-0) 95%, white) 0%,
+                            var(--clay-1) 70%,
+                            color-mix(in oklab, var(--clay-2) 80%, transparent) 100%);
+                    box-shadow:
+                        inset 0 -8px 24px color-mix(in oklab, var(--clay-3) 25%, transparent),
+                        0 24px 60px -24px color-mix(in oklab, var(--clay-5) 55%, transparent);
+                }
+                .hero__logo {
+                    position: relative;
+                    width: 58%;
+                    height: auto;
+                    filter: drop-shadow(0 6px 10px color-mix(in oklab, var(--clay-6) 35%, transparent));
+                }
+
+                /* Wordmark + meta block. */
+                .identity {
+                    text-align: center;
+                    display: grid;
+                    gap: var(--size-3);
+                    margin-top: var(--size-2);
+                }
+                .wordmark {
+                    font-family: ui-serif, "New York", "Iowan Old Style", "Charter",
+                        "Georgia", serif;
+                    font-style: italic;
+                    font-weight: 400;
+                    font-size: clamp(3.75rem, 16vw, 5.5rem);
+                    line-height: 0.9;
+                    letter-spacing: -0.045em;
+                    color: var(--stone-10);
+                    /* Decorative serif glyph: a hairline accent under the wordmark. */
+                    position: relative;
+                }
+                .wordmark::after {
+                    content: "";
+                    display: block;
+                    width: 2.25rem;
+                    height: 2px;
+                    background: var(--ember);
+                    border-radius: 2px;
+                    margin: var(--size-3) auto 0;
+                }
+                .tagline {
+                    font-size: 0.95rem;
+                    line-height: var(--font-lineheight-2);
+                    color: var(--color-text-secondary);
+                    font-weight: var(--font-weight-5);
+                    max-width: 22rem;
+                    margin-inline: auto;
+                }
+                .tagline em {
+                    font-family: ui-serif, "New York", "Iowan Old Style", "Charter",
+                        "Georgia", serif;
+                    font-style: italic;
+                    font-weight: 500;
+                    color: var(--clay-5);
+                    font-size: 1.05em;
+                }
+                .tagline .kicker {
+                    display: block;
+                    margin-bottom: var(--size-1);
+                    font-size: 0.625rem;
+                    letter-spacing: var(--font-letterspacing-5);
+                    text-transform: uppercase;
+                    color: var(--color-text-muted);
+                    font-weight: var(--font-weight-7);
+                }
+
+                /* CTA stack: bold primary + secondary text link with arrow.
+                   The secondary form keeps its own POST flow (webauthn) but
+                   presents as a quiet text link, not a parallel button. */
+                .cta {
+                    display: grid;
+                    gap: var(--size-4);
+                    margin-top: var(--size-3);
+                }
+                .cta__primary-form {
+                    display: contents;
+                }
+                .cta__primary {
+                    width: 100%;
+                    font-size: var(--font-size-2);
+                    padding-block: var(--size-3);
+                    letter-spacing: var(--font-letterspacing-4);
+                    box-shadow:
+                        0 1px 0 color-mix(in oklab, var(--clay-6) 50%, transparent) inset,
+                        0 10px 24px -10px color-mix(in oklab, var(--clay-5) 70%, transparent);
+                }
+                .cta__primary .arrow {
+                    margin-left: 0.55em;
+                    display: inline-block;
+                    transition: transform var(--duration-2) var(--ease-out-quiet);
+                }
+                .cta__primary:hover .arrow { transform: translateX(3px); }
+
+                .cta__secondary-form {
+                    display: flex;
+                    justify-content: center;
+                }
+                .cta__secondary {
+                    background: none;
+                    border: none;
+                    color: var(--clay-5);
+                    font-family: inherit;
+                    font-size: 0.875rem;
+                    font-weight: var(--font-weight-6);
+                    letter-spacing: var(--font-letterspacing-2);
+                    text-transform: none;
+                    padding: var(--size-2) var(--size-3);
+                    min-height: 2.5rem;
+                    cursor: pointer;
+                    border-radius: var(--radius-2);
+                    transition: color var(--duration-2) var(--ease-out-quiet);
+                    box-shadow: none;
+                }
+                .cta__secondary span.muted {
+                    color: var(--color-text-muted);
+                    font-weight: var(--font-weight-5);
+                    margin-right: 0.4em;
+                }
+                .cta__secondary:hover {
+                    background: none;
+                    color: var(--clay-6);
+                    text-decoration: underline;
+                    text-underline-offset: 4px;
+                    text-decoration-thickness: 1px;
+                    transform: none;
+                }
+                .cta__secondary:focus-visible {
+                    outline: 2px solid var(--clay-3);
+                    outline-offset: 3px;
+                }
+                .cta__secondary:active:not([aria-busy="true"]) { transform: none; }
+
+                @media (min-width: 32rem) {
+                    .wordmark { font-size: 5.5rem; }
+                    .hero { width: 16rem; }
                 }
             }
         </style>
-        {{ template "backdrop-blur-top" }}
-        <div>
-            <style {{ nonce }}>
-                @scope {
-                    :scope {
-                        height: 100%;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        padding-top: var(--size-8);
-                        padding-bottom: var(--size-8);
 
-                        > div {
-                            margin-left: auto;
-                            margin-right: auto;
-                            max-width: 50rem;
-                            padding-left: var(--size-5);
-                            padding-right: var(--size-5);
-                        }
-                    }
-                }
-            </style>
-            <div>
-                <div class="stack">
-                    <style {{nonce}}>
-                        @scope {
-                            :scope {
-                                gap: var(--size-5);
-                                text-align: center;
-
-                                > img {
-                                    margin-left: auto;
-                                    margin-right: auto;
-                                    aspect-ratio: 1;
-                                    height: var(--size-12);
-                                }
-
-                                > h1 {
-                                    font-size: var(--font-size-5);
-                                    font-weight: var(--font-weight-4);
-                                    letter-spacing: var(--font-letterspacing-1);
-                                }
-
-                                > p {
-                                    font-size: var(--font-size-3);
-                                    line-height: var(--font-lineheight-3);
-                                    color: var(--color-text-secondary);
-                                }
-                            }
-                        }
-                    </style>
-                    <img src="/logo.svg" alt="Happy kettlebell"/>
-                    <h1>
-                        Petra
-                    </h1>
-                    <p>
-                        Personal trainer in your pocket.
-                    </p>
-                    <div class="cluster">
-                        <style {{ nonce }}>
-                            @scope {
-                                :scope {
-                                    justify-content: center;
-                                    gap: var(--size-4);
-                                }
-                            }
-                        </style>
-                        <form method="post" action="/api/login/start">
-                            <button type="submit">Sign in</button>
-                            <script {{ nonce }}>
-                              (async (form = me()) => {
-                                const {loginUser} = await import("webauthn")
-                                form.addEventListener("submit", loginUser)
-                              })()
-                            </script>
-                        </form>
-                        <form action="/api/registration/start">
-                            <button type="submit">Register</button>
-                            <script {{ nonce }}>
-                              (async (form = me()) => {
-                                const {registerUser} = await import("webauthn")
-                                form.addEventListener("submit", registerUser)
-                              })()
-                            </script>
-                        </form>
-                    </div>
-                </div>
-            </div>
+        <div class="stamp reveal reveal-1">
+            <b>Petra</b> Athletics<span class="dot"></span>Est. MMXXVI
         </div>
-        {{ template "backdrop-blur-bottom" }}
+
+        <figure class="hero reveal reveal-2">
+            <svg class="hero__rings" viewBox="0 0 100 100" aria-hidden="true"
+                 preserveAspectRatio="xMidYMid meet">
+                <circle cx="50" cy="50" r="48" fill="none"
+                        stroke="currentColor" stroke-width="0.4"
+                        stroke-dasharray="0.6 2.2" opacity="0.55"/>
+                <circle cx="50" cy="50" r="44" fill="none"
+                        stroke="currentColor" stroke-width="0.3"
+                        opacity="0.25"/>
+            </svg>
+            <div class="hero__halo" aria-hidden="true"></div>
+            <img class="hero__logo" src="/logo.svg" alt="Petra kettlebell mascot"
+                 width="240" height="240"/>
+        </figure>
+
+        <div class="identity reveal reveal-3">
+            <h1 class="wordmark">Petra</h1>
+            <p class="tagline">
+                <span class="kicker">Personal Training</span>
+                A trainer <em>in your pocket</em>.
+            </p>
+        </div>
+
+        <div class="cta">
+            <form class="cta__primary-form reveal reveal-4"
+                  action="/api/registration/start">
+                <button type="submit" class="cta__primary">
+                    Begin training<span class="arrow" aria-hidden="true">→</span>
+                </button>
+                <script {{ nonce }}>
+                  (async (form = me()) => {
+                    const {registerUser} = await import("webauthn")
+                    form.addEventListener("submit", registerUser)
+                  })()
+                </script>
+            </form>
+
+            <form class="cta__secondary-form reveal reveal-5"
+                  method="post" action="/api/login/start">
+                <button type="submit" class="cta__secondary">
+                    <span class="muted">Already a member?</span>Sign in →
+                </button>
+                <script {{ nonce }}>
+                  (async (form = me()) => {
+                    const {loginUser} = await import("webauthn")
+                    form.addEventListener("submit", loginUser)
+                  })()
+                </script>
+            </form>
+        </div>
     </main>
+
     <footer>
         <style {{ nonce }}>
             @scope {
                 :scope {
-                    margin-top: var(--size-8);
-                    padding-block: var(--size-4);
+                    padding:
+                        var(--size-3)
+                        var(--size-5)
+                        max(env(safe-area-inset-bottom, 0), var(--size-3));
                     text-align: center;
-                    border-top: 1px solid var(--color-border);
+                    font-size: 0.6875rem;
+                    letter-spacing: var(--font-letterspacing-5);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-muted);
+                    border-top: 1px solid color-mix(in oklab, var(--color-border) 60%, transparent);
+                    background: color-mix(in oklab, var(--color-surface) 80%, transparent);
                 }
 
                 a {
-                    color: var(--color-text-secondary);
+                    color: inherit;
                     text-decoration: none;
-                    font-size: var(--font-size-1);
+                    transition: color var(--duration-2) var(--ease-out-quiet);
                 }
 
                 a:hover {
-                    color: var(--color-text-primary);
-                    text-decoration: underline;
+                    color: var(--clay-5);
+                }
+
+                .sep {
+                    display: inline-block;
+                    width: 3px;
+                    height: 3px;
+                    border-radius: 50%;
+                    background: currentColor;
+                    margin: 0 0.7em;
+                    vertical-align: 2px;
+                    opacity: 0.6;
                 }
             }
         </style>
-        <a href="/privacy">Privacy & Security</a>
+        <a href="/privacy">Privacy <span class="sep"></span> Security</a>
     </footer>
 {{ end }}
-
