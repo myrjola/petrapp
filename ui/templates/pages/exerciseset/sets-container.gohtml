@@ -567,6 +567,42 @@
                                 }
                             }
                         </style>
+                        <form method="post"
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
+                              id="form-{{ $index }}"
+                              class="set-form timed-form"
+                              aria-label="Complete current hold">
+                            <div class="input-field">
+                                <label for="completed-value-{{ $index }}">Seconds held</label>
+                                <input
+                                        id="completed-value-{{ $index }}"
+                                        inputmode="numeric"
+                                        pattern="[0-9]*"
+                                        name="completed_value"
+                                        value="{{ $.CurrentSetTimedTarget }}"
+                                        required
+                                        class="reps-input"
+                                >
+                            </div>
+                            {{ if $.IsDeload }}
+                                <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
+                            {{ else }}
+                                <fieldset class="signal-group">
+                                    <legend>How did {{ $.CurrentSetTimedTarget }}s feel?</legend>
+                                    <div class="signal-buttons">
+                                        <button type="submit" name="signal" value="too_heavy"
+                                                class="signal-btn too-heavy-btn"
+                                                aria-label="Too heavy — failed to reach the target hold">too heavy</button>
+                                        <button type="submit" name="signal" value="on_target"
+                                                class="signal-btn on-target-btn"
+                                                aria-label="Barely reached target hold">BARELY</button>
+                                        <button type="submit" name="signal" value="too_light"
+                                                class="signal-btn too-light-btn"
+                                                aria-label="Easy — could have held longer">easy</button>
+                                    </div>
+                                </fieldset>
+                            {{ end }}
+                        </form>
                         <script {{ nonce }}>
                             (() => {
                                 const root = document.querySelector('[data-timed-runner]');
@@ -722,42 +758,6 @@
                                 window.addEventListener('beforeunload', releaseWakeLock);
                             })();
                         </script>
-                        <form method="post"
-                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
-                              id="form-{{ $index }}"
-                              class="set-form timed-form"
-                              aria-label="Complete current hold">
-                            <div class="input-field">
-                                <label for="completed-value-{{ $index }}">Seconds held</label>
-                                <input
-                                        id="completed-value-{{ $index }}"
-                                        inputmode="numeric"
-                                        pattern="[0-9]*"
-                                        name="completed_value"
-                                        value="{{ $.CurrentSetTimedTarget }}"
-                                        required
-                                        class="reps-input"
-                                >
-                            </div>
-                            {{ if $.IsDeload }}
-                                <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
-                            {{ else }}
-                                <fieldset class="signal-group">
-                                    <legend>How did {{ $.CurrentSetTimedTarget }}s feel?</legend>
-                                    <div class="signal-buttons">
-                                        <button type="submit" name="signal" value="too_heavy"
-                                                class="signal-btn too-heavy-btn"
-                                                aria-label="Too heavy — failed to reach the target hold">too heavy</button>
-                                        <button type="submit" name="signal" value="on_target"
-                                                class="signal-btn on-target-btn"
-                                                aria-label="Barely reached target hold">BARELY</button>
-                                        <button type="submit" name="signal" value="too_light"
-                                                class="signal-btn too-light-btn"
-                                                aria-label="Easy — could have held longer">easy</button>
-                                    </div>
-                                </fieldset>
-                            {{ end }}
-                        </form>
                     {{ else }}
                         <div class="active-hero">
                             <span>{{ $setDisplay.TargetStr }}<span class="unit">{{ $setDisplay.Unit }}</span></span>
