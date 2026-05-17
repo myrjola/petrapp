@@ -4,14 +4,16 @@ Status: draft
 Owner: Martin
 Created: 2026-05-17
 
-Supersedes [`2026-05-16-card-state-view-transitions-design.md`](2026-05-16-card-state-view-transitions-design.md)
-(and the matching plan at `docs/superpowers/plans/2026-05-16-card-state-view-transitions.md`).
-A PoC built against the original spec validated the visual design but disproved
-its load-bearing mechanic — `@view-transition { navigation: auto }` does not
-fire on the `navigation.reload()` triggered from inside `pageshow`. This spec
-re-grounds on a `navigation.navigate(..., { history: 'replace' })` mechanism
-that does work, with a small cache-buster trick to keep Chromium from
-reclassifying the same-URL navigate as a reload when deferred.
+Supersedes a prior spec + plan pair (`docs/superpowers/specs/2026-05-16-card-state-view-transitions-design.md`
+and `docs/superpowers/plans/2026-05-16-card-state-view-transitions.md`) that
+was removed when this spec replaced it — see `git log --diff-filter=D
+--follow` if you need the historical text. A PoC built against the original
+spec validated the visual design but disproved its load-bearing mechanic —
+`@view-transition { navigation: auto }` does not fire on the
+`navigation.reload()` triggered from inside `pageshow`. This spec re-grounds
+on a `navigation.navigate(..., { history: 'replace' })` mechanism that does
+work, with a small cache-buster trick to keep Chromium from reclassifying the
+same-URL navigate as a reload when deferred.
 
 ## Goal
 
