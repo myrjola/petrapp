@@ -1,12 +1,10 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
 
 {{ define "schedule" }}
-    <main class="week-page">
+    <main class="week-page stack">
         <style {{ nonce }}>
             @scope (.week-page) {
                 :scope {
-                    display: flex;
-                    flex-direction: column;
                     gap: var(--size-5);
                     max-width: 640px;
                     margin-inline: auto;

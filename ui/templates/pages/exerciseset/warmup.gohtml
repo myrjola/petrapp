@@ -2,18 +2,15 @@
 
 {{ define "warmup" }}
     {{ if not .ExerciseSet.WarmupCompletedAt }}
-        <div class="warmup-row" role="region" aria-label="Warmup">
+        <div class="warmup-row cluster" role="region" aria-label="Warmup">
             <style {{ nonce }}>
                 @scope (.warmup-row) {
                     :scope {
-                        display: flex;
-                        align-items: center;
                         gap: var(--size-3);
                         padding: var(--size-3);
                         border-radius: var(--radius-3);
                         background: var(--color-surface-elevated);
                         box-shadow: var(--shadow-1);
-                        flex-wrap: wrap;
                     }
 
                     .warmup-label {

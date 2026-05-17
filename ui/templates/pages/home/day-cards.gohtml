@@ -1,12 +1,10 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
 
 {{ define "day-cards" }}
-    <section class="weekly-schedule" aria-label="Weekly schedule">
+    <section class="weekly-schedule stack" aria-label="Weekly schedule">
         <style {{ nonce }}>
             @scope (.weekly-schedule) {
                 :scope {
-                    display: flex;
-                    flex-direction: column;
                     gap: var(--size-2);
                 }
 
