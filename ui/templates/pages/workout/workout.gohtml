@@ -335,6 +335,12 @@
                     }
                 </style>
 
+                <style {{ nonce }}>
+                    {{ range .Exercises }}
+                    .exercise[data-workout-exercise-id="{{ .ID }}"] { view-transition-name: ex-card-{{ .ID }}; }
+                    {{ end }}
+                </style>
+
                 {{ range .Exercises }}
                     <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
                        class="exercise {{ .State }}"
