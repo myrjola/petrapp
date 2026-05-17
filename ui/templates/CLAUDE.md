@@ -73,6 +73,19 @@ A component's delivery mechanism is decided by what it must *guarantee*:
   composition. Still fine; just not the first reach for layout or for the
   pieces above.
 
+### Primitives first, bespoke when warranted
+
+Before writing `display: flex` or `display: grid` in a scoped `<style>`, ask:
+would another page reasonably want this layout? If yes, reach for `.stack` /
+`.cluster` / `.grid-auto` / `.center` — an extra `gap` override on a primitive
+is still cheaper than the next page reinventing the same flex column. Scoped
+`<style>` remains the documented escape hatch for genuinely page-specific
+composition (asymmetric hero grids, editorial landing layouts), but treat it
+as escalation, not the default. The signal isn't admin-vs-user — it's reuse
+potential and change frequency: high-churn pages (`workout.gohtml`,
+`sets-container.gohtml`, admin lists) pay the duplication cost every time
+they're touched, so the bar to escape the primitives is highest there.
+
 ### Current components
 
 **Partials** (call via `{{ template "name" <dot> }}`):
