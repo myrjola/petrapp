@@ -116,43 +116,78 @@ for `serverError` only on parser/IO failures the user cannot fix.
 
 ## Error Handling
 
-### Error Response Patterns
+### Three terminal calls
 
-- Use `app.serverError(w, r, err)` for 500-level errors (logs and renders error page)
-- Use `http.NotFound(w, r)` for 404 errors
-- Use specific HTTP status codes when rendering templates (404 for not found pages)
-- Always wrap errors with context using `fmt.Errorf("operation description: %w", err)`
+Every POST handler ends in exactly one of:
+
+| Call | When | Effect |
+|---|---|---|
+| `redirect(w, r, url)` | Success | 200 + `X-Location` (stacknav) or 303 (plain); client navigates |
+| `app.userError(w, r, err, safeURL)` | Any user-visible failure on an in-flight action | Routes by error type, calls `putFlashError`, then `redirect(w, r, safeURL)` |
+| `app.serverError(w, r, err)` | True full-page failure (template render, broken session, no safe URL exists) | Logs and renders `error.gohtml` 500. Rare. |
+
+`userError` is the single helper for *both* `domain.ValidationError` and unexpected
+system errors on inline actions. It dispatches on the error type:
+
+- `errors.As(err, &domain.ValidationError{})` → flash with `ve.Message` verbatim.
+- Otherwise → log the underlying error at ERROR and flash a generic message.
+
+Then it writes the flash and redirects to `safeURL`. The form's GET handler
+pops the flash with `app.popFlashError(...)` and renders the `banner`
+component as today — see the worked example in `workoutGET` /
+`workoutAddExercisePOST`.
+
+#### `safeURL` is mandatory, must pop + render the flash
+
+The call site must pass a URL that is known to render successfully AND whose
+handler pops + renders the flash banner. Today that means: `/`, `/workouts/{date}`
+(both success and not-found branches), `/schedule`, `/admin/exercises`,
+`/admin/exercises/{id}`. If you need a new target, plumb a `Flash BannerData`
+field through its template data struct, render `{{ template "banner" .Flash }}`
+in the template, and pop with `app.popFlashError(r.Context())` in the handler.
+
+**Do not** default `safeURL` to `r.Referer()` (unreliable on direct POSTs,
+easily forged) or to the request URL (wrong for action endpoints like
+`POST /workouts/.../complete`, which would 404 on a GET). Pointing `safeURL`
+at an action endpoint or another broken handler will produce a redirect loop.
+
+#### Existing handlers may still use inline `errors.As(&ve)` boilerplate
+
+> Go-forward convention for new and migrating handlers. Existing handlers
+> predate `userError` and may still use the inline `errors.As(&ve) {
+> putFlashError(ve.Message); redirect(formURL) }` pattern — that's fine,
+> functionally equivalent, and they migrate opportunistically when next
+> touched. Don't expect every form handler to call `userError` today.
+
+#### Other patterns
+
+- `http.NotFound(w, r)` (or `app.notFound(w, r)`) for 404s. Path-param
+  parsers like `parseDateParam` call `notFound` for you on parse failure.
+- `app.render(w, r, http.StatusNotFound, "workout-not-found", data)` for
+  domain-level "no such resource" pages that want richer copy than the
+  generic 404. These pages also pop + render the flash so `userError`
+  redirects to them surface the message.
 
 ### Service Layer Error Handling
 
-- Check for specific business errors using `errors.Is(err, domain.ErrNotFound)`
-- Handle business errors with appropriate user-facing responses
-- Let service layer handle business validation, handlers handle HTTP concerns
+- Check for specific business errors using `errors.Is(err, domain.ErrNotFound)`.
+- For user-actionable business failures, return a `domain.ValidationError`
+  from the service / domain layer so `userError` can surface the message
+  verbatim. Example: `internal/service/exercises.go:AddExercise` returns
+  `domain.ValidationError{Message: "This day has no planned workout..."}`
+  on the missing-session branch.
+- For system faults the user cannot fix, return the wrapped underlying
+  error and let `userError` log it and show the generic message.
+- Let the service layer handle business validation; handlers handle HTTP
+  concerns.
 
-### User-facing validation errors
+### Client-side error surface (`#js-flash`)
 
-> **Go-forward convention for new and migrating forms.** Existing handlers predate this
-> pattern and still validate inline with hand-written messages — don't expect to find
-> `errors.As` call sites or a `.Flash` field on every existing form struct yet.
-
-Validation failures that should be shown to the user (not 500s) flow through
-`domain.ValidationError`:
-
-1. Domain/service code returns a `domain.ValidationError{Message: "..."}` —
-   the `Message` is safe to display verbatim.
-2. The handler detects it with `errors.As`, calls
-   `app.putFlashError(r.Context(), ve.Message)`, and redirects to the form
-   with `redirect(w, r, formPath)`.
-3. The form's GET handler pops the flash with `app.popFlashError(...)` and
-   passes it to the template as a `BannerData` field (conventionally named `.Flash`)
-   with `BannerData{Variant: "error", Message: ...}`.
-4. The form template renders it with `{{ template "banner" .Flash }}`.
-
-This keeps the stack-navigator wire protocol uniform (a `200 + X-Location`
-back to the form URL) — see `docs/superpowers/specs/2026-05-14-frontend-foundation-design.md`.
-Native HTML validation attributes (`required`, `min`, `pattern`, …) handle the
-client-side field UX; the `field` component passes them through. There is no
-per-field server-side error channel and no submitted-value preservation.
+`base.gohtml` renders a hidden `<div id="js-flash" role="alert" hidden>` for
+the JS shim to populate via `textContent` when `fetch` throws (offline / DNS
+/ CORS). It is **only** for client-only failures — any server response (2xx
+or not) still drives navigation or reload through the wire protocol, so the
+flash-on-reload path stays canonical for server-originating messages.
 
 ## Redirects and Navigation
 
