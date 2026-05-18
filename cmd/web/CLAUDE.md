@@ -129,7 +129,7 @@ Every POST handler ends in exactly one of:
 `userError` is the single helper for *both* `domain.ValidationError` and unexpected
 system errors on inline actions. It dispatches on the error type:
 
-- `errors.As(err, &domain.ValidationError{})` → flash with `ve.Message` verbatim.
+- `var ve domain.ValidationError; errors.As(err, &ve)` → flash with `ve.Message` verbatim.
 - Otherwise → log the underlying error at ERROR and flash a generic message.
 
 Then it writes the flash and redirects to `safeURL`. The form's GET handler
@@ -140,7 +140,7 @@ component as today — see the worked example in `workoutGET` /
 #### `safeURL` is mandatory, must pop + render the flash
 
 The call site must pass a URL that is known to render successfully AND whose
-handler pops + renders the flash banner. Today that means: `/`, `/workouts/{date}`
+handler pops + renders the flash banner. Today that means: `/workouts/{date}`
 (both success and not-found branches), `/schedule`, `/admin/exercises`,
 `/admin/exercises/{id}`. If you need a new target, plumb a `Flash BannerData`
 field through its template data struct, render `{{ template "banner" .Flash }}`
@@ -148,8 +148,9 @@ in the template, and pop with `app.popFlashError(r.Context())` in the handler.
 
 **Do not** default `safeURL` to `r.Referer()` (unreliable on direct POSTs,
 easily forged) or to the request URL (wrong for action endpoints like
-`POST /workouts/.../complete`, which would 404 on a GET). Pointing `safeURL`
-at an action endpoint or another broken handler will produce a redirect loop.
+`POST /workouts/{date}/start`, which is POST-only and would 405 on a GET).
+Pointing `safeURL` at an action endpoint or another broken handler will
+produce a redirect loop.
 
 #### Existing handlers may still use inline `errors.As(&ve)` boilerplate
 
