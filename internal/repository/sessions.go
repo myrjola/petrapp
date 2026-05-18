@@ -209,6 +209,9 @@ func (r *sqliteSessionRepository) Create(ctx context.Context, sess domain.Sessio
 		}
 	}()
 	if err = r.insertSession(ctx, tx, sess); err != nil {
+		// Only the workout_sessions PK conflict (duplicate date for this user) maps to
+		// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
+		// those are programming errors, not concurrent-insert races.
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
 			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)

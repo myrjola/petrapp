@@ -334,8 +334,8 @@ func TestSessionRepository_Create_ConflictReturnsErrAlreadyExists(t *testing.T) 
 		t.Fatalf("create exercise: %v", err)
 	}
 
-	date := time.Date(2026, 1, 7, 0, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero on insert.
+	date := time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC) // a Thursday — distinct from the round-trip test
+	sess := domain.Session{                             //nolint:exhaustruct // StartedAt/CompletedAt zero on insert.
 		Date:              date,
 		PeriodizationType: domain.PeriodizationStrength,
 		ExerciseSets: []domain.ExerciseSet{
