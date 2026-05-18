@@ -169,6 +169,72 @@ func mondayOf(date time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, offset)
 }
 
+// summarizeWeek walks existing and returns aggregate info needed by
+// StartSession for the lazy-create branch:
+//   - weekCount: number of sessions whose Date falls in monday..sunday.
+//   - hasDate: whether a session exists for date specifically.
+//   - usedExerciseIDs: set of exercise IDs used in any in-week session,
+//     for PlanDay's no-repeat avoidance.
+//
+//nolint:unused // Used by StartSession in the next task.
+func summarizeWeek(existing []domain.Session, date, monday time.Time) (int, bool, map[int]bool) {
+	sunday := monday.AddDate(0, 0, 6)
+	used := make(map[int]bool)
+	var weekCount int
+	var hasDate bool
+	for _, sess := range existing {
+		if sess.Date.Before(monday) || sess.Date.After(sunday) {
+			continue
+		}
+		weekCount++
+		if sess.Date.Equal(date) {
+			hasDate = true
+		}
+		for _, es := range sess.ExerciseSets {
+			used[es.Exercise.ID] = true
+		}
+	}
+	return weekCount, hasDate, used
+}
+
+// createAdHocSession plans and persists a single session for date. Used by
+// StartSession when the user starts an unscheduled day (extra workout) or a
+// day added to the schedule mid-week after another in-week session was
+// already started. used is the set of exercise IDs already used in other
+// in-week sessions, passed through to PlanDay's no-repeat selection.
+//
+//nolint:unused // Used by StartSession in the next task.
+func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used map[int]bool) error {
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+	exercises, err := s.repos.Exercises.List(ctx)
+	if err != nil {
+		return fmt.Errorf("get exercises: %w", err)
+	}
+	targets, err := s.repos.MuscleTargets.List(ctx)
+	if err != nil {
+		return fmt.Errorf("get muscle group targets: %w", err)
+	}
+
+	planner := domain.NewPlanner(prefs, exercises, targets)
+	sess, err := planner.PlanDay(date, used)
+	if err != nil {
+		return fmt.Errorf("plan day %s: %w", date.Format(time.DateOnly), err)
+	}
+
+	if sess.IsDeload {
+		if err = s.seedDeloadWeights(ctx, &sess); err != nil {
+			return err
+		}
+	}
+	if err = s.repos.Sessions.Create(ctx, sess); err != nil {
+		return fmt.Errorf("create session %s: %w", date.Format(time.DateOnly), err)
+	}
+	return nil
+}
+
 // StartSession starts a new workout session.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	monday := mondayOf(date)
