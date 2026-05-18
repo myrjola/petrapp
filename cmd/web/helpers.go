@@ -2,15 +2,48 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/domain"
 )
 
 func (app *application) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	app.logger.LogAttrs(r.Context(), slog.LevelError, "server error", slog.Any("error", err))
 	app.render(w, r, http.StatusInternalServerError, "error", nil)
+}
+
+// userError surfaces a failure of an in-flight user action through the
+// flash + banner flow and redirects the client to safeURL. Use it instead
+// of serverError when there is a meaningful page to land the user on.
+//
+// Routing:
+//   - domain.ValidationError → flash with ve.Message (safe to display).
+//   - any other error → log at ERROR and flash a generic message.
+//
+// safeURL must point at a GET handler known to render successfully AND
+// that pops + renders the flash. Do NOT pass an action endpoint
+// (e.g. ".../complete"), and do not default to r.Referer() — it is
+// unreliable on direct POSTs.
+//
+//nolint:unused // wired up by the workout AddExercise handler migration (Task 4).
+func (app *application) userError(
+	w http.ResponseWriter, r *http.Request, err error, safeURL string,
+) {
+	var ve domain.ValidationError
+	var msg string
+	if errors.As(err, &ve) {
+		msg = ve.Message
+	} else {
+		app.logger.LogAttrs(r.Context(), slog.LevelError,
+			"user-facing server error", slog.Any("error", err))
+		msg = "Couldn't complete that action. Please try again."
+	}
+	app.putFlashError(r.Context(), msg)
+	redirect(w, r, safeURL)
 }
 
 func (app *application) notFound(w http.ResponseWriter, r *http.Request) {
