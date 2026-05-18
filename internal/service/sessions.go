@@ -175,8 +175,6 @@ func mondayOf(date time.Time) time.Time {
 //   - hasDate: whether a session exists for date specifically.
 //   - usedExerciseIDs: set of exercise IDs used in any in-week session,
 //     for PlanDay's no-repeat avoidance.
-//
-//nolint:unused // Used by StartSession in the next task.
 func summarizeWeek(existing []domain.Session, date, monday time.Time) (int, bool, map[int]bool) {
 	sunday := monday.AddDate(0, 0, 6)
 	used := make(map[int]bool)
@@ -202,8 +200,6 @@ func summarizeWeek(existing []domain.Session, date, monday time.Time) (int, bool
 // day added to the schedule mid-week after another in-week session was
 // already started. used is the set of exercise IDs already used in other
 // in-week sessions, passed through to PlanDay's no-repeat selection.
-//
-//nolint:unused // Used by StartSession in the next task.
 func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used map[int]bool) error {
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
@@ -235,27 +231,40 @@ func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used m
 	return nil
 }
 
-// StartSession starts a new workout session.
+// StartSession marks the workout session for date as started. If no session
+// exists for date — either because date is unscheduled (extra workout) or
+// because date is a newly-scheduled day that was added mid-week after the
+// weekly plan was generated — a single-day session is planned via PlanDay
+// and inserted before the start mutation. If the whole week is missing the
+// existing generateWeeklyPlan path runs first; only then is the per-date
+// check applied.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	monday := mondayOf(date)
-	existing, listErr := s.repos.Sessions.List(ctx, monday)
-	if listErr != nil {
-		return fmt.Errorf("list sessions for week of %s: %w", date.Format(time.DateOnly), listErr)
+	existing, err := s.repos.Sessions.List(ctx, monday)
+	if err != nil {
+		return fmt.Errorf("list sessions for week of %s: %w", date.Format(time.DateOnly), err)
 	}
-	sunday := monday.AddDate(0, 0, 6)
-	weekCount := 0
-	for _, sess := range existing {
-		if !sess.Date.After(sunday) {
-			weekCount++
-		}
-	}
+
+	weekCount, hasDate, used := summarizeWeek(existing, date, monday)
+
 	if weekCount == 0 {
-		if genErr := s.generateWeeklyPlan(ctx, monday); genErr != nil {
-			return fmt.Errorf("generate weekly plan for %s: %w", date.Format(time.DateOnly), genErr)
+		if err = s.generateWeeklyPlan(ctx, monday); err != nil {
+			return fmt.Errorf("generate weekly plan for %s: %w", date.Format(time.DateOnly), err)
+		}
+		existing, err = s.repos.Sessions.List(ctx, monday)
+		if err != nil {
+			return fmt.Errorf("re-list sessions for week of %s: %w", date.Format(time.DateOnly), err)
+		}
+		_, hasDate, used = summarizeWeek(existing, date, monday)
+	}
+
+	if !hasDate {
+		if err = s.createAdHocSession(ctx, date, used); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
+			return fmt.Errorf("create ad-hoc session %s: %w", date.Format(time.DateOnly), err)
 		}
 	}
 
-	err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
 		return sess.Start(time.Now())
 	})
 	if errors.Is(err, domain.ErrAlreadyStarted) {
