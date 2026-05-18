@@ -268,7 +268,7 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 }
 
 // Test_application_workoutAddExercisePOST_unplanned_day verifies that
-// POSTing /workouts/{date}/exercises on a date with no planned session
+// POSTing /workouts/{date}/add-exercise on a date with no planned session
 // surfaces the flash + banner explaining the situation instead of a 500.
 // The user lands back on the workout-not-found page with role="alert"
 // banner content.
