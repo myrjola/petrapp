@@ -248,13 +248,18 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	weekCount, hasDate, used := summarizeWeek(existing, date, monday)
 
 	if weekCount == 0 {
-		if err = s.generateWeeklyPlan(ctx, monday); err != nil {
+		// generateWeeklyPlan may race against another caller who already inserted
+		// the week's sessions. Treat ErrAlreadyExists as success — the row we
+		// need is now present, so we just re-list below.
+		if err = s.generateWeeklyPlan(ctx, monday); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
 			return fmt.Errorf("generate weekly plan for %s: %w", date.Format(time.DateOnly), err)
 		}
 		existing, err = s.repos.Sessions.List(ctx, monday)
 		if err != nil {
 			return fmt.Errorf("re-list sessions for week of %s: %w", date.Format(time.DateOnly), err)
 		}
+		// weekCount is irrelevant on the second call — generateWeeklyPlan (or a
+		// concurrent caller) just ensured the week is populated.
 		_, hasDate, used = summarizeWeek(existing, date, monday)
 	}
 

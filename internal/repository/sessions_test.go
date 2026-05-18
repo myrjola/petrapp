@@ -355,6 +355,36 @@ func TestSessionRepository_Create_ConflictReturnsErrAlreadyExists(t *testing.T) 
 	}
 }
 
+func TestSessionRepository_CreateBatch_ConflictReturnsErrAlreadyExists(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
+	if err != nil {
+		t.Fatalf("create exercise: %v", err)
+	}
+
+	date := time.Date(2026, 1, 9, 0, 0, 0, 0, time.UTC) // a Friday, distinct from other Create tests
+	sess := domain.Session{                             //nolint:exhaustruct // completion fields nil on insert.
+		Date:              date,
+		PeriodizationType: domain.PeriodizationStrength,
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // ID assigned on insert, WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // completion fields nil.
+			},
+		},
+	}
+
+	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
+		t.Fatalf("first CreateBatch: %v", err)
+	}
+
+	err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess})
+	if !errors.Is(err, domain.ErrAlreadyExists) {
+		t.Errorf("second CreateBatch err = %v, want wraps domain.ErrAlreadyExists", err)
+	}
+}
+
 func TestSessionRepository_DeleteWeek(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 

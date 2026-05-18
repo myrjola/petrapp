@@ -174,6 +174,9 @@ func (r *sqliteSessionRepository) Update(
 	return nil
 }
 
+// CreateBatch inserts a slice of sessions and their exercise slots in one transaction.
+// Returns domain.ErrAlreadyExists (wrapped) if any session in the batch conflicts with an
+// existing row, so callers can recover from concurrent weekly-plan-generation races.
 func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []domain.Session) (err error) {
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
@@ -186,6 +189,13 @@ func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []do
 	}()
 	for _, sess := range sessions {
 		if err = r.insertSession(ctx, tx, sess); err != nil {
+			// Only the workout_sessions PK conflict (duplicate date for this user) maps to
+			// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
+			// those are programming errors, not concurrent-insert races.
+			var sqliteErr sqlite3.Error
+			if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
+				return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)
+			}
 			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
 		}
 	}
