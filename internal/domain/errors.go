@@ -8,6 +8,12 @@ import "errors"
 // persistence concerns.
 var ErrNotFound = errors.New("not found")
 
+// ErrAlreadyExists is returned by repositories when an insert would violate
+// a uniqueness constraint (e.g. inserting a workout_sessions row for a date
+// the user already has). Callers use errors.Is to fall through to the
+// "already there" code path (idempotent retry, lazy-create race recovery).
+var ErrAlreadyExists = errors.New("already exists")
+
 // Aggregate-method sentinels. Each is returned by a Session method when an
 // invariant is violated; callers use errors.Is to branch.
 var (
