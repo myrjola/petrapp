@@ -111,25 +111,35 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 		if !plannedSessions[i].IsDeload {
 			continue
 		}
-		for j := range plannedSessions[i].ExerciseSets {
-			ex := plannedSessions[i].ExerciseSets[j].Exercise
-			if !ex.HasWeight() {
-				continue
-			}
-			var w float64
-			w, err = s.GetDeloadStartingWeight(ctx, ex.ID, plannedSessions[i].Date)
-			if err != nil {
-				return fmt.Errorf("seed deload weight for %s: %w", ex.Name, err)
-			}
-			weight := w
-			for k := range plannedSessions[i].ExerciseSets[j].Sets {
-				plannedSessions[i].ExerciseSets[j].Sets[k].WeightKg = &weight
-			}
+		if err = s.seedDeloadWeights(ctx, &plannedSessions[i]); err != nil {
+			return err
 		}
 	}
 
 	if err = s.repos.Sessions.CreateBatch(ctx, plannedSessions); err != nil {
 		return fmt.Errorf("create batch sessions: %w", err)
+	}
+	return nil
+}
+
+// seedDeloadWeights sets the per-set weight for every weighted exercise in a
+// deload session to GetDeloadStartingWeight (a fraction of the user's recent
+// working weight). Called for both weekly-plan generation and ad-hoc session
+// creation when sess.IsDeload is true.
+func (s *Service) seedDeloadWeights(ctx context.Context, sess *domain.Session) error {
+	for j := range sess.ExerciseSets {
+		ex := sess.ExerciseSets[j].Exercise
+		if !ex.HasWeight() {
+			continue
+		}
+		w, err := s.GetDeloadStartingWeight(ctx, ex.ID, sess.Date)
+		if err != nil {
+			return fmt.Errorf("seed deload weight for %s: %w", ex.Name, err)
+		}
+		weight := w
+		for k := range sess.ExerciseSets[j].Sets {
+			sess.ExerciseSets[j].Sets[k].WeightKg = &weight
+		}
 	}
 	return nil
 }
