@@ -266,3 +266,103 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 		t.Error("expected the per-card info dialog as dialog.sheet-dialog")
 	}
 }
+
+// Test_application_workoutAddExercisePOST_unplanned_day verifies that
+// POSTing /workouts/{date}/exercises on a date with no planned session
+// surfaces the flash + banner explaining the situation instead of a 500.
+// The user lands back on the workout-not-found page with role="alert"
+// banner content.
+func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// Set preferences so today is a planned day; the date 8 days out lands
+	// on a different weekday (an unplanned day) for every possible "today".
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("Submit preferences: %v", err)
+	}
+
+	plannedDate := time.Now().Format("2006-01-02")
+	unplannedDate := time.Now().AddDate(0, 0, 8).Format("2006-01-02")
+
+	// Start the planned workout so the picker page renders, then grab any
+	// exercise_id off the picker — data-driven against fixtures.
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+plannedDate+"/start", nil); err != nil {
+		t.Fatalf("Start planned workout: %v", err)
+	}
+	pickerDoc, err := client.GetDoc(ctx, "/workouts/"+plannedDate+"/add-exercise")
+	if err != nil {
+		t.Fatalf("Get add-exercise picker: %v", err)
+	}
+	exerciseID, ok := pickerDoc.Find(".exercise-option [name='exercise_id']").
+		First().Attr("value")
+	if !ok || exerciseID == "" {
+		t.Fatalf("Could not find an exercise_id in the picker page")
+	}
+
+	// POST directly to the unplanned date's add-exercise endpoint. Disable
+	// auto-redirect following on this one-off request so we can assert the
+	// raw 303 + Location from userError before manually following it below.
+	body := url.Values{"exercise_id": {exerciseID}}.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		server.URL()+"/workouts/"+unplannedDate+"/add-exercise",
+		strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("Build POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	httpClient := *client.HTTPClient() // shallow copy preserves jar + transport.
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST to unplanned date: %v", err)
+	}
+	if cerr := resp.Body.Close(); cerr != nil {
+		t.Fatalf("Close response body: %v", cerr)
+	}
+	// Non-stacknav POSTs get a 303 See Other (see helpers.go:redirect).
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("Expected 303 See Other from userError redirect, got %d", resp.StatusCode)
+	}
+	if loc := resp.Header.Get("Location"); loc != "/workouts/"+unplannedDate {
+		t.Errorf("Expected Location: /workouts/%s, got %q", unplannedDate, loc)
+	}
+
+	// Follow the redirect and assert the banner is rendered on the
+	// workout-not-found page.
+	workoutResp, err := client.Get(ctx, "/workouts/"+unplannedDate)
+	if err != nil {
+		t.Fatalf("Get workout page after redirect: %v", err)
+	}
+	defer func() { _ = workoutResp.Body.Close() }()
+	// workout-not-found renders with HTTP 404; the banner is still in the body.
+	workoutDoc, err := goquery.NewDocumentFromReader(workoutResp.Body)
+	if err != nil {
+		t.Fatalf("Parse workout page: %v", err)
+	}
+	banner := workoutDoc.Find("[role='alert']").First()
+	if banner.Length() == 0 {
+		t.Fatalf("Expected role=\"alert\" banner on workout-not-found page; got none")
+	}
+	wantSubstr := "no planned workout"
+	if !strings.Contains(strings.ToLower(banner.Text()), wantSubstr) {
+		t.Errorf("Banner text = %q, want substring %q",
+			strings.TrimSpace(banner.Text()), wantSubstr)
+	}
+}

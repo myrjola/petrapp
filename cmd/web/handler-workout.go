@@ -528,7 +528,8 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 	// land the user straight on the new exercise's detail page.
 	newWorkoutExerciseID, err := app.service.AddExercise(r.Context(), date, exerciseID)
 	if err != nil {
-		app.serverError(w, r, err)
+		workoutURL := fmt.Sprintf("/workouts/%s", date.Format("2006-01-02"))
+		app.userError(w, r, err, workoutURL)
 		return
 	}
 

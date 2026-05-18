@@ -28,8 +28,6 @@ func (app *application) serverError(w http.ResponseWriter, r *http.Request, err 
 // that pops + renders the flash. Do NOT pass an action endpoint
 // (e.g. ".../complete"), and do not default to r.Referer() — it is
 // unreliable on direct POSTs.
-//
-//nolint:unused // wired up by the workout AddExercise handler migration (Task 4).
 func (app *application) userError(
 	w http.ResponseWriter, r *http.Request, err error, safeURL string,
 ) {
