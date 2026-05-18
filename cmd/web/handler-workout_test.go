@@ -366,3 +366,115 @@ func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
 			strings.TrimSpace(banner.Text()), wantSubstr)
 	}
 }
+
+func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Schedule a non-today weekday at 60 min so today is unscheduled.
+	today := time.Now().Weekday()
+	nonToday := time.Monday
+	if today == time.Monday {
+		nonToday = time.Tuesday
+	}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+		nonToday.String(): "60",
+	}); err != nil {
+		t.Fatalf("Failed to submit preferences: %v", err)
+	}
+
+	// Submit "Start Extra Workout" for today.
+	todayStr := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+todayStr+"/start", nil); err != nil {
+		t.Fatalf("Failed to start extra workout: %v", err)
+	}
+
+	// The workout page must list exercises after lazy-create.
+	if doc.Find("a.exercise").Length() == 0 {
+		t.Error("Expected exercises on workout page after starting ad-hoc session")
+	}
+}
+
+func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	// Set schedule to today only.
+	today := time.Now().Weekday()
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+		today.String(): "60",
+	}); err != nil {
+		t.Fatalf("Failed to submit preferences: %v", err)
+	}
+
+	// Start today's workout so RegenerateWeeklyPlanIfUnstarted will later skip.
+	todayStr := time.Now().Format("2006-01-02")
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+todayStr+"/start", nil); err != nil {
+		t.Fatalf("Failed to start today's workout: %v", err)
+	}
+
+	// Add another weekday mid-week (a different day in this week).
+	addedDay := time.Now().Weekday() + 1
+	if addedDay > time.Saturday {
+		addedDay = time.Monday
+	}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences (2nd): %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+		today.String():    "60",
+		addedDay.String(): "60",
+	}); err != nil {
+		t.Fatalf("Failed to submit updated preferences: %v", err)
+	}
+
+	// Compute the calendar date for addedDay in this week (UTC, matching service.mondayOf).
+	now := time.Now().UTC()
+	y, m, d := now.Date()
+	mondayOffset := int(time.Monday - now.Weekday())
+	if mondayOffset > 0 {
+		mondayOffset = -6
+	}
+	monday := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, mondayOffset)
+	addedDateStr := monday.AddDate(0, 0, int(addedDay-time.Monday)).Format("2006-01-02")
+
+	// Start the newly-scheduled day — this is the case that fails without lazy-create.
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+addedDateStr+"/start", nil); err != nil {
+		t.Fatalf("Failed to start newly-scheduled day: %v", err)
+	}
+	if doc.Find("a.exercise").Length() == 0 {
+		t.Error("Expected exercises on newly-scheduled day's workout page after lazy-create")
+	}
+}
