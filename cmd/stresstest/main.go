@@ -322,6 +322,11 @@ func main() {
 	users := flag.Int("users", defaultUsers, "number of concurrent virtual users")
 	duration := flag.Duration("duration", 0,
 		"sustained-load window (e.g. 2m). 0 = single-shot legacy mode.")
+	pprofURL := flag.String("pprof-url", "",
+		"base URL where the target exposes pprof (e.g. http://localhost:6060). "+
+			"If set, CPU + heap profiles + JSON report are saved to --out during the load run.")
+	outDir := flag.String("out", "pprof",
+		"directory for pprof captures and JSON report bundle")
 	flag.Usage = func() { //nolint:reassign // documented stdlib customization point.
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: %s [flags] <hostname>\n", os.Args[0])
 		flag.PrintDefaults()
@@ -351,6 +356,8 @@ func main() {
 	}
 
 	loadStart := time.Now()
+	pprofDone := startPprofCapture(ctx, *pprofURL, *outDir, *duration, logger)
+
 	var result loadResult
 	if *duration > 0 {
 		result = runLoadTestSustained(ctx, authedUsers, *duration, logger)
@@ -358,6 +365,7 @@ func main() {
 		if err = runLoadTestSingleShot(ctx, authedUsers, logger); err != nil {
 			logger.LogAttrs(ctx, slog.LevelError, "load test failed", slog.Any("error", err))
 			printReport(os.Stdout, recorder.Snapshot(), time.Since(loadStart), 0, int64(len(authedUsers)))
+			<-pprofDone
 			os.Exit(1)
 		}
 		// Per-user attempt count equals user count in single-shot mode.
@@ -365,10 +373,59 @@ func main() {
 	}
 
 	elapsed := time.Since(loadStart)
-	printReport(os.Stdout, recorder.Snapshot(), elapsed, result.Successes, result.Failures)
+	snap := recorder.Snapshot()
+	printReport(os.Stdout, snap, elapsed, result.Successes, result.Failures)
+	<-pprofDone
+
+	if *pprofURL != "" {
+		if reportPath, reportErr := loadtest.WriteJSONReport(*outDir, snap); reportErr == nil {
+			logger.LogAttrs(ctx, slog.LevelInfo, "report bundle written",
+				slog.String("path", reportPath))
+		} else {
+			logger.LogAttrs(ctx, slog.LevelWarn, "failed to write JSON report",
+				slog.Any("error", reportErr))
+		}
+	}
 
 	logger.LogAttrs(ctx, slog.LevelInfo, "Load test completed successfully",
 		slog.Duration("total_duration", time.Since(start)),
 		slog.Duration("load_test_duration", elapsed),
 		slog.Int("users_tested", len(authedUsers)))
 }
+
+// startPprofCapture spawns goroutines that fetch CPU + heap profiles from the
+// target's pprof endpoint, if pprofURL is non-empty. Returns a channel that
+// closes once both captures have finished, so main can wait on completion
+// before exiting. The CPU profile sample window matches duration (clamped to
+// at least 30s so a single-shot run still gives pprof something to chew on).
+func startPprofCapture(
+	ctx context.Context, pprofURL, outDir string, duration time.Duration, logger *slog.Logger,
+) <-chan struct{} {
+	done := make(chan struct{})
+	if pprofURL == "" {
+		close(done)
+		return done
+	}
+	cpuWindow := max(duration, minPprofWindow)
+	go func() {
+		defer close(done)
+		logger.LogAttrs(ctx, slog.LevelInfo, "capturing CPU profile",
+			slog.Duration("seconds", cpuWindow),
+			slog.String("pprof_url", pprofURL))
+		if path, err := loadtest.CapturePprofProfile(ctx, pprofURL, outDir, cpuWindow); err != nil {
+			logger.LogAttrs(ctx, slog.LevelWarn, "cpu profile capture failed",
+				slog.Any("error", err))
+		} else {
+			logger.LogAttrs(ctx, slog.LevelInfo, "cpu profile saved", slog.String("path", path))
+		}
+		if path, err := loadtest.CapturePprofHeap(ctx, pprofURL, outDir); err != nil {
+			logger.LogAttrs(ctx, slog.LevelWarn, "heap profile capture failed",
+				slog.Any("error", err))
+		} else {
+			logger.LogAttrs(ctx, slog.LevelInfo, "heap profile saved", slog.String("path", path))
+		}
+	}()
+	return done
+}
+
+const minPprofWindow = 30 * time.Second
