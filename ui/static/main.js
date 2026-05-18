@@ -173,6 +173,14 @@ if ('navigation' in window) {
 }
 
 async function submitForm(e) {
+    // Clear any leftover client-only flash at the start of every submit;
+    // a fresh action supersedes the prior failure state.
+    const flash = document.getElementById('js-flash')
+    if (flash) {
+        flash.hidden = true
+        flash.textContent = ''
+    }
+
     const body = new URLSearchParams(e.formData)
     let res
     try {
@@ -190,7 +198,15 @@ async function submitForm(e) {
             redirect: 'manual',
         })
     } catch (_) {
-        location.reload()
+        // Client-side failure (offline, DNS, CORS). The server never saw the
+        // request, so there is no flash to read on reload — and reload itself
+        // may fail when offline. Surface inline via the pre-existing
+        // role="alert" skeleton; textContent is CSP / Trusted-Types safe.
+        if (flash) {
+            flash.textContent = 'Connection lost. Check your network and try again.'
+            flash.hidden = false
+        }
+        clearLoad()
         return
     }
 
@@ -206,7 +222,8 @@ async function submitForm(e) {
     }
 
     // CSP blocks document.write/innerHTML, so we can't render the response
-    // body in place. Reload to surface the server state on any unexpected status.
+    // body in place. Reload to surface the server state on any unexpected
+    // status — the server's flash (set via app.userError) carries the message.
     location.reload()
 }
 
