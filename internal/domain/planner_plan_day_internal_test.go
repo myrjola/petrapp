@@ -63,9 +63,10 @@ func TestPlanner_PlanDay_IsolatedDateDefaultsToFullBody(t *testing.T) {
 	}
 }
 
-func TestPlanner_PlanDay_AdjacencyToScheduledDayPicksUpperOrLower(t *testing.T) {
+func TestPlanner_PlanDay_AdjacencyToScheduledTomorrowPicksLower(t *testing.T) {
 	// Prefs: Tue scheduled. For Mon (yesterday is Sun=off, tomorrow is Tue=on)
-	// the adjacency rule yields CategoryLower.
+	// the adjacency rule yields CategoryLower — Lower whenever tomorrow is
+	// scheduled, regardless of today.
 	wp := newPlanDayPlanner(t, prefs(time.Tuesday))
 	mon := monday2026Date()
 
@@ -74,7 +75,7 @@ func TestPlanner_PlanDay_AdjacencyToScheduledDayPicksUpperOrLower(t *testing.T) 
 		t.Fatalf("PlanDay: %v", err)
 	}
 	if sess.WorkoutType() != CategoryLower {
-		t.Errorf("WorkoutType = %s, want lower (today on, tomorrow on)", sess.WorkoutType())
+		t.Errorf("WorkoutType = %s, want lower (tomorrow is scheduled)", sess.WorkoutType())
 	}
 }
 
@@ -138,8 +139,7 @@ func TestPlanner_PlanDay_UsesPrefsExerciseCountWhenScheduled(t *testing.T) {
 
 func TestPlanner_PlanDay_EmptyCategoryPoolReturnsError(t *testing.T) {
 	// Pool contains only Upper and FullBody. Pick a day whose category is Lower:
-	// adjacency requires "yesterday is workout day" → Upper. So we need Lower:
-	// today is on, tomorrow is on (gives Lower) → schedule Mon+Tue, ask for Mon.
+	// tomorrow is on (gives Lower) → schedule Mon+Tue, ask for Mon.
 	// Remove all Lower exercises from the pool to trigger the error.
 	all := planDayExercises()
 	noLower := make([]Exercise, 0, len(all))
@@ -157,5 +157,34 @@ func TestPlanner_PlanDay_EmptyCategoryPoolReturnsError(t *testing.T) {
 	}
 	if !errors.Is(err, errNoExercisesForCategory) {
 		t.Errorf("err = %v, want wrap of errNoExercisesForCategory", err)
+	}
+}
+
+func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *testing.T) {
+	// Mon+Sun schedule. Plan assigns Mon→idx0, Sun→idx1. PlanDay must agree
+	// for Sunday — regression test for the Sunday=0 weekday-arithmetic bug.
+	p := prefs(time.Monday, time.Sunday)
+	wp := newPlanDayPlanner(t, p)
+	mon := monday2026Date()
+	sun := date(mon, 6)
+
+	weekly, err := wp.Plan(mon)
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	var planSunPT PeriodizationType
+	for _, s := range weekly {
+		if s.Date.Equal(sun) {
+			planSunPT = s.PeriodizationType
+		}
+	}
+
+	got, err := wp.PlanDay(sun, nil)
+	if err != nil {
+		t.Fatalf("PlanDay(Sunday): %v", err)
+	}
+	if got.PeriodizationType != planSunPT {
+		t.Errorf("Sunday PeriodizationType = %s, want %s (matches weekly planner)",
+			got.PeriodizationType, planSunPT)
 	}
 }

@@ -442,16 +442,26 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 	}
 
 	// Periodization: replicate the weekly planner's per-day alternation.
-	// Count scheduled prefs days strictly before date.Weekday(); the result
-	// is the 0-based index PlanDay's date would have occupied in workoutDays.
+	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
+	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
+	// handles Sunday correctly: time.Sunday = 0 < time.Monday = 1, so an int
+	// range would never count anything for a Sunday date.
 	idx := 0
-	for d := time.Monday; d < date.Weekday(); d++ {
+	target := date.Weekday()
+	for _, d := range []time.Weekday{
+		time.Monday, time.Tuesday, time.Wednesday,
+		time.Thursday, time.Friday, time.Saturday,
+	} {
+		if d == target {
+			break
+		}
 		if wp.Prefs.IsWorkoutDay(d) {
 			idx++
 		}
 	}
-	// Special case: date.Weekday() == Sunday loops d through Mon..Sat which
-	// is exactly what we want (Sunday is the last possible workout slot).
+	// Sunday never matches any d above, so it falls through with the full count
+	// of scheduled Mon..Sat days — exactly the index workoutDays[i==len-1] would
+	// have produced for it.
 	monday := mondayForDate(date)
 	firstPT := wp.firstSessionPeriodizationType(monday)
 	pt := nextPeriodizationType(firstPT, idx)
