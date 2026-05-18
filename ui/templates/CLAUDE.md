@@ -250,6 +250,17 @@ Dynamic `import()` of bare specifiers resolved through the `<script type="import
 
 The "JavaScript in Templates" guidance above is unchanged. The nonce on `<script {{ nonce }}>` authorizes the inline JS itself; Trusted Types is a separate runtime constraint on what that JS does. Inline scripts must follow the same DOM-construction and script-URL rules — there's no relaxation for being inline.
 
+### Client-only error surface (`#js-flash`)
+
+`base.gohtml` renders a hidden `<div id="js-flash" role="alert" hidden>` above
+the page content. The Stack Navigator shim populates it via `textContent` on
+`fetch` failure (offline / DNS / CORS) — the standard "live region whose text
+changes" pattern, announced by screen readers without focus moves. Use
+`textContent` only (CSP / Trusted Types blocks `innerHTML`). The skeleton is
+*not* for server-originating errors: those flow through `app.userError` →
+flash + redirect → server-rendered `banner` component on the next GET. Keep
+the client surface as a true last resort.
+
 ## CSS Architecture and Scoping
 
 ### Scoped CSS Pattern
