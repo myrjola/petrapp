@@ -2,16 +2,27 @@
 // petrapp instance to produce load for performance profiling. Scenario logic
 // lives in internal/loadtest so it is also exercised by the in-process smoke
 // test in cmd/web.
+//
+// Usage:
+//
+//	stresstest [--users N] [--duration 2m] <hostname>
+//
+// With no --duration, each user runs one WorkoutScenario and the run is
+// reported pass/fail against a 95% success-rate threshold (legacy mode).
+// With --duration > 0, every user loops scenarios for that wall-clock window
+// and the run reports per-route latency percentiles + 4xx/5xx counts.
 package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"text/tabwriter"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
@@ -27,9 +38,9 @@ const (
 	maxConcurrentRegistrations = 10
 	maxConcurrentOperations    = 20
 	successRateThreshold       = 95.0
-	expectedArgsCount          = 2
 	percentageMultiplier       = 100
 	historyTimeout             = 5 * time.Minute
+	defaultUsers               = 10
 )
 
 // setupUsers registers and authenticates the specified number of users concurrently.
@@ -137,13 +148,14 @@ func generateHistoryForUsers(
 	return nil
 }
 
-// runLoadTest drives each user through one WorkoutScenario concurrently and
-// reports a pass/fail based on a 95% success-rate threshold.
-func runLoadTest(
+// runLoadTestSingleShot drives each user through one WorkoutScenario concurrently and
+// reports a pass/fail based on a 95% success-rate threshold. Legacy mode used when
+// --duration is not set.
+func runLoadTestSingleShot(
 	ctx context.Context, users []*loadtest.AuthenticatedUser, logger *slog.Logger,
 ) error {
 	userCount := len(users)
-	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test", slog.Int("num_users", userCount))
+	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test (single-shot)", slog.Int("num_users", userCount))
 
 	var successCount, failureCount int64
 	g, ctx := errgroup.WithContext(ctx)
@@ -154,7 +166,6 @@ func runLoadTest(
 			u := user
 			scenarioCtx, cancel := context.WithTimeout(ctx, scenarioTimeout)
 			defer cancel()
-
 			if err := loadtest.WorkoutScenario(scenarioCtx, u, logger); err != nil {
 				atomic.AddInt64(&failureCount, 1)
 				logger.LogAttrs(scenarioCtx, slog.LevelWarn, "Scenario failed",
@@ -175,55 +186,111 @@ func runLoadTest(
 		slog.Int64("successful", successCount),
 		slog.Int64("failed", failureCount),
 		slog.Float64("success_rate", successRate))
-
 	if successRate < successRateThreshold {
 		return fmt.Errorf("load test failed: success rate %.1f%% below threshold", successRate)
 	}
 	return nil
 }
 
-func main() {
-	logger := testhelpers.NewLogger(os.Stdout)
-	ctx := context.Background()
+// loadResult counts scenario outcomes across a sustained-load run.
+type loadResult struct {
+	Successes int64
+	Failures  int64
+}
 
-	if len(os.Args) != expectedArgsCount {
-		logger.LogAttrs(ctx, slog.LevelError, "usage: stresstest <hostname>")
-		os.Exit(1)
+// runLoadTestSustained keeps every user in a tight scenario loop for the full
+// wall-clock window. Scenario successes/failures are counted but a "low success
+// rate" no longer fails the run on its own — the goal of a sustained run is to
+// produce load for the latency report, not gate CI.
+func runLoadTestSustained(
+	ctx context.Context, users []*loadtest.AuthenticatedUser, duration time.Duration, logger *slog.Logger,
+) loadResult {
+	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test (sustained)",
+		slog.Int("num_users", len(users)),
+		slog.Duration("duration", duration))
+
+	loadCtx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
+	var result loadResult
+	var wg sync.WaitGroup
+	for _, user := range users {
+		wg.Add(1)
+		go func(u *loadtest.AuthenticatedUser) {
+			defer wg.Done()
+			for {
+				if loadCtx.Err() != nil {
+					return
+				}
+				scenarioCtx, scenarioCancel := context.WithTimeout(loadCtx, scenarioTimeout)
+				if err := loadtest.WorkoutScenario(scenarioCtx, u, logger); err != nil {
+					atomic.AddInt64(&result.Failures, 1)
+					logger.LogAttrs(scenarioCtx, slog.LevelDebug, "Scenario failed",
+						slog.String("user_id", u.UserID),
+						slog.Any("error", err))
+				} else {
+					atomic.AddInt64(&result.Successes, 1)
+				}
+				scenarioCancel()
+			}
+		}(user)
 	}
+	wg.Wait()
+	return result
+}
 
-	var (
-		hostname = os.Args[1]
-		numUsers = 10
-		start    = time.Now()
-	)
-	ctx = logging.WithAttrs(ctx, slog.String("hostname", hostname))
+const tabwriterPadding = 2
 
+// printReport writes the per-route latency snapshot to w as a fixed-width table.
+func printReport(w *os.File, snap *loadtest.Snapshot, elapsed time.Duration, successes, failures int64) {
+	totalRequests := 0
+	for _, r := range snap.Routes {
+		totalRequests += r.Count
+	}
+	fmt.Fprintf(w, "\n=== Load report (elapsed %s) ===\n", elapsed.Round(time.Millisecond))
+	fmt.Fprintf(w, "Scenarios: %d ok / %d failed\n", successes, failures)
+	if elapsed > 0 {
+		fmt.Fprintf(w, "Total HTTP requests: %d  (%.1f req/s)\n",
+			totalRequests, float64(totalRequests)/elapsed.Seconds())
+	}
+	tw := tabwriter.NewWriter(w, 0, 0, tabwriterPadding, ' ', 0)
+	fmt.Fprintln(tw, "METHOD\tPATH\tN\t4XX\t5XX\tP50\tP95\tP99\tMAX")
+	for _, r := range snap.Routes {
+		fmt.Fprintf(tw, "%s\t%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\n",
+			r.Method, r.Path, r.Count, r.Status4xx, r.Status5xx,
+			r.P50.Round(time.Millisecond),
+			r.P95.Round(time.Millisecond),
+			r.P99.Round(time.Millisecond),
+			r.Max.Round(time.Millisecond))
+	}
+	if flushErr := tw.Flush(); flushErr != nil {
+		fmt.Fprintf(os.Stderr, "report flush: %v\n", flushErr)
+	}
+}
+
+// runSetupPhase runs the smoke test, registers users, and triggers history
+// generation. Returns the live users and a fresh recorder scoped to the
+// load-test phase (setup traffic is not measured).
+func runSetupPhase(
+	ctx context.Context, url, hostname string, numUsers int, logger *slog.Logger,
+) ([]*loadtest.AuthenticatedUser, *loadtest.Recorder, error) {
 	logger.LogAttrs(ctx, slog.LevelInfo, "Running smoke test first...")
-	url := "https://" + hostname
-	if strings.Contains(hostname, "localhost") {
-		url = "http://" + hostname
-		hostname = "localhost"
-	}
 	client, err := e2etest.NewClient(url, hostname, url)
 	if err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "error creating client", slog.Any("error", err))
-		os.Exit(1)
+		return nil, nil, fmt.Errorf("create client: %w", err)
 	}
 	if err = client.WaitForReady(ctx, "/api/healthy"); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "server not ready in time", slog.Any("error", err))
-		os.Exit(1)
+		return nil, nil, fmt.Errorf("server not ready: %w", err)
 	}
 	if err = loadtest.RunAuthFlow(ctx, client); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "smoke test failed", slog.Any("error", err))
-		os.Exit(1)
+		return nil, nil, fmt.Errorf("smoke test: %w", err)
 	}
 	logger.LogAttrs(ctx, slog.LevelInfo, "Smoke test passed")
 
 	setupStart := time.Now()
 	users, err := setupUsers(ctx, url, hostname, numUsers, logger)
 	if err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "failed to setup users", slog.Any("error", err))
-		os.Exit(1)
+		return nil, nil, fmt.Errorf("setup users: %w", err)
 	}
 	logger.LogAttrs(ctx, slog.LevelInfo, "User setup completed",
 		slog.Duration("setup_duration", time.Since(setupStart)),
@@ -241,13 +308,67 @@ func main() {
 		slog.Duration("history_duration", time.Since(historyStart)),
 		slog.Int("users_with_history", len(users)))
 
-	loadTestStart := time.Now()
-	if err = runLoadTest(ctx, users, logger); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "load test failed", slog.Any("error", err))
+	// Attach a fresh recorder only after setup, so the report covers the
+	// load-test phase alone.
+	recorder := loadtest.NewRecorder()
+	for _, u := range users {
+		httpClient := u.Client.HTTPClient()
+		httpClient.Transport = loadtest.NewRecordingTransport(httpClient.Transport, recorder)
+	}
+	return users, recorder, nil
+}
+
+func main() {
+	users := flag.Int("users", defaultUsers, "number of concurrent virtual users")
+	duration := flag.Duration("duration", 0,
+		"sustained-load window (e.g. 2m). 0 = single-shot legacy mode.")
+	flag.Usage = func() { //nolint:reassign // documented stdlib customization point.
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: %s [flags] <hostname>\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+	if flag.NArg() != 1 {
+		flag.Usage()
 		os.Exit(1)
 	}
+
+	logger := testhelpers.NewLogger(os.Stdout)
+	ctx := context.Background()
+	hostname := flag.Arg(0)
+	start := time.Now()
+	ctx = logging.WithAttrs(ctx, slog.String("hostname", hostname))
+
+	url := "https://" + hostname
+	if strings.Contains(hostname, "localhost") {
+		url = "http://" + hostname
+		hostname = "localhost"
+	}
+
+	authedUsers, recorder, err := runSetupPhase(ctx, url, hostname, *users, logger)
+	if err != nil {
+		logger.LogAttrs(ctx, slog.LevelError, "setup phase failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	loadStart := time.Now()
+	var result loadResult
+	if *duration > 0 {
+		result = runLoadTestSustained(ctx, authedUsers, *duration, logger)
+	} else {
+		if err = runLoadTestSingleShot(ctx, authedUsers, logger); err != nil {
+			logger.LogAttrs(ctx, slog.LevelError, "load test failed", slog.Any("error", err))
+			printReport(os.Stdout, recorder.Snapshot(), time.Since(loadStart), 0, int64(len(authedUsers)))
+			os.Exit(1)
+		}
+		// Per-user attempt count equals user count in single-shot mode.
+		result.Successes = int64(len(authedUsers))
+	}
+
+	elapsed := time.Since(loadStart)
+	printReport(os.Stdout, recorder.Snapshot(), elapsed, result.Successes, result.Failures)
+
 	logger.LogAttrs(ctx, slog.LevelInfo, "Load test completed successfully",
 		slog.Duration("total_duration", time.Since(start)),
-		slog.Duration("load_test_duration", time.Since(loadTestStart)),
-		slog.Int("users_tested", len(users)))
+		slog.Duration("load_test_duration", elapsed),
+		slog.Int("users_tested", len(authedUsers)))
 }
