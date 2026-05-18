@@ -20,6 +20,10 @@ const (
 	numPeriodizationTypes     = 2
 )
 
+// errNoExercisesForCategory is returned by PlanDay (and wrapped by Plan) when
+// the exercise pool contains nothing compatible with the derived category.
+var errNoExercisesForCategory = errors.New("no exercises available for day category")
+
 // Planner holds the static inputs needed to plan a full week of workouts.
 type Planner struct {
 	Prefs     Preferences
@@ -57,12 +61,14 @@ func exercisesPerSession(prefs Preferences, weekday time.Weekday) int {
 // determineCategory returns the workout category for a given date using the adjacency rule.
 // Uses preference-based weekday checks so week boundaries wrap naturally through date arithmetic:
 // Sunday's "tomorrow" is Monday, Monday's "yesterday" is Sunday.
+// Lower is chosen when tomorrow is a workout day (whether today is scheduled or ad-hoc), so that
+// the following session can use Upper-body exercises while the legs recover. Upper is chosen when
+// yesterday was a workout day. Otherwise FullBody.
 func (wp *Planner) determineCategory(date time.Time) Category {
-	today := date.Weekday()
 	tomorrow := date.AddDate(0, 0, 1).Weekday()
 	yesterday := date.AddDate(0, 0, -1).Weekday()
 
-	if wp.Prefs.IsWorkoutDay(today) && wp.Prefs.IsWorkoutDay(tomorrow) {
+	if wp.Prefs.IsWorkoutDay(tomorrow) {
 		return CategoryLower
 	}
 	if wp.Prefs.IsWorkoutDay(yesterday) {
@@ -370,7 +376,7 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 	for _, day := range workoutDays {
 		cat := wp.determineCategory(day)
 		if !wp.hasExercisesForCategory(cat) {
-			return nil, fmt.Errorf("no exercises available for %s day (%s)", cat, day.Weekday())
+			return nil, fmt.Errorf("%w: %s day (%s)", errNoExercisesForCategory, cat, day.Weekday())
 		}
 		categories[day] = cat
 	}
@@ -414,4 +420,70 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 	}
 
 	return sessions, nil
+}
+
+// PlanDay generates one Session for date, suitable for ad-hoc workouts on
+// days outside the weekly plan (extra workouts, or days added mid-week after
+// Plan(monday) already ran). weekUsedExerciseIDs is the set of exercise IDs
+// already used in other sessions this week; the planner avoids repeating
+// them when possible. Returns errNoExercisesForCategory (wrapped) if the
+// derived category has no compatible exercises.
+func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Session, error) {
+	category := wp.determineCategory(date)
+	if !wp.hasExercisesForCategory(category) {
+		return Session{}, fmt.Errorf(
+			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday())
+	}
+
+	// Exercise count: from prefs if the day is scheduled, otherwise medium.
+	n := exercisesPerSession(wp.Prefs, date.Weekday())
+	if n == 0 {
+		n = exercisesMedium
+	}
+
+	// Periodization: replicate the weekly planner's per-day alternation.
+	// Count scheduled prefs days strictly before date.Weekday(); the result
+	// is the 0-based index PlanDay's date would have occupied in workoutDays.
+	idx := 0
+	for d := time.Monday; d < date.Weekday(); d++ {
+		if wp.Prefs.IsWorkoutDay(d) {
+			idx++
+		}
+	}
+	// Special case: date.Weekday() == Sunday loops d through Mon..Sat which
+	// is exactly what we want (Sunday is the last possible workout slot).
+	monday := mondayForDate(date)
+	firstPT := wp.firstSessionPeriodizationType(monday)
+	pt := nextPeriodizationType(firstPT, idx)
+
+	isDeload := IsDeloadWeek(monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
+	if isDeload {
+		pt = PeriodizationHypertrophy
+	}
+
+	used := weekUsedExerciseIDs
+	if used == nil {
+		used = make(map[int]bool)
+	}
+	exerciseSets := wp.selectExercisesForDayWithPeriodization(
+		category, nil, n, pt, isDeload, used,
+	)
+
+	return Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+		Date:              date,
+		PeriodizationType: pt,
+		IsDeload:          isDeload,
+		ExerciseSets:      exerciseSets,
+	}, nil
+}
+
+// mondayForDate returns the Monday of the week containing date, in UTC,
+// using calendar-date arithmetic to avoid timezone-related rollovers.
+func mondayForDate(date time.Time) time.Time {
+	y, m, d := date.Date()
+	offset := int(time.Monday - date.Weekday())
+	if offset > 0 {
+		offset = -6
+	}
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, offset)
 }
