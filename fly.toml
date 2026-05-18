@@ -32,8 +32,3 @@ memory = "4gb"
 [[metrics]]
 port = 9090
 path = "/metrics"
-
-# Breaks preview environments
-# [experimental]
-# machine_config = "machine-config.json"
-# container = "petra"
