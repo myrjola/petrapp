@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -190,6 +191,32 @@ func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []do
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit batch sessions: %w", err)
+	}
+	return nil
+}
+
+// Create inserts a single session and its exercise slots in one transaction.
+// Translates the workout_sessions PRIMARY KEY conflict to domain.ErrAlreadyExists
+// so callers can detect concurrent-insert races.
+func (r *sqliteSessionRepository) Create(ctx context.Context, sess domain.Session) (err error) {
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+	if err = r.insertSession(ctx, tx, sess); err != nil {
+		var sqliteErr sqlite3.Error
+		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
+			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)
+		}
+		return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit create session: %w", err)
 	}
 	return nil
 }

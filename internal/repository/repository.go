@@ -56,6 +56,11 @@ type SessionRepository interface {
 	List(ctx context.Context, sinceDate time.Time) ([]domain.Session, error)
 	CreateBatch(ctx context.Context, sessions []domain.Session) error
 
+	// Create inserts a single session and its exercise slots. Returns
+	// domain.ErrAlreadyExists (wrapped) if a session already exists for the
+	// date — callers use errors.Is to recover from concurrent insert races.
+	Create(ctx context.Context, sess domain.Session) error
+
 	// Update loads the session inside a single transaction, runs fn against
 	// the hydrated *domain.Session, and persists the result. Returning nil
 	// from fn commits; returning an error rolls back. Sentinel errors from

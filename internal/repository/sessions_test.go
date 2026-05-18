@@ -287,6 +287,74 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 	}
 }
 
+func TestSessionRepository_Create_InsertsSingleSession(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
+	if err != nil {
+		t.Fatalf("create exercise: %v", err)
+	}
+
+	date := time.Date(2026, 1, 7, 0, 0, 0, 0, time.UTC) // a Wednesday
+	sess := domain.Session{                             //nolint:exhaustruct // StartedAt/CompletedAt zero on insert.
+		Date:              date,
+		PeriodizationType: domain.PeriodizationStrength,
+		IsDeload:          false,
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // ID assigned on insert, WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets: []domain.Set{
+					{TargetValue: 5}, //nolint:exhaustruct // all completion fields nil.
+				},
+			},
+		},
+	}
+
+	if err = repos.Sessions.Create(ctx, sess); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	got, err := repos.Sessions.Get(ctx, date)
+	if err != nil {
+		t.Fatalf("Get after Create: %v", err)
+	}
+	if len(got.ExerciseSets) != 1 || got.ExerciseSets[0].Exercise.ID != ex.ID {
+		t.Errorf("round-trip mismatch: %+v", got)
+	}
+	if got.PeriodizationType != domain.PeriodizationStrength {
+		t.Errorf("PeriodizationType = %s, want strength", got.PeriodizationType)
+	}
+}
+
+func TestSessionRepository_Create_ConflictReturnsErrAlreadyExists(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
+	if err != nil {
+		t.Fatalf("create exercise: %v", err)
+	}
+
+	date := time.Date(2026, 1, 7, 0, 0, 0, 0, time.UTC)
+	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero on insert.
+		Date:              date,
+		PeriodizationType: domain.PeriodizationStrength,
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // ID assigned on insert, WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // completion fields nil.
+			},
+		},
+	}
+	if err = repos.Sessions.Create(ctx, sess); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+
+	err = repos.Sessions.Create(ctx, sess)
+	if !errors.Is(err, domain.ErrAlreadyExists) {
+		t.Errorf("second Create err = %v, want wraps domain.ErrAlreadyExists", err)
+	}
+}
+
 func TestSessionRepository_DeleteWeek(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
