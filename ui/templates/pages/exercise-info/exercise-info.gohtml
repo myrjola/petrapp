@@ -49,10 +49,6 @@
                     letter-spacing: var(--font-letterspacing-1);
                 }
 
-                .admin-edit:hover {
-                    background: color-mix(in oklab, var(--clay-1) 92%, black);
-                }
-
                 /* HERO */
                 .hero {
                     display: grid;
@@ -312,38 +308,17 @@
                     font-weight: var(--font-weight-6);
                     font-size: var(--font-size-1);
                     text-decoration: none;
-                    transition: background var(--duration-2) var(--ease-out-quiet),
-                                border-color var(--duration-2) var(--ease-out-quiet),
-                                transform var(--duration-2) var(--ease-out-quiet);
                 }
 
                 .prose ul li > a:only-child::after {
                     content: "↗";
                     font-size: 0.95em;
                     color: var(--clay-3);
-                    transition: transform var(--duration-2) var(--ease-out-quiet);
-                }
-
-                .prose ul li > a:only-child:hover {
-                    background: var(--clay-0);
-                    border-color: var(--clay-2);
-                    transform: translateY(-1px);
-                }
-
-                .prose ul li > a:only-child:hover::after {
-                    transform: translate(2px, -2px);
                 }
 
                 .prose ul li > a:only-child:focus-visible {
                     outline: 2px solid var(--color-border-focus);
                     outline-offset: 2px;
-                }
-
-                @media (prefers-reduced-motion: reduce) {
-                    .prose ul li > a:only-child,
-                    .prose ul li > a:only-child::after {
-                        transition: none;
-                    }
                 }
             }
         </style>

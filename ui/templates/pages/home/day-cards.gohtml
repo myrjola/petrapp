@@ -114,15 +114,6 @@
                     letter-spacing: var(--font-letterspacing-2);
                     text-transform: uppercase;
                     text-decoration: none;
-                    cursor: pointer;
-                    transition:
-                        background var(--duration-2) var(--ease-out-quiet),
-                        color var(--duration-2) var(--ease-out-quiet);
-                }
-
-                .day-text-action:hover {
-                    background: color-mix(in oklab, var(--clay-1) 60%, transparent);
-                    color: var(--clay-6);
                 }
 
                 .day-text-action:focus-visible {
@@ -132,11 +123,6 @@
 
                 .day-text-action .arrow {
                     display: inline-block;
-                    transition: transform var(--duration-2) var(--ease-out-quiet);
-                }
-
-                .day-text-action:hover .arrow {
-                    transform: translateX(2px);
                 }
 
                 /* Today's primary CTA — keep the brown button only here, where the
@@ -183,10 +169,6 @@
                 .day[data-status="in_progress"] .day-text-action {
                     color: var(--color-warning);
                 }
-                .day[data-status="in_progress"] .day-text-action:hover {
-                    background: color-mix(in oklab, var(--color-warning) 12%, transparent);
-                    color: color-mix(in oklab, var(--color-warning) 80%, black);
-                }
 
                 /* Completed — sage wash, success ribbon, struck-through day name. */
                 .day[data-status="completed"] {
@@ -204,10 +186,6 @@
                 .day[data-status="completed"] .day-text-action {
                     color: var(--color-success);
                 }
-                .day[data-status="completed"] .day-text-action:hover {
-                    background: color-mix(in oklab, var(--color-success) 12%, transparent);
-                    color: color-mix(in oklab, var(--color-success) 80%, black);
-                }
 
                 /* Missed — warm ochre wash (NOT red), dimmed warning ribbon. */
                 .day[data-status="past-incomplete"] {
@@ -221,10 +199,6 @@
                 .day[data-status="past-incomplete"] .progress-fill { background: var(--stone-5); }
                 .day[data-status="past-incomplete"] .day-text-action {
                     color: var(--color-warning);
-                }
-                .day[data-status="past-incomplete"] .day-text-action:hover {
-                    background: color-mix(in oklab, var(--color-warning) 12%, transparent);
-                    color: color-mix(in oklab, var(--color-warning) 80%, black);
                 }
 
                 /* Upcoming — clean elevated surface, quiet meta. */

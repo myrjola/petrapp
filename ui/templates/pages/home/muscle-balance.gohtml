@@ -74,10 +74,7 @@
                         text-transform: uppercase;
                         font-weight: var(--font-weight-7);
                         color: var(--clay-5);
-                        cursor: pointer;
                         list-style: none;
-                        transition: background var(--duration-2) var(--ease-out-quiet),
-                                    color var(--duration-2) var(--ease-out-quiet);
                     }
 
                     .legend > summary::-webkit-details-marker { display: none; }
@@ -89,11 +86,6 @@
                     }
 
                     .legend[open] > summary::after { transform: rotate(180deg); }
-
-                    .legend > summary:hover {
-                        background: color-mix(in oklab, var(--clay-1) 60%, transparent);
-                        color: var(--clay-6);
-                    }
 
                     .legend > summary:focus-visible {
                         outline: 2px solid var(--color-border-focus);

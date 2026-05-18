@@ -282,11 +282,6 @@
         text-decoration: none;
         transition: background-color var(--duration-2) var(--ease-out-quiet), transform var(--duration-1) var(--ease-out-quiet);
 
-        &:hover {
-            cursor: pointer;
-            background-color: var(--clay-5);
-        }
-
         &:focus-visible {
             outline: var(--clay-3) solid 2px;
         }
@@ -338,19 +333,9 @@
         cursor: not-allowed;
     }
 
-    button:disabled:hover,
-    .btn:disabled:hover,
-    .btn[aria-disabled="true"]:hover {
-        transform: none;
-    }
-
     .btn--quiet {
         background-color: var(--color-success-bg);
         color: var(--color-success);
-    }
-
-    .btn--quiet:hover {
-        background-color: color-mix(in oklab, var(--color-success-bg) 92%, black);
     }
 
     .btn--ghost {
@@ -359,18 +344,9 @@
         border: var(--border-size-1) solid var(--color-border);
     }
 
-    .btn--ghost:hover {
-        background-color: var(--stone-1);
-        border-color: var(--stone-4);
-    }
-
     .btn--danger {
         background-color: var(--color-error);
         color: var(--color-surface-elevated);
-    }
-
-    .btn--danger:hover {
-        background-color: color-mix(in oklab, var(--color-error) 88%, black);
     }
 
     .btn--danger:active {
@@ -382,10 +358,6 @@
         color: var(--stone-10);
         font-weight: var(--font-weight-8);
         text-transform: uppercase;
-    }
-
-    .btn--focus:hover {
-        background-color: color-mix(in oklab, var(--ember) 90%, white);
     }
 
     .btn--focus:active {
@@ -509,11 +481,6 @@
             transform var(--duration-3) var(--ease-out-quiet),
             box-shadow var(--duration-3) var(--ease-out-quiet),
             border-color var(--duration-2) var(--ease-out-quiet);
-
-        &:hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-2);
-        }
 
         &:active {
             transform: translateY(0);
@@ -663,7 +630,6 @@ html:active-view-transition-type(backward) {
     .btn:active:not([aria-busy="true"]) {
         transform: none;
     }
-    a.card:hover,
     a.card:active {
         transform: none;
     }
