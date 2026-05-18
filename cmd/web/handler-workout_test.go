@@ -356,9 +356,9 @@ func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse workout page: %v", err)
 	}
-	banner := workoutDoc.Find("[role='alert']").First()
+	banner := workoutDoc.Find(".banner.banner--error[role='alert']").First()
 	if banner.Length() == 0 {
-		t.Fatalf("Expected role=\"alert\" banner on workout-not-found page; got none")
+		t.Fatalf("Expected .banner.banner--error[role=\"alert\"] on workout-not-found page; got none")
 	}
 	wantSubstr := "no planned workout"
 	if !strings.Contains(strings.ToLower(banner.Text()), wantSubstr) {

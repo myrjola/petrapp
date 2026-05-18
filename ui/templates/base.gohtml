@@ -43,6 +43,22 @@
     <body>
     <div id="loading-bar" aria-hidden="true"></div>
     <div id="loading-announce" role="status" aria-live="polite" class="sr-only"></div>
+    <style {{ nonce }}>
+        @scope (#js-flash) {
+            :scope {
+                margin: var(--size-3);
+                padding: var(--size-2) var(--size-3);
+                border-radius: var(--radius-2);
+                font-weight: var(--font-weight-5);
+                background: var(--color-error-bg);
+                color: var(--color-error);
+            }
+            :scope[hidden] {
+                display: none;
+            }
+        }
+    </style>
+    <div id="js-flash" role="alert" hidden></div>
     {{ template "page" . }}
     </body>
     </html>
