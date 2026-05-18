@@ -205,6 +205,111 @@ func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
 	}
 }
 
+func Test_StartSession_CreatesAdHocSessionForUnscheduledToday(t *testing.T) {
+	// setupTestService sets Mon/Wed/Fri preferences. Pick a day this week
+	// the user has not scheduled (a Tuesday) and verify StartSession both
+	// creates the session and marks it started.
+	ctx, svc := setupTestService(t)
+
+	// Ensure the week is generated first so usedExerciseIDs is populated.
+	weekSessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+	monday := weekSessions[0].Date
+	tue := monday.AddDate(0, 0, 1)
+
+	if err = svc.StartSession(ctx, tue); err != nil {
+		t.Fatalf("StartSession on unscheduled Tuesday: %v", err)
+	}
+
+	sess, err := svc.GetSession(ctx, tue)
+	if err != nil {
+		t.Fatalf("GetSession after ad-hoc Start: %v", err)
+	}
+	if sess.StartedAt.IsZero() {
+		t.Error("StartedAt is zero — Start did not mark the session")
+	}
+	if len(sess.ExerciseSets) == 0 {
+		t.Error("ad-hoc session has no exercises — PlanDay or persistence failed")
+	}
+}
+
+func Test_StartSession_CreatesNewlyScheduledMidWeekDay(t *testing.T) {
+	// Mon/Wed/Fri prefs, start Monday, then change prefs to add Tuesday
+	// — RegenerateWeeklyPlanIfUnstarted will skip because Monday is started.
+	// StartSession on Tuesday must still succeed by creating the session.
+	ctx, svc := setupTestService(t)
+
+	weekSessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+	monday := weekSessions[0].Date
+	tue := monday.AddDate(0, 0, 1)
+
+	if err = svc.StartSession(ctx, monday); err != nil {
+		t.Fatalf("StartSession Monday: %v", err)
+	}
+
+	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days omitted.
+		MondayMinutes:    60,
+		TuesdayMinutes:   60,
+		WednesdayMinutes: 60,
+		FridayMinutes:    60,
+	}); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+	// RegenerateWeeklyPlanIfUnstarted is a no-op now (Monday is started).
+	if err = svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
+	}
+
+	if err = svc.StartSession(ctx, tue); err != nil {
+		t.Fatalf("StartSession Tuesday after schedule change: %v", err)
+	}
+
+	sess, err := svc.GetSession(ctx, tue)
+	if err != nil {
+		t.Fatalf("GetSession Tuesday: %v", err)
+	}
+	if sess.StartedAt.IsZero() {
+		t.Error("Tuesday StartedAt is zero")
+	}
+	if len(sess.ExerciseSets) == 0 {
+		t.Error("Tuesday session has no exercises")
+	}
+}
+
+func Test_StartSession_DoubleStartIsIdempotent(t *testing.T) {
+	// Two StartSession calls on the same unscheduled date must both succeed
+	// and leave exactly one started session. Simulates the lazy-create race
+	// via sequential calls (the second's Create returns ErrAlreadyExists and
+	// the Update is idempotent via ErrAlreadyStarted).
+	ctx, svc := setupTestService(t)
+
+	weekSessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+	tue := weekSessions[0].Date.AddDate(0, 0, 1)
+
+	if err = svc.StartSession(ctx, tue); err != nil {
+		t.Fatalf("first StartSession: %v", err)
+	}
+	if err = svc.StartSession(ctx, tue); err != nil {
+		t.Fatalf("second StartSession (must be idempotent): %v", err)
+	}
+
+	sess, err := svc.GetSession(ctx, tue)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if sess.StartedAt.IsZero() {
+		t.Error("StartedAt is zero after two Start calls")
+	}
+}
+
 func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T) {
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
