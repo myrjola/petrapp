@@ -153,7 +153,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	}
 
 	if _, err = s.repos.Sessions.Get(ctx, date); errors.Is(err, domain.ErrNotFound) {
-		return 0, fmt.Errorf("workout session for date %s does not exist", date.Format(time.DateOnly))
+		return 0, domain.ValidationError{
+			Message: "This day has no planned workout. Schedule one from the home page first.",
+		}
 	} else if err != nil {
 		return 0, fmt.Errorf("check session existence: %w", err)
 	}

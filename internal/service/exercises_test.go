@@ -352,7 +352,8 @@ func Test_AddExercise(t *testing.T) {
 		}
 	})
 
-	// Test adding an exercise to a non-existent workout (should return an error)
+	// Test adding an exercise to a non-existent workout (should return a
+	// user-facing ValidationError).
 	t.Run("Add exercise to non-existent workout", func(t *testing.T) {
 		// Set a future date for a workout that doesn't exist yet
 		futureDate := today.AddDate(0, 0, 7) // 1 week in the future
@@ -368,10 +369,19 @@ func Test_AddExercise(t *testing.T) {
 			t.Fatalf("Workout already exists for future date, can't test error case")
 		}
 
-		// Add exercise to the non-existent workout - should fail
+		// Add exercise to the non-existent workout - should fail with a
+		// ValidationError carrying a user-facing message.
 		_, err = svc.AddExercise(ctx, futureDate, exercise1ID)
 		if err == nil {
-			t.Error("Expected error when adding exercise to non-existent workout, but got nil")
+			t.Fatal("Expected error when adding exercise to non-existent workout, but got nil")
+		}
+		var ve domain.ValidationError
+		if !errors.As(err, &ve) {
+			t.Fatalf("Expected ValidationError, got %T: %v", err, err)
+		}
+		wantMsg := "This day has no planned workout. Schedule one from the home page first."
+		if ve.Message != wantMsg {
+			t.Errorf("ValidationError.Message = %q, want %q", ve.Message, wantMsg)
 		}
 
 		// Verify workout was NOT created
