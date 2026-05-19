@@ -1,0 +1,239 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.errorUXTemplateData*/ -}}
+
+{{ define "page" }}
+    <main>
+        <style {{ nonce }}>
+            @scope {
+                :scope {
+                    max-width: 56rem;
+                    margin: 0 auto;
+                    padding: var(--size-6) var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-6);
+                }
+
+                h1 {
+                    font-family: var(--font-serif);
+                    font-weight: var(--font-weight-6);
+                    font-size: clamp(2rem, 7vw, 2.5rem);
+                    line-height: 0.95;
+                    letter-spacing: -0.025em;
+                    color: var(--color-text-primary);
+                }
+
+                .overline {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-6);
+                    color: var(--clay-4);
+                    margin-bottom: var(--size-2);
+                }
+
+                .lead {
+                    color: var(--color-text-secondary);
+                    font-size: var(--font-size-2);
+                    line-height: var(--font-lineheight-3);
+                    max-width: 42rem;
+                }
+
+                .lead code {
+                    font-family: var(--font-mono);
+                    font-size: 0.95em;
+                    background: var(--stone-1);
+                    padding: 0 var(--size-1);
+                    border-radius: var(--radius-1);
+                }
+
+                .cards {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+                    gap: var(--size-4);
+                }
+
+                .card {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                    padding: var(--size-4);
+                }
+
+                .card h2 {
+                    font-size: var(--font-size-3);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin: 0;
+                }
+
+                .card .tag {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-3);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-muted);
+                }
+
+                .card p {
+                    color: var(--color-text-secondary);
+                    font-size: var(--font-size-1);
+                    line-height: var(--font-lineheight-3);
+                    margin: 0;
+                }
+
+                .card .action {
+                    margin-top: auto;
+                }
+
+                .card code {
+                    font-family: var(--font-mono);
+                    font-size: 0.95em;
+                    background: var(--stone-1);
+                    padding: 0 var(--size-1);
+                    border-radius: var(--radius-1);
+                }
+
+                .static-banners {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-2);
+                }
+
+                section.variants > h2 {
+                    font-size: var(--font-size-4);
+                    font-weight: var(--font-weight-6);
+                    color: var(--color-text-primary);
+                    margin-bottom: var(--size-2);
+                    padding-bottom: var(--size-2);
+                    border-bottom: var(--border-size-1) solid var(--color-border);
+                }
+            }
+        </style>
+
+        <header>
+            <p class="overline">Dev · Error UX</p>
+            <h1>Error UX showcase</h1>
+            <p class="lead">
+                Live exercises of the four error-surfacing classes documented in the
+                <code>2026-05-18-error-ux-conventions</code> spec. Each card triggers
+                a real handler path; the resulting banner appears at the top of the page
+                via flash + redirect. The client-only path populates
+                <code>#js-flash</code>.
+            </p>
+        </header>
+
+        {{ template "banner" .Flash }}
+
+        <section class="variants">
+            <h2>Live triggers</h2>
+            <div class="cards">
+
+                <article class="card">
+                    <span class="tag">A · Validation</span>
+                    <h2>Server-side validation error</h2>
+                    <p>
+                        Service returns <code>domain.ValidationError</code>;
+                        <code>userError</code> flashes the message verbatim and
+                        redirects to <code>safeURL</code>. The banner re-renders
+                        with <code>role="alert"</code>.
+                    </p>
+                    <form class="action" method="post" action="/dev/error-ux/trigger/validation">
+                        <button type="submit" class="btn btn--block">
+                            Trigger validation error
+                        </button>
+                    </form>
+                </article>
+
+                <article class="card">
+                    <span class="tag">B · Business</span>
+                    <h2>Expected business error</h2>
+                    <p>
+                        Logically-not-allowed action (e.g. "Add exercise on
+                        unplanned day"). Same channel as A — the service returns
+                        <code>ValidationError</code> with a user-actionable
+                        message.
+                    </p>
+                    <form class="action" method="post" action="/dev/error-ux/trigger/business">
+                        <button type="submit" class="btn btn--block">
+                            Trigger business error
+                        </button>
+                    </form>
+                </article>
+
+                <article class="card">
+                    <span class="tag">C · System</span>
+                    <h2>Unexpected system error</h2>
+                    <p>
+                        Anything else — DB hiccup, plumbing fault.
+                        <code>userError</code> logs the underlying error and
+                        flashes a generic message; the user keeps their place
+                        instead of getting a silent reload.
+                    </p>
+                    <form class="action" method="post" action="/dev/error-ux/trigger/system">
+                        <button type="submit" class="btn btn--block btn--danger">
+                            Trigger system error
+                        </button>
+                    </form>
+                </article>
+
+                <article class="card">
+                    <span class="tag">D · Network</span>
+                    <h2>Client-side network failure</h2>
+                    <p>
+                        <code>fetch</code> throws (offline / DNS / CORS). The
+                        shim populates the page-top
+                        <code>#js-flash</code> via <code>textContent</code>.
+                        Click below to simulate the visual.
+                    </p>
+                    <button id="simulate-network-failure" type="button" class="btn btn--block btn--quiet action">
+                        Simulate network failure
+                    </button>
+                    <script {{ nonce }}>
+                      (() => {
+                        const btn = document.getElementById('simulate-network-failure')
+                        const flash = document.getElementById('js-flash')
+                        if (!btn || !flash) return
+                        btn.addEventListener('click', () => {
+                          flash.textContent =
+                            'Connection lost. Check your network and try again.'
+                          flash.hidden = false
+                        })
+                      })()
+                    </script>
+                </article>
+
+                <article class="card">
+                    <span class="tag">E · Full page</span>
+                    <h2>Full-page server error</h2>
+                    <p>
+                        For the rare case with no safe URL — template render
+                        failure, broken session. <code>serverError</code> logs
+                        and renders <code>error.gohtml</code> 500 directly.
+                        No flash, no banner. Hitting the link below navigates
+                        away from this page.
+                    </p>
+                    <a class="btn btn--block btn--quiet action" href="/dev/error-ux/server-error">
+                        Trigger full-page 500
+                    </a>
+                </article>
+
+            </div>
+        </section>
+
+        <section class="variants">
+            <h2>Banner variants</h2>
+            <p class="lead">
+                Static reference. Mirrors the same component (<code>banner</code>)
+                used by the live paths above; matches the styleguide for
+                cross-reference.
+            </p>
+            <div class="static-banners">
+                {{ range .BannerVariants }}
+                    {{ template "banner" . }}
+                {{ end }}
+            </div>
+        </section>
+    </main>
+{{ end }}

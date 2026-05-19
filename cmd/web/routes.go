@@ -75,6 +75,14 @@ func (app *application) routes() (*http.ServeMux, error) {
 	// so prod returns 404; route is registered unconditionally to keep startup simple.
 	mux.Handle("GET /dev/styleguide", app.sessionStack(http.HandlerFunc(app.styleguideGET)))
 
+	// Developer-only error-UX showcase. Same dev-mode gating as /dev/styleguide.
+	// See docs/superpowers/specs/2026-05-19-dev-error-ux-showcase-design.md.
+	mux.Handle("GET /dev/error-ux", app.sessionStack(http.HandlerFunc(app.devErrorUXGET)))
+	mux.Handle("POST /dev/error-ux/trigger/{kind}",
+		app.sessionStack(http.HandlerFunc(app.devErrorUXTriggerPOST)))
+	mux.Handle("GET /dev/error-ux/server-error",
+		app.sessionStack(http.HandlerFunc(app.devErrorUXServerErrorGET)))
+
 	// Home route (most specific)
 	mux.Handle("GET /{$}", app.sessionStack(http.HandlerFunc(app.home)))
 
