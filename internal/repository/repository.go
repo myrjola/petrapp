@@ -27,16 +27,16 @@ type Repositories struct {
 	ScheduledPushes   ScheduledPushRepository
 }
 
-// New constructs all seven SQLite-backed repositories, wiring the
-// ExerciseRepository into the SessionRepository so Get/List can hydrate
-// ExerciseSet.Exercise inside a single read.
+// New constructs all seven SQLite-backed repositories. SessionRepository
+// hydrates ExerciseSet.Exercise inline by joining `exercises` and batching
+// muscle-group lookups, so it no longer depends on ExerciseRepository.
 func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
 	_ = logger // reserved for future per-repo logging; unused today.
 	prefs := newSQLitePreferencesRepository(db)
 	muscleTargets := newSQLiteMuscleGroupTargetRepository(db)
 	featureFlags := newSQLiteFeatureFlagRepository(db)
 	exercises := newSQLiteExerciseRepository(db)
-	sessions := newSQLiteSessionRepository(db, exercises)
+	sessions := newSQLiteSessionRepository(db)
 	pushSubs := newSQLitePushSubscriptionRepository(db)
 	scheduledPushes := newSQLiteScheduledPushRepository(db)
 	return &Repositories{

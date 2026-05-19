@@ -61,10 +61,13 @@ negligible and the simplicity is worth the trade.
 ## Hydration policy
 
 `SessionRepository.Get` and `List` always populate `ExerciseSet.Exercise`
-by calling the injected `ExerciseRepository.Get` per slot. Callers
-receive a "fully hydrated" `domain.Session` and never need to enrich it
-themselves. The N+1 query pattern is preserved from the pre-rearchitecture
-service code; for current data sizes the convenience outweighs the cost.
+inline: the base exercise columns are joined in via
+`workout_exercise.exercise_id → exercises.id`, and primary/secondary
+muscle groups are fetched in a single follow-up query keyed by the
+deduped exercise IDs of the session. A session with N exercise slots
+costs two read queries (the sets+exercise join plus the batched muscle
+group fetch) rather than the prior 1 + 2N. Callers receive a
+"fully hydrated" `domain.Session` and never need to enrich it themselves.
 
 ## ErrNotFound translation at the boundary
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
@@ -22,13 +23,11 @@ type queryer interface {
 
 type sqliteSessionRepository struct {
 	baseRepository
-	exercises ExerciseRepository
 }
 
-func newSQLiteSessionRepository(db *sqlite.Database, exercises ExerciseRepository) *sqliteSessionRepository {
+func newSQLiteSessionRepository(db *sqlite.Database) *sqliteSessionRepository {
 	return &sqliteSessionRepository{
 		baseRepository: newBaseRepository(db),
-		exercises:      exercises,
 	}
 }
 
@@ -297,24 +296,38 @@ func parseSessionRow(
 	return session, nil
 }
 
-// loadExerciseSetsRow holds one row of the loadExerciseSets join.
+// loadExerciseSetsRow holds one row of the loadExerciseSets join. Exercise
+// columns join from `exercises` so we don't issue a per-slot follow-up
+// query for the base exercise.
 type loadExerciseSetsRow struct {
-	weID                 int
-	exerciseID           int
-	warmupCompletedAtStr sql.NullString
-	setNumber            sql.NullInt32
-	weightKg             sql.NullFloat64
-	targetValue          sql.NullInt32
-	completedValue       sql.NullInt32
-	completedAtStr       sql.NullString
-	signalStr            sql.NullString
+	weID                   int
+	exerciseID             int
+	warmupCompletedAtStr   sql.NullString
+	setNumber              sql.NullInt32
+	weightKg               sql.NullFloat64
+	targetValue            sql.NullInt32
+	completedValue         sql.NullInt32
+	completedAtStr         sql.NullString
+	signalStr              sql.NullString
+	exerciseName           string
+	exerciseCategory       domain.Category
+	exerciseType           domain.ExerciseType
+	exerciseDescription    string
+	defaultStartingSeconds sql.NullInt64
+	repMin                 sql.NullInt64
+	repMax                 sql.NullInt64
 }
 
 // loadExerciseSets fetches all exercise slots for a session, including ones
 // with no sets yet (e.g. just-swapped exercises). The driving table is
-// workout_exercise so empty slots still appear; sets are LEFT-JOINed in. Each
-// slot is hydrated by calling exercises.Get for its exercise_id — preserving
-// today's N+1 pattern (relocated from service.enrichSessionAggregate).
+// workout_exercise so empty slots still appear; sets are LEFT-JOINed in.
+//
+// The base exercise definition is joined in from `exercises` so we don't
+// fire a separate SELECT per slot. Muscle-group hydration is batched into a
+// single follow-up query over the deduped exercise IDs, replacing the
+// per-slot N+1 against `exercise_muscle_groups`. A session with N exercise
+// slots now costs 2 queries (sets+exercise join, muscle groups by IN list)
+// instead of the prior 1 + 2N.
 func (r *sqliteSessionRepository) loadExerciseSets(
 	ctx context.Context,
 	q queryer,
@@ -326,9 +339,12 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	rows, err := q.QueryContext(ctx, `
 		SELECT we.id, we.exercise_id, we.warmup_completed_at,
 		       es.set_number, es.weight_kg, es.target_value,
-		       es.completed_value, es.completed_at, es.signal
+		       es.completed_value, es.completed_at, es.signal,
+		       e.name, e.category, e.exercise_type, e.description_markdown,
+		       e.default_starting_seconds, e.rep_min, e.rep_max
 		FROM workout_exercise we
 		LEFT JOIN exercise_sets es ON es.workout_exercise_id = we.id
+		JOIN exercises e ON e.id = we.exercise_id
 		WHERE we.workout_user_id = ? AND we.workout_date = ?
 		ORDER BY we.id, es.set_number`,
 		userID, dateStr)
@@ -353,13 +369,15 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		var row loadExerciseSetsRow
 		if err = rows.Scan(&row.weID, &row.exerciseID, &row.warmupCompletedAtStr,
 			&row.setNumber, &row.weightKg, &row.targetValue,
-			&row.completedValue, &row.completedAtStr, &row.signalStr); err != nil {
+			&row.completedValue, &row.completedAtStr, &row.signalStr,
+			&row.exerciseName, &row.exerciseCategory, &row.exerciseType, &row.exerciseDescription,
+			&row.defaultStartingSeconds, &row.repMin, &row.repMax); err != nil {
 			return nil, fmt.Errorf("scan exercise set: %w", err)
 		}
 
 		if current == nil || row.weID != current.ID {
 			flush()
-			started, startErr := r.startExerciseSet(ctx, row)
+			started, startErr := startExerciseSet(row)
 			if startErr != nil {
 				return nil, startErr
 			}
@@ -381,22 +399,113 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
+
+	// Hydrate muscle groups in one query keyed on the deduped exercise IDs.
+	if err = hydrateMuscleGroups(ctx, q, exerciseSets); err != nil {
+		return nil, err
+	}
 	return exerciseSets, nil
 }
 
-// startExerciseSet constructs a fresh domain.ExerciseSet with the hydrated
-// Exercise filled in from the exercises repository.
-func (r *sqliteSessionRepository) startExerciseSet(
-	ctx context.Context,
-	row loadExerciseSetsRow,
-) (domain.ExerciseSet, error) {
+// hydrateMuscleGroups fetches primary/secondary muscle groups for every
+// distinct Exercise.ID across the given slots in a single query and writes
+// them back onto the slots' Exercise fields.
+func hydrateMuscleGroups(ctx context.Context, q queryer, sets []domain.ExerciseSet) error {
+	if len(sets) == 0 {
+		return nil
+	}
+	seen := make(map[int]struct{}, len(sets))
+	ids := make([]any, 0, len(sets))
+	for _, es := range sets {
+		if _, ok := seen[es.Exercise.ID]; ok {
+			continue
+		}
+		seen[es.Exercise.ID] = struct{}{}
+		ids = append(ids, es.Exercise.ID)
+	}
+
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1] // trim trailing comma
+	query := `
+		SELECT emg.exercise_id, mg.name, emg.is_primary
+		FROM exercise_muscle_groups emg
+		JOIN muscle_groups mg ON emg.muscle_group_name = mg.name
+		WHERE emg.exercise_id IN (` + placeholders + `)`
+
+	rows, err := q.QueryContext(ctx, query, ids...)
+	if err != nil {
+		return fmt.Errorf("query muscle groups: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	type groups struct {
+		primary   []string
+		secondary []string
+	}
+	byExercise := make(map[int]*groups, len(ids))
+	for rows.Next() {
+		var (
+			exerciseID int
+			name       string
+			isPrimary  bool
+		)
+		if err = rows.Scan(&exerciseID, &name, &isPrimary); err != nil {
+			return fmt.Errorf("scan muscle group row: %w", err)
+		}
+		g, ok := byExercise[exerciseID]
+		if !ok {
+			g = &groups{primary: nil, secondary: nil}
+			byExercise[exerciseID] = g
+		}
+		if isPrimary {
+			g.primary = append(g.primary, name)
+		} else {
+			g.secondary = append(g.secondary, name)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("iterate muscle group rows: %w", err)
+	}
+
+	for i := range sets {
+		g, ok := byExercise[sets[i].Exercise.ID]
+		if !ok {
+			continue
+		}
+		sets[i].Exercise.PrimaryMuscleGroups = g.primary
+		sets[i].Exercise.SecondaryMuscleGroups = g.secondary
+	}
+	return nil
+}
+
+// startExerciseSet constructs a fresh domain.ExerciseSet from a joined row.
+// Muscle-group fields stay empty here — they are populated in a single
+// follow-up query by hydrateMuscleGroups once all slots are read.
+func startExerciseSet(row loadExerciseSetsRow) (domain.ExerciseSet, error) {
 	warmupCompletedAt, err := parseWarmupCompletedAtTimestamp(row.warmupCompletedAtStr)
 	if err != nil {
 		return domain.ExerciseSet{}, err
 	}
-	exercise, err := r.exercises.Get(ctx, row.exerciseID)
-	if err != nil {
-		return domain.ExerciseSet{}, fmt.Errorf("hydrate exercise %d: %w", row.exerciseID, err)
+	exercise := domain.Exercise{ //nolint:exhaustruct // muscle groups filled in by hydrateMuscleGroups.
+		ID:                  row.exerciseID,
+		Name:                row.exerciseName,
+		Category:            row.exerciseCategory,
+		ExerciseType:        row.exerciseType,
+		DescriptionMarkdown: row.exerciseDescription,
+	}
+	if row.defaultStartingSeconds.Valid {
+		v := int(row.defaultStartingSeconds.Int64)
+		exercise.DefaultStartingSeconds = &v
+	}
+	if row.repMin.Valid {
+		v := int(row.repMin.Int64)
+		exercise.RepMin = &v
+	}
+	if row.repMax.Valid {
+		v := int(row.repMax.Int64)
+		exercise.RepMax = &v
 	}
 	return domain.ExerciseSet{
 		ID:                row.weID,
