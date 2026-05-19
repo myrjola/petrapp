@@ -334,5 +334,11 @@
             }
         </style>
         <a href="/privacy">Privacy <span class="sep"></span> Security</a>
+        {{ if .DevMode }}
+            <span class="sep"></span>
+            <a href="/dev/styleguide">Styleguide</a>
+            <span class="sep"></span>
+            <a href="/dev/error-ux">Error UX</a>
+        {{ end }}
     </footer>
 {{ end }}

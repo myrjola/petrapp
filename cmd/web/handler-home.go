@@ -63,6 +63,10 @@ type homeTemplateData struct {
 	IsDeloadWeek bool
 	// DeloadEnabled reports whether the deload feature is enabled for this user.
 	DeloadEnabled bool
+	// DevMode mirrors app.devMode so the template can surface dev-only
+	// affordances (links to /dev/styleguide, /dev/error-ux). Prod renders
+	// nothing because the field is false there.
+	DevMode bool
 }
 
 // muscleBalanceView wraps the per-region groupings rendered below the weekly schedule.
@@ -402,6 +406,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		MesocycleLength:  0,
 		IsDeloadWeek:     false,
 		DeloadEnabled:    false,
+		DevMode:          app.devMode,
 	}
 
 	// Only fetch workout data for authenticated users.

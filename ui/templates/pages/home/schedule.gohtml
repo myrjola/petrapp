@@ -55,6 +55,18 @@
                     outline-offset: 2px;
                 }
 
+                .week-eyebrow .dev-link {
+                    color: var(--clay-4);
+                    text-decoration: none;
+                    padding: var(--size-1) var(--size-2);
+                    border-radius: var(--radius-2);
+                }
+
+                .week-eyebrow .dev-link:focus-visible {
+                    outline: 2px solid var(--color-border-focus);
+                    outline-offset: 2px;
+                }
+
                 .week-title {
                     font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
                     font-weight: var(--font-weight-6);
@@ -80,6 +92,12 @@
                     {{ end }}
                 {{ end }}
                 <span class="eyebrow-rule" aria-hidden="true"></span>
+                {{ if .DevMode }}
+                    <a href="/dev/styleguide" class="dev-link">Styleguide</a>
+                    <span class="dot">·</span>
+                    <a href="/dev/error-ux" class="dev-link">Error UX</a>
+                    <span class="dot">·</span>
+                {{ end }}
                 <a href="/preferences" class="settings-link">Settings</a>
             </div>
             <h1 class="week-title">{{ .Header.Title }}</h1>

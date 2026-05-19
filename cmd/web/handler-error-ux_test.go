@@ -143,6 +143,42 @@ func Test_application_devErrorUX_triggerSystem_surfacesGenericMessage(t *testing
 	}
 }
 
+func Test_application_home_devLinks_devMode(t *testing.T) {
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	doc, err := server.Client().GetDoc(t.Context(), "/")
+	if err != nil {
+		t.Fatalf("Failed to GET /: %v", err)
+	}
+
+	for _, href := range []string{"/dev/styleguide", "/dev/error-ux"} {
+		if doc.Find("a[href='"+href+"']").Length() == 0 {
+			t.Errorf("expected dev-mode home to surface a link to %s", href)
+		}
+	}
+}
+
+func Test_application_home_devLinks_hiddenOutsideDevMode(t *testing.T) {
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), prodLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	doc, err := server.Client().GetDoc(t.Context(), "/")
+	if err != nil {
+		t.Fatalf("Failed to GET /: %v", err)
+	}
+
+	for _, href := range []string{"/dev/styleguide", "/dev/error-ux"} {
+		if doc.Find("a[href='"+href+"']").Length() != 0 {
+			t.Errorf("non-dev home should not surface a link to %s", href)
+		}
+	}
+}
+
 func Test_application_devErrorUX_triggerUnknownKind_returns404(t *testing.T) {
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
