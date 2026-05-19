@@ -29,21 +29,23 @@ type PushScheduler interface {
 // layer and external integrations. One instance per process; safe for
 // concurrent use because each method opens its own DB transaction.
 type Service struct {
-	repos        *repository.Repositories
-	db           *sqlite.Database
-	logger       *slog.Logger
-	openaiAPIKey string
-	scheduler    PushScheduler // nil-safe; methods no-op when nil.
+	repos            *repository.Repositories
+	db               *sqlite.Database
+	logger           *slog.Logger
+	openaiAPIKey     string
+	scheduler        PushScheduler // nil-safe; methods no-op when nil.
+	maintenanceCache *maintenanceCache
 }
 
 // NewService creates a new workout service.
 func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
 	return &Service{
-		repos:        repository.New(db, logger),
-		db:           db,
-		logger:       logger,
-		openaiAPIKey: openaiAPIKey,
-		scheduler:    nil,
+		repos:            repository.New(db, logger),
+		db:               db,
+		logger:           logger,
+		openaiAPIKey:     openaiAPIKey,
+		scheduler:        nil,
+		maintenanceCache: newMaintenanceCache(),
 	}
 }
 

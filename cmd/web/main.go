@@ -202,6 +202,13 @@ const (
 	// sessionLifetime keeps users logged in across mid-workout sessions
 	// so a 7am passkey login doesn't expire before the evening's lift.
 	sessionLifetime = 7 * 24 * time.Hour
+
+	// maintenanceCacheTTL bounds how stale the cached maintenance_mode flag
+	// may be before the next request re-reads it from the database. Toggling
+	// maintenance is an interactive admin action, so a few seconds of lag is
+	// well below human reaction time; Service.SetFeatureFlag invalidates the
+	// cache anyway so the TTL only matters for out-of-band writes.
+	maintenanceCacheTTL = 5 * time.Second
 )
 
 // ensureVAPIDKeys validates the VAPID config: petra and petra-staging require
@@ -272,7 +279,16 @@ func buildNotificationStack(
 		return nil, fmt.Errorf("reload scheduled pushes: %w", err)
 	}
 
+	// Memoise the maintenance_mode feature flag in process when running on
+	// Fly. Every HTTP request consults it via middleware; before caching,
+	// that was one DB read per request. Service.SetFeatureFlag invalidates
+	// the cache, so an admin toggle propagates immediately under normal
+	// operation. Locally and in tests we leave caching off so raw-SQL flag
+	// writes are observed immediately.
 	svc := baseService.WithScheduler(scheduler)
+	if cfg.FlyAppName != "" {
+		svc = svc.WithMaintenanceCacheTTL(maintenanceCacheTTL)
+	}
 
 	lastRequestAt := new(atomic.Int64)
 	lastRequestAt.Store(time.Now().UnixNano())
