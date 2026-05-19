@@ -2,8 +2,73 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 )
+
+// Test_pageTemplate_cachesAndReturnsCloneInProdMode verifies that successive
+// calls in production mode return distinct *template.Template instances (so
+// per-request Funcs() overrides don't bleed across goroutines) while reusing
+// the cached parsed tree (the cache's whole point).
+func Test_pageTemplate_cachesAndReturnsCloneInProdMode(t *testing.T) {
+	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
+	if err != nil {
+		t.Fatalf("resolve template path: %v", err)
+	}
+	app := &application{ //nolint:exhaustruct // only the fields touched by pageTemplate matter here.
+		templateFS:      os.DirFS(templatePath),
+		parsedTemplates: newTemplateCache(),
+		devMode:         false,
+	}
+
+	first, err := app.pageTemplate("home")
+	if err != nil {
+		t.Fatalf("first pageTemplate: %v", err)
+	}
+	second, err := app.pageTemplate("home")
+	if err != nil {
+		t.Fatalf("second pageTemplate: %v", err)
+	}
+	if first == second {
+		t.Errorf("expected pageTemplate to return clones (distinct pointers), got the same instance")
+	}
+	if cached := app.parsedTemplates.get("home"); cached == nil {
+		t.Errorf("expected cache to retain a parsed template for 'home'")
+	}
+
+	// Concurrent access must not race or duplicate work observably.
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() {
+			if _, gerr := app.pageTemplate("home"); gerr != nil {
+				t.Errorf("concurrent pageTemplate: %v", gerr)
+			}
+		})
+	}
+	wg.Wait()
+}
+
+// Test_pageTemplate_skipsCacheInDevMode verifies that dev mode re-parses on
+// every call so template edits are reflected on the next refresh.
+func Test_pageTemplate_skipsCacheInDevMode(t *testing.T) {
+	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
+	if err != nil {
+		t.Fatalf("resolve template path: %v", err)
+	}
+	app := &application{ //nolint:exhaustruct // only the fields touched by pageTemplate matter here.
+		templateFS:      os.DirFS(templatePath),
+		parsedTemplates: newTemplateCache(),
+		devMode:         true,
+	}
+	if _, err = app.pageTemplate("home"); err != nil {
+		t.Fatalf("pageTemplate: %v", err)
+	}
+	if cached := app.parsedTemplates.get("home"); cached != nil {
+		t.Errorf("dev mode should not populate the template cache")
+	}
+}
 
 func Test_formatFloat(t *testing.T) {
 	tests := []struct {

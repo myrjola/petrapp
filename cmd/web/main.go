@@ -34,6 +34,9 @@ type application struct {
 	webAuthnHandler *webauthnhandler.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
+	// parsedTemplates memoizes page templates so renders skip filesystem reads
+	// and re-parsing. Bypassed in devMode so template edits surface on refresh.
+	parsedTemplates *templateCache
 	service         *service.Service
 	flightRecorder  *flightrecorder.Service
 	// devMode is true when running outside the Fly.io production deployment.
@@ -175,6 +178,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
 		templateFS:      os.DirFS(htmlTemplatePath),
+		parsedTemplates: newTemplateCache(),
 		service:         notif.svc,
 		flightRecorder:  flightRecorderService,
 		devMode:         cfg.FlyAppName == "",

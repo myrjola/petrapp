@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
@@ -50,20 +51,71 @@ func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncM
 	}
 }
 
-// pageTemplate returns a template for the given page name.
+// templateCache memoizes parsed page templates so each request doesn't
+// re-read template files from disk and re-parse them. Cloned per render so
+// request-scoped Funcs don't bleed across goroutines.
+type templateCache struct {
+	mu sync.RWMutex
+	m  map[string]*template.Template
+}
+
+func newTemplateCache() *templateCache {
+	return &templateCache{mu: sync.RWMutex{}, m: make(map[string]*template.Template)}
+}
+
+func (c *templateCache) get(name string) *template.Template {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.m[name]
+}
+
+func (c *templateCache) set(name string, t *template.Template) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.m[name] = t
+}
+
+// pageTemplate returns a template ready to execute for the given page name.
 //
 // pageName corresponds to directory inside ui/templates/pages folder. It has to include a template named "page".
 // Shared component templates from ui/templates/components are also parsed and available to every page.
+//
+// In dev mode (no FLY_APP_NAME) templates are parsed fresh on every call so a
+// template edit is reflected on the next refresh. In production the parsed
+// template is cached and a clone is returned so per-request Funcs() overrides
+// don't race with concurrent renders.
 func (app *application) pageTemplate(pageName string) (*template.Template, error) {
-	var err error
+	if app.devMode {
+		return app.parsePageTemplate(pageName)
+	}
+	if cached := app.parsedTemplates.get(pageName); cached != nil {
+		clone, err := cached.Clone()
+		if err != nil {
+			return nil, fmt.Errorf("clone template %s: %w", pageName, err)
+		}
+		return clone, nil
+	}
+	parsed, err := app.parsePageTemplate(pageName)
+	if err != nil {
+		return nil, err
+	}
+	app.parsedTemplates.set(pageName, parsed)
+	clone, err := parsed.Clone()
+	if err != nil {
+		return nil, fmt.Errorf("clone template %s: %w", pageName, err)
+	}
+	return clone, nil
+}
+
+func (app *application) parsePageTemplate(pageName string) (*template.Template, error) {
 	// We need to initialize the FuncMap before parsing the files. These will be overridden in the render function.
-	var t *template.Template
-	t = template.New(pageName).Funcs(app.baseTemplateFuncs())
-	if t, err = t.ParseFS(app.templateFS,
+	t := template.New(pageName).Funcs(app.baseTemplateFuncs())
+	t, err := t.ParseFS(app.templateFS,
 		"base.gohtml",
 		"components/*.gohtml",
 		fmt.Sprintf("pages/%s/*.gohtml", pageName),
-	); err != nil {
+	)
+	if err != nil {
 		return nil, fmt.Errorf("new template: %w", err)
 	}
 	return t, nil
