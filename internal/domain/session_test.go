@@ -409,6 +409,30 @@ func Test_Session_SwapExerciseInSlot_UnknownSlot(t *testing.T) {
 	}
 }
 
+func Test_Session_Slot(t *testing.T) {
+	bench := domain.Exercise{ID: 1, Name: "Bench"} //nolint:exhaustruct // Only ID and Name read.
+	sess := domain.Session{                        //nolint:exhaustruct // Test only sets ExerciseSets.
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				ID: 11, Exercise: bench,
+				Sets: []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+			},
+		},
+	}
+
+	got, ok := sess.Slot(11)
+	if !ok {
+		t.Fatal("Slot(11): ok = false, want true")
+	}
+	if got.ID != 11 || got.Exercise.ID != bench.ID {
+		t.Errorf("Slot(11) = %+v, want slot 11 with exercise %d", got, bench.ID)
+	}
+
+	if _, ok = sess.Slot(99); ok {
+		t.Error("Slot(99): ok = true, want false for unknown slot")
+	}
+}
+
 func Test_Session_WorkoutType(t *testing.T) {
 	sessionWith := func(cats ...domain.Category) domain.Session {
 		sets := make([]domain.ExerciseSet, 0, len(cats))

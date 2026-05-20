@@ -67,18 +67,11 @@ func (s *Service) RecordSet(
 	now := time.Now().UTC()
 
 	err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		for i := range sess.ExerciseSets {
-			if sess.ExerciseSets[i].ID != workoutExerciseID {
-				continue
-			}
-			if setIndex < 0 || setIndex >= len(sess.ExerciseSets[i].Sets) {
-				break
-			}
-			wasComplete = sess.ExerciseSets[i].Sets[setIndex].CompletedAt != nil
-			exercise = sess.ExerciseSets[i].Exercise
+		if slot, ok := sess.Slot(workoutExerciseID); ok && setIndex >= 0 && setIndex < len(slot.Sets) {
+			wasComplete = slot.Sets[setIndex].CompletedAt != nil
+			exercise = slot.Exercise
 			completedSetNumber = setIndex + 1
-			setsTotal = len(sess.ExerciseSets[i].Sets)
-			break
+			setsTotal = len(slot.Sets)
 		}
 		periodization = sess.PeriodizationType
 		sessionIsDeload = sess.IsDeload

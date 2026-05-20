@@ -148,6 +148,19 @@ func (s *Session) findSlot(slotID int) (*ExerciseSet, error) {
 	return nil, ErrSlotNotFound
 }
 
+// Slot returns a copy of the exercise slot identified by slotID; ok is false
+// when no slot matches. It is a read accessor for callers that need to
+// inspect slot state — e.g. the service layer capturing pre-mutation data
+// for rest-push scheduling. Use the mutating aggregate methods to change
+// session state.
+func (s *Session) Slot(slotID int) (ExerciseSet, bool) {
+	slot, err := s.findSlot(slotID)
+	if err != nil {
+		return ExerciseSet{}, false //nolint:exhaustruct // Zero value for the not-found case.
+	}
+	return *slot, true
+}
+
 // MarkWarmupComplete records the warmup completion timestamp for the
 // exercise slot identified by slotID. Returns ErrSlotNotFound if no slot
 // matches.
