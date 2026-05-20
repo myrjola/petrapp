@@ -20,7 +20,7 @@ import (
 // next call to ResolveWeeklySchedule (e.g. on the home page redirect) detects zero
 // sessions and regenerates automatically.
 func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
-	monday := mondayOf(time.Now())
+	monday := domain.MondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6)
 
 	existing, err := s.repos.Sessions.List(ctx, monday)
@@ -47,7 +47,7 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 // If no sessions exist for the week, it generates all scheduled days at once using
 // the weekly planner and persists them in a single transaction.
 func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]domain.Session, error) {
-	monday := mondayOf(time.Now())
+	monday := domain.MondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6)
 
 	existing, err := s.repos.Sessions.List(ctx, monday)
@@ -153,22 +153,6 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (domain.Sessio
 	return sess, nil
 }
 
-// mondayOf returns the Monday of the week containing date as midnight UTC. The
-// calendar date is taken from date's location so the user's local week boundary
-// is preserved, but the result is anchored to UTC so it compares cleanly against
-// session dates loaded from the database (which time.Parse always returns in
-// UTC). Time.Truncate is unsafe here because it rounds to UTC-midnight
-// boundaries from an absolute instant, which can roll local-timezone times back
-// into the previous calendar day.
-func mondayOf(date time.Time) time.Time {
-	y, m, d := date.Date()
-	offset := int(time.Monday - date.Weekday())
-	if offset > 0 {
-		offset = -6
-	}
-	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, offset)
-}
-
 // summarizeWeek walks existing and returns aggregate info needed by
 // StartSession for the lazy-create branch:
 //   - weekCount: number of sessions whose Date falls in monday..sunday.
@@ -239,7 +223,7 @@ func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used m
 // existing generateWeeklyPlan path runs first; only then is the per-date
 // check applied.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
-	monday := mondayOf(date)
+	monday := domain.MondayOf(date)
 	existing, err := s.repos.Sessions.List(ctx, monday)
 	if err != nil {
 		return fmt.Errorf("list sessions for week of %s: %w", date.Format(time.DateOnly), err)

@@ -113,11 +113,11 @@ func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
 }
 
 // nextMonday returns the upcoming Monday at 00:00 UTC. If now is already a
-// Monday, it returns now truncated to the date.
+// Monday, it returns that Monday. Callers pass a UTC instant.
 func nextMonday(now time.Time) time.Time {
-	d := now.UTC().Truncate(24 * time.Hour)
-	for d.Weekday() != time.Monday {
-		d = d.AddDate(0, 0, 1)
+	monday := domain.MondayOf(now)
+	if now.Weekday() == time.Monday {
+		return monday
 	}
-	return d
+	return monday.AddDate(0, 0, 7)
 }

@@ -462,7 +462,7 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 	// Sunday never matches any d above, so it falls through with the full count
 	// of scheduled Mon..Sat days — exactly the index workoutDays[i==len-1] would
 	// have produced for it.
-	monday := mondayForDate(date)
+	monday := MondayOf(date)
 	firstPT := wp.firstSessionPeriodizationType(monday)
 	pt := nextPeriodizationType(firstPT, idx)
 
@@ -487,9 +487,14 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 	}, nil
 }
 
-// mondayForDate returns the Monday of the week containing date, in UTC,
-// using calendar-date arithmetic to avoid timezone-related rollovers.
-func mondayForDate(date time.Time) time.Time {
+// MondayOf returns the Monday of the week containing date, at 00:00 UTC.
+// The calendar date is taken from date's own location so the user's local
+// week boundary is preserved, but the result is anchored to UTC so it
+// compares cleanly against session dates loaded from the database (which
+// time.Parse always returns in UTC). time.Truncate is unsafe here because
+// it rounds to UTC-midnight boundaries from an absolute instant, which can
+// roll local-timezone times back into the previous calendar day.
+func MondayOf(date time.Time) time.Time {
 	y, m, d := date.Date()
 	offset := int(time.Monday - date.Weekday())
 	if offset > 0 {

@@ -15,7 +15,8 @@ and `internal/contexthelpers`. It does NOT depend on `cmd/web` or
 - **`Service` struct + `NewService` constructor.** One monolithic struct
   that the web app references as `app.service` (`*service.Service`).
 - **Session orchestration** (`sessions.go`): start/complete/feedback,
-  weekly plan generation, schedule resolution, the `mondayOf` helper.
+  weekly plan generation, schedule resolution. Week-start arithmetic
+  uses `domain.MondayOf`.
 - **Set mutations** (`sets.go`): all `Session.Update`-via-aggregate
   calls that change recorded set data.
 - **Exercise CRUD + slot ops** (`exercises.go`): list/get/update,
