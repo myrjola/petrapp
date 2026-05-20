@@ -39,6 +39,12 @@
                     background: linear-gradient(to right, var(--stone-3), transparent);
                 }
 
+                /* Shared element with the exercise-set page overline: the date
+                   prefix stays continuous across the page transition. */
+                .overline-date {
+                    view-transition-name: overline-date;
+                }
+
                 .workout-title {
                     font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
                     font-weight: var(--font-weight-6);
@@ -115,7 +121,9 @@
 
         <div class="workout-body stack">
             <header class="workout-header">
-                <div class="workout-overline">{{ .Date.Format "Mon · Jan 2" }}</div>
+                <div class="workout-overline">
+                    <span class="overline-date">{{ .Date.Format "Mon · Jan 2" }}</span>
+                </div>
                 <h1 class="workout-title">{{ .WorkoutTypeName }}</h1>
                 <div class="workout-meta">
                     <div class="workout-progress">

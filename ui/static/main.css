@@ -539,6 +539,20 @@
     }
 }
 
+@keyframes overline-suffix-in {
+    from {
+        opacity: 0;
+        translate: 0.5rem 0;
+    }
+}
+
+@keyframes overline-suffix-out {
+    to {
+        opacity: 0;
+        translate: 0.5rem 0;
+    }
+}
+
 @keyframes sheet-dialog-slide-up {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
@@ -569,6 +583,12 @@ html:active-view-transition-type(forward) {
     &::view-transition-new(page) {
         animation-name: slide-in;
     }
+
+    /* The "· Set N of M" suffix has no counterpart on the workout page,
+       so it slides in on its own rather than fading by UA default. */
+    &::view-transition-new(overline-suffix) {
+        animation: overline-suffix-in var(--duration-3) var(--ease-out-quiet) both;
+    }
 }
 
 html:active-view-transition-type(backward) {
@@ -580,6 +600,10 @@ html:active-view-transition-type(backward) {
     &::view-transition-new(page) {
         animation-name: grow;
         transform-origin: 100% 50%;
+    }
+
+    &::view-transition-old(overline-suffix) {
+        animation: overline-suffix-out var(--duration-3) var(--ease-out-quiet) both;
     }
 }
 
@@ -635,7 +659,13 @@ html:active-view-transition-type(backward) {
     }
     ::view-transition-group(page),
     ::view-transition-old(page),
-    ::view-transition-new(page) {
+    ::view-transition-new(page),
+    ::view-transition-group(overline-date),
+    ::view-transition-old(overline-date),
+    ::view-transition-new(overline-date),
+    ::view-transition-group(overline-suffix),
+    ::view-transition-old(overline-suffix),
+    ::view-transition-new(overline-suffix) {
         animation-duration: 0.001ms !important;
     }
 }
