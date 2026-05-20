@@ -40,7 +40,7 @@ func setupTestReposWithDB(t *testing.T) (context.Context, *sqlite.Database, *rep
 	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
-	return ctx, db, repository.New(db, logger)
+	return ctx, db, repository.New(db)
 }
 
 // seedWorkoutExercise inserts a workout_session and workout_exercise row for the

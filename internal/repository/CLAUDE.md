@@ -13,9 +13,8 @@ template logic, no business orchestration.
   `PushSubscriptionRepository`, `ScheduledPushRepository`. Implementations
   are unexported (`sqliteSessionRepository`, etc.).
 - **The `Repositories` composite struct** plus the single public
-  constructor `New(db *sqlite.Database, logger *slog.Logger) *Repositories`
-  that wires everything together (notably injecting `ExerciseRepository`
-  into `SessionRepository` for hydration).
+  constructor `New(db *sqlite.Database) *Repositories` that wires every
+  repository together.
 - **Shared helpers** in `shared.go`: `parseTimestamp`, `formatTimestamp`,
   `formatDate`, the `baseRepository` mixin, and the timestamp/date format
   constants.

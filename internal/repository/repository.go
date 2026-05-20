@@ -7,7 +7,6 @@ package repository
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -30,8 +29,7 @@ type Repositories struct {
 // New constructs all seven SQLite-backed repositories. SessionRepository
 // hydrates ExerciseSet.Exercise inline by joining `exercises` and batching
 // muscle-group lookups, so it no longer depends on ExerciseRepository.
-func New(db *sqlite.Database, logger *slog.Logger) *Repositories {
-	_ = logger // reserved for future per-repo logging; unused today.
+func New(db *sqlite.Database) *Repositories {
 	prefs := newSQLitePreferencesRepository(db)
 	muscleTargets := newSQLiteMuscleGroupTargetRepository(db)
 	featureFlags := newSQLiteFeatureFlagRepository(db)

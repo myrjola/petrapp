@@ -40,7 +40,7 @@ type Service struct {
 // NewService creates a new workout service.
 func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
 	return &Service{
-		repos:            repository.New(db, logger),
+		repos:            repository.New(db),
 		db:               db,
 		logger:           logger,
 		openaiAPIKey:     openaiAPIKey,
