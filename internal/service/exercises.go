@@ -92,29 +92,25 @@ func (s *Service) SwapExercise(
 	return nil
 }
 
-// findHistoricalSets retrieves set data from the most recent usage of an exercise.
-// Aggregates with no sets are skipped — they exist for exercises whose historical
-// exercise_sets rows were dropped by the time-based premigration but whose
-// workout_exercise slot survived. Returns nil when no usable history is found.
-// Sets are returned as-is; domain.BuildSetsForAdd reads only WeightKg from them.
+// findHistoricalSets retrieves set data from the most recent usage of an
+// exercise within the last three months, excluding date's own session.
+// ListSetsForExerciseSince inner-joins exercise_sets, so dates whose slot
+// survived but whose sets were dropped (time-based premigration) never
+// appear — no empty-set entries to skip. Returns nil when no usable history
+// is found. Sets are returned as-is; domain.BuildSetsForAdd reads only
+// WeightKg from them.
 func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]domain.Set, error) {
 	threeMonthsAgo := date.AddDate(0, -3, 0)
-	history, err := s.repos.Sessions.List(ctx, threeMonthsAgo)
+	histories, err := s.repos.Sessions.ListSetsForExerciseSince(ctx, exerciseID, threeMonthsAgo)
 	if err != nil {
-		return nil, fmt.Errorf("get workout history: %w", err)
+		return nil, fmt.Errorf("list sets for exercise: %w", err)
 	}
 
-	for _, session := range history {
-		if session.Date.Equal(date) {
+	for _, h := range histories {
+		if h.Date.Equal(date) {
 			continue
 		}
-
-		for _, exerciseSet := range session.ExerciseSets {
-			if exerciseSet.Exercise.ID != exerciseID || len(exerciseSet.Sets) == 0 {
-				continue
-			}
-			return exerciseSet.Sets, nil
-		}
+		return h.Sets, nil
 	}
 
 	return nil, nil
