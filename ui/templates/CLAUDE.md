@@ -489,7 +489,7 @@ can drop the border entirely.
 ## Text overflow & localization-readiness
 
 Layouts must survive text longer than today's English strings. The app is
-not localized yet, but German / Finnish / Russian routinely run 30-50%
+not localized yet, but German / Finnish / Russian routinely run 30–50%
 longer — a layout validated only against compact English WILL break on
 translation. Build the resilience in now.
 
