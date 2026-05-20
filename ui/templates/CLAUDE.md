@@ -516,10 +516,11 @@ Pick exactly one, deliberately:
   anywhere`. Use `anywhere`, not `break-word`: only `anywhere` shrinks
   min-content, so only `anywhere` also fixes grid/flex track sizing. Add
   `hyphens: auto` for prose.
-- **Truncate** — `text-overflow: ellipsis` or `-webkit-line-clamp`, only
-  for secondary, repeating text whose full value is reachable elsewhere
-  (a `title`, an `aria-label`, a detail view). Never silently truncate a
-  primary label.
+- **Truncate** — `text-overflow: ellipsis` (inert without `overflow:
+  hidden` plus `white-space: nowrap` on the same element) or
+  `-webkit-line-clamp`, only for secondary, repeating text whose full
+  value is reachable elsewhere (a `title`, an `aria-label`, a detail
+  view). Never silently truncate a primary label.
 
 ### Don't let two flexible elements fight for one row
 
