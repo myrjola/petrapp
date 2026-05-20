@@ -486,6 +486,59 @@ can drop the border entirely.
   colour (`--stone-9` or a two-tone `outline` + `box-shadow`). Don't
   rely on a light-tone outline against a similarly-toned background.
 
+## Text overflow & localization-readiness
+
+Layouts must survive text longer than today's English strings. The app is
+not localized yet, but German / Finnish / Russian routinely run 30-50%
+longer — a layout validated only against compact English WILL break on
+translation. Build the resilience in now.
+
+### Let flex/grid children shrink
+
+Flex and grid items default to `min-width: auto` (their min-content width)
+and refuse to shrink below their longest word. This is the single most
+common cause of text bleeding past a container.
+
+- Use `minmax(0, 1fr)` instead of a bare `1fr` for grid tracks that should
+  yield. A bare `1fr` is `minmax(auto, 1fr)` — it will not shrink.
+- Put `min-width: 0` on text-bearing flex children.
+- Apply `justify-self: end` / `margin-inline-start: auto` only *after* the
+  element can shrink — otherwise it pushes itself off the edge.
+
+### Give every text node one overflow strategy
+
+Pick exactly one, deliberately:
+
+- **Wrap** (default, preferred) — no fixed height; if the row holds
+  competing items, give the row `flex-wrap: wrap` so the lower-priority
+  item drops to its own line.
+- **Break** unbreakable tokens (long compounds, URLs) — `overflow-wrap:
+  anywhere`. Use `anywhere`, not `break-word`: only `anywhere` shrinks
+  min-content, so only `anywhere` also fixes grid/flex track sizing. Add
+  `hyphens: auto` for prose.
+- **Truncate** — `text-overflow: ellipsis` or `-webkit-line-clamp`, only
+  for secondary, repeating text whose full value is reachable elsewhere
+  (a `title`, an `aria-label`, a detail view). Never silently truncate a
+  primary label.
+
+### Don't let two flexible elements fight for one row
+
+Two elements that both want horizontal space will collide. Either let the
+row wrap, or let the lower-priority element move to its own line. No fixed
+`width` / `height` on text containers — `min-*` plus padding is fine; a
+size fitted to an English label breaks in other languages.
+
+### Test for growth
+
+Budget roughly +40% length. Check new components at 320px width with a
+deliberately long label, not just the English string. Keep source labels
+short — but a short label is never a substitute for a layout that
+survives a long one.
+
+Worked example: `pages/home/day-cards.gohtml` — the day name and action
+share a `flex-wrap: wrap` row (`.day-headline`), so a long action drops
+to its own line instead of bleeding past the card.
+
 ## Template Data Preparation
 
 Templates should range, format primitives, and conditionally render — nothing
