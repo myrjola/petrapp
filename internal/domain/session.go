@@ -69,6 +69,17 @@ func (es ExerciseSet) CompletedSetCount() int {
 	return n
 }
 
+// setAt returns a pointer to the set at setIndex, or ErrSetIndexOutOfBounds
+// when setIndex is out of range. The value receiver still yields a usable
+// pointer: es.Sets shares its backing array with the caller's slot, so
+// mutations through the returned pointer land on the original set.
+func (es ExerciseSet) setAt(setIndex int) (*Set, error) {
+	if setIndex < 0 || setIndex >= len(es.Sets) {
+		return nil, ErrSetIndexOutOfBounds
+	}
+	return &es.Sets[setIndex], nil
+}
+
 // ExerciseProgressEntry represents the sets performed for an exercise on a specific date.
 type ExerciseProgressEntry struct {
 	Date time.Time
@@ -125,17 +136,28 @@ func (s *Session) SetDifficulty(rating int) error {
 	return nil
 }
 
+// findSlot returns a pointer to the exercise slot identified by slotID, or
+// ErrSlotNotFound when no slot matches. The pointer aliases into
+// ExerciseSets so callers can mutate the slot in place.
+func (s *Session) findSlot(slotID int) (*ExerciseSet, error) {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID == slotID {
+			return &s.ExerciseSets[i], nil
+		}
+	}
+	return nil, ErrSlotNotFound
+}
+
 // MarkWarmupComplete records the warmup completion timestamp for the
 // exercise slot identified by slotID. Returns ErrSlotNotFound if no slot
 // matches.
 func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID == slotID {
-			s.ExerciseSets[i].WarmupCompletedAt = &now
-			return nil
-		}
+	slot, err := s.findSlot(slotID)
+	if err != nil {
+		return err
 	}
-	return ErrSlotNotFound
+	slot.WarmupCompletedAt = &now
+	return nil
 }
 
 // RecordSet records the completion of a single set: signal (perceived
@@ -149,51 +171,48 @@ func (s *Session) RecordSet(
 	completedValue int,
 	now time.Time,
 ) error {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID != slotID {
-			continue
-		}
-		if setIndex < 0 || setIndex >= len(s.ExerciseSets[i].Sets) {
-			return ErrSetIndexOutOfBounds
-		}
-		set := &s.ExerciseSets[i].Sets[setIndex]
-		if signal != nil {
-			sigCopy := *signal
-			set.Signal = &sigCopy
-		} else {
-			set.Signal = nil
-		}
-		if weightKg != nil {
-			w := *weightKg
-			set.WeightKg = &w
-		}
-		v := completedValue
-		set.CompletedValue = &v
-		t := now
-		set.CompletedAt = &t
-		return nil
+	slot, err := s.findSlot(slotID)
+	if err != nil {
+		return err
 	}
-	return ErrSlotNotFound
+	set, err := slot.setAt(setIndex)
+	if err != nil {
+		return err
+	}
+	if signal != nil {
+		sigCopy := *signal
+		set.Signal = &sigCopy
+	} else {
+		set.Signal = nil
+	}
+	if weightKg != nil {
+		w := *weightKg
+		set.WeightKg = &w
+	}
+	v := completedValue
+	set.CompletedValue = &v
+	t := now
+	set.CompletedAt = &t
+	return nil
 }
 
 // UpdateCompletedValue records the actual reps (or seconds for time-based)
 // achieved on a set, and stamps the completion time. Returns
 // ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
 func (s *Session) UpdateCompletedValue(slotID, setIndex, value int, now time.Time) error {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID != slotID {
-			continue
-		}
-		if setIndex < 0 || setIndex >= len(s.ExerciseSets[i].Sets) {
-			return ErrSetIndexOutOfBounds
-		}
-		v := value
-		s.ExerciseSets[i].Sets[setIndex].CompletedValue = &v
-		t := now
-		s.ExerciseSets[i].Sets[setIndex].CompletedAt = &t
-		return nil
+	slot, err := s.findSlot(slotID)
+	if err != nil {
+		return err
 	}
-	return ErrSlotNotFound
+	set, err := slot.setAt(setIndex)
+	if err != nil {
+		return err
+	}
+	v := value
+	set.CompletedValue = &v
+	t := now
+	set.CompletedAt = &t
+	return nil
 }
 
 // AddExercise appends a new exercise slot to the session. The slot's stable
@@ -226,33 +245,30 @@ func (s *Session) AddExercise(ex Exercise, sets []Set) (int, error) {
 // does not apply to the new one. Returns ErrSlotNotFound when no slot
 // matches.
 func (s *Session) SwapExerciseInSlot(slotID int, newExercise Exercise, sets []Set) error {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID != slotID {
-			continue
-		}
-		s.ExerciseSets[i].Exercise = newExercise
-		s.ExerciseSets[i].Sets = sets
-		s.ExerciseSets[i].WarmupCompletedAt = nil
-		return nil
+	slot, err := s.findSlot(slotID)
+	if err != nil {
+		return err
 	}
-	return ErrSlotNotFound
+	slot.Exercise = newExercise
+	slot.Sets = sets
+	slot.WarmupCompletedAt = nil
+	return nil
 }
 
 // UpdateSetWeight overwrites the weight on a single set within a slot.
 // Returns ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
 func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID != slotID {
-			continue
-		}
-		if setIndex < 0 || setIndex >= len(s.ExerciseSets[i].Sets) {
-			return ErrSetIndexOutOfBounds
-		}
-		w := weightKg
-		s.ExerciseSets[i].Sets[setIndex].WeightKg = &w
-		return nil
+	slot, err := s.findSlot(slotID)
+	if err != nil {
+		return err
 	}
-	return ErrSlotNotFound
+	set, err := slot.setAt(setIndex)
+	if err != nil {
+		return err
+	}
+	w := weightKg
+	set.WeightKg = &w
+	return nil
 }
 
 // WorkoutType derives the muscle-split category for the session from the
