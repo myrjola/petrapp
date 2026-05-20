@@ -158,11 +158,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 
 	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
 		newSets := domain.BuildSetsForAdd(exercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
-		_, addErr := sess.AddExercise(exercise, newSets)
-		if addErr != nil {
-			return fmt.Errorf("add exercise to session: %w", addErr)
-		}
-		return nil
+		return sess.AddExercise(exercise, newSets)
 	})
 	if err != nil {
 		return 0, fmt.Errorf("update session with new exercise: %w", err)

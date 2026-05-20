@@ -216,17 +216,16 @@ func (s *Session) UpdateCompletedValue(slotID, setIndex, value int, now time.Tim
 }
 
 // AddExercise appends a new exercise slot to the session. The slot's stable
-// ID is left as 0 — the repository assigns it at insert time, then mirrors
-// the assigned ID back to the caller. Returns ErrExerciseAlreadyInSession
-// when an existing slot already references the same Exercise.ID.
+// ID is left as 0 — the repository assigns the workout_exercise.id at insert
+// time. Returns ErrExerciseAlreadyInSession when an existing slot already
+// references the same Exercise.ID.
 //
-// The returned slotID is always 0 from the aggregate's POV; the actual
-// workout_exercise.id is determined by SQLite. Service code reads the new
-// ID by re-fetching the session after the Update closure commits.
-func (s *Session) AddExercise(ex Exercise, sets []Set) (int, error) {
+// Service code that needs the assigned ID re-fetches the session after the
+// Update closure commits; the aggregate itself never observes it.
+func (s *Session) AddExercise(ex Exercise, sets []Set) error {
 	for _, existing := range s.ExerciseSets {
 		if existing.Exercise.ID == ex.ID {
-			return 0, ErrExerciseAlreadyInSession
+			return ErrExerciseAlreadyInSession
 		}
 	}
 	s.ExerciseSets = append(s.ExerciseSets, ExerciseSet{ //nolint:exhaustruct // ID set by repo; WarmupCompletedAt nil.
@@ -234,7 +233,7 @@ func (s *Session) AddExercise(ex Exercise, sets []Set) (int, error) {
 		Exercise: ex,
 		Sets:     sets,
 	})
-	return 0, nil
+	return nil
 }
 
 // SwapExerciseInSlot replaces the exercise occupying the slot identified by

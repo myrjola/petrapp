@@ -332,12 +332,9 @@ func Test_Session_AddExercise_Append(t *testing.T) {
 		},
 	}
 
-	slotID, err := sess.AddExercise(squat, []domain.Set{{TargetValue: 5}}) //nolint:exhaustruct // Other Set fields nil.
+	err := sess.AddExercise(squat, []domain.Set{{TargetValue: 5}}) //nolint:exhaustruct // Other Set fields nil.
 	if err != nil {
 		t.Fatalf("AddExercise: %v", err)
-	}
-	if slotID != 0 {
-		t.Errorf("slotID = %d, want 0 (repo will assign on insert)", slotID)
 	}
 	if len(sess.ExerciseSets) != 2 {
 		t.Fatalf("ExerciseSets length = %d, want 2", len(sess.ExerciseSets))
@@ -362,7 +359,7 @@ func Test_Session_AddExercise_DuplicateExerciseID_ReturnsErr(t *testing.T) {
 		},
 	}
 
-	_, err := sess.AddExercise(bench, nil)
+	err := sess.AddExercise(bench, nil)
 	if !errors.Is(err, domain.ErrExerciseAlreadyInSession) {
 		t.Fatalf("got %v, want ErrExerciseAlreadyInSession", err)
 	}
