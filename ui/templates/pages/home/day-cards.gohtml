@@ -10,10 +10,9 @@
 
                 .day {
                     position: relative;
-                    display: grid;
-                    grid-template-columns: 1fr auto;
-                    column-gap: var(--size-3);
-                    row-gap: var(--size-2);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-2);
                     padding: var(--size-4);
                     border-radius: var(--radius-3);
                     background: var(--color-surface-elevated);
@@ -24,9 +23,8 @@
                         border-color var(--duration-2) var(--ease-out-quiet);
                 }
 
-                /* Top row: mono date overline + right-aligned status meta. Spans full width. */
+                /* Top row: mono date overline + right-aligned status meta. */
                 .day-overline {
-                    grid-column: 1 / -1;
                     display: flex;
                     align-items: baseline;
                     gap: var(--size-2);
@@ -44,10 +42,20 @@
                     color: var(--color-text-secondary);
                 }
 
+                /* Day name + action share a wrapping row: side by side when they
+                   fit, the action drops to its own line when the combined width
+                   would bleed past the card edge. */
+                .day-headline {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: var(--size-2) var(--size-3);
+                }
+
                 /* Serif day name — the editorial anchor. */
                 .day-name {
-                    grid-column: 1;
-                    align-self: center;
+                    min-width: 0;
                     margin: 0;
                     font-family: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
                     font-weight: var(--font-weight-6);
@@ -58,18 +66,15 @@
                 }
 
                 .day-action {
-                    grid-column: 2;
-                    align-self: center;
-                    justify-self: end;
+                    min-width: 0;
                 }
 
                 .day-action form {
                     margin: 0;
                 }
 
-                /* Slim sub-row: 3px rule + tiny mono caption. Spans full width. */
+                /* Slim sub-row: 3px rule + tiny mono caption. */
                 .day-progress {
-                    grid-column: 1 / -1;
                     display: flex;
                     align-items: center;
                     gap: var(--size-3);
@@ -240,27 +245,29 @@
                     <span class="day-status">{{ .StatusLabel }}</span>
                 </div>
 
-                <h2 class="day-name">{{ .Name }}</h2>
+                <div class="day-headline">
+                    <h2 class="day-name">{{ .Name }}</h2>
 
-                {{ if .Action }}
-                    <div class="day-action">
-                        {{ if eq .Status "today" }}
-                            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                                <button type="submit" class="btn day-cta">{{ .Action.Label }}</button>
-                            </form>
-                        {{ else if .Action.StartWorkout }}
-                            <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                                <button type="submit" class="day-text-action">
+                    {{ if .Action }}
+                        <div class="day-action">
+                            {{ if eq .Status "today" }}
+                                <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                                    <button type="submit" class="btn day-cta">{{ .Action.Label }}</button>
+                                </form>
+                            {{ else if .Action.StartWorkout }}
+                                <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
+                                    <button type="submit" class="day-text-action">
+                                        {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
+                                    </button>
+                                </form>
+                            {{ else }}
+                                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="day-text-action">
                                     {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
-                                </button>
-                            </form>
-                        {{ else }}
-                            <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="day-text-action">
-                                {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
-                            </a>
-                        {{ end }}
-                    </div>
-                {{ end }}
+                                </a>
+                            {{ end }}
+                        </div>
+                    {{ end }}
+                </div>
 
                 {{ if .ShouldShowProgress }}
                     <div class="day-progress">
