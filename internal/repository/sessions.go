@@ -31,16 +31,45 @@ func newSQLiteSessionRepository(db *sqlite.Database) *sqliteSessionRepository {
 	}
 }
 
-func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time) (_ []domain.Session, err error) {
+// List returns the user's sessions on or after sinceDate, newest first, each
+// fully hydrated. Exercise slots for the entire range are loaded with a single
+// batched query (plus one muscle-group query), so List issues three queries
+// total regardless of how many sessions it returns — see loadExerciseSetsSince.
+func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time) ([]domain.Session, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
-	sinceDateStr := formatDate(sinceDate)
 
+	sessions, err := r.listSessionRows(ctx, userID, sinceDate)
+	if err != nil {
+		return nil, err
+	}
+	if len(sessions) == 0 {
+		return sessions, nil
+	}
+
+	setsByDate, err := r.loadExerciseSetsSince(ctx, r.db.ReadOnly, userID, sinceDate)
+	if err != nil {
+		return nil, err
+	}
+	for i := range sessions {
+		sessions[i].ExerciseSets = setsByDate[formatDate(sessions[i].Date)]
+	}
+	return sessions, nil
+}
+
+// listSessionRows scans the workout_sessions scalar rows for a user on or
+// after sinceDate, newest first. ExerciseSets is left nil — List hydrates it
+// in a single batched follow-up query.
+func (r *sqliteSessionRepository) listSessionRows(
+	ctx context.Context,
+	userID int,
+	sinceDate time.Time,
+) (_ []domain.Session, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
 		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date >= ?
 		ORDER BY workout_date DESC`,
-		userID, sinceDateStr)
+		userID, formatDate(sinceDate))
 	if err != nil {
 		return nil, fmt.Errorf("query workout history: %w", err)
 	}
@@ -72,12 +101,6 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 		if err != nil {
 			return nil, err
 		}
-		var exerciseSets []domain.ExerciseSet
-		exerciseSets, err = r.loadExerciseSets(ctx, r.db.ReadOnly, userID, session.Date)
-		if err != nil {
-			return nil, err
-		}
-		session.ExerciseSets = exerciseSets
 		sessions = append(sessions, session)
 	}
 	if err = rows.Err(); err != nil {
@@ -296,7 +319,8 @@ func parseSessionRow(
 	return session, nil
 }
 
-// loadExerciseSetsRow holds one row of the loadExerciseSets join. Exercise
+// loadExerciseSetsRow holds one scanned row of the workout_exercise /
+// exercise_sets / exercises join consumed by scanExerciseSetRows. Exercise
 // columns join from `exercises` so we don't issue a per-slot follow-up
 // query for the base exercise.
 type loadExerciseSetsRow struct {
@@ -318,26 +342,20 @@ type loadExerciseSetsRow struct {
 	repMax                 sql.NullInt64
 }
 
-// loadExerciseSets fetches all exercise slots for a session, including ones
-// with no sets yet (e.g. just-swapped exercises). The driving table is
-// workout_exercise so empty slots still appear; sets are LEFT-JOINed in.
-//
-// The base exercise definition is joined in from `exercises` so we don't
-// fire a separate SELECT per slot. Muscle-group hydration is batched into a
-// single follow-up query over the deduped exercise IDs, replacing the
-// per-slot N+1 against `exercise_muscle_groups`. A session with N exercise
-// slots now costs 2 queries (sets+exercise join, muscle groups by IN list)
-// instead of the prior 1 + 2N.
+// loadExerciseSets fetches all exercise slots for a single session, including
+// ones with no sets yet (e.g. just-swapped exercises). The driving table is
+// workout_exercise so empty slots still appear; sets are LEFT-JOINed in and
+// the base exercise definition is JOINed from `exercises`. Muscle groups are
+// hydrated in one follow-up query. Used by Get, including inside the Update
+// transaction, where a single-date point read is what we want.
 func (r *sqliteSessionRepository) loadExerciseSets(
 	ctx context.Context,
 	q queryer,
 	userID int,
 	date time.Time,
 ) (_ []domain.ExerciseSet, err error) {
-	dateStr := formatDate(date)
-
 	rows, err := q.QueryContext(ctx, `
-		SELECT we.id, we.exercise_id, we.warmup_completed_at,
+		SELECT we.workout_date, we.id, we.exercise_id, we.warmup_completed_at,
 		       es.set_number, es.weight_kg, es.target_value,
 		       es.completed_value, es.completed_at, es.signal,
 		       e.name, e.category, e.exercise_type, e.description_markdown,
@@ -347,7 +365,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		JOIN exercises e ON e.id = we.exercise_id
 		WHERE we.workout_user_id = ? AND we.workout_date = ?
 		ORDER BY we.id, es.set_number`,
-		userID, dateStr)
+		userID, formatDate(date))
 	if err != nil {
 		return nil, fmt.Errorf("query exercise sets: %w", err)
 	}
@@ -357,31 +375,106 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		}
 	}()
 
-	var exerciseSets []domain.ExerciseSet
-	var current *domain.ExerciseSet
+	slots, _, err := scanExerciseSetRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if err = hydrateMuscleGroups(ctx, q, slots); err != nil {
+		return nil, err
+	}
+	return slots, nil
+}
+
+// loadExerciseSetsSince fetches every exercise slot (with its sets) for the
+// user's sessions on or after sinceDate in one query and returns them grouped
+// by workout-date string. Muscle groups are hydrated in a single further
+// query across all slots. This is the batched equivalent of loadExerciseSets
+// used by List: the whole date range costs this one query plus one muscle-
+// group query, replacing the prior per-session 1 + 2N N+1.
+func (r *sqliteSessionRepository) loadExerciseSetsSince(
+	ctx context.Context,
+	q queryer,
+	userID int,
+	sinceDate time.Time,
+) (_ map[string][]domain.ExerciseSet, err error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT we.workout_date, we.id, we.exercise_id, we.warmup_completed_at,
+		       es.set_number, es.weight_kg, es.target_value,
+		       es.completed_value, es.completed_at, es.signal,
+		       e.name, e.category, e.exercise_type, e.description_markdown,
+		       e.default_starting_seconds, e.rep_min, e.rep_max
+		FROM workout_exercise we
+		LEFT JOIN exercise_sets es ON es.workout_exercise_id = we.id
+		JOIN exercises e ON e.id = we.exercise_id
+		WHERE we.workout_user_id = ? AND we.workout_date >= ?
+		ORDER BY we.workout_date DESC, we.id, es.set_number`,
+		userID, formatDate(sinceDate))
+	if err != nil {
+		return nil, fmt.Errorf("query exercise sets: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
+
+	slots, dates, err := scanExerciseSetRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if err = hydrateMuscleGroups(ctx, q, slots); err != nil {
+		return nil, err
+	}
+
+	byDate := make(map[string][]domain.ExerciseSet)
+	for i := range slots {
+		byDate[dates[i]] = append(byDate[dates[i]], slots[i])
+	}
+	return byDate, nil
+}
+
+// scanExerciseSetRows consumes the workout_exercise / exercise_sets /
+// exercises join (with we.workout_date as the first selected column) into
+// exercise slots. It returns the slots and a parallel slice of their
+// workout-date strings; consecutive rows sharing a workout_exercise.id
+// collapse into one slot. Muscle groups are left empty for the caller to
+// hydrate in a single batched query.
+func scanExerciseSetRows(rows *sql.Rows) ([]domain.ExerciseSet, []string, error) {
+	var (
+		slots       []domain.ExerciseSet
+		dates       []string
+		current     *domain.ExerciseSet
+		currentDate string
+		err         error
+	)
 	flush := func() {
 		if current != nil {
-			exerciseSets = append(exerciseSets, *current)
+			slots = append(slots, *current)
+			dates = append(dates, currentDate)
 		}
 	}
 
 	for rows.Next() {
-		var row loadExerciseSetsRow
-		if err = rows.Scan(&row.weID, &row.exerciseID, &row.warmupCompletedAtStr,
+		var (
+			workoutDateStr string
+			row            loadExerciseSetsRow
+		)
+		if err = rows.Scan(&workoutDateStr, &row.weID, &row.exerciseID, &row.warmupCompletedAtStr,
 			&row.setNumber, &row.weightKg, &row.targetValue,
 			&row.completedValue, &row.completedAtStr, &row.signalStr,
 			&row.exerciseName, &row.exerciseCategory, &row.exerciseType, &row.exerciseDescription,
 			&row.defaultStartingSeconds, &row.repMin, &row.repMax); err != nil {
-			return nil, fmt.Errorf("scan exercise set: %w", err)
+			return nil, nil, fmt.Errorf("scan exercise set: %w", err)
 		}
 
 		if current == nil || row.weID != current.ID {
 			flush()
 			started, startErr := startExerciseSet(row)
 			if startErr != nil {
-				return nil, startErr
+				return nil, nil, startErr
 			}
 			current = &started
+			currentDate = workoutDateStr
 		}
 
 		// LEFT JOIN can yield a workout_exercise row with no sets (set_number IS NULL).
@@ -390,21 +483,16 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		}
 		set, parseErr := buildSet(row)
 		if parseErr != nil {
-			return nil, parseErr
+			return nil, nil, parseErr
 		}
 		current.Sets = append(current.Sets, set)
 	}
 	flush()
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows error: %w", err)
+		return nil, nil, fmt.Errorf("rows error: %w", err)
 	}
-
-	// Hydrate muscle groups in one query keyed on the deduped exercise IDs.
-	if err = hydrateMuscleGroups(ctx, q, exerciseSets); err != nil {
-		return nil, err
-	}
-	return exerciseSets, nil
+	return slots, dates, nil
 }
 
 // hydrateMuscleGroups fetches primary/secondary muscle groups for every

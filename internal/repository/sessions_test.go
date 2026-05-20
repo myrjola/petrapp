@@ -74,6 +74,65 @@ func TestSessionRepository_CreateBatchThenGetHydratesExercise(t *testing.T) {
 	}
 }
 
+func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
+	ctx, repos := setupTestRepos(t)
+
+	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
+	if err != nil {
+		t.Fatalf("Create exercise: %v", err)
+	}
+	earlier := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	later := time.Date(2026, 5, 13, 0, 0, 0, 0, time.UTC)
+	mkSession := func(day time.Time) domain.Session {
+		return domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
+			Date:              day,
+			PeriodizationType: domain.PeriodizationStrength,
+			ExerciseSets: []domain.ExerciseSet{
+				{ //nolint:exhaustruct // ID assigned by DB; WarmupCompletedAt nil.
+					Exercise: exercise,
+					Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
+				},
+			},
+		}
+	}
+	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{
+		mkSession(earlier), mkSession(later),
+	}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+
+	got, err := repos.Sessions.List(ctx, earlier)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("want 2 sessions, got %d", len(got))
+	}
+	// Newest first.
+	if !got[0].Date.Equal(later) || !got[1].Date.Equal(earlier) {
+		t.Fatalf("want dates [%s, %s], got [%s, %s]",
+			later.Format(time.DateOnly), earlier.Format(time.DateOnly),
+			got[0].Date.Format(time.DateOnly), got[1].Date.Format(time.DateOnly))
+	}
+	// The batched query must hydrate every session, not just the first.
+	for _, sess := range got {
+		label := sess.Date.Format(time.DateOnly)
+		if len(sess.ExerciseSets) != 1 {
+			t.Fatalf("session %s: want 1 ExerciseSet, got %d", label, len(sess.ExerciseSets))
+		}
+		ex := sess.ExerciseSets[0].Exercise
+		if ex.ID != exercise.ID || ex.Name != exercise.Name {
+			t.Errorf("session %s: exercise not hydrated: %+v", label, ex)
+		}
+		if len(ex.PrimaryMuscleGroups) != 1 || ex.PrimaryMuscleGroups[0] != "Chest" {
+			t.Errorf("session %s: PrimaryMuscleGroups = %v, want [Chest]", label, ex.PrimaryMuscleGroups)
+		}
+		if len(sess.ExerciseSets[0].Sets) != 1 || sess.ExerciseSets[0].Sets[0].TargetValue != 5 {
+			t.Errorf("session %s: sets not hydrated: %+v", label, sess.ExerciseSets[0].Sets)
+		}
+	}
+}
+
 func TestSessionRepository_UpdatePreservesSlotID(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 

@@ -64,9 +64,12 @@ negligible and the simplicity is worth the trade.
 inline: the base exercise columns are joined in via
 `workout_exercise.exercise_id → exercises.id`, and primary/secondary
 muscle groups are fetched in a single follow-up query keyed by the
-deduped exercise IDs of the session. A session with N exercise slots
-costs two read queries (the sets+exercise join plus the batched muscle
-group fetch) rather than the prior 1 + 2N. Callers receive a
+deduped exercise IDs. `Get` costs two read queries on top of the session
+row (the sets+exercise join plus the batched muscle-group fetch).
+`List` stays flat regardless of how many sessions it returns: one query
+for the session rows, one batched sets+exercise join over the whole date
+range, and one muscle-group query — three queries total, not the prior
+1 + 2N per session (see `loadExerciseSetsSince`). Callers receive a
 "fully hydrated" `domain.Session` and never need to enrich it themselves.
 
 ## ErrNotFound translation at the boundary
