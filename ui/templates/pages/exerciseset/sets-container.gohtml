@@ -803,6 +803,42 @@
                     (() => {
                         const chips = document.querySelectorAll('.exercise-set.active .rest-chip[data-rest-end-at-ms]');
                         if (chips.length === 0) return;
+
+                        let audioCtx = null;
+                        const unlockAudio = () => {
+                            const Ctor = window.AudioContext || window.webkitAudioContext;
+                            if (!Ctor) return;
+                            if (!audioCtx) audioCtx = new Ctor();
+                            if (audioCtx.state === 'suspended') audioCtx.resume();
+                        };
+                        // Resume the context on the next interaction so the chime can
+                        // sound even on a fresh page load with no prior user gesture.
+                        document.addEventListener('pointerdown', unlockAudio, { once: true });
+                        document.addEventListener('keydown', unlockAudio, { once: true });
+                        unlockAudio();
+
+                        const playChime = () => {
+                            if (!audioCtx || audioCtx.state !== 'running') return;
+                            const start = audioCtx.currentTime;
+                            [880, 1320].forEach((freq, i) => {
+                                const t0 = start + i * 0.18;
+                                const t1 = t0 + 0.16;
+                                const osc = audioCtx.createOscillator();
+                                const gain = audioCtx.createGain();
+                                osc.type = 'sine';
+                                osc.frequency.value = freq;
+                                gain.gain.setValueAtTime(0, t0);
+                                gain.gain.linearRampToValueAtTime(0.3, t0 + 0.01);
+                                gain.gain.setValueAtTime(0.3, t1 - 0.01);
+                                gain.gain.linearRampToValueAtTime(0, t1);
+                                osc.connect(gain).connect(audioCtx.destination);
+                                osc.start(t0);
+                                osc.stop(t1);
+                            });
+                        };
+
+                        let chimed = false;
+                        let intervalId = null;
                         const tick = () => {
                             const now = Date.now();
                             chips.forEach((chip) => {
@@ -812,6 +848,16 @@
                                 if (remaining === 0) {
                                     chip.classList.add('ready');
                                     if (timeEl) timeEl.textContent = 'Ready';
+                                    if (!chimed) {
+                                        chimed = true;
+                                        // Chime only when the rest just elapsed on a visible
+                                        // screen. A backgrounded tab whose timer resumes late
+                                        // stays silent — the push notification covered it.
+                                        if (document.visibilityState === 'visible' && now - endAt <= 1000) {
+                                            playChime();
+                                        }
+                                        if (intervalId !== null) clearInterval(intervalId);
+                                    }
                                 } else {
                                     const totalSec = Math.ceil(remaining / 1000);
                                     const m = Math.floor(totalSec / 60);
@@ -821,7 +867,7 @@
                             });
                         };
                         tick();
-                        setInterval(tick, 250);
+                        intervalId = setInterval(tick, 250);
                     })();
                 </script>
                 {{ end }}
