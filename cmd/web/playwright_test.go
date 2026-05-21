@@ -316,11 +316,17 @@ func Test_playwright_smoketest(t *testing.T) {
 	}
 
 	// Step 12: Login — JS calls window.location.reload() after finishing.
+	// The reload lands back on "/", so the page URL never changes. Waiting on
+	// the URL resolves immediately (Playwright treats an already-current URL as
+	// satisfied), which would let the test return while POST /api/login/finish
+	// is still in flight — the server shuts down on test return and the request
+	// is refused. Wait for an authenticated-only element instead: the Settings
+	// link renders only after the post-login reload commits.
 	if err = signInBtn.Click(); err != nil {
 		t.Fatalf("login click: %v", err)
 	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect redirect to / after login: %v", err)
+	if err = settingsLink.WaitFor(); err != nil {
+		t.Fatalf("expect authenticated home after login: %v", err)
 	}
 }
 
