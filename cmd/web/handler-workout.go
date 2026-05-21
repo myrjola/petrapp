@@ -340,7 +340,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		existingExerciseIDs[exerciseSet.Exercise.ID] = true
 	}
 
-	allExercises, err := app.service.List(r.Context())
+	allExercises, err := app.service.ListExercises(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -463,7 +463,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get all exercises
-	allExercises, err := app.service.List(r.Context())
+	allExercises, err := app.service.ListExercises(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return

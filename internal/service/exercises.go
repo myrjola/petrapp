@@ -10,8 +10,8 @@ import (
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
-// List returns all available exercises.
-func (s *Service) List(ctx context.Context) ([]domain.Exercise, error) {
+// ListExercises returns all available exercises.
+func (s *Service) ListExercises(ctx context.Context) ([]domain.Exercise, error) {
 	exercises, err := s.repos.Exercises.List(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list exercises: %w", err)

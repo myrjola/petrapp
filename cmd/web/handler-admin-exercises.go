@@ -63,7 +63,7 @@ type exerciseEditTemplateData struct {
 
 // adminExercisesGET handles GET requests to the exercise admin page.
 func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request) {
-	exercises, err := app.service.List(r.Context())
+	exercises, err := app.service.ListExercises(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return
