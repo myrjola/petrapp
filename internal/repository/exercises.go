@@ -19,10 +19,17 @@ func newSQLiteExerciseRepository(db *sqlite.Database) *sqliteExerciseRepository 
 }
 
 func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (domain.Exercise, error) {
+	return r.get(ctx, r.db.ReadOnly, id)
+}
+
+// get loads a single exercise via q, which may be the read-only handle or an
+// open transaction. Reading through the Update transaction is what makes the
+// exercise read-modify-write atomic.
+func (r *sqliteExerciseRepository) get(ctx context.Context, q queryer, id int) (domain.Exercise, error) {
 	var exercise domain.Exercise
 	var defaultStartingSeconds, repMin, repMax sql.NullInt64
 
-	err := r.db.ReadOnly.QueryRowContext(ctx, `
+	err := q.QueryRowContext(ctx, `
 		SELECT id, name, category, exercise_type, description_markdown,
 		       default_starting_seconds, rep_min, rep_max
 		FROM exercises
@@ -55,12 +62,13 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (domain.Exer
 		exercise.RepMax = &v
 	}
 
-	primaryMuscleGroups, secondaryMuscleGroups, err := r.fetchMuscleGroups(ctx, exercise.ID)
+	byExercise, err := fetchMuscleGroupsByExerciseID(ctx, q, []int{exercise.ID})
 	if err != nil {
 		return domain.Exercise{}, fmt.Errorf("fetch muscle groups for exercise %d: %w", exercise.ID, err)
 	}
-	exercise.PrimaryMuscleGroups = primaryMuscleGroups
-	exercise.SecondaryMuscleGroups = secondaryMuscleGroups
+	g := byExercise[exercise.ID]
+	exercise.PrimaryMuscleGroups = g.primary
+	exercise.SecondaryMuscleGroups = g.secondary
 
 	return exercise, nil
 }
@@ -108,93 +116,26 @@ func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []domain.Exercis
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	for i, exercise := range exercises {
-		var primary, secondary []string
-		primary, secondary, err = r.fetchMuscleGroups(ctx, exercise.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetch muscle groups for exercise %d: %w", exercise.ID, err)
-		}
-		exercises[i].PrimaryMuscleGroups = primary
-		exercises[i].SecondaryMuscleGroups = secondary
+	ids := make([]int, len(exercises))
+	for i := range exercises {
+		ids[i] = exercises[i].ID
+	}
+	byExercise, err := fetchMuscleGroupsByExerciseID(ctx, r.db.ReadOnly, ids)
+	if err != nil {
+		return nil, fmt.Errorf("fetch muscle groups: %w", err)
+	}
+	for i := range exercises {
+		g := byExercise[exercises[i].ID]
+		exercises[i].PrimaryMuscleGroups = g.primary
+		exercises[i].SecondaryMuscleGroups = g.secondary
 	}
 	return exercises, nil
 }
 
-func (r *sqliteExerciseRepository) fetchMuscleGroups(
-	ctx context.Context,
-	exerciseID int,
-) (_ []string, _ []string, err error) {
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT mg.name, emg.is_primary
-		FROM exercise_muscle_groups emg
-		JOIN muscle_groups mg ON emg.muscle_group_name = mg.name
-		WHERE emg.exercise_id = ?`, exerciseID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("query muscle groups: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
-		}
-	}()
-
-	var primary, secondary []string
-	for rows.Next() {
-		var (
-			name      string
-			isPrimary bool
-		)
-		if err = rows.Scan(&name, &isPrimary); err != nil {
-			return nil, nil, fmt.Errorf("scan muscle group row: %w", err)
-		}
-		if isPrimary {
-			primary = append(primary, name)
-		} else {
-			secondary = append(secondary, name)
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("iterate muscle group rows: %w", err)
-	}
-	return primary, secondary, nil
-}
-
-func (r *sqliteExerciseRepository) Create(ctx context.Context, ex domain.Exercise) (domain.Exercise, error) {
-	created, err := r.set(ctx, ex, false)
-	if err != nil {
-		return domain.Exercise{}, fmt.Errorf("create exercise: %w", err)
-	}
-	return created, nil
-}
-
-// Update reads the exercise, runs fn, and persists the result if fn returned
-// nil. fn returning an error rolls back without writing.
-func (r *sqliteExerciseRepository) Update(
-	ctx context.Context,
-	exerciseID int,
-	fn func(*domain.Exercise) error,
-) error {
-	exercise, err := r.Get(ctx, exerciseID)
-	if err != nil {
-		return fmt.Errorf("get exercise for update: %w", err)
-	}
-	if err = fn(&exercise); err != nil {
-		return err
-	}
-	if _, err = r.set(ctx, exercise, true); err != nil {
-		return fmt.Errorf("save updated exercise: %w", err)
-	}
-	return nil
-}
-
-func (r *sqliteExerciseRepository) set(
-	ctx context.Context,
-	ex domain.Exercise,
-	upsert bool,
-) (_ domain.Exercise, err error) {
+func (r *sqliteExerciseRepository) Create(ctx context.Context, ex domain.Exercise) (_ domain.Exercise, err error) {
 	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
 	if err != nil {
-		return ex, fmt.Errorf("begin transaction: %w", err)
+		return domain.Exercise{}, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
@@ -202,13 +143,72 @@ func (r *sqliteExerciseRepository) set(
 		}
 	}()
 
+	created, err := r.set(ctx, tx, ex, false)
+	if err != nil {
+		return domain.Exercise{}, fmt.Errorf("create exercise: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return domain.Exercise{}, fmt.Errorf("commit create exercise: %w", err)
+	}
+	return created, nil
+}
+
+// Update loads the exercise inside a single transaction, runs fn against the
+// hydrated *domain.Exercise, and persists the result. Returning nil from fn
+// commits; returning an error rolls back without writing. The read and write
+// share one transaction so concurrent updates cannot interleave a
+// read-modify-write race.
+func (r *sqliteExerciseRepository) Update(
+	ctx context.Context,
+	exerciseID int,
+	fn func(*domain.Exercise) error,
+) (err error) {
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+
+	exercise, err := r.get(ctx, tx, exerciseID)
+	if err != nil {
+		return fmt.Errorf("get exercise for update: %w", err)
+	}
+	if err = fn(&exercise); err != nil {
+		return err
+	}
+	if _, err = r.set(ctx, tx, exercise, true); err != nil {
+		return fmt.Errorf("save updated exercise: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit update exercise: %w", err)
+	}
+	return nil
+}
+
+// set writes the exercise row and its muscle-group associations inside tx. When
+// upsert is true the existing row (matched by ex.ID) is deleted first and the
+// explicit ID is reused; otherwise a fresh ID is assigned and returned. The
+// caller owns the transaction.
+func (r *sqliteExerciseRepository) set(
+	ctx context.Context,
+	tx *sql.Tx,
+	ex domain.Exercise,
+	upsert bool,
+) (domain.Exercise, error) {
 	if upsert {
-		if _, err = tx.ExecContext(ctx, `DELETE FROM exercises WHERE id = ?`, ex.ID); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM exercises WHERE id = ?`, ex.ID); err != nil {
 			return ex, fmt.Errorf("delete exercise: %w", err)
 		}
 	}
 
-	var result sql.Result
+	var (
+		result sql.Result
+		err    error
+	)
 	if upsert {
 		result, err = tx.ExecContext(ctx, `
 			INSERT INTO exercises (id, name, category, exercise_type, description_markdown,
@@ -241,10 +241,6 @@ func (r *sqliteExerciseRepository) set(
 	}
 	if err = r.insertMuscleGroups(ctx, tx, ex.ID, ex.SecondaryMuscleGroups, false); err != nil {
 		return ex, fmt.Errorf("insert secondary muscle groups: %w", err)
-	}
-
-	if err = tx.Commit(); err != nil {
-		return ex, fmt.Errorf("commit transaction: %w", err)
 	}
 	return ex, nil
 }

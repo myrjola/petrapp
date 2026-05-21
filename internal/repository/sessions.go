@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
@@ -13,13 +12,6 @@ import (
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
-
-// queryer is satisfied by both *sql.DB and *sql.Tx, so read helpers can run
-// either standalone or inside an open transaction.
-type queryer interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
 
 type sqliteSessionRepository struct {
 	baseRepository
@@ -503,7 +495,7 @@ func hydrateMuscleGroups(ctx context.Context, q queryer, sets []domain.ExerciseS
 		return nil
 	}
 	seen := make(map[int]struct{}, len(sets))
-	ids := make([]any, 0, len(sets))
+	ids := make([]int, 0, len(sets))
 	for _, es := range sets {
 		if _, ok := seen[es.Exercise.ID]; ok {
 			continue
@@ -512,56 +504,13 @@ func hydrateMuscleGroups(ctx context.Context, q queryer, sets []domain.ExerciseS
 		ids = append(ids, es.Exercise.ID)
 	}
 
-	placeholders := strings.Repeat("?,", len(ids))
-	placeholders = placeholders[:len(placeholders)-1] // trim trailing comma
-	query := `
-		SELECT emg.exercise_id, mg.name, emg.is_primary
-		FROM exercise_muscle_groups emg
-		JOIN muscle_groups mg ON emg.muscle_group_name = mg.name
-		WHERE emg.exercise_id IN (` + placeholders + `)`
-
-	rows, err := q.QueryContext(ctx, query, ids...)
+	byExercise, err := fetchMuscleGroupsByExerciseID(ctx, q, ids)
 	if err != nil {
-		return fmt.Errorf("query muscle groups: %w", err)
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	type groups struct {
-		primary   []string
-		secondary []string
-	}
-	byExercise := make(map[int]*groups, len(ids))
-	for rows.Next() {
-		var (
-			exerciseID int
-			name       string
-			isPrimary  bool
-		)
-		if err = rows.Scan(&exerciseID, &name, &isPrimary); err != nil {
-			return fmt.Errorf("scan muscle group row: %w", err)
-		}
-		g, ok := byExercise[exerciseID]
-		if !ok {
-			g = &groups{primary: nil, secondary: nil}
-			byExercise[exerciseID] = g
-		}
-		if isPrimary {
-			g.primary = append(g.primary, name)
-		} else {
-			g.secondary = append(g.secondary, name)
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("iterate muscle group rows: %w", err)
+		return err
 	}
 
 	for i := range sets {
-		g, ok := byExercise[sets[i].Exercise.ID]
-		if !ok {
-			continue
-		}
+		g := byExercise[sets[i].Exercise.ID]
 		sets[i].Exercise.PrimaryMuscleGroups = g.primary
 		sets[i].Exercise.SecondaryMuscleGroups = g.secondary
 	}

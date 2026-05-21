@@ -16,8 +16,10 @@ template logic, no business orchestration.
   constructor `New(db *sqlite.Database) *Repositories` that wires every
   repository together.
 - **Shared helpers** in `shared.go`: `parseTimestamp`, `formatTimestamp`,
-  `formatDate`, the `baseRepository` mixin, and the timestamp/date format
-  constants.
+  `formatDate`, the `queryer` interface, `fetchMuscleGroupsByExerciseID`
+  (batched muscle-group hydration shared by the exercise and session
+  repositories), the `baseRepository` mixin, and the timestamp/date
+  format constants.
 
 ## What does NOT live here
 
