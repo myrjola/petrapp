@@ -289,16 +289,21 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse difficulty from URL path
+	// Parse difficulty from URL path.
 	difficultyStr := r.PathValue("difficulty")
 	difficulty, err := strconv.Atoi(difficultyStr)
 	if err != nil {
-		app.serverError(w, r, fmt.Errorf("parse difficulty rating: %w", err))
+		app.notFound(w, r)
 		return
 	}
 
-	// Save the feedback
+	// Save the feedback. An out-of-range rating is a malformed URL, not a
+	// server fault, so surface it as a 404 like the parse failure above.
 	if err = app.service.SaveFeedback(r.Context(), date, difficulty); err != nil {
+		if errors.Is(err, domain.ErrInvalidDifficultyRating) {
+			app.notFound(w, r)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}

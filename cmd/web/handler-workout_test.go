@@ -411,6 +411,40 @@ func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
 	}
 }
 
+func TestWorkoutFeedbackPOST_BadDifficultyParamReturns404(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// POST to /workouts/2026-05-22/feedback/not-a-number and expect 404.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		server.URL()+"/workouts/2026-05-22/feedback/not-a-number",
+		strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("Build POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.HTTPClient().Do(req)
+	if err != nil {
+		t.Fatalf("POST to bad difficulty param: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
+	}
+}
+
 func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 	var (
 		ctx = t.Context()
