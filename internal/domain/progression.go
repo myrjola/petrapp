@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -97,7 +96,10 @@ func adjustedWeight(last SetResult) float64 {
 	case SignalOnTarget:
 		return last.WeightKg
 	default:
-		panic(fmt.Sprintf("domain: unknown Signal %q", last.Signal))
+		// Unknown signal: degrade gracefully to no adjustment rather than
+		// crashing. Signal is DB- and request-validated, so this is a
+		// should-be-unreachable safety net.
+		return last.WeightKg
 	}
 }
 
