@@ -12,9 +12,14 @@ func (app *application) healthy(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
 
-// testTimeout is a handler for testing timeout functionality.
-// It accepts a query parameter sleep_ms to control how long it sleeps.
+// testTimeout sleeps for the sleep_ms query-parameter duration so the timeout
+// middleware can be exercised in tests. Returns 404 outside devMode.
 func (app *application) testTimeout(w http.ResponseWriter, r *http.Request) {
+	if !app.devMode {
+		http.NotFound(w, r)
+		return
+	}
+
 	sleepMsStr := r.URL.Query().Get("sleep_ms")
 	if sleepMsStr == "" {
 		sleepMsStr = "0"

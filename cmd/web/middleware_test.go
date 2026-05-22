@@ -72,7 +72,8 @@ func Test_application_timeout(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				// Create a minimal application for testing
 				app := &application{ //nolint:exhaustruct // this is a test
-					logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+					logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+					devMode: true,
 				}
 				handler, err := app.routes()
 				if err != nil {
