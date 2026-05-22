@@ -1,0 +1,28 @@
+{{- /* exercise-search: search form shared by the Add and Swap exercise pages. Dot: the query string. */ -}}
+{{ define "exercise-search" }}
+    <section class="exercise-search">
+        <style {{ nonce }}>
+            @scope (.exercise-search) {
+                input[type="search"] {
+                    flex: 1;
+                    padding: var(--size-2) var(--size-3);
+                    border: 1px solid var(--color-border);
+                    border-radius: var(--radius-2);
+                    font-size: var(--font-size-1);
+                    background: var(--color-surface-elevated);
+                }
+            }
+        </style>
+        <form method="get" role="search" class="cluster">
+            <label for="exercise-search-q" class="sr-only">Search exercises</label>
+            <input id="exercise-search-q"
+                   type="search"
+                   name="q"
+                   value="{{ . }}"
+                   placeholder="Search exercises…"
+                   autocomplete="off"
+                   inputmode="search">
+            <button type="submit">Search</button>
+        </form>
+    </section>
+{{ end }}

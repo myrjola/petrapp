@@ -439,7 +439,7 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 		t.Fatalf("Get swap page: %v", err)
 	}
 	var allNames []string
-	doc.Find(".exercise-option .exercise-name").Each(func(_ int, s *goquery.Selection) {
+	doc.Find(".exercise-result .exercise-result__name").Each(func(_ int, s *goquery.Selection) {
 		allNames = append(allNames, strings.TrimSpace(s.Text()))
 	})
 	if len(allNames) < 2 {
@@ -460,7 +460,7 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 		t.Fatalf("Get swap page with query: %v", err)
 	}
 	var filteredNames []string
-	doc.Find(".exercise-option .exercise-name").Each(func(_ int, s *goquery.Selection) {
+	doc.Find(".exercise-result .exercise-result__name").Each(func(_ int, s *goquery.Selection) {
 		filteredNames = append(filteredNames, strings.TrimSpace(s.Text()))
 	})
 	if len(filteredNames) == 0 {
@@ -488,7 +488,7 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, slotURL+"/swap?q="+url.QueryEscape(noMatch)); err != nil {
 		t.Fatalf("Get swap page with no-match query: %v", err)
 	}
-	if doc.Find(".exercise-option").Length() != 0 {
+	if doc.Find(".exercise-result").Length() != 0 {
 		t.Error("Expected zero exercise options when query matches nothing")
 	}
 	emptyState := doc.Find(".no-results")
@@ -503,9 +503,9 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, slotURL+"/swap"); err != nil {
 		t.Fatalf("Get swap page for structure assertions: %v", err)
 	}
-	swapCard := doc.Find(".exercise-option").First()
+	swapCard := doc.Find(".exercise-result").First()
 	if swapCard.Length() == 0 {
-		t.Fatal("expected at least one .exercise-option on the swap page")
+		t.Fatal("expected at least one .exercise-result on the swap page")
 	}
 	if swapCard.Find(".badge").Length() == 0 {
 		t.Error("expected category badge inside the swap card")
@@ -732,13 +732,13 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 		name string
 	}
 	var renderedOpts []rendered
-	doc.Find(".exercise-option").Each(func(_ int, s *goquery.Selection) {
+	doc.Find(".exercise-result").Each(func(_ int, s *goquery.Selection) {
 		idStr, _ := s.Find("input[name='new_exercise_id']").Attr("value")
 		id, convErr := strconv.Atoi(idStr)
 		if convErr != nil {
 			return
 		}
-		name := strings.TrimSpace(s.Find(".exercise-name").Text())
+		name := strings.TrimSpace(s.Find(".exercise-result__name").Text())
 		renderedOpts = append(renderedOpts, rendered{id: id, name: name})
 	})
 	if len(renderedOpts) < 2 {

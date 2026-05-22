@@ -1,5 +1,7 @@
 package main
 
+import "github.com/myrjola/petrapp/internal/domain"
+
 // BannerData is the dot for the `banner` component. Variant is one of
 // "error", "success", or "info"; the component renders nothing when
 // Message is empty.
@@ -32,4 +34,13 @@ type FieldData struct {
 	Max      string
 	Step     string
 	Pattern  string
+}
+
+// ExerciseResultCardData drives the components/exercise-result-card partial,
+// shared by the Add and Swap exercise pages.
+type ExerciseResultCardData struct {
+	Exercise    domain.Exercise
+	FormAction  string // POST target for the add/swap form
+	FieldName   string // hidden input name ("exercise_id" or "new_exercise_id")
+	ButtonLabel string // submit button text
 }

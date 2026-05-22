@@ -487,6 +487,24 @@
             box-shadow: var(--shadow-1);
         }
     }
+
+    .exercise-result {
+        display: flex;
+        flex-direction: column;
+        gap: var(--size-3);
+    }
+
+    .exercise-result__name {
+        font-weight: var(--font-weight-6);
+    }
+
+    .exercise-result .actions {
+        align-items: stretch;
+    }
+
+    .exercise-result__form {
+        flex: 1;
+    }
 }
 
 @keyframes shrink {
