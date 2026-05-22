@@ -31,18 +31,42 @@ const (
 	RegionOther     MuscleGroupRegion = "Other"
 )
 
+// Muscle-group names are the canonical identifiers shared by MuscleGroupTarget,
+// Exercise muscle-group fields, and the planner. They mirror the rows seeded in
+// the muscle_groups table.
+const (
+	MuscleGroupChest      = "Chest"
+	MuscleGroupShoulders  = "Shoulders"
+	MuscleGroupTriceps    = "Triceps"
+	MuscleGroupUpperBack  = "Upper Back"
+	MuscleGroupLats       = "Lats"
+	MuscleGroupBiceps     = "Biceps"
+	MuscleGroupTraps      = "Traps"
+	MuscleGroupForearms   = "Forearms"
+	MuscleGroupQuads      = "Quads"
+	MuscleGroupHamstrings = "Hamstrings"
+	MuscleGroupGlutes     = "Glutes"
+	MuscleGroupCalves     = "Calves"
+	MuscleGroupHipFlexors = "Hip Flexors"
+	MuscleGroupAdductors  = "Adductors"
+	MuscleGroupAbs        = "Abs"
+	MuscleGroupObliques   = "Obliques"
+	MuscleGroupLowerBack  = "Lower Back"
+)
+
 // RegionFor classifies a muscle group name into its anatomical region. Names that
 // aren't recognised fall through to RegionOther so newly added muscle groups still
 // render even before this map is updated.
 func RegionFor(muscleGroupName string) MuscleGroupRegion {
 	switch muscleGroupName {
-	case "Chest", "Shoulders", "Triceps":
+	case MuscleGroupChest, MuscleGroupShoulders, MuscleGroupTriceps:
 		return RegionUpperPush
-	case "Upper Back", "Lats", "Biceps", "Traps", "Forearms":
+	case MuscleGroupUpperBack, MuscleGroupLats, MuscleGroupBiceps, MuscleGroupTraps, MuscleGroupForearms:
 		return RegionUpperPull
-	case "Quads", "Hamstrings", "Glutes", "Calves", "Hip Flexors", "Adductors":
+	case MuscleGroupQuads, MuscleGroupHamstrings, MuscleGroupGlutes,
+		MuscleGroupCalves, MuscleGroupHipFlexors, MuscleGroupAdductors:
 		return RegionLegs
-	case "Abs", "Obliques", "Lower Back":
+	case MuscleGroupAbs, MuscleGroupObliques, MuscleGroupLowerBack:
 		return RegionCore
 	default:
 		return RegionOther
