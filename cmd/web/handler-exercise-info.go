@@ -63,7 +63,7 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	// Fetch the progress data.
 	progressData, err := app.generateExerciseProgressData(r.Context(), date, exercise)
 	if err != nil {
-		http.Error(w, "Failed to generate chart data", http.StatusInternalServerError)
+		app.serverError(w, r, fmt.Errorf("generate exercise progress data: %w", err))
 		return
 	}
 
