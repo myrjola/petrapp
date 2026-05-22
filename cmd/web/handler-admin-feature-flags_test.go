@@ -28,23 +28,15 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 		t.Fatalf("Failed to register: %v", err)
 	}
 
-	t.Run("Feature flags admin shows message for non-admin users", func(t *testing.T) {
-		// Try to access feature flags admin as non-admin user
-		nonAdminDoc, getErr := client.GetDoc(ctx, "/admin/feature-flags")
+	t.Run("Feature flags admin is gated to admin users only", func(t *testing.T) {
+		// Non-admin user should be rejected by mustAdminStack with 401.
+		resp, getErr := client.Get(ctx, "/admin/feature-flags")
 		if getErr != nil {
 			t.Fatalf("Failed to get response: %v", getErr)
 		}
 
-		// Should show message about needing admin privileges
-		text := nonAdminDoc.Find("p").Text()
-		if !strings.Contains(text, "administrator privileges") {
-			t.Errorf("Expected message about admin privileges, got: %s", text)
-		}
-
-		// Should not show feature flags table
-		table := nonAdminDoc.Find("table")
-		if table.Length() > 0 {
-			t.Error("Non-admin user should not see feature flags table")
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("Expected 401 for non-admin user, got %d", resp.StatusCode)
 		}
 	})
 
