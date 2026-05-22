@@ -64,7 +64,7 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("POST /admin/exercises/{id}", app.mustAdminStack(http.HandlerFunc(app.adminExerciseUpdatePOST)))
 	mux.Handle("POST /admin/exercises/generate", app.mustAdminStack(http.HandlerFunc(app.adminExerciseGeneratePOST)))
 
-	mux.Handle("GET /admin/feature-flags", app.sessionStack(http.HandlerFunc(app.adminFeatureFlagsGET)))
+	mux.Handle("GET /admin/feature-flags", app.mustAdminStack(http.HandlerFunc(app.adminFeatureFlagsGET)))
 	mux.Handle("POST /admin/feature-flags/{name}/toggle",
 		app.mustAdminStack(http.HandlerFunc(app.adminFeatureFlagTogglePOST)))
 

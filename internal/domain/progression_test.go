@@ -432,6 +432,18 @@ func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
 	}
 }
 
+func TestAdjustedWeight_UnknownSignalDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	p := domain.NewFromHistory(
+		domain.Config{Type: domain.PeriodizationStrength, RepMin: 5, RepMax: 8, StartingWeight: 50, IsDeload: false},
+		[]domain.SetResult{{ActualReps: 5, Signal: domain.Signal("bogus"), WeightKg: 60}},
+	)
+	got := p.CurrentSet()
+	if got.WeightKg != 60 {
+		t.Errorf("unknown signal: got weight %v, want unchanged 60", got.WeightKg)
+	}
+}
+
 // TestExhaustiveSignalCoverage documents that every valid Signal resolves to
 // a finite weight via the package's internal adjustedWeight switch (exercised
 // through CurrentSet).

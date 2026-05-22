@@ -289,16 +289,21 @@ func (app *application) workoutFeedbackPOST(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse difficulty from URL path
+	// Parse difficulty from URL path.
 	difficultyStr := r.PathValue("difficulty")
 	difficulty, err := strconv.Atoi(difficultyStr)
 	if err != nil {
-		app.serverError(w, r, fmt.Errorf("parse difficulty rating: %w", err))
+		app.notFound(w, r)
 		return
 	}
 
-	// Save the feedback
+	// Save the feedback. An out-of-range rating is a malformed URL, not a
+	// server fault, so surface it as a 404 like the parse failure above.
 	if err = app.service.SaveFeedback(r.Context(), date, difficulty); err != nil {
+		if errors.Is(err, domain.ErrInvalidDifficultyRating) {
+			app.notFound(w, r)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}
@@ -367,14 +372,25 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		return compatibleExercises[i].Name < compatibleExercises[j].Name
 	})
 
+	dateStr := date.Format("2006-01-02")
+	cards := make([]ExerciseResultCardData, 0, len(compatibleExercises))
+	for _, ex := range compatibleExercises {
+		cards = append(cards, ExerciseResultCardData{
+			Exercise:    ex,
+			FormAction:  fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
+			FieldName:   "new_exercise_id",
+			ButtonLabel: "Swap to this exercise",
+		})
+	}
+
 	data := exerciseSwapTemplateData{
-		BaseTemplateData:    newBaseTemplateData(r),
-		Date:                date,
-		Header:              PageHeaderData{Title: "Swap Exercise", Subtitle: ""},
-		WorkoutExerciseID:   workoutExerciseID,
-		CurrentExercise:     currentSlot.Exercise,
-		CompatibleExercises: compatibleExercises,
-		Query:               query,
+		BaseTemplateData:  newBaseTemplateData(r),
+		Date:              date,
+		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: ""},
+		WorkoutExerciseID: workoutExerciseID,
+		CurrentExercise:   currentSlot.Exercise,
+		Cards:             cards,
+		Query:             query,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-swap", data)
@@ -392,9 +408,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
 
@@ -422,21 +436,21 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 // exerciseSwapTemplateData contains data for the exercise swap template.
 type exerciseSwapTemplateData struct {
 	BaseTemplateData
-	Date                time.Time
-	Header              PageHeaderData
-	WorkoutExerciseID   int
-	CurrentExercise     domain.Exercise
-	CompatibleExercises []domain.Exercise
-	Query               string
+	Date              time.Time
+	Header            PageHeaderData
+	WorkoutExerciseID int
+	CurrentExercise   domain.Exercise
+	Cards             []ExerciseResultCardData
+	Query             string
 }
 
 // exerciseAddTemplateData contains data for the exercise add template.
 type exerciseAddTemplateData struct {
 	BaseTemplateData
-	Date      time.Time
-	Header    PageHeaderData
-	Exercises []domain.Exercise
-	Query     string
+	Date   time.Time
+	Header PageHeaderData
+	Cards  []ExerciseResultCardData
+	Query  string
 }
 
 // workoutAddExerciseGET handles GET requests to show available exercises for adding.
@@ -481,7 +495,17 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 		availableExercises = append(availableExercises, exercise)
 	}
 
-	// Prepare template data
+	dateStr := date.Format("2006-01-02")
+	cards := make([]ExerciseResultCardData, 0, len(availableExercises))
+	for _, ex := range availableExercises {
+		cards = append(cards, ExerciseResultCardData{
+			Exercise:    ex,
+			FormAction:  fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
+			FieldName:   "exercise_id",
+			ButtonLabel: "Add this exercise",
+		})
+	}
+
 	data := exerciseAddTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Date:             date,
@@ -489,8 +513,8 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 			Title:    "Add Exercise",
 			Subtitle: "",
 		},
-		Exercises: availableExercises, // Use filtered exercises instead of all exercises
-		Query:     query,
+		Cards: cards,
+		Query: query,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-add", data)
@@ -505,9 +529,7 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 	}
 
 	// Parse form
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
 

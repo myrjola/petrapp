@@ -653,7 +653,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	}
 
 	// Capture the name of the first available exercise to verify we land on its DETAIL.
-	firstAvailableName, err := page.Locator(".exercise-option .exercise-name").First().InnerText()
+	firstAvailableName, err := page.Locator(".exercise-result .exercise-result__name").First().InnerText()
 	if err != nil {
 		t.Fatalf("Flow 6: read first available exercise name: %v", err)
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -109,6 +110,18 @@ func (app *application) parseDateParam(w http.ResponseWriter, r *http.Request) (
 		return time.Time{}, false
 	}
 	return date, true
+}
+
+// parseForm caps the request body at maxBytes and parses the form. On failure
+// it writes a 500 via serverError and returns false; the caller must return
+// immediately when it returns false.
+func (app *application) parseForm(w http.ResponseWriter, r *http.Request, maxBytes int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := r.ParseForm(); err != nil {
+		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+		return false
+	}
+	return true
 }
 
 // parseWorkoutExerciseIDParam parses the "workoutExerciseID" path parameter from

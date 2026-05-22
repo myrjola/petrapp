@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/alexedwards/scs/v2"
@@ -51,13 +50,11 @@ func New(
 	var (
 		err     error
 		timeout = time.Minute * 5
-		init    sync.Once
 	)
 	// Register the session data struct for encoding to the session.
+	// gob.Register is idempotent, so calling it per New is safe.
 	// See https://github.com/alexedwards/scs?tab=readme-ov-file#working-with-session-data.
-	init.Do(func() {
-		gob.Register(webauthn.SessionData{}) //nolint:exhaustruct // only need to register the struct.
-	})
+	gob.Register(webauthn.SessionData{}) //nolint:exhaustruct // only need to register the struct.
 
 	var rpOrigins []string
 	switch {

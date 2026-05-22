@@ -36,9 +36,7 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
 

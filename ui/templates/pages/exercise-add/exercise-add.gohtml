@@ -14,31 +14,7 @@
         {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
         {{ template "page-header" .Header }}
 
-        <section class="exercise-search">
-            <style {{ nonce }}>
-                @scope (.exercise-search) {
-                    input[type="search"] {
-                        flex: 1;
-                        padding: var(--size-2) var(--size-3);
-                        border: 1px solid var(--color-border);
-                        border-radius: var(--radius-2);
-                        font-size: var(--font-size-1);
-                        background: var(--color-surface-elevated);
-                    }
-                }
-            </style>
-            <form method="get" role="search" class="cluster">
-                <label for="exercise-search-q" class="sr-only">Search exercises</label>
-                <input id="exercise-search-q"
-                       type="search"
-                       name="q"
-                       value="{{ .Query }}"
-                       placeholder="Search exercises…"
-                       autocomplete="off"
-                       inputmode="search">
-                <button type="submit">Search</button>
-            </form>
-        </section>
+        {{ template "exercise-search" .Query }}
 
         <section class="available-exercises">
             <style {{ nonce }}>
@@ -53,24 +29,6 @@
                             gap: var(--size-3);
                         }
 
-                        .exercise-option {
-                            display: flex;
-                            flex-direction: column;
-                            gap: var(--size-3);
-                        }
-
-                        .exercise-name {
-                            font-weight: var(--font-weight-6);
-                        }
-
-                        .actions {
-                            align-items: stretch;
-                        }
-
-                        .actions .add-form {
-                            flex: 1;
-                        }
-
                         .no-results {
                             color: var(--color-text-secondary);
                             padding: var(--size-4) 0;
@@ -82,40 +40,10 @@
             <h2>Choose Exercise to Add</h2>
 
             <div class="exercises-list stack">
-                {{ if .Exercises }}
-                {{ range .Exercises }}
-                    <div class="exercise-option card stack">
-                        <div class="exercise-name">{{ .Name }}</div>
-                        <div class="meta cluster">
-                            <span class="badge">{{ .Category.Label }}</span>
-                            {{ range .PrimaryMuscleGroups }}
-                                <span class="muscle-chip muscle-chip--primary">{{ . }}</span>
-                            {{ end }}
-                        </div>
-                        <div class="actions cluster">
-                            <form method="post"
-                                  action="/workouts/{{ $.Date.Format "2006-01-02" }}/add-exercise"
-                                  class="add-form">
-                                <input type="hidden" name="exercise_id" value="{{ .ID }}">
-                                <button type="submit" class="btn btn--quiet btn--block">Add this exercise</button>
-                            </form>
-                            <button type="button" class="btn btn--ghost btn--sm info-trigger">
-                                <script {{ nonce }}>
-                                  me().addEventListener('click', () => {
-                                    document.getElementById('dialog-exercise-{{ .ID }}').showModal()
-                                  })
-                                </script>
-                                Info
-                            </button>
-                        </div>
-                        <dialog id="dialog-exercise-{{ .ID }}" class="sheet-dialog">
-                            <form method="dialog" class="sheet-dialog__close">
-                                <button class="btn btn--ghost btn--sm">Close</button>
-                            </form>
-                            {{ mdToHTML .DescriptionMarkdown }}
-                        </dialog>
-                    </div>
-                {{ end }}
+                {{ if .Cards }}
+                    {{ range .Cards }}
+                        {{ template "exercise-result-card" . }}
+                    {{ end }}
                 {{ else }}
                     <p class="no-results">
                         {{ if .Query }}No exercises match &ldquo;{{ .Query }}&rdquo;.{{ else }}No exercises available to add.{{ end }}

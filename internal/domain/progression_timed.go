@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -85,7 +84,8 @@ func adjustedSeconds(last TimedSetResult) int {
 	case SignalOnTarget:
 		return last.ActualSeconds
 	default:
-		panic(fmt.Sprintf("domain: unknown Signal %q", last.Signal))
+		// Unknown signal: degrade gracefully to no adjustment. See adjustedWeight.
+		return last.ActualSeconds
 	}
 }
 

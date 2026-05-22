@@ -1,0 +1,32 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.ExerciseResultCardData*/ -}}
+{{ define "exercise-result-card" }}
+    <div class="exercise-result card stack">
+        <div class="exercise-result__name">{{ .Exercise.Name }}</div>
+        <div class="meta cluster">
+            <span class="badge">{{ .Exercise.Category.Label }}</span>
+            {{ range .Exercise.PrimaryMuscleGroups }}
+                <span class="muscle-chip muscle-chip--primary">{{ . }}</span>
+            {{ end }}
+        </div>
+        <div class="actions cluster">
+            <form method="post" action="{{ .FormAction }}" class="exercise-result__form">
+                <input type="hidden" name="{{ .FieldName }}" value="{{ .Exercise.ID }}">
+                <button type="submit" class="btn btn--quiet btn--block">{{ .ButtonLabel }}</button>
+            </form>
+            <button type="button" class="btn btn--ghost btn--sm">
+                <script {{ nonce }}>
+                  me().addEventListener('click', () => {
+                    document.getElementById('dialog-exercise-{{ .Exercise.ID }}').showModal()
+                  })
+                </script>
+                Info
+            </button>
+        </div>
+        <dialog id="dialog-exercise-{{ .Exercise.ID }}" class="sheet-dialog">
+            <form method="dialog" class="sheet-dialog__close">
+                <button class="btn btn--ghost btn--sm">Close</button>
+            </form>
+            {{ mdToHTML .Exercise.DescriptionMarkdown }}
+        </dialog>
+    </div>
+{{ end }}

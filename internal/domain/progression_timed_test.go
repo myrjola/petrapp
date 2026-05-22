@@ -114,6 +114,18 @@ func TestTimedProgressionCurrentSet(t *testing.T) {
 	}
 }
 
+func TestAdjustedSeconds_UnknownSignalDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	p := domain.NewTimedFromHistory(
+		domain.TimedConfig{StartingSeconds: 30},
+		[]domain.TimedSetResult{{ActualSeconds: 45, Signal: domain.Signal("bogus")}},
+	)
+	got := p.CurrentSet()
+	if got.TargetSeconds != 45 {
+		t.Errorf("unknown signal: got seconds %v, want unchanged 45", got.TargetSeconds)
+	}
+}
+
 func TestTimedProgressionRecordCompletion(t *testing.T) {
 	t.Parallel()
 

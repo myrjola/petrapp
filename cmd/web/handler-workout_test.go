@@ -180,7 +180,7 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 		t.Fatalf("Get add-exercise page: %v", err)
 	}
 	var allNames []string
-	doc.Find(".exercise-option .exercise-name").Each(func(_ int, s *goquery.Selection) {
+	doc.Find(".exercise-result .exercise-result__name").Each(func(_ int, s *goquery.Selection) {
 		allNames = append(allNames, strings.TrimSpace(s.Text()))
 	})
 	if len(allNames) < 2 {
@@ -201,7 +201,7 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 		t.Fatalf("Get add-exercise page with query: %v", err)
 	}
 	var filteredNames []string
-	doc.Find(".exercise-option .exercise-name").Each(func(_ int, s *goquery.Selection) {
+	doc.Find(".exercise-result .exercise-result__name").Each(func(_ int, s *goquery.Selection) {
 		filteredNames = append(filteredNames, strings.TrimSpace(s.Text()))
 	})
 	if len(filteredNames) == 0 {
@@ -229,7 +229,7 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/workouts/"+today+"/add-exercise?q="+url.QueryEscape(noMatch)); err != nil {
 		t.Fatalf("Get add-exercise page with no-match query: %v", err)
 	}
-	if doc.Find(".exercise-option").Length() != 0 {
+	if doc.Find(".exercise-result").Length() != 0 {
 		t.Error("Expected zero exercise options when query matches nothing")
 	}
 	emptyState := doc.Find(".no-results")
@@ -246,9 +246,9 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 	}
 
 	// Lock in the new card structure.
-	card := doc.Find(".exercise-option").First()
+	card := doc.Find(".exercise-result").First()
 	if card.Length() == 0 {
-		t.Fatal("expected at least one .exercise-option on the add page")
+		t.Fatal("expected at least one .exercise-result on the add page")
 	}
 	if card.Find(".badge").Length() == 0 {
 		t.Error("expected category badge inside the exercise card")
@@ -308,7 +308,7 @@ func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get add-exercise picker: %v", err)
 	}
-	exerciseID, ok := pickerDoc.Find(".exercise-option [name='exercise_id']").
+	exerciseID, ok := pickerDoc.Find(".exercise-result [name='exercise_id']").
 		First().Attr("value")
 	if !ok || exerciseID == "" {
 		t.Fatalf("Could not find an exercise_id in the picker page")
@@ -408,6 +408,39 @@ func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
 	// The workout page must list exercises after lazy-create.
 	if doc.Find("a.exercise").Length() == 0 {
 		t.Error("Expected exercises on workout page after starting ad-hoc session")
+	}
+}
+
+func TestWorkoutFeedbackPOST_BadDifficultyParamReturns404(t *testing.T) {
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// POST to /workouts/2026-05-22/feedback/not-a-number and expect 404.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		server.URL()+"/workouts/2026-05-22/feedback/not-a-number",
+		strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("Build POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.HTTPClient().Do(req)
+	if err != nil {
+		t.Fatalf("POST to bad difficulty param: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Expected status %d, got %d", http.StatusNotFound, resp.StatusCode)
 	}
 }
 
