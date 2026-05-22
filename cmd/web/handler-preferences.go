@@ -46,6 +46,7 @@ type preferencesTemplateData struct {
 	MesocycleLength          int
 	MesocycleLengthOptions   []int
 	MesocycleAnchor          time.Time
+	Flash                    BannerData
 }
 
 func getWorkoutDurationOptions() []workoutDurationOption {
@@ -122,6 +123,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		MesocycleLength:          prefs.MesocycleLength,
 		MesocycleLengthOptions:   []int{4, 5, 6, 7},
 		MesocycleAnchor:          prefs.MesocycleAnchor,
+		Flash:                    BannerData{Variant: "error", Message: app.popFlashError(ctx)},
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)
@@ -146,6 +148,12 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 	prefs.FridayMinutes = parseMinutes(r.Form.Get("friday_minutes"))
 	prefs.SaturdayMinutes = parseMinutes(r.Form.Get("saturday_minutes"))
 	prefs.SundayMinutes = parseMinutes(r.Form.Get("sunday_minutes"))
+
+	if prefs.IsEmpty() {
+		app.putFlashError(r.Context(), "Please schedule at least one workout day.")
+		redirect(w, r, "/preferences")
+		return
+	}
 
 	if err = app.service.SaveUserPreferences(r.Context(), prefs); err != nil {
 		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))

@@ -412,6 +412,54 @@ func Test_application_deleteUser(t *testing.T) {
 	}
 }
 
+func TestPreferencesPOST_RejectsEmptySchedule(t *testing.T) {
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+
+	// Submit form with all days set to 0 minutes (rest day).
+	formData := map[string]string{
+		"Monday":    "0",
+		"Tuesday":   "0",
+		"Wednesday": "0",
+		"Thursday":  "0",
+		"Friday":    "0",
+		"Saturday":  "0",
+		"Sunday":    "0",
+	}
+	doc, err = client.SubmitForm(ctx, doc, "/preferences", formData)
+	if err != nil {
+		t.Fatalf("Failed to submit preferences form: %v", err)
+	}
+
+	// Should stay on /preferences (redirected back after flash).
+	if doc.Url.Path != "/preferences" {
+		t.Errorf("Expected to stay on /preferences, got %q", doc.Url.Path)
+	}
+
+	// Should render an error banner containing "at least one workout day".
+	banner := doc.Find(".banner--error")
+	if banner.Length() == 0 {
+		t.Fatal("Expected error banner to be rendered")
+	}
+	if !strings.Contains(banner.Text(), "at least one workout day") {
+		t.Errorf("Expected banner to contain 'at least one workout day', got %q", banner.Text())
+	}
+}
+
 func verifySelected(t *testing.T, doc *goquery.Document, weekdays map[string]int) {
 	t.Helper()
 	form, err := e2etest.FindForm(doc, "/preferences")
