@@ -432,13 +432,13 @@ func TestPreferencesPOST_RejectsEmptySchedule(t *testing.T) {
 
 	// Submit form with all days set to 0 minutes (rest day).
 	formData := map[string]string{
-		"Monday":    "0",
-		"Tuesday":   "0",
-		"Wednesday": "0",
-		"Thursday":  "0",
-		"Friday":    "0",
-		"Saturday":  "0",
-		"Sunday":    "0",
+		"monday_minutes":    "0",
+		"tuesday_minutes":   "0",
+		"wednesday_minutes": "0",
+		"thursday_minutes":  "0",
+		"friday_minutes":    "0",
+		"saturday_minutes":  "0",
+		"sunday_minutes":    "0",
 	}
 	doc, err = client.SubmitForm(ctx, doc, "/preferences", formData)
 	if err != nil {
