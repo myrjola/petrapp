@@ -2,63 +2,42 @@
 {{ define "page" }}
     <main class="stack">
         {{ template "page-header" .Header }}
-        {{ if not .Authenticated }}
-            <section>
-                <p>You need to be signed in as an administrator to manage feature flags.</p>
-                <div>
-                    <form method="post" action="/api/login/start">
-                        <button type="submit">Sign in</button>
-                        <script {{ nonce }}>
-                          (async (form = me()) => {
-                            const {loginUser} = await import("webauthn")
-                            form.addEventListener("submit", loginUser)
-                          })()
-                        </script>
-                    </form>
-                </div>
-            </section>
-        {{ else if not .IsAdmin }}
-            <section>
-                <p>You need administrator privileges to manage feature flags.</p>
-            </section>
-        {{ else }}
-            <section>
-                <h2>Feature Flags</h2>
-                <table>
-                    <thead>
+        <section>
+            <h2>Feature Flags</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{ range .FeatureFlags }}
                     <tr>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <td>{{ .Name }}</td>
+                        <td>
+                            {{ if .Enabled }}
+                                <span class="badge badge--success">Enabled</span>
+                            {{ else }}
+                                <span class="badge badge--neutral">Disabled</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            <form method="post" action="/admin/feature-flags/{{ .Name }}/toggle">
+                                <button type="submit">
+                                    {{ if .Enabled }}
+                                        Disable
+                                    {{ else }}
+                                        Enable
+                                    {{ end }}
+                                </button>
+                            </form>
+                        </td>
                     </tr>
-                    </thead>
-                    <tbody>
-                    {{ range .FeatureFlags }}
-                        <tr>
-                            <td>{{ .Name }}</td>
-                            <td>
-                                {{ if .Enabled }}
-                                    <span class="badge badge--success">Enabled</span>
-                                {{ else }}
-                                    <span class="badge badge--neutral">Disabled</span>
-                                {{ end }}
-                            </td>
-                            <td>
-                                <form method="post" action="/admin/feature-flags/{{ .Name }}/toggle">
-                                    <button type="submit">
-                                        {{ if .Enabled }}
-                                            Disable
-                                        {{ else }}
-                                            Enable
-                                        {{ end }}
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    {{ end }}
-                    </tbody>
-                </table>
-            </section>
-        {{ end }}
+                {{ end }}
+                </tbody>
+            </table>
+        </section>
     </main>
 {{ end }}
