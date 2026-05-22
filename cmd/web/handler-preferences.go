@@ -128,9 +128,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
 
@@ -236,9 +234,7 @@ func (app *application) exportUserDataGET(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) preferencesRestartMesocyclePOST(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
 	if err := app.service.RestartMesocycleAnchor(r.Context()); err != nil {
@@ -249,9 +245,7 @@ func (app *application) preferencesRestartMesocyclePOST(w http.ResponseWriter, r
 }
 
 func (app *application) preferencesRestNotificationsTogglePOST(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, defaultMaxFormSize)
-	if err := r.ParseForm(); err != nil {
-		app.serverError(w, r, fmt.Errorf("parse form: %w", err))
+	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
 	prefs, err := app.service.GetUserPreferences(r.Context())
