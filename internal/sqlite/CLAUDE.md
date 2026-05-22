@@ -1,6 +1,22 @@
 # Database Schema Guidelines - SQLite Layer
 
-Guidelines for working with database schema, migrations, and data access patterns in `internal/sqlite/`.
+Guidelines for the database schema, migrations, and the SQLite connection handle in `internal/sqlite/`.
+
+## What lives here
+
+- **`schema.sql`** — the declarative single source of truth for the schema.
+- **The declarative migrator** (`migrate.go`) and one-shot **premigrations**
+  (`premigrate.go`).
+- **`fixtures.sql`** — seed data re-applied on every boot.
+- **The `*sqlite.Database` connection handle** (`sqlite.go`): `connect`,
+  `NewDatabase`, PRAGMA setup.
+
+## What does NOT live here
+
+- SQL queries (SELECT/INSERT/UPDATE) and repository implementations —
+  `internal/repository/` (see `internal/repository/CLAUDE.md`).
+- Domain models and business rules — `internal/domain/`.
+- Service orchestration — `internal/service/`.
 
 ## Schema Architecture
 

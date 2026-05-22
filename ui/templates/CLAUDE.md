@@ -2,58 +2,34 @@
 
 Guidelines for working with Go templates, CSS architecture, and design systems in `ui/templates/` and `ui/static/`.
 
+## What lives here
+
+- **Page templates** (`pages/`) and **shared components** (`components/`) —
+  Go `html/template` markup.
+- **CSS** — colocated scoped `<style>` blocks plus the global `ui/static/main.css`.
+- **Static assets** (`ui/static/`) — `main.js`, `webauthn.js`, icons.
+
+## What does NOT live here
+
+- Handler-side data preparation and per-template data structs — `cmd/web/`.
+- Business rules and display derivations on domain types — `internal/domain/`.
+
 ## Design Language
 
-The app's visual identity is an *editorial training logbook*, not a fitness
-SaaS. Closest references: field notebooks, atelier signage, small-press
-editorial design. Restrained, warm, intentional. Density is low — every
-element earns its space.
+The visual identity is an *editorial training logbook* — warm, restrained,
+low-density. **Before any visual or CSS work, read
+[`docs/design-system.md`](../../docs/design-system.md)** — the full design
+language, the design-token catalogue, and the colour / motion / active-state
+conventions live there.
 
-### Identity rules
+Non-negotiables that hold even for non-visual changes:
 
-- **Warm-only palette.** Stone neutrals + Clay terracotta accent + Ember
-  one-off pop. No cool grays anywhere; shadows are warm-tinted
-  (`rgb(120 90 60 / .10)`), never neutral black. The semantic-token
-  catalogue is documented under "Color System" below.
-- **Three type voices, system stacks only — zero web fonts.** Display =
-  serif (Charter → Iowan Old Style → Georgia → ui-serif), tight tracking
-  `-0.025em`, line-height `0.95`, weight 6. Body = `system-ui`. Mono =
-  the developer-font waterfall in `--font-monospace-code`, and it does
-  real work: overlines, dates, counters, status labels are all mono. Mono
-  is the "annotation" voice and a signature of the system.
-- **No `@font-face` rules. No font CDN requests.** Cross-platform
-  rendering variance is intentional — the system aims for *native craft*
-  per OS, not pixel-identical rendering. Don't propose a Google-fonted
-  look or introduce a custom face.
-- **Signature page-header motif.** Uppercase mono overline in
-  `--clay-4` → serif display title (`clamp(2.25rem, 9vw, 3rem)`,
-  line-height `0.95`, tracking `-0.025em`) → meta row. The overline ends
-  with a 1px hairline fading right via
-  `linear-gradient(to right, var(--stone-3), transparent)`. Worked
-  example in `pages/workout/workout.gohtml` and
-  `pages/exerciseset/exercise-header.gohtml`. Reuse this rhythm; don't
-  reinvent it.
-- **State is never colour-only.** Every state carries a non-colour
-  signal too: in-progress = amber wash *plus* a 3px left-edge tab;
-  completed = sage wash *plus* a drawn strike-through; default =
-  elevated paper. Required by WCAG SC 1.4.1 and by the visual identity.
-- **Motion: one curve, sparingly.** `cubic-bezier(0.2, 0, 0, 1)`
-  (`--ease-out-quiet`), `80–320ms`. The View Transitions API is
-  first-class — title morphs list ↔ detail, strike-through draws on
-  completion. No springs, no bounces, no scattered micro-interactions.
-
-### Anti-patterns
-
-Do not introduce: Inter / Space Grotesk / generic geometric sans; web
-fonts via Google or any CDN; purple gradients or neon accents;
-dashboard-style multi-column layouts or sidebars; card-on-card density;
-saturated status colours (use the muted sage / amber / terracotta
-washes); neutral-black drop shadows; springy or bouncy motion.
-
-### The one thing to keep
-
-Serif title + mono overline + fading hairline on a paper-warm surface,
-with terracotta as the only saturated voice. That's the brand.
+- **Warm-only palette**, system font stacks only — **no `@font-face`, no
+  web-font CDN requests**.
+- **State is never colour-only** — every state also carries a shape, line, or
+  wash signal (WCAG SC 1.4.1).
+- **No `:hover` / `cursor: pointer`** — the app is mobile-first; style
+  `:active` and `:focus-visible` instead.
 
 ## Template Structure
 
@@ -258,8 +234,9 @@ the page content. The Stack Navigator shim populates it via `textContent` on
 changes" pattern, announced by screen readers without focus moves. Use
 `textContent` only (CSP / Trusted Types blocks `innerHTML`). The skeleton is
 *not* for server-originating errors: those flow through `app.userError` →
-flash + redirect → server-rendered `banner` component on the next GET. Keep
-the client surface as a true last resort.
+flash + redirect → server-rendered `banner` component on the next GET — see
+[`cmd/web/CLAUDE.md`](../../cmd/web/CLAUDE.md) "Error Handling". Keep the
+client surface as a true last resort.
 
 ## CSS Architecture and Scoping
 
@@ -297,94 +274,6 @@ the client surface as a true last resort.
 - Use multiple `@scope` blocks within the same template for different components
 - Each scope block applies only to its parent container
 - Scopes don't interfere with each other or global styles
-
-## Design System Usage
-
-### CSS Custom Properties (Design Tokens)
-
-Always verify these exist in `main.css` before using:
-
-#### Spacing System
-
-- `--size-1` through `--size-15` (0.25rem to 30rem)
-- Use for margins, padding, gaps: `margin: var(--size-4)`
-
-#### Color System
-
-The app is on the warm "Stone" palette. **Reach for semantic tokens first**, then
-the Stone/Clay ramps; the raw Tailwind-style ramps are legacy holdouts being
-retired page-by-page.
-
-- **Semantic colors** (prefer these): `--color-surface`, `--color-surface-elevated`,
-  `--color-surface-active`, `--color-surface-completed`, `--color-border`,
-  `--color-border-focus`, `--color-text-primary` / `-secondary` / `-muted`,
-  `--color-success` / `-bg`, `--color-warning` / `-bg`, `--color-error` / `-bg`,
-  `--color-info` / `-bg`
-- **Stone**: `--stone-0` through `--stone-10` (warm neutral ramp — surfaces, borders, text)
-- **Clay**: `--clay-0` through `--clay-6` (primary accent — buttons, links, active state)
-- **Ember**: `--ember` (single bright accent, reserved for Focus-mode CTAs)
-- **Raw ramps** (`--sky-*`, `--lime-*`, `--yellow-*`, `--red-*`) — legacy; still defined
-  but being replaced by the semantic tokens above. Don't introduce new uses.
-
-#### Border & Typography
-
-- **Radius**: `--radius-1` through `--radius-6`, `--radius-round`
-- **Border sizes**: `--border-size-1` through `--border-size-5`
-- **Shadows (elevation)**: `--shadow-1` (subtle), `--shadow-2` (card), `--shadow-3` (raised). Use these instead of inline `box-shadow` values; reach for raw `box-shadow` only for color-tinted glows or focus rings.
-- **Font families**: `--font-sans` (system-ui), `--font-serif` (Charter
-  → Iowan Old Style → Georgia → ui-serif), `--font-mono` (the developer
-  waterfall in `--font-monospace-code`). Three roles — display serif,
-  body sans, mono annotation — documented under "Design Language"
-  above. Zero `@font-face` rules; do not add web-font loading.
-- **Font weights**: `--font-weight-1` through `--font-weight-9`
-- **Font sizes**: `--font-size-00` (0.5rem) and `--font-size-0` through `--font-size-8`
-- **Fluid font sizes**: `--font-size-fluid-0` through `--font-size-fluid-3` (responsive via `clamp()`)
-
-### Color Usage Patterns
-
-- Use proper contrast ratios by pairing light backgrounds with dark text
-- Map semantic intentions to the semantic tokens (e.g., success state → `--color-success-bg` background, `--color-success` text; neutral surface → `--color-surface` / `--stone-*`)
-- **NEVER use undefined color tokens** - always verify they exist in main.css first
-
-### No `:hover` — mobile-first
-
-The app is mobile-first. `:hover` styles are deliberately omitted because
-on touch devices a tap triggers hover and the state sticks until the next
-interaction (the "sticky hover" bug). The same reasoning rules out
-`cursor: pointer` and other mouse-only declarations — they have no effect
-on touch and add no value to the mobile experience.
-
-Reserve interactive-state styling for `:active` (fires on touch and mouse
-alike) and `:focus-visible` (keyboard). Don't reintroduce `:hover`,
-`cursor: pointer`, `@media (hover: hover)` gates, or `mouseenter` /
-`mouseleave` listeners.
-
-### Active-state darkening — named-ramp step vs `color-mix`
-
-There are two ways to nudge a token a shade darker for `:active`:
-a named ramp step (e.g. `var(--clay-6)` to depress a `--clay-4` base), or
-`color-mix(in oklab, var(--BASE) NN%, black)`. The decision is mechanical:
-
-- **Use the ramp step when one exists.** Clay primaries depress on
-  `var(--clay-6)`. Terse, responds to ramp retunes, no perceptual math at
-  the call site.
-- **Use `color-mix(... black)` when no darker ramp step exists.** Applies
-  to `--color-error`, `--color-info`, `--color-info-bg`,
-  `--color-success-bg`, and `--ember` — none have a `*-darker` companion,
-  so mixing toward black is the way.
-
-#### `color-mix` percentage convention
-
-Picked perceptually in oklab — lighter bases need less black to register
-the state change, so the percentages slide toward 100%:
-
-| Base lightness                                  | Active       | Example                                      |
-|-------------------------------------------------|--------------|----------------------------------------------|
-| Mid (saturated, e.g. `--color-error`)           | `78%, black` | `.btn--danger` in `ui/static/main.css`       |
-| Bright accent (`--ember`)                       | `85%, black` | Focus-mode CTA in `sets-container.gohtml`    |
-
-If you reach for `color-mix(... var(--clay-N) NN%, black)` you're
-probably reinventing `var(--clay-N+1)` — use the ramp step instead.
 
 ## CSS Layer System
 

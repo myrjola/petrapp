@@ -2,6 +2,23 @@
 
 Guidelines for working with HTTP handlers, routing, middleware, and web server components in `cmd/web/`.
 
+## What lives here
+
+- **HTTP handlers** — methods on the `application` struct — plus routing
+  (`routes.go`) and middleware.
+- **Per-template data structs** embedding `BaseTemplateData`, and the
+  handler-side data transformation that feeds them.
+- **Request/response concerns** — form parsing, CSRF, sessions, flash
+  plumbing, redirects, and the error→HTTP mapping (`serverError` / `userError`).
+- **Component dot structs** (`components.go`).
+
+## What does NOT live here
+
+- Business rules and aggregate methods — `internal/domain/`.
+- Cross-aggregate orchestration and external integrations — `internal/service/`.
+- SQL queries and persistence — `internal/repository/`.
+- Template markup and CSS — `ui/templates/`.
+
 ## Handler Structure
 
 ### Handler Method Pattern
@@ -184,11 +201,13 @@ produce a redirect loop.
 
 ### Client-side error surface (`#js-flash`)
 
-`base.gohtml` renders a hidden `<div id="js-flash" role="alert" hidden>` for
-the JS shim to populate via `textContent` when `fetch` throws (offline / DNS
-/ CORS). It is **only** for client-only failures — any server response (2xx
-or not) still drives navigation or reload through the wire protocol, so the
-flash-on-reload path stays canonical for server-originating messages.
+`#js-flash` is the JS shim's last-resort surface for client-only `fetch`
+failures (offline / DNS / CORS) — **not** for server-originating messages.
+Any server response (2xx or not) drives navigation or reload through the wire
+protocol, so the `userError` → flash → redirect path stays canonical for
+server messages. Markup, accessibility, and Trusted-Types detail live in
+[`ui/templates/CLAUDE.md`](../../ui/templates/CLAUDE.md) under "Client-only
+error surface".
 
 ## Redirects and Navigation
 

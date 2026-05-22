@@ -10,10 +10,12 @@ When a feature spans multiple layers, work outwards from the data model:
    see [Database Guidelines](internal/sqlite/CLAUDE.md))
 2. **Domain Models** - Update pure domain logic in `internal/domain/` (
    see [Domain Guidelines](internal/domain/CLAUDE.md))
-3. **Service Layer** - Add orchestration / cross-aggregate logic in `internal/service/` (
+3. **Repository Layer** - Add SQL persistence and query implementations in
+   `internal/repository/` (see [Repository Guidelines](internal/repository/CLAUDE.md))
+4. **Service Layer** - Add orchestration / cross-aggregate logic in `internal/service/` (
    see [Service Guidelines](internal/service/CLAUDE.md))
-4. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
-5. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
+5. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
+6. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
 
 If a change is scoped to one or two layers (e.g. a UI-only tweak or a handler-only bug fix), start at the lowest relevant layer — you don't have to touch the ones above.
 
@@ -60,12 +62,8 @@ Run a single test: `go test -v ./path/to/package -run TestName`.
 
 ## Following Conventions
 
-When making changes to files, first understand the file's code conventions:
-
-- NEVER assume that a given library is available - check neighboring files or `go.mod` first
-- When creating new components, examine existing ones for patterns and conventions
-- Always look at the surrounding context (especially imports) to understand framework choices
-- Make changes in the most idiomatic way for the existing codebase
+Match the existing code: check `go.mod` and neighboring files before assuming a
+library is available, and mirror the patterns and imports of nearby code.
 
 Test-selector resilience (goquery patterns, `SubmitForm`, etc.) lives in
 [Web Guidelines](cmd/web/CLAUDE.md) under "Testing with e2etest" — consult it
