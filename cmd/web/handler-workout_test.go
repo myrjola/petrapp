@@ -412,7 +412,6 @@ func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
 }
 
 func TestWorkoutFeedbackPOST_BadDifficultyParamReturns404(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
