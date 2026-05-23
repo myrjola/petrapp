@@ -68,3 +68,38 @@ satisfy `wrapcheck` and to add the date for diagnostic context.
   one-line service method here.
 - **New SQL:** `internal/repository/`, then a one-line service method
   here that wraps the call with `fmt.Errorf` and returns.
+
+## Testing
+
+Service tests live in `package service_test` (external) and exercise the
+real wiring — real `*sqlite.Database`, real repositories, real domain
+methods. **Do not mock the repository layer.** The orchestration and the
+SQL contract are tested together because that's where bugs hide.
+
+- **Use `setupTestService`** (in `helpers_test.go`) to get a fresh
+  in-memory database, an authenticated context, and a `*service.Service`
+  with sensible default preferences (Mon/Wed/Fri at 60 min). It returns
+  `(ctx, svc)` — both already configured for the test user.
+- **Sentinel errors propagate unchanged.** Assert them with
+  `errors.Is(err, domain.ErrNotFound)`, `errors.Is(err, domain.ErrAlreadyStarted)`,
+  etc. The service wraps with `fmt.Errorf("...: %w", err)` so `errors.Is`
+  still matches.
+- **`ValidationError` is not a sentinel.** Detect it with `errors.As(err, &ve)`
+  (see `domain.ValidationError` — its message is user-facing).
+- **For OpenAI / external integrations**, test the pure logic
+  (parsing, validation, schema, prompt, fallback) as internal tests in
+  `package service` against fakes. Gate the live API call behind
+  `os.Getenv("OPENAI_API_KEY") == ""` → `t.Skip(...)` and `testing.Short()`,
+  as in `exercise_generation_internal_test.go`.
+
+Example shape (see `sessions_test.go`, `feature_flags_test.go`):
+
+```go
+func Test_Something(t *testing.T) {
+    ctx, svc := setupTestService(t)
+    // arrange via service or direct SQL
+    got, err := svc.DoThing(ctx, ...)
+    if err != nil { t.Fatalf("DoThing: %v", err) }
+    // assert outcome (returned value, error type, or DB state)
+}
+```

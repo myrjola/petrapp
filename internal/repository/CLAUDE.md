@@ -90,3 +90,29 @@ sentinel has no SQL ancestry.
 3. Wire the new repo into `Repositories` and `New`.
 4. Add round-trip tests in `widgets_test.go` (external `package
    repository_test`) using the `setupTestRepos` helper.
+
+## Testing
+
+Repository tests live in `package repository_test` (external) and run
+against a real in-memory SQLite database — no mocks. They verify the
+SQL-shaped contract, not the business rule.
+
+- **Use `setupTestRepos`** (in `helpers_test.go`) to get a fresh
+  database and the wired `*Repositories`. `seedWorkoutExercise` is a
+  reusable fixture for tests that need a session + exercise row.
+- **What to assert:**
+  - Round-trip persistence — write a domain value, read it back,
+    confirm the round-trip preserves every field including hydration.
+  - Error translation at the boundary — missing rows surface as
+    `domain.ErrNotFound` via `errors.Is`, never as `sql.ErrNoRows`.
+  - Update-closure semantics — on `nil` from the closure the change
+    persists; on a returned error the transaction rolls back and the
+    on-disk state is unchanged.
+  - Slot-ID stability — pre-existing `ExerciseSet.ID` values survive the
+    delete-and-reinsert cycle inside `SessionRepository.Update`.
+- **What NOT to test here:** business rules and aggregate invariants
+  (those live in `internal/domain/`), and end-to-end orchestration
+  across multiple aggregates (that lives in `internal/service/`).
+
+See `exercises_test.go` for a tight worked example covering all four
+assertions above.

@@ -34,6 +34,17 @@ Guidelines for the database schema, migrations, and the SQLite connection handle
 5. **Test with `make test`** to ensure migrations and queries work correctly
 6. **Add test fixtures** in `fixtures.sql` if needed for new data that needs to be seeded
 
+### Testing schema changes
+
+`migrate_internal_test.go::TestDatabase_migrate` is the table-driven home
+for testing the declarative migrator itself — add a case there if your
+change exercises a new diff/apply pattern (column add/drop, table
+rename, constraint change). Each case is `{name, schemaDefinitions[],
+testQueries[], wantErr}`: the migrator is applied for each schema in
+sequence, then `testQueries` run against the final state. Repository
+round-trip tests in `internal/repository/*_test.go` cover the SQL
+contract end-to-end; you usually do not need both.
+
 ### Premigration Escape Hatch
 
 The declarative migrator in `migrate.go` is purely structural: it diffs the live schema against

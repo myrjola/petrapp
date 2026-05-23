@@ -113,3 +113,97 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 		}
 	})
 }
+
+// TestExerciseGenerator_GenerateEmptyName asserts the cheap pre-check fires
+// before any API call — empty input never reaches OpenAI.
+func TestExerciseGenerator_GenerateEmptyName(t *testing.T) {
+	eg := newExerciseGenerator("dummy-key", []string{"quadriceps"},
+		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	if _, err := eg.Generate(t.Context(), ""); err == nil {
+		t.Fatal("Generate(\"\") returned nil error, want non-nil")
+	}
+}
+
+func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
+	eg := newExerciseGenerator("dummy-key", []string{"quadriceps", "glutes"},
+		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	tests := []struct {
+		name    string
+		input   []string
+		wantErr bool
+	}{
+		{name: "empty is allowed", input: nil, wantErr: false},
+		{name: "all valid", input: []string{"quadriceps", "glutes"}, wantErr: false},
+		{name: "one invalid rejects", input: []string{"quadriceps", "biceps"}, wantErr: true},
+		{name: "case sensitive", input: []string{"Quadriceps"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := eg.validateMuscleGroups(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateMuscleGroups(%v) err=%v, wantErr=%v", tt.input, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
+	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	resources := []domain.Resource{
+		{Title: "Real video", URL: "https://youtube.com/real"},
+		{Title: "Real guide", URL: "https://exrx.net/real"},
+	}
+
+	t.Run("replaces existing Resources section", func(t *testing.T) {
+		input := "## Instructions\n1. Step one\n\n## Resources\n" +
+			"- [Old video](https://example.com/video)\n" +
+			"- [Old guide](https://example.com/guide)\n"
+		got := eg.updateResourcesInDescription(input, resources)
+
+		if !strings.Contains(got, "[Real video](https://youtube.com/real)") {
+			t.Errorf("missing real video link; got:\n%s", got)
+		}
+		if strings.Contains(got, "https://example.com/video") {
+			t.Errorf("placeholder URL leaked through; got:\n%s", got)
+		}
+		if !strings.Contains(got, "## Instructions") {
+			t.Errorf("Instructions section was dropped; got:\n%s", got)
+		}
+	})
+
+	t.Run("appends Resources section when missing", func(t *testing.T) {
+		input := "## Instructions\n1. Step one\n"
+		got := eg.updateResourcesInDescription(input, resources)
+
+		if !strings.Contains(got, "## Resources") {
+			t.Errorf("Resources section not appended; got:\n%s", got)
+		}
+		if !strings.Contains(got, "[Real guide](https://exrx.net/real)") {
+			t.Errorf("real guide link not appended; got:\n%s", got)
+		}
+	})
+}
+
+func TestCreateMinimalExercise(t *testing.T) {
+	ex := createMinimalExercise("Goblet Squat")
+
+	if ex.Name != "Goblet Squat" {
+		t.Errorf("Name = %q, want %q", ex.Name, "Goblet Squat")
+	}
+	if ex.ID != -1 {
+		t.Errorf("ID = %d, want -1 (sentinel for unsaved)", ex.ID)
+	}
+	if ex.Category != domain.CategoryFullBody {
+		t.Errorf("Category = %q, want %q", ex.Category, domain.CategoryFullBody)
+	}
+	if ex.ExerciseType != domain.ExerciseTypeWeighted {
+		t.Errorf("ExerciseType = %q, want %q", ex.ExerciseType, domain.ExerciseTypeWeighted)
+	}
+	if ex.RepMin == nil || ex.RepMax == nil || *ex.RepMin != 5 || *ex.RepMax != 10 {
+		t.Errorf("rep range = (%v, %v), want (5, 10) so DB CHECK passes for non-time_based",
+			ex.RepMin, ex.RepMax)
+	}
+	if !strings.Contains(ex.DescriptionMarkdown, "Goblet Squat") {
+		t.Errorf("description missing exercise name; got %q", ex.DescriptionMarkdown)
+	}
+}
