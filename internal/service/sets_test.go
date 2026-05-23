@@ -275,6 +275,149 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 	}
 }
 
+// Test_UpdateCompletedValue_DoesNotTouchScheduler locks in that editing the
+// recorded value on an already-complete set is bookkeeping, not progress —
+// no Schedule and no Cancel calls should reach the scheduler.
+func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/edit', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	weight := 100.0
+	sig := domain.SignalOnTarget
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+		t.Fatalf("RecordSet (seed completion): %v", err)
+	}
+
+	fake.mu.Lock()
+	scheduledBefore := len(fake.scheduled)
+	cancelsBefore := len(fake.cancels)
+	fake.mu.Unlock()
+
+	if err := svc.UpdateCompletedValue(ctx, date, weID, 0, 6); err != nil {
+		t.Fatalf("UpdateCompletedValue: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != scheduledBefore {
+		t.Errorf("Schedule calls after edit = %d, want %d", len(fake.scheduled), scheduledBefore)
+	}
+	if len(fake.cancels) != cancelsBefore {
+		t.Errorf("Cancel calls after edit = %d, want %d", len(fake.cancels), cancelsBefore)
+	}
+}
+
+// Test_UpdateSetWeight_DoesNotTouchScheduler locks in the same invariant
+// for weight edits.
+func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/weight-edit', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := svc.UpdateSetWeight(ctx, date, weID, 0, 105.0); err != nil {
+		t.Fatalf("UpdateSetWeight: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 0 {
+		t.Errorf("Schedule calls = %d, want 0 (weight edit is not a trigger)", len(fake.scheduled))
+	}
+	if len(fake.cancels) != 0 {
+		t.Errorf("Cancel calls = %d, want 0 (weight edit is not a trigger)", len(fake.cancels))
+	}
+}
+
+// Test_RecordSet_RerecordCompletedSet_DoesNotReschedule locks in the
+// !wasComplete guard: re-recording an already-complete set produces no
+// new scheduler interactions.
+func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	// Seed a second set so the first completion schedules a push.
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+		 VALUES (?, 2, 100.0, 5)`, weID,
+	); err != nil {
+		t.Fatalf("seed second set: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/rerecord', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	weight := 100.0
+	sig := domain.SignalOnTarget
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+		t.Fatalf("RecordSet (first): %v", err)
+	}
+
+	fake.mu.Lock()
+	if len(fake.scheduled) != 1 {
+		fake.mu.Unlock()
+		t.Fatalf("after first RecordSet, scheduled = %d, want 1", len(fake.scheduled))
+	}
+	fake.mu.Unlock()
+
+	// Re-record the same set with a different value. wasComplete is true now,
+	// so the policy must not be re-invoked.
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 6); err != nil {
+		t.Fatalf("RecordSet (re-record): %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 1 {
+		t.Errorf("Schedule calls after re-record = %d, want 1", len(fake.scheduled))
+	}
+	if len(fake.cancels) != 0 {
+		t.Errorf("Cancel calls after re-record = %d, want 0", len(fake.cancels))
+	}
+}
+
 // setupSessionForRecordSet builds a workout session with one weighted exercise
 // and one planned set, returning everything the scheduling tests need.
 func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, int, int) {
