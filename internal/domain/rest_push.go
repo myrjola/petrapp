@@ -46,7 +46,7 @@ type RestPushDecision struct {
 // push scheduler should do. completedAt is the moment the mutation happened
 // — used as the rest-clock zero point. The rule is uniform across triggers
 // (warmup-complete and set-complete) because both ask the same question:
-// "what is the first incomplete set in this slot?"
+// "what is the first incomplete set in this slot?".
 func PlanRestPush(
 	slot ExerciseSet,
 	periodization PeriodizationType,
@@ -62,12 +62,12 @@ func PlanRestPush(
 	}
 	if nextIdx == -1 {
 		// No incomplete sets remain — every set in this slot is done.
-		return RestPushDecision{Action: RestPushActionCancel} //nolint:exhaustruct
+		return RestPushDecision{Action: RestPushActionCancel} //nolint:exhaustruct // FireAt/Payload unused for Cancel.
 	}
 
 	restSeconds := RestSecondsFor(slot.Exercise, periodization, isDeload)
 	if restSeconds <= 0 {
-		return RestPushDecision{Action: RestPushActionNoOp} //nolint:exhaustruct
+		return RestPushDecision{Action: RestPushActionNoOp} //nolint:exhaustruct // FireAt/Payload unused for NoOp.
 	}
 
 	nextSetNumber := nextIdx + 1
