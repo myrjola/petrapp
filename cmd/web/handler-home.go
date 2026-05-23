@@ -148,6 +148,9 @@ type dayView struct {
 	ProgressPercent int
 	// ShouldShowProgress indicates if progress info should be displayed
 	ShouldShowProgress bool
+	// ShouldShowRibbon is true for cards that carry the side-ribbon
+	// emphasis (today, in progress, completed, missed).
+	ShouldShowRibbon bool
 	// DifficultyRating is the user's difficulty rating (1-5) if provided
 	DifficultyRating *int
 	// DifficultyStars represents filled and empty stars for display
@@ -160,6 +163,10 @@ type dayView struct {
 type workoutAction struct {
 	// StartWorkout indicates if we need to start a workout instead of navigating to it
 	StartWorkout bool
+	// IsCTA renders the primary call-to-action button used for today's
+	// "Start Workout". When false but StartWorkout is true, the action
+	// renders as a text-form-button instead.
+	IsCTA bool
 	// Label is the button/link text
 	Label string
 }
@@ -243,6 +250,7 @@ func calculateWorkoutAction(status string, isToday bool) *workoutAction {
 		if isToday {
 			return &workoutAction{
 				StartWorkout: true,
+				IsCTA:        false,
 				Label:        "Start Extra Workout",
 			}
 		}
@@ -250,36 +258,54 @@ func calculateWorkoutAction(status string, isToday bool) *workoutAction {
 	case statusToday:
 		return &workoutAction{
 			StartWorkout: true,
+			IsCTA:        true,
 			Label:        "Start Workout",
 		}
 	case statusInProgress:
 		return &workoutAction{
 			StartWorkout: false,
+			IsCTA:        false,
 			Label:        "Continue Workout",
 		}
 	case statusCompleted:
 		if isToday {
 			return &workoutAction{
 				StartWorkout: false,
+				IsCTA:        false,
 				Label:        "Review Workout",
 			}
 		}
 		return &workoutAction{
 			StartWorkout: false,
+			IsCTA:        false,
 			Label:        "View Details",
 		}
 	case statusUpcoming:
 		return &workoutAction{
 			StartWorkout: true,
+			IsCTA:        false,
 			Label:        "Start Early",
 		}
 	case statusPastIncomplete:
 		return &workoutAction{
 			StartWorkout: true,
+			IsCTA:        false,
 			Label:        "Start Late",
 		}
 	default:
 		return nil
+	}
+}
+
+// shouldShowRibbon returns true for cards that carry the side-ribbon
+// emphasis: today, in-progress, completed, and missed-past. Upcoming
+// and unscheduled have no ribbon.
+func shouldShowRibbon(status string) bool {
+	switch status {
+	case statusToday, statusInProgress, statusCompleted, statusPastIncomplete:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -311,6 +337,7 @@ func toDays(sessions []domain.Session, preferences domain.Preferences) []dayView
 			TotalSets:          totalSets,
 			ProgressPercent:    progressPercent,
 			ShouldShowProgress: totalSets > 0 && status != statusUnscheduled,
+			ShouldShowRibbon:   shouldShowRibbon(status),
 			DifficultyRating:   session.DifficultyRating,
 			DifficultyStars:    difficultyStars,
 			Action:             action,

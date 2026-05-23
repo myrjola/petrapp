@@ -238,7 +238,7 @@
             <article class="day"
                      data-status="{{ .Status }}"
                      data-day="{{ .Date.Format "2006-01-02" }}"
-                     {{ if or (eq .Status "today") (eq .Status "in_progress") (eq .Status "completed") (eq .Status "past-incomplete") }}data-ribbon{{ end }}>
+                     {{ if .ShouldShowRibbon }}data-ribbon{{ end }}>
 
                 <div class="day-overline">
                     <span>{{ .Date.Format "Jan 2" }}</span>
@@ -250,7 +250,7 @@
 
                     {{ if .Action }}
                         <div class="day-action">
-                            {{ if eq .Status "today" }}
+                            {{ if .Action.IsCTA }}
                                 <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
                                     <button type="submit" class="btn day-cta">{{ .Action.Label }}</button>
                                 </form>

@@ -104,6 +104,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 		isToday          bool
 		wantNil          bool
 		wantStartWorkout bool
+		wantIsCTA        bool
 		wantLabel        string
 	}{
 		{
@@ -112,6 +113,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          true,
 			wantNil:          false,
 			wantStartWorkout: true,
+			wantIsCTA:        true,
 			wantLabel:        "Start Workout",
 		},
 		{
@@ -120,6 +122,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          false,
 			wantNil:          false,
 			wantStartWorkout: false,
+			wantIsCTA:        false,
 			wantLabel:        "Continue Workout",
 		},
 		{
@@ -128,6 +131,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          false,
 			wantNil:          false,
 			wantStartWorkout: false,
+			wantIsCTA:        false,
 			wantLabel:        "View Details",
 		},
 		{
@@ -136,6 +140,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          false,
 			wantNil:          false,
 			wantStartWorkout: true,
+			wantIsCTA:        false,
 			wantLabel:        "Start Late",
 		},
 		{
@@ -144,6 +149,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          false,
 			wantNil:          false,
 			wantStartWorkout: true,
+			wantIsCTA:        false,
 			wantLabel:        "Start Early",
 		},
 		{
@@ -152,6 +158,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          true,
 			wantNil:          false,
 			wantStartWorkout: true,
+			wantIsCTA:        false,
 			wantLabel:        "Start Extra Workout",
 		},
 		{
@@ -160,6 +167,7 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			isToday:          false,
 			wantNil:          true,
 			wantStartWorkout: false,
+			wantIsCTA:        false,
 			wantLabel:        "",
 		},
 	}
@@ -179,8 +187,34 @@ func TestCalculateWorkoutAction(t *testing.T) {
 			if got.StartWorkout != tt.wantStartWorkout {
 				t.Errorf("StartWorkout = %v, want %v", got.StartWorkout, tt.wantStartWorkout)
 			}
+			if got.IsCTA != tt.wantIsCTA {
+				t.Errorf("IsCTA = %v, want %v", got.IsCTA, tt.wantIsCTA)
+			}
 			if got.Label != tt.wantLabel {
 				t.Errorf("Label = %q, want %q", got.Label, tt.wantLabel)
+			}
+		})
+	}
+}
+
+func TestShouldShowRibbon(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		status string
+		want   bool
+	}{
+		{statusToday, true},
+		{statusInProgress, true},
+		{statusCompleted, true},
+		{statusPastIncomplete, true},
+		{statusUpcoming, false},
+		{statusUnscheduled, false},
+		{statusNotStarted, false},
+	} {
+		t.Run(tc.status, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldShowRibbon(tc.status); got != tc.want {
+				t.Errorf("shouldShowRibbon(%q) = %v, want %v", tc.status, got, tc.want)
 			}
 		})
 	}
