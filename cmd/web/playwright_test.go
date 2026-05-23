@@ -49,7 +49,13 @@ func setupPlaywrightPage(t *testing.T) (playwright.Page, string) {
 	}
 	t.Cleanup(func() { _ = browser.Close() })
 
-	bCtx, err := browser.NewContext()
+	// Emulate prefers-reduced-motion: reduce. The app's CSS honors this
+	// media feature and collapses view transitions to 0.001ms, removes
+	// button transforms, and disables the loading-bar animation — all of
+	// which Playwright waits on for actionability/stability checks.
+	bCtx, err := browser.NewContext(playwright.BrowserNewContextOptions{
+		ReducedMotion: playwright.ReducedMotionReduce,
+	})
 	if err != nil {
 		t.Fatalf("new browser context: %v", err)
 	}
