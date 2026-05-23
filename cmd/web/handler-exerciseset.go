@@ -41,7 +41,7 @@ type exerciseSetTemplateData struct {
 	CurrentSetTimedTarget int              // Recommended seconds for time_based exercises; 0 for others.
 	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
 	RestEndAtMs           int64            // 0 when no rest chip should be shown.
-	CurrentSetNumber      int              // 1-based number of the first incomplete set (or len+1 when all done).
+	CurrentSetNumber      int              // 1-based number of the first incomplete set, clamped to TotalSetCount when all done.
 	TotalSetCount         int              // len(ExerciseSet.Sets), for the "Set N of M" overline.
 }
 
@@ -208,7 +208,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		CurrentSetTimedTarget: currentSetTimedTarget,
 		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
 		RestEndAtMs:           restEndAtMs,
-		CurrentSetNumber:      getFirstIncompleteIndex(exerciseSet.Sets) + 1,
+		CurrentSetNumber:      min(getFirstIncompleteIndex(exerciseSet.Sets)+1, len(exerciseSet.Sets)),
 		TotalSetCount:         len(exerciseSet.Sets),
 	}
 

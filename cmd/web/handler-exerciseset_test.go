@@ -1451,3 +1451,75 @@ func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
 		t.Errorf("[data-cancel] count inside runner = %d, want 1", cancelBtn.Length())
 	}
 }
+
+// Test_application_exerciseSet_overline_clamps_when_all_sets_complete verifies
+// that the "Set N of M" overline does not overflow past the total once every
+// set is complete — it should read "Set M of M", not "Set M+1 of M".
+func Test_application_exerciseSet_overline_clamps_when_all_sets_complete(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	db := server.DB()
+	var plankID int
+	if err = db.QueryRowContext(ctx,
+		`SELECT id FROM exercises WHERE name = 'Plank'`).Scan(&plankID); err != nil {
+		t.Fatalf("get Plank id: %v", err)
+	}
+
+	var slotID int
+	if err = db.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+            warmup_completed_at)
+         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions WHERE workout_date = ?
+         RETURNING id`, plankID, today).Scan(&slotID); err != nil {
+		t.Fatalf("insert plank slot: %v", err)
+	}
+
+	// Seed a single set already completed so the page renders the "all sets
+	// done" state.
+	if _, err = db.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+            weight_kg, target_value, completed_value, completed_at)
+         VALUES (?, 1, 0.0, 30, 30, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))`, slotID); err != nil {
+		t.Fatalf("insert completed plank set: %v", err)
+	}
+
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
+		t.Fatalf("get exercise set page: %v", err)
+	}
+
+	suffix := strings.TrimSpace(doc.Find(".overline-suffix").Text())
+	if !strings.Contains(suffix, "Set 1 of 1") {
+		t.Errorf("overline suffix = %q, want it to contain %q (no overflow past total)",
+			suffix, "Set 1 of 1")
+	}
+}
