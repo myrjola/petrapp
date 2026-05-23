@@ -207,6 +207,74 @@ func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 	}
 }
 
+// Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels is the
+// regression for a defect where finishing the last set of one exercise
+// scheduled a "Time for set N+1 of N" push because the gate was session-wide
+// instead of per-slot. After the fix the policy returns Cancel for the
+// just-finished slot.
+func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	// Seed a SECOND exercise slot with one incomplete set so the session
+	// still has work after finishing the first slot's only set.
+	var otherExerciseID int
+	if err := db.ReadOnly.QueryRowContext(ctx,
+		`SELECT id FROM exercises WHERE name = 'Bench Press'`,
+	).Scan(&otherExerciseID); err != nil {
+		t.Fatalf("get bench press id: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	var otherWEID int
+	if err := db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
+		 VALUES (?, ?, ?) RETURNING id`,
+		userID, today, otherExerciseID,
+	).Scan(&otherWEID); err != nil {
+		t.Fatalf("insert second workout_exercise: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+		 VALUES (?, 1, 60.0, 5)`, otherWEID,
+	); err != nil {
+		t.Fatalf("insert other slot set: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/cancel', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	// Complete the only set in the first slot (weID).
+	weight := 100.0
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	sig := domain.SignalOnTarget
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 0 {
+		t.Errorf("Schedule calls = %d, want 0 (slot fully complete must not schedule)", len(fake.scheduled))
+	}
+	if len(fake.cancels) != 1 {
+		t.Fatalf("Cancel calls = %d, want 1", len(fake.cancels))
+	}
+	if fake.cancels[0] != weID {
+		t.Errorf("Cancel target = %d, want %d", fake.cancels[0], weID)
+	}
+}
+
 // setupSessionForRecordSet builds a workout session with one weighted exercise
 // and one planned set, returning everything the scheduling tests need.
 func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, int, int) {
