@@ -324,31 +324,36 @@ function registerServiceWorker() {
     return navigator.serviceWorker.register(swUrl)
 }
 
+// Clear the bfcache-captured button spinner on restore. The navigation
+// that started the spinner has long since resolved; the snapshot just
+// has stale aria-busy / .btn-loading-label markup that startLoad would
+// otherwise leave dangling.
 window.addEventListener('pageshow', (event) => {
-    if (event.persisted) {
-        // Clear any in-flight navigation feedback that was captured in the
-        // bfcache snapshot — the navigation that triggered it has long
-        // since resolved (we are reading this snapshot from the cache).
-        clearLoad()
+    if (event.persisted) clearLoad()
+})
 
-        // Pages that handle their own bfcache invalidation opt out here so
-        // their custom flow (e.g. replace navigation for cross-doc view
-        // transitions) isn't preempted by our global reload.
-        if (document.body.dataset.bfcacheHandler === 'page-local') return
-
-        // Reload if the invalidation cookie has changed since this page was rendered.
-        // The render-time value is baked into a <meta> tag; a mismatch means a POST
-        // ran while we were in bfcache and our state may be stale.
-        const meta = document.querySelector('meta[name="invalidation-token"]')
-        const rendered = meta ? meta.content : ''
-        const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
-        const current = m ? m[1] : ''
-        if (rendered !== current) {
-            if ('navigation' in window) {
-                navigation.reload()
-            } else {
-                location.reload()
-            }
-        }
-    }
+// Staleness check runs on every reveal — fresh load, prefetched-and-
+// promoted load, bfcache restore. Catches three classes of stale-doc:
+//   1. bfcache restore of a page rendered before a since-POSTed mutation
+//   2. Speculation Rules prefetch promoted after a POST has moved the
+//      cookie past the prefetched response's baked token (base.gohtml
+//      prefetches all /* at conservative eagerness)
+//   3. (defensive) any other path that promotes a doc whose meta token
+//      is older than the current cookie
+//
+// Pages that drive their own bfcache flow opt out via dataset:
+// workout.gohtml sets data-bfcache-handler="page-local" at parse time
+// and runs its own pagereveal handler that does a replace navigation to
+// keep the bfcache snapshot as the outgoing view-transition snapshot
+// (so the per-card strike-through animation can play).
+//
+// Verified by tlaplus/StackNav_PrefetchMitigated.cfg.
+window.addEventListener('pagereveal', () => {
+    if (document.body.dataset.bfcacheHandler === 'page-local') return
+    const meta = document.querySelector('meta[name="invalidation-token"]')
+    const rendered = meta ? meta.content : ''
+    const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
+    const current = m ? m[1] : ''
+    if (rendered === current) return
+    navigation.reload()
 })
