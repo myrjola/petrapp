@@ -1,7 +1,12 @@
 package service_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -133,6 +138,21 @@ func (f *fakeScheduler) CancelForWorkout(_ context.Context, userID int, date tim
 	f.mu.Lock()
 	f.workout = append(f.workout, fakeWorkoutCancel{userID: userID, date: date})
 	f.mu.Unlock()
+	return nil
+}
+
+// erroringScheduler returns the configured error from Schedule and behaves
+// like a normal fake for Cancel/CancelForWorkout. Used to exercise the
+// rest-push failure-logging path.
+type erroringScheduler struct {
+	scheduleErr error
+}
+
+func (e *erroringScheduler) Schedule(_ context.Context, _ domain.ScheduledPush) error {
+	return e.scheduleErr
+}
+func (e *erroringScheduler) Cancel(_ context.Context, _ int) error { return nil }
+func (e *erroringScheduler) CancelForWorkout(_ context.Context, _ int, _ time.Time) error {
 	return nil
 }
 
@@ -470,4 +490,55 @@ func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, 
 		t.Fatalf("insert set: %v", err)
 	}
 	return ctx, db, userID, weID
+}
+
+func Test_RecordSet_FailedSchedule_LogsUserAndExerciseID(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	// Seed an incomplete second set so the just-completed one isn't the last,
+	// which means PlanRestPush returns Schedule (not Cancel).
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+		 VALUES (?, 2, 100.0, 5)`, weID,
+	); err != nil {
+		t.Fatalf("seed second set: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/fail', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	var logBuf bytes.Buffer
+	//nolint:exhaustruct // AddSource/ReplaceAttr intentionally zero.
+	handlerOpts := &slog.HandlerOptions{Level: slog.LevelDebug}
+	logger := slog.New(slog.NewTextHandler(&logBuf, handlerOpts))
+	failer := &erroringScheduler{scheduleErr: errors.New("boom: push backend down")}
+	svc := service.NewService(db, logger, "").WithScheduler(failer)
+
+	weight := 100.0
+	sig := domain.SignalOnTarget
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+
+	out := logBuf.String()
+	wantUser := fmt.Sprintf("user_id=%d", userID)
+	wantWE := fmt.Sprintf("workout_exercise_id=%d", weID)
+	if !strings.Contains(out, wantUser) {
+		t.Errorf("log missing %q; got:\n%s", wantUser, out)
+	}
+	if !strings.Contains(out, wantWE) {
+		t.Errorf("log missing %q; got:\n%s", wantWE, out)
+	}
+	if !strings.Contains(out, "rest push: schedule failed") {
+		t.Errorf("log missing expected message; got:\n%s", out)
+	}
 }
