@@ -157,19 +157,6 @@ func (h *WebAuthnHandler) BeginRegistration(ctx context.Context) ([]byte, error)
 	return out, nil
 }
 
-func (h *WebAuthnHandler) parseWebAuthnSession(ctx context.Context) (webauthn.SessionData, error) {
-	var (
-		session webauthn.SessionData
-		ok      bool
-		err     error
-	)
-	ses := h.sessionManager.Get(ctx, string(webAuthnSessionKey))
-	if session, ok = ses.(webauthn.SessionData); !ok {
-		err = fmt.Errorf("could not parse webauthn.SessionData (data: %v)", ses)
-	}
-	return session, err
-}
-
 func (h *WebAuthnHandler) FinishRegistration(r *http.Request) error {
 	var (
 		err     error
@@ -217,12 +204,6 @@ func (h *WebAuthnHandler) BeginLogin(r *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("json marshal webauthn options: %w", err)
 	}
 	return out, nil
-}
-
-func (h *WebAuthnHandler) findUserHandler(ctx context.Context) webauthn.DiscoverableUserHandler {
-	return func(_, userID []byte) (webauthn.User, error) {
-		return h.getUser(ctx, userID)
-	}
 }
 
 func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
@@ -293,4 +274,23 @@ func (h *WebAuthnHandler) DeleteUser(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (h *WebAuthnHandler) parseWebAuthnSession(ctx context.Context) (webauthn.SessionData, error) {
+	var (
+		session webauthn.SessionData
+		ok      bool
+		err     error
+	)
+	ses := h.sessionManager.Get(ctx, string(webAuthnSessionKey))
+	if session, ok = ses.(webauthn.SessionData); !ok {
+		err = fmt.Errorf("could not parse webauthn.SessionData (data: %v)", ses)
+	}
+	return session, err
+}
+
+func (h *WebAuthnHandler) findUserHandler(ctx context.Context) webauthn.DiscoverableUserHandler {
+	return func(_, userID []byte) (webauthn.User, error) {
+		return h.getUser(ctx, userID)
+	}
 }

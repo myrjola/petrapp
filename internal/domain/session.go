@@ -136,18 +136,6 @@ func (s *Session) SetDifficulty(rating int) error {
 	return nil
 }
 
-// findSlot returns a pointer to the exercise slot identified by slotID, or
-// ErrSlotNotFound when no slot matches. The pointer aliases into
-// ExerciseSets so callers can mutate the slot in place.
-func (s *Session) findSlot(slotID int) (*ExerciseSet, error) {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID == slotID {
-			return &s.ExerciseSets[i], nil
-		}
-	}
-	return nil, ErrSlotNotFound
-}
-
 // Slot returns a copy of the exercise slot identified by slotID; ok is false
 // when no slot matches. It is a read accessor for callers that need to
 // inspect slot state — e.g. the service layer capturing pre-mutation data
@@ -353,4 +341,16 @@ func (s *Session) HasIncompleteSets() bool {
 		}
 	}
 	return false
+}
+
+// findSlot returns a pointer to the exercise slot identified by slotID, or
+// ErrSlotNotFound when no slot matches. The pointer aliases into
+// ExerciseSets so callers can mutate the slot in place.
+func (s *Session) findSlot(slotID int) (*ExerciseSet, error) {
+	for i := range s.ExerciseSets {
+		if s.ExerciseSets[i].ID == slotID {
+			return &s.ExerciseSets[i], nil
+		}
+	}
+	return nil, ErrSlotNotFound
 }

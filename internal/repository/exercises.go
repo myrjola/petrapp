@@ -23,55 +23,32 @@ func (r *sqliteExerciseRepository) Get(ctx context.Context, id int) (domain.Exer
 	return r.get(ctx, r.db.ReadOnly, id)
 }
 
-// get loads a single exercise via q, which may be the read-only handle or an
-// open transaction. Reading through the Update transaction is what makes the
-// exercise read-modify-write atomic.
-func (r *sqliteExerciseRepository) get(ctx context.Context, q queryer, id int) (domain.Exercise, error) {
-	var exercise domain.Exercise
-	var defaultStartingSeconds, repMin, repMax sql.NullInt64
-
-	err := q.QueryRowContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown,
-		       default_starting_seconds, rep_min, rep_max
-		FROM exercises
-		WHERE id = ?`, id).Scan(
-		&exercise.ID,
-		&exercise.Name,
-		&exercise.Category,
-		&exercise.ExerciseType,
-		&exercise.DescriptionMarkdown,
-		&defaultStartingSeconds,
-		&repMin,
-		&repMax,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.Exercise{}, domain.ErrNotFound
-	}
+func (r *sqliteExerciseRepository) ListMuscleGroups(ctx context.Context) (_ []string, err error) {
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+		SELECT name
+		FROM muscle_groups
+		ORDER BY name`)
 	if err != nil {
-		return domain.Exercise{}, fmt.Errorf("query exercise: %w", err)
+		return nil, fmt.Errorf("query muscle groups: %w", err)
 	}
-	if defaultStartingSeconds.Valid {
-		v := int(defaultStartingSeconds.Int64)
-		exercise.DefaultStartingSeconds = &v
-	}
-	if repMin.Valid {
-		v := int(repMin.Int64)
-		exercise.RepMin = &v
-	}
-	if repMax.Valid {
-		v := int(repMax.Int64)
-		exercise.RepMax = &v
-	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
 
-	byExercise, err := fetchMuscleGroupsByExerciseID(ctx, q, []int{exercise.ID})
-	if err != nil {
-		return domain.Exercise{}, fmt.Errorf("fetch muscle groups for exercise %d: %w", exercise.ID, err)
+	var muscleGroups []string
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scan muscle group: %w", err)
+		}
+		muscleGroups = append(muscleGroups, name)
 	}
-	g := byExercise[exercise.ID]
-	exercise.PrimaryMuscleGroups = g.primary
-	exercise.SecondaryMuscleGroups = g.secondary
-
-	return exercise, nil
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+	return muscleGroups, nil
 }
 
 func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []domain.Exercise, err error) {
@@ -190,6 +167,57 @@ func (r *sqliteExerciseRepository) Update(
 	return nil
 }
 
+// get loads a single exercise via q, which may be the read-only handle or an
+// open transaction. Reading through the Update transaction is what makes the
+// exercise read-modify-write atomic.
+func (r *sqliteExerciseRepository) get(ctx context.Context, q queryer, id int) (domain.Exercise, error) {
+	var exercise domain.Exercise
+	var defaultStartingSeconds, repMin, repMax sql.NullInt64
+
+	err := q.QueryRowContext(ctx, `
+		SELECT id, name, category, exercise_type, description_markdown,
+		       default_starting_seconds, rep_min, rep_max
+		FROM exercises
+		WHERE id = ?`, id).Scan(
+		&exercise.ID,
+		&exercise.Name,
+		&exercise.Category,
+		&exercise.ExerciseType,
+		&exercise.DescriptionMarkdown,
+		&defaultStartingSeconds,
+		&repMin,
+		&repMax,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Exercise{}, domain.ErrNotFound
+	}
+	if err != nil {
+		return domain.Exercise{}, fmt.Errorf("query exercise: %w", err)
+	}
+	if defaultStartingSeconds.Valid {
+		v := int(defaultStartingSeconds.Int64)
+		exercise.DefaultStartingSeconds = &v
+	}
+	if repMin.Valid {
+		v := int(repMin.Int64)
+		exercise.RepMin = &v
+	}
+	if repMax.Valid {
+		v := int(repMax.Int64)
+		exercise.RepMax = &v
+	}
+
+	byExercise, err := fetchMuscleGroupsByExerciseID(ctx, q, []int{exercise.ID})
+	if err != nil {
+		return domain.Exercise{}, fmt.Errorf("fetch muscle groups for exercise %d: %w", exercise.ID, err)
+	}
+	g := byExercise[exercise.ID]
+	exercise.PrimaryMuscleGroups = g.primary
+	exercise.SecondaryMuscleGroups = g.secondary
+
+	return exercise, nil
+}
+
 // set writes the exercise row and its muscle-group associations inside tx. When
 // upsert is true the existing row (matched by ex.ID) is deleted first and the
 // explicit ID is reused; otherwise a fresh ID is assigned and returned. The
@@ -271,32 +299,4 @@ func (r *sqliteExerciseRepository) insertMuscleGroups(
 		return fmt.Errorf("insert muscle groups: %w", err)
 	}
 	return nil
-}
-
-func (r *sqliteExerciseRepository) ListMuscleGroups(ctx context.Context) (_ []string, err error) {
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT name
-		FROM muscle_groups
-		ORDER BY name`)
-	if err != nil {
-		return nil, fmt.Errorf("query muscle groups: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
-		}
-	}()
-
-	var muscleGroups []string
-	for rows.Next() {
-		var name string
-		if err = rows.Scan(&name); err != nil {
-			return nil, fmt.Errorf("scan muscle group: %w", err)
-		}
-		muscleGroups = append(muscleGroups, name)
-	}
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows error: %w", err)
-	}
-	return muscleGroups, nil
 }

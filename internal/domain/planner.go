@@ -44,6 +44,142 @@ func NewPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTa
 	}
 }
 
+// Plan generates one Session per scheduled workout day for the week beginning on
+// startingDate. Returns an error if startingDate is not a Monday, if no workout days are
+// scheduled, or if a scheduled day has no compatible exercises.
+func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
+	if startingDate.Weekday() != time.Monday {
+		return nil, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
+	}
+
+	// Collect scheduled workout days Mon–Sun.
+	var workoutDays []time.Time
+	for i := range 7 {
+		day := startingDate.AddDate(0, 0, i)
+		if wp.Prefs.IsWorkoutDay(day.Weekday()) {
+			workoutDays = append(workoutDays, day)
+		}
+	}
+	if len(workoutDays) == 0 {
+		return nil, errors.New("no workout days scheduled in preferences")
+	}
+
+	// Phase 1: determine category for each scheduled day.
+	categories := make(map[time.Time]Category, len(workoutDays))
+	for _, day := range workoutDays {
+		cat := wp.determineCategory(day)
+		if !wp.hasExercisesForCategory(cat) {
+			return nil, fmt.Errorf("%w: %s day (%s)", errNoExercisesForCategory, cat, day.Weekday())
+		}
+		categories[day] = cat
+	}
+
+	// Phase 2: allocate muscle group slots across days.
+	dayMuscleGroups := wp.allocateMuscleGroups(workoutDays, categories)
+
+	// Determine periodization type for first session.
+	firstPT := wp.firstSessionPeriodizationType(startingDate)
+	isDeload := IsDeloadWeek(startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
+
+	// Phase 3: select exercises and build sessions.
+	weekUsedExercises := make(map[int]bool)
+	sessions := make([]Session, len(workoutDays))
+	for i, day := range workoutDays {
+		pt := nextPeriodizationType(firstPT, i)
+		if isDeload {
+			pt = PeriodizationHypertrophy
+		}
+		n := exercisesPerSession(wp.Prefs, day.Weekday())
+		exerciseSets := wp.selectExercisesForDayWithPeriodization(
+			categories[day],
+			dayMuscleGroups[day],
+			n,
+			pt,
+			isDeload,
+			weekUsedExercises,
+		)
+
+		// Record which exercises were used this week.
+		for _, es := range exerciseSets {
+			weekUsedExercises[es.Exercise.ID] = true
+		}
+
+		sessions[i] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+			Date:              day,
+			PeriodizationType: pt,
+			IsDeload:          isDeload,
+			ExerciseSets:      exerciseSets,
+		}
+	}
+
+	return sessions, nil
+}
+
+// PlanDay generates one Session for date, suitable for ad-hoc workouts on
+// days outside the weekly plan (extra workouts, or days added mid-week after
+// Plan(monday) already ran). weekUsedExerciseIDs is the set of exercise IDs
+// already used in other sessions this week; the planner avoids repeating
+// them when possible. Returns errNoExercisesForCategory (wrapped) if the
+// derived category has no compatible exercises.
+func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Session, error) {
+	category := wp.determineCategory(date)
+	if !wp.hasExercisesForCategory(category) {
+		return Session{}, fmt.Errorf(
+			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday())
+	}
+
+	// Exercise count: from prefs if the day is scheduled, otherwise medium.
+	n := exercisesPerSession(wp.Prefs, date.Weekday())
+	if n == 0 {
+		n = exercisesMedium
+	}
+
+	// Periodization: replicate the weekly planner's per-day alternation.
+	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
+	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
+	// handles Sunday correctly: time.Sunday = 0 < time.Monday = 1, so an int
+	// range would never count anything for a Sunday date.
+	idx := 0
+	target := date.Weekday()
+	for _, d := range []time.Weekday{
+		time.Monday, time.Tuesday, time.Wednesday,
+		time.Thursday, time.Friday, time.Saturday,
+	} {
+		if d == target {
+			break
+		}
+		if wp.Prefs.IsWorkoutDay(d) {
+			idx++
+		}
+	}
+	// Sunday never matches any d above, so it falls through with the full count
+	// of scheduled Mon..Sat days — exactly the index workoutDays[i==len-1] would
+	// have produced for it.
+	monday := MondayOf(date)
+	firstPT := wp.firstSessionPeriodizationType(monday)
+	pt := nextPeriodizationType(firstPT, idx)
+
+	isDeload := IsDeloadWeek(monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
+	if isDeload {
+		pt = PeriodizationHypertrophy
+	}
+
+	used := weekUsedExerciseIDs
+	if used == nil {
+		used = make(map[int]bool)
+	}
+	exerciseSets := wp.selectExercisesForDayWithPeriodization(
+		category, nil, n, pt, isDeload, used,
+	)
+
+	return Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+		Date:              date,
+		PeriodizationType: pt,
+		IsDeload:          isDeload,
+		ExerciseSets:      exerciseSets,
+	}, nil
+}
+
 // exercisesPerSession returns how many exercises to include based on session duration.
 func exercisesPerSession(prefs Preferences, weekday time.Weekday) int {
 	switch minutes := prefs.MinutesForDay(weekday); {
@@ -349,142 +485,6 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 		return PeriodizationHypertrophy
 	}
 	return PeriodizationStrength
-}
-
-// Plan generates one Session per scheduled workout day for the week beginning on
-// startingDate. Returns an error if startingDate is not a Monday, if no workout days are
-// scheduled, or if a scheduled day has no compatible exercises.
-func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
-	if startingDate.Weekday() != time.Monday {
-		return nil, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
-	}
-
-	// Collect scheduled workout days Mon–Sun.
-	var workoutDays []time.Time
-	for i := range 7 {
-		day := startingDate.AddDate(0, 0, i)
-		if wp.Prefs.IsWorkoutDay(day.Weekday()) {
-			workoutDays = append(workoutDays, day)
-		}
-	}
-	if len(workoutDays) == 0 {
-		return nil, errors.New("no workout days scheduled in preferences")
-	}
-
-	// Phase 1: determine category for each scheduled day.
-	categories := make(map[time.Time]Category, len(workoutDays))
-	for _, day := range workoutDays {
-		cat := wp.determineCategory(day)
-		if !wp.hasExercisesForCategory(cat) {
-			return nil, fmt.Errorf("%w: %s day (%s)", errNoExercisesForCategory, cat, day.Weekday())
-		}
-		categories[day] = cat
-	}
-
-	// Phase 2: allocate muscle group slots across days.
-	dayMuscleGroups := wp.allocateMuscleGroups(workoutDays, categories)
-
-	// Determine periodization type for first session.
-	firstPT := wp.firstSessionPeriodizationType(startingDate)
-	isDeload := IsDeloadWeek(startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
-
-	// Phase 3: select exercises and build sessions.
-	weekUsedExercises := make(map[int]bool)
-	sessions := make([]Session, len(workoutDays))
-	for i, day := range workoutDays {
-		pt := nextPeriodizationType(firstPT, i)
-		if isDeload {
-			pt = PeriodizationHypertrophy
-		}
-		n := exercisesPerSession(wp.Prefs, day.Weekday())
-		exerciseSets := wp.selectExercisesForDayWithPeriodization(
-			categories[day],
-			dayMuscleGroups[day],
-			n,
-			pt,
-			isDeload,
-			weekUsedExercises,
-		)
-
-		// Record which exercises were used this week.
-		for _, es := range exerciseSets {
-			weekUsedExercises[es.Exercise.ID] = true
-		}
-
-		sessions[i] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
-			Date:              day,
-			PeriodizationType: pt,
-			IsDeload:          isDeload,
-			ExerciseSets:      exerciseSets,
-		}
-	}
-
-	return sessions, nil
-}
-
-// PlanDay generates one Session for date, suitable for ad-hoc workouts on
-// days outside the weekly plan (extra workouts, or days added mid-week after
-// Plan(monday) already ran). weekUsedExerciseIDs is the set of exercise IDs
-// already used in other sessions this week; the planner avoids repeating
-// them when possible. Returns errNoExercisesForCategory (wrapped) if the
-// derived category has no compatible exercises.
-func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Session, error) {
-	category := wp.determineCategory(date)
-	if !wp.hasExercisesForCategory(category) {
-		return Session{}, fmt.Errorf(
-			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday())
-	}
-
-	// Exercise count: from prefs if the day is scheduled, otherwise medium.
-	n := exercisesPerSession(wp.Prefs, date.Weekday())
-	if n == 0 {
-		n = exercisesMedium
-	}
-
-	// Periodization: replicate the weekly planner's per-day alternation.
-	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
-	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
-	// handles Sunday correctly: time.Sunday = 0 < time.Monday = 1, so an int
-	// range would never count anything for a Sunday date.
-	idx := 0
-	target := date.Weekday()
-	for _, d := range []time.Weekday{
-		time.Monday, time.Tuesday, time.Wednesday,
-		time.Thursday, time.Friday, time.Saturday,
-	} {
-		if d == target {
-			break
-		}
-		if wp.Prefs.IsWorkoutDay(d) {
-			idx++
-		}
-	}
-	// Sunday never matches any d above, so it falls through with the full count
-	// of scheduled Mon..Sat days — exactly the index workoutDays[i==len-1] would
-	// have produced for it.
-	monday := MondayOf(date)
-	firstPT := wp.firstSessionPeriodizationType(monday)
-	pt := nextPeriodizationType(firstPT, idx)
-
-	isDeload := IsDeloadWeek(monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
-	if isDeload {
-		pt = PeriodizationHypertrophy
-	}
-
-	used := weekUsedExerciseIDs
-	if used == nil {
-		used = make(map[int]bool)
-	}
-	exerciseSets := wp.selectExercisesForDayWithPeriodization(
-		category, nil, n, pt, isDeload, used,
-	)
-
-	return Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
-		Date:              date,
-		PeriodizationType: pt,
-		IsDeload:          isDeload,
-		ExerciseSets:      exerciseSets,
-	}, nil
 }
 
 // MondayOf returns the Monday of the week containing date, at 00:00 UTC.

@@ -56,15 +56,6 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 	}
 }
 
-// userMutex returns the per-user mutex, creating it on first access.
-func (s *Service) userMutex(userID int) *sync.Mutex {
-	if m, ok := s.userLocks.Load(userID); ok {
-		return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
-	}
-	m, _ := s.userLocks.LoadOrStore(userID, &sync.Mutex{})
-	return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
-}
-
 // Repos exposes the wired repositories so the notification.Scheduler can
 // reuse them at process startup without re-instantiating. Only intended
 // for main.go; HTTP handlers should call typed Service methods instead.
@@ -126,6 +117,15 @@ func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
 		return fmt.Errorf("save preferences: %w", err)
 	}
 	return nil
+}
+
+// userMutex returns the per-user mutex, creating it on first access.
+func (s *Service) userMutex(userID int) *sync.Mutex {
+	if m, ok := s.userLocks.Load(userID); ok {
+		return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
+	}
+	m, _ := s.userLocks.LoadOrStore(userID, &sync.Mutex{})
+	return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
 }
 
 // nextMonday returns the upcoming Monday at 00:00 UTC. If now is already a

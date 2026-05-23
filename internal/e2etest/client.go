@@ -171,22 +171,6 @@ func (c *Client) GetDoc(ctx context.Context, urlPath string) (*goquery.Document,
 	return doc, nil
 }
 
-// newRequestWithContext creates a new HTTP request to the server that respects the given context.
-func (c *Client) newRequestWithContext(
-	ctx context.Context,
-	method, urlPath string,
-	body io.Reader,
-) (*http.Request, error) {
-	var (
-		req *http.Request
-		err error
-	)
-	if req, err = http.NewRequestWithContext(ctx, method, c.url+urlPath, body); err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	return req.WithContext(ctx), nil
-}
-
 // Register registers a new WebAuthn credential with the server and returns the front page document.
 func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 	var attOpts *virtualwebauthn.AttestationOptions
@@ -212,71 +196,6 @@ func (c *Client) Register(ctx context.Context) (*goquery.Document, error) {
 	return doc, nil
 }
 
-// finishRegistration finishes the registration process and returns the new credential that can be used for logging in.
-func (c *Client) finishRegistration(
-	ctx context.Context,
-	attOpts *virtualwebauthn.AttestationOptions,
-) (*virtualwebauthn.Credential, error) {
-	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	attestationResponse := virtualwebauthn.CreateAttestationResponse(c.rp, c.authenticator, credential, *attOpts)
-	var (
-		req *http.Request
-		err error
-	)
-	if req, err = c.newRequestWithContext(
-		ctx,
-		http.MethodPost,
-		"/api/registration/finish",
-		strings.NewReader(attestationResponse),
-	); err != nil {
-		return nil, fmt.Errorf("new request with context: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	var resp *http.Response
-	if resp, err = c.client.Do(req); err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	if err = resp.Body.Close(); err != nil {
-		return nil, fmt.Errorf("close response body: %w", err)
-	}
-	if http.StatusOK != resp.StatusCode {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	return &credential, nil
-}
-
-// startRegistration starts the registration process and returns the attestation options needed for finishRegistration.
-func (c *Client) startRegistration(
-	ctx context.Context,
-	registrationStartURLPath string,
-) (*virtualwebauthn.AttestationOptions, error) {
-	var (
-		err error
-		req *http.Request
-	)
-	if req, err = c.newRequestWithContext(ctx, http.MethodPost, registrationStartURLPath, nil); err != nil {
-		return nil, fmt.Errorf("new request with context: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	var resp *http.Response
-	if resp, err = c.client.Do(req); err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-	if http.StatusOK != resp.StatusCode {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	var bodyBytes []byte
-	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
-		return nil, fmt.Errorf("read body bytes: %w", err)
-	}
-	var attOpts *virtualwebauthn.AttestationOptions
-	if attOpts, err = virtualwebauthn.ParseAttestationOptions(string(bodyBytes)); err != nil {
-		return nil, fmt.Errorf("parse attestation options: %w", err)
-	}
-	return attOpts, nil
-}
-
 // Login logs in to the server given there is a registered WebAuthn credential and returns the front page document.
 func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
 	var asOpts *virtualwebauthn.AssertionOptions
@@ -296,77 +215,6 @@ func (c *Client) Login(ctx context.Context) (*goquery.Document, error) {
 	return doc, nil
 }
 
-// startLogin starts the login process and returns the assertion options needed for finishLogin.
-func (c *Client) startLogin(
-	ctx context.Context,
-	loginStartURLPath string,
-) (*virtualwebauthn.AssertionOptions, error) {
-	var (
-		req *http.Request
-		err error
-	)
-	if req, err = c.newRequestWithContext(ctx, http.MethodPost, loginStartURLPath, nil); err != nil {
-		return nil, fmt.Errorf("new request with context: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	var resp *http.Response
-	if resp, err = c.client.Do(req); err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-	if http.StatusOK != resp.StatusCode {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	var bodyBytes []byte
-	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
-		return nil, fmt.Errorf("read body bytes: %w", err)
-	}
-	var asOpts *virtualwebauthn.AssertionOptions
-	if asOpts, err = virtualwebauthn.ParseAssertionOptions(string(bodyBytes)); err != nil {
-		return nil, fmt.Errorf("parse assertion options: %w", err)
-	}
-	return asOpts, nil
-}
-
-func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.AssertionOptions) error {
-	credential := c.authenticator.Credentials[0]
-	asResp := virtualwebauthn.CreateAssertionResponse(c.rp, c.authenticator, credential, *asOpts)
-	var (
-		req *http.Request
-		err error
-	)
-	if req, err = c.newRequestWithContext(
-		ctx,
-		http.MethodPost,
-		"/api/login/finish",
-		strings.NewReader(asResp),
-	); err != nil {
-		return fmt.Errorf("new request with context: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	var resp *http.Response
-	if resp, err = c.client.Do(req); err != nil {
-		return fmt.Errorf("do request: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	if http.StatusOK != resp.StatusCode {
-		// Parse error response body to detect unknown credential error.
-		var errResp struct {
-			Error string `json:"error"`
-		}
-		var bodyBytes []byte
-		bodyBytes, _ = io.ReadAll(resp.Body)
-		_ = json.Unmarshal(bodyBytes, &errResp)
-		if errResp.Error == "unknown_credential" {
-			return ErrUnknownCredential
-		}
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-	return nil
-}
-
 func (c *Client) Logout(ctx context.Context) (*goquery.Document, error) {
 	var (
 		doc *goquery.Document
@@ -379,30 +227,6 @@ func (c *Client) Logout(ctx context.Context) (*goquery.Document, error) {
 		return nil, fmt.Errorf("submit form: %w", err)
 	}
 	return doc, nil
-}
-
-func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPath string) (map[string]string, error) {
-	formSelector := fmt.Sprintf("form[action='%s']", formActionURLPath)
-	form := doc.Find(formSelector)
-
-	// Assert that the form exists
-	if form.Length() == 0 {
-		return nil, fmt.Errorf("form with action '%s' not found in document", formActionURLPath)
-	}
-
-	// Initialize the map to store hidden field values
-	hiddenFields := make(map[string]string)
-
-	// Find all hidden input fields
-	form.Find("input[type=hidden]").Each(func(_ int, s *goquery.Selection) {
-		name, nameExists := s.Attr("name")
-		value, valueExists := s.Attr("value")
-		if nameExists && valueExists {
-			hiddenFields[name] = value
-		}
-	})
-
-	return hiddenFields, nil
 }
 
 // SubmitForm submits a form in the doc identified with action formActionUrlPath and returns the response document.
@@ -602,4 +426,180 @@ func (c *Client) submitFormRequest(
 	}
 	newDoc.Url = resp.Request.URL
 	return newDoc, nil
+}
+
+// newRequestWithContext creates a new HTTP request to the server that respects the given context.
+func (c *Client) newRequestWithContext(
+	ctx context.Context,
+	method, urlPath string,
+	body io.Reader,
+) (*http.Request, error) {
+	var (
+		req *http.Request
+		err error
+	)
+	if req, err = http.NewRequestWithContext(ctx, method, c.url+urlPath, body); err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	return req.WithContext(ctx), nil
+}
+
+// startRegistration starts the registration process and returns the attestation options needed for finishRegistration.
+func (c *Client) startRegistration(
+	ctx context.Context,
+	registrationStartURLPath string,
+) (*virtualwebauthn.AttestationOptions, error) {
+	var (
+		err error
+		req *http.Request
+	)
+	if req, err = c.newRequestWithContext(ctx, http.MethodPost, registrationStartURLPath, nil); err != nil {
+		return nil, fmt.Errorf("new request with context: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	var resp *http.Response
+	if resp, err = c.client.Do(req); err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+	if http.StatusOK != resp.StatusCode {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	var bodyBytes []byte
+	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
+		return nil, fmt.Errorf("read body bytes: %w", err)
+	}
+	var attOpts *virtualwebauthn.AttestationOptions
+	if attOpts, err = virtualwebauthn.ParseAttestationOptions(string(bodyBytes)); err != nil {
+		return nil, fmt.Errorf("parse attestation options: %w", err)
+	}
+	return attOpts, nil
+}
+
+// finishRegistration finishes the registration process and returns the new credential that can be used for logging in.
+func (c *Client) finishRegistration(
+	ctx context.Context,
+	attOpts *virtualwebauthn.AttestationOptions,
+) (*virtualwebauthn.Credential, error) {
+	credential := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	attestationResponse := virtualwebauthn.CreateAttestationResponse(c.rp, c.authenticator, credential, *attOpts)
+	var (
+		req *http.Request
+		err error
+	)
+	if req, err = c.newRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"/api/registration/finish",
+		strings.NewReader(attestationResponse),
+	); err != nil {
+		return nil, fmt.Errorf("new request with context: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	var resp *http.Response
+	if resp, err = c.client.Do(req); err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	if err = resp.Body.Close(); err != nil {
+		return nil, fmt.Errorf("close response body: %w", err)
+	}
+	if http.StatusOK != resp.StatusCode {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	return &credential, nil
+}
+
+// startLogin starts the login process and returns the assertion options needed for finishLogin.
+func (c *Client) startLogin(
+	ctx context.Context,
+	loginStartURLPath string,
+) (*virtualwebauthn.AssertionOptions, error) {
+	var (
+		req *http.Request
+		err error
+	)
+	if req, err = c.newRequestWithContext(ctx, http.MethodPost, loginStartURLPath, nil); err != nil {
+		return nil, fmt.Errorf("new request with context: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	var resp *http.Response
+	if resp, err = c.client.Do(req); err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+	if http.StatusOK != resp.StatusCode {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	var bodyBytes []byte
+	if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
+		return nil, fmt.Errorf("read body bytes: %w", err)
+	}
+	var asOpts *virtualwebauthn.AssertionOptions
+	if asOpts, err = virtualwebauthn.ParseAssertionOptions(string(bodyBytes)); err != nil {
+		return nil, fmt.Errorf("parse assertion options: %w", err)
+	}
+	return asOpts, nil
+}
+
+func (c *Client) finishLogin(ctx context.Context, asOpts *virtualwebauthn.AssertionOptions) error {
+	credential := c.authenticator.Credentials[0]
+	asResp := virtualwebauthn.CreateAssertionResponse(c.rp, c.authenticator, credential, *asOpts)
+	var (
+		req *http.Request
+		err error
+	)
+	if req, err = c.newRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"/api/login/finish",
+		strings.NewReader(asResp),
+	); err != nil {
+		return fmt.Errorf("new request with context: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	var resp *http.Response
+	if resp, err = c.client.Do(req); err != nil {
+		return fmt.Errorf("do request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	if http.StatusOK != resp.StatusCode {
+		// Parse error response body to detect unknown credential error.
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		var bodyBytes []byte
+		bodyBytes, _ = io.ReadAll(resp.Body)
+		_ = json.Unmarshal(bodyBytes, &errResp)
+		if errResp.Error == "unknown_credential" {
+			return ErrUnknownCredential
+		}
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *Client) extractHiddenFormFields(doc *goquery.Document, formActionURLPath string) (map[string]string, error) {
+	formSelector := fmt.Sprintf("form[action='%s']", formActionURLPath)
+	form := doc.Find(formSelector)
+
+	// Assert that the form exists
+	if form.Length() == 0 {
+		return nil, fmt.Errorf("form with action '%s' not found in document", formActionURLPath)
+	}
+
+	// Initialize the map to store hidden field values
+	hiddenFields := make(map[string]string)
+
+	// Find all hidden input fields
+	form.Find("input[type=hidden]").Each(func(_ int, s *goquery.Selection) {
+		name, nameExists := s.Attr("name")
+		value, valueExists := s.Attr("value")
+		if nameExists && valueExists {
+			hiddenFields[name] = value
+		}
+	})
+
+	return hiddenFields, nil
 }
