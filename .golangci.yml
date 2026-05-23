@@ -40,6 +40,7 @@ linters:
     - gosec
     - govet
     - iface
+    - inamedparam
     - ineffassign
     - interfacebloat
     - intrange
@@ -47,8 +48,8 @@ linters:
     - ireturn
     - loggercheck
     - makezero
-    - modernize
     - mirror
+    - modernize
     - mnd
     - musttag
     - nakedret
@@ -92,43 +93,6 @@ linters:
     cyclop:
       max-complexity: 30
       package-average: 10
-    errcheck:
-      check-type-assertions: true
-    exhaustive:
-      check:
-        - switch
-        - map
-    exhaustruct:
-      allow-empty-returns: true
-      exclude:
-        - ^net/http.Client$
-        - ^net/http.Cookie$
-        - ^net/http.Request$
-        - ^net/http.Response$
-        - ^net/http.Server$
-        - ^net/http.Transport$
-        - ^net/url.URL$
-        - ^os/exec.Cmd$
-        - ^reflect.StructField$
-        - ^github.com/Shopify/sarama.Config$
-        - ^github.com/Shopify/sarama.ProducerMessage$
-        - ^github.com/mitchellh/mapstructure.DecoderConfig$
-        - ^github.com/prometheus/client_golang/.+Opts$
-        - ^github.com/spf13/cobra.Command$
-        - ^github.com/spf13/cobra.CompletionOptions$
-        - ^github.com/stretchr/testify/mock.Mock$
-        - ^github.com/testcontainers/testcontainers-go.+Request$
-        - ^github.com/testcontainers/testcontainers-go.FromDockerfile$
-        - ^golang.org/x/tools/go/analysis.Analyzer$
-        - ^google.golang.org/protobuf/.+Options$
-        - ^gopkg.in/yaml.v3.Node$
-        - ^github.com/playwright-community/playwright-go\..+Options$
-        - ^github.com/playwright-community/playwright-go\..+Values$
-        - ^github.com/openai/openai-go/v3.ChatCompletionNewParams$
-    funlen:
-      lines: 100
-      statements: 50
-      ignore-comments: true
     depguard:
       rules:
         deprecated:
@@ -150,12 +114,35 @@ linters:
           deny:
             - pkg: log$
               desc: Use log/slog instead, see https://go.dev/blog/slog
+    errcheck:
+      check-type-assertions: true
+    exhaustive:
+      check:
+        - switch
+        - map
+    exhaustruct:
+      allow-empty-returns: true
+      exclude:
+        - ^net/http.Client$
+        - ^net/http.Cookie$
+        - ^net/http.Request$
+        - ^net/http.Response$
+        - ^net/http.Server$
+        - ^net/http.Transport$
+        - ^net/url.URL$
+        - ^github.com/playwright-community/playwright-go\..+Options$
+        - ^github.com/playwright-community/playwright-go\..+Values$
+        - ^github.com/openai/openai-go/v3.ChatCompletionNewParams$
+    funlen:
+      lines: 100
+      statements: 50
+      ignore-comments: true
+    gochecksumtype:
+      default-signifies-exhaustive: false
     gocognit:
       min-complexity: 20
     goconst:
       ignore-tests: true
-    gochecksumtype:
-      default-signifies-exhaustive: false
     gocritic:
       settings:
         captLocal:
@@ -176,7 +163,7 @@ linters:
       skip-single-param: true
     mnd:
       ignored-numbers:
-        - "6"   # days from Monday to Sunday
+        - "6"   # Sunday offset from Monday (week ends)
         - "7"   # days in a week
         - "24"  # hours in a day
       ignored-functions:
@@ -194,8 +181,6 @@ linters:
         - prometheus.LinearBuckets
     nakedret:
       max-func-lines: 0
-    paralleltest:
-      ignore-missing-subtests: true
     nolintlint:
       require-explanation: true
       require-specific: true
@@ -203,6 +188,8 @@ linters:
         - funlen
         - gocognit
         - golines
+    paralleltest:
+      ignore-missing-subtests: true
     perfsprint:
       strconcat: false
     reassign:
