@@ -48,6 +48,7 @@ func isWorkoutScheduled(date time.Time, preferences domain.Preferences) bool {
 
 type homeTemplateData struct {
 	BaseTemplateData
+
 	// Header is the page-header dot for the authenticated view.
 	Header PageHeaderData
 	// Days contains the workout sessions for the current week.

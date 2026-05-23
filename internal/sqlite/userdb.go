@@ -216,7 +216,11 @@ func (db *Database) findUserRelatedTables(ctx context.Context, tx *sql.Tx) ([]us
 
 // getAllTableNames retrieves all table names except 'users'.
 func (db *Database) getAllTableNames(ctx context.Context, tx *sql.Tx) ([]string, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table' AND name != ?`, usersTableName)
+	rows, err := tx.QueryContext(
+		ctx,
+		`SELECT name FROM sqlite_master WHERE type = 'table' AND name != ?`,
+		usersTableName,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("query tables: %w", err)
 	}
@@ -420,13 +424,16 @@ func (db *Database) copyUserTableData(ctx context.Context, tx *sql.Tx, table use
 		args = append(args, userID)
 	}
 
-	// Copy the data
+	// Copy the data. SELECT * is intentional: this export must mirror
+	// every column without coupling to the schema layout.
 	var query string
 	if whereClause == "" {
 		// language=text
+		//nolint:unqueryvet // schema-agnostic export; see comment above.
 		query = fmt.Sprintf("INSERT INTO export.%s SELECT * FROM main.%s", table.name, table.name)
 	} else {
 		// language=text
+		//nolint:unqueryvet // schema-agnostic export; see comment above.
 		query = fmt.Sprintf("INSERT INTO export.%s SELECT * FROM main.%s %s", table.name, table.name, whereClause)
 	}
 	_, err := tx.ExecContext(ctx, query, args...)

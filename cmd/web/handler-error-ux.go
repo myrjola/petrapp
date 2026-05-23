@@ -12,6 +12,7 @@ const devErrorUXPath = "/dev/error-ux"
 
 type errorUXTemplateData struct {
 	BaseTemplateData
+
 	Flash          BannerData
 	BannerVariants []BannerData
 }

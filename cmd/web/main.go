@@ -143,7 +143,14 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 	var webAuthnHandler *webauthnhandler.WebAuthnHandler
 	tlsEnabled := cfg.TLSCert != ""
-	if webAuthnHandler, err = webauthnhandler.New(actualAddr, fqdn, tlsEnabled, logger, sessionManager, db); err != nil {
+	if webAuthnHandler, err = webauthnhandler.New(
+		actualAddr,
+		fqdn,
+		tlsEnabled,
+		logger,
+		sessionManager,
+		db,
+	); err != nil {
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 

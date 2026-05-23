@@ -19,6 +19,7 @@ import (
 // exerciseInfoTemplateData contains data for the exercise info template.
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
+
 	Date              time.Time
 	Header            PageHeaderData
 	WorkoutExerciseID int

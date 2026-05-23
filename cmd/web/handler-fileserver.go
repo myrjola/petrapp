@@ -17,6 +17,7 @@ import (
 // are not flushed before we know the response is a 404.
 type notFoundInterceptor struct {
 	http.ResponseWriter
+
 	is404         bool
 	headerWritten bool
 }

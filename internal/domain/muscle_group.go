@@ -134,7 +134,14 @@ func aggregateMuscleGroupLoad(
 			for _, set := range ex.Sets {
 				done := set.CompletedAt != nil
 				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetWeight, done, known, planned, completed)
-				creditMuscleGroups(ex.Exercise.SecondaryMuscleGroups, SecondarySetWeight, done, known, planned, completed)
+				creditMuscleGroups(
+					ex.Exercise.SecondaryMuscleGroups,
+					SecondarySetWeight,
+					done,
+					known,
+					planned,
+					completed,
+				)
 			}
 		}
 	}

@@ -165,7 +165,11 @@ func TestDeriveScheme_Deload(t *testing.T) {
 				t.Errorf("TargetSets = %d, want %d (halved, min 1)", got.TargetSets, tt.wantTargetSets)
 			}
 			if got.RestSeconds != tt.wantRestSeconds {
-				t.Errorf("RestSeconds = %d, want %d (unchanged from hypertrophy mapping)", got.RestSeconds, tt.wantRestSeconds)
+				t.Errorf(
+					"RestSeconds = %d, want %d (unchanged from hypertrophy mapping)",
+					got.RestSeconds,
+					tt.wantRestSeconds,
+				)
 			}
 		})
 	}

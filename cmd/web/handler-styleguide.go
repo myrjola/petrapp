@@ -25,6 +25,7 @@ const (
 
 type styleguideTemplateData struct {
 	BaseTemplateData
+
 	Grays          []string
 	Stones         []string
 	Clays          []string

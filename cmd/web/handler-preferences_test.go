@@ -251,7 +251,10 @@ func Test_application_exportUserData(t *testing.T) {
 	// Verify Content-Disposition header for download
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	if !strings.Contains(contentDisposition, "attachment") || !strings.Contains(contentDisposition, ".sqlite3") {
-		t.Errorf("Expected Content-Disposition header with attachment and .sqlite3 filename, got %s", contentDisposition)
+		t.Errorf(
+			"Expected Content-Disposition header with attachment and .sqlite3 filename, got %s",
+			contentDisposition,
+		)
 	}
 
 	// Read the SQLite data into a temporary file

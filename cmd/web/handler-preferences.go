@@ -36,6 +36,7 @@ type workoutDurationOption struct {
 
 type preferencesTemplateData struct {
 	BaseTemplateData
+
 	Header                   PageHeaderData
 	Weekdays                 []weekdayPreference
 	DurationOptions          []workoutDurationOption

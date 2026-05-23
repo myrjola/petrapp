@@ -7,6 +7,7 @@ import (
 
 type scheduleTemplateData struct {
 	BaseTemplateData
+
 	Header          PageHeaderData
 	Weekdays        []weekdayPreference
 	DurationOptions []workoutDurationOption

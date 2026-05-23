@@ -13,6 +13,7 @@ import (
 
 const (
 	pprofFilePerm           = 0o644
+	pprofDirPerm            = 0o750
 	pprofHTTPTimeoutPadding = 10 * time.Second
 )
 
@@ -26,7 +27,7 @@ const (
 func CapturePprofProfile(
 	ctx context.Context, pprofBaseURL, outDir string, seconds time.Duration,
 ) (string, error) {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(outDir, pprofDirPerm); err != nil {
 		return "", fmt.Errorf("create pprof outDir: %w", err)
 	}
 	outPath := filepath.Join(outDir, fmt.Sprintf("cpu-%s.pb.gz", timestampNow()))
@@ -41,7 +42,7 @@ func CapturePprofProfile(
 // CapturePprofHeap fetches the heap profile from pprofBaseURL and writes it
 // to <outDir>/heap-<timestamp>.pb.gz. Returns the saved file path.
 func CapturePprofHeap(ctx context.Context, pprofBaseURL, outDir string) (string, error) {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(outDir, pprofDirPerm); err != nil {
 		return "", fmt.Errorf("create pprof outDir: %w", err)
 	}
 	outPath := filepath.Join(outDir, fmt.Sprintf("heap-%s.pb.gz", timestampNow()))
@@ -56,7 +57,7 @@ func CapturePprofHeap(ctx context.Context, pprofBaseURL, outDir string) (string,
 // returns the saved path. Used to bundle the latency snapshot alongside the
 // pprof captures from the same run.
 func WriteJSONReport(outDir string, snap *Snapshot) (string, error) {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(outDir, pprofDirPerm); err != nil {
 		return "", fmt.Errorf("create report outDir: %w", err)
 	}
 	outPath := filepath.Join(outDir, fmt.Sprintf("report-%s.json", timestampNow()))

@@ -10,6 +10,7 @@ import (
 // featureFlagsAdminTemplateData contains data for the feature flags admin template.
 type featureFlagsAdminTemplateData struct {
 	BaseTemplateData
+
 	Header       PageHeaderData
 	FeatureFlags []domain.FeatureFlag
 }

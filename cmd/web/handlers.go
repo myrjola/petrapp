@@ -162,6 +162,7 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 
 type privacyTemplateData struct {
 	BaseTemplateData
+
 	Header PageHeaderData
 }
 

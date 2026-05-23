@@ -456,8 +456,16 @@ func Test_Session_WorkoutType(t *testing.T) {
 		{"empty defaults to full body", sessionWith(), domain.CategoryFullBody},
 		{"only upper", sessionWith(domain.CategoryUpper, domain.CategoryUpper), domain.CategoryUpper},
 		{"only lower", sessionWith(domain.CategoryLower), domain.CategoryLower},
-		{"upper and lower is full body", sessionWith(domain.CategoryUpper, domain.CategoryLower), domain.CategoryFullBody},
-		{"any full body is full body", sessionWith(domain.CategoryUpper, domain.CategoryFullBody), domain.CategoryFullBody},
+		{
+			"upper and lower is full body",
+			sessionWith(domain.CategoryUpper, domain.CategoryLower),
+			domain.CategoryFullBody,
+		},
+		{
+			"any full body is full body",
+			sessionWith(domain.CategoryUpper, domain.CategoryFullBody),
+			domain.CategoryFullBody,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -514,7 +522,10 @@ func Test_Session_Status(t *testing.T) {
 		},
 		{
 			"completed",
-			domain.Session{StartedAt: past, CompletedAt: later}, //nolint:exhaustruct // Test sessions omit irrelevant fields.
+			domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
+				StartedAt:   past,
+				CompletedAt: later,
+			},
 			domain.SessionCompleted,
 		},
 	}

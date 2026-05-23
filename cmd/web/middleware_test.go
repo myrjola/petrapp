@@ -15,6 +15,7 @@ import (
 
 type timeoutResponseWriter struct {
 	httptest.ResponseRecorder
+
 	writeDeadlineSet bool
 }
 

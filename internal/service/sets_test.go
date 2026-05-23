@@ -45,9 +45,12 @@ func Test_RecordSetCompletion(t *testing.T) {
 	}
 
 	today := time.Now().Format("2006-01-02")
-	_, err = db.ReadWrite.ExecContext(ctx,
+	_, err = db.ReadWrite.ExecContext(
+		ctx,
 		"INSERT INTO workout_sessions (user_id, workout_date, started_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
-		userID, today)
+		userID,
+		today,
+	)
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
 	}

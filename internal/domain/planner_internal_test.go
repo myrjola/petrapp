@@ -416,7 +416,10 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 				ex := findExercise(exercises, es.Exercise.ID)
 				for _, mg := range ex.PrimaryMuscleGroups {
 					if seenPrimary[mg] {
-						t.Errorf("primary muscle group %q appears twice; expected graceful degradation to 1 exercise", mg)
+						t.Errorf(
+							"primary muscle group %q appears twice; expected graceful degradation to 1 exercise",
+							mg,
+						)
 					}
 					seenPrimary[mg] = true
 				}
@@ -666,7 +669,11 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 			t.Errorf("session %s IsDeload = false, want true", s.Date.Format("2006-01-02"))
 		}
 		if s.PeriodizationType != PeriodizationHypertrophy {
-			t.Errorf("session %s PeriodizationType = %s, want hypertrophy", s.Date.Format("2006-01-02"), s.PeriodizationType)
+			t.Errorf(
+				"session %s PeriodizationType = %s, want hypertrophy",
+				s.Date.Format("2006-01-02"),
+				s.PeriodizationType,
+			)
 		}
 		for _, es := range s.ExerciseSets {
 			// Normal mid-rep band has 3 sets. Deload halves to 2.

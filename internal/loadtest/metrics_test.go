@@ -1,8 +1,4 @@
-// These tests poke at unexported helpers (normalizePath, routeKeys, etc.) and
-// therefore live in the loadtest package, not loadtest_test. The testpackage
-// linter wants them split out; keeping them internal is the deliberate trade.
-//
-//nolint:testpackage // see comment above.
+//nolint:testpackage // these tests poke at unexported helpers; live inside the package by design.
 package loadtest
 
 import (

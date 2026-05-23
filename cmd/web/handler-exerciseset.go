@@ -29,6 +29,7 @@ type setDisplay struct {
 
 type exerciseSetTemplateData struct {
 	BaseTemplateData
+
 	Date                  time.Time
 	ExerciseSet           domain.ExerciseSet
 	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
@@ -264,7 +265,7 @@ func findExerciseSetInSession(session *domain.Session, workoutExerciseID int) (d
 			return es, true
 		}
 	}
-	return domain.ExerciseSet{}, false //nolint:exhaustruct // zero value signals "not found".
+	return domain.ExerciseSet{}, false
 }
 
 // recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
@@ -363,7 +364,14 @@ func (app *application) recordTimedSetCompletion(
 	}
 
 	if err = app.service.RecordSet(
-		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, nil, completedSeconds); err != nil {
+		r.Context(),
+		params.Date,
+		params.WorkoutExerciseID,
+		params.SetIndex,
+		signal,
+		nil,
+		completedSeconds,
+	); err != nil {
 		app.serverError(w, r, fmt.Errorf("record timed set completion: %w", err))
 		return false
 	}

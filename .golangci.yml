@@ -10,17 +10,19 @@ linters:
     - copyloopvar
     - cyclop
     - decorder
+    - depguard
     - dupl
     - durationcheck
+    - embeddedstructfieldcheck
     - errcheck
     - errname
     - errorlint
     - exhaustive
     - exhaustruct
+    - exptostd
     - fatcontext
     - forbidigo
     - funlen
-    - ginkgolinter
     - gocheckcompilerdirectives
     - gochecknoglobals
     - gochecknoinits
@@ -29,11 +31,10 @@ linters:
     - goconst
     - gocritic
     - gocyclo
+    - godoclint
     - godot
     - godox
-    - goheader
     - gomoddirectives
-    - gomodguard_v2
     - goprintffuncname
     - gosec
     - govet
@@ -41,8 +42,8 @@ linters:
     - ineffassign
     - interfacebloat
     - intrange
+    - iotamixing
     - ireturn
-    - lll
     - loggercheck
     - makezero
     - modernize
@@ -52,6 +53,7 @@ linters:
     - nakedret
     - nestif
     - nilerr
+    - nilnesserr
     - nilnil
     - noctx
     - nolintlint
@@ -77,13 +79,13 @@ linters:
     - tparallel
     - unconvert
     - unparam
+    - unqueryvet
     - unused
     - usestdlibvars
     - usetesting
     - wastedassign
     - whitespace
     - wrapcheck
-    - zerologlint
   settings:
     cyclop:
       max-complexity: 30
@@ -95,6 +97,7 @@ linters:
         - switch
         - map
     exhaustruct:
+      allow-empty-returns: true
       exclude:
         - ^net/http.Client$
         - ^net/http.Cookie$
@@ -124,6 +127,27 @@ linters:
       lines: 100
       statements: 50
       ignore-comments: true
+    depguard:
+      rules:
+        deprecated:
+          files: ["$all"]
+          deny:
+            - pkg: github.com/golang/protobuf
+              desc: Use google.golang.org/protobuf instead, see https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules
+            - pkg: github.com/satori/go.uuid
+              desc: Use github.com/google/uuid instead, satori's package is not maintained
+            - pkg: github.com/gofrs/uuid$
+              desc: Use github.com/gofrs/uuid/v5 or later, it was not a go module before v5
+        "non-test files":
+          files: ["!$test"]
+          deny:
+            - pkg: math/rand$
+              desc: Use math/rand/v2 instead, see https://go.dev/blog/randv2
+        "non-main files":
+          files: ["!**/main.go"]
+          deny:
+            - pkg: log$
+              desc: Use log/slog instead, see https://go.dev/blog/slog
     gocognit:
       min-complexity: 20
     goconst:
@@ -139,20 +163,6 @@ linters:
     gomoddirectives:
       replace-allow-list:
         - github.com/descope/virtualwebauthn
-    gomodguard_v2:
-      blocked:
-        - module: github.com/golang/protobuf
-          recommendations:
-            - google.golang.org/protobuf
-          reason: see https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules
-        - module: github.com/satori/go.uuid
-          recommendations:
-            - github.com/google/uuid
-          reason: satori's package is not maintained
-        - module: github.com/gofrs/uuid
-          recommendations:
-            - github.com/gofrs/uuid/v5
-          reason: gofrs' package was not go module before v5
     govet:
       disable:
         - fieldalignment
@@ -188,7 +198,7 @@ linters:
       allow-no-explanation:
         - funlen
         - gocognit
-        - lll
+        - golines
     perfsprint:
       strconcat: false
     reassign:
@@ -200,14 +210,19 @@ linters:
     sloglint:
       no-global: all
       context: scope
+    staticcheck:
+      checks:
+        - all
+        - -ST1000  # package comments not required
+        - -ST1016  # receiver name consistency
+        - -QF1008  # embedded selector style
     usetesting:
       os-temp-dir: true
   exclusions:
     generated: lax
+    warn-unused: true
     presets:
-      - comments
       - common-false-positives
-      - legacy
       - std-error-handling
     rules:
       - linters:
@@ -216,6 +231,16 @@ linters:
       - linters:
           - gocritic
         source: //noinspection
+      - text: 'should have a package comment'
+        linters: [revive]
+      - text: 'exported \S+ \S+ should have comment( \(or a comment on this block\))? or be unexported'
+        linters: [revive]
+      - text: 'package comment should be of the form ".+"'
+        source: '// ?(nolint|TODO)'
+        linters: [revive]
+      - text: 'comment on exported \S+ \S+ should be of the form ".+"'
+        source: '// ?(nolint|TODO)'
+        linters: [revive, staticcheck]
       - linters:
           - bodyclose
           - cyclop
@@ -229,18 +254,14 @@ linters:
           - noctx
           - wrapcheck
         path: _test\.go
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 issues:
   max-same-issues: 50
 formatters:
   enable:
     - gofmt
+    - golines
+  settings:
+    golines:
+      max-len: 120
   exclusions:
     generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$

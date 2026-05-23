@@ -49,8 +49,11 @@ func Populate(v any, lookupEnv func(string) (string, bool)) error {
 			}
 
 			if refField.Kind() != reflect.String {
-				errorList = append(errorList, fmt.Errorf("%w: only strings are supported - field: %s, type: %s, env: %s",
-					ErrInvalidValue, refTypeField.Name, refField.Kind().String(), envVarName))
+				errorList = append(
+					errorList,
+					fmt.Errorf("%w: only strings are supported - field: %s, type: %s, env: %s",
+						ErrInvalidValue, refTypeField.Name, refField.Kind().String(), envVarName),
+				)
 				continue
 			}
 

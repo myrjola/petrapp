@@ -523,7 +523,9 @@ func Test_playwright_stacknav(t *testing.T) {
 		t.Fatalf("click warmup button: %v", err)
 	}
 	// Wait for the reload triggered by the same-URL auto-replace to fully settle.
-	if err = page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateLoad}); err != nil {
+	if err = page.WaitForLoadState(
+		playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateLoad},
+	); err != nil {
 		t.Fatalf("expect load after warmup complete: %v", err)
 	}
 

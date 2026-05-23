@@ -25,6 +25,7 @@ type adminExerciseRow struct {
 // exerciseAdminTemplateData contains data for the exercise admin template.
 type exerciseAdminTemplateData struct {
 	BaseTemplateData
+
 	Header    PageHeaderData
 	Flash     BannerData
 	Exercises []adminExerciseRow
@@ -48,6 +49,7 @@ type selectOption struct {
 // exerciseEditTemplateData contains data for the exercise edit template.
 type exerciseEditTemplateData struct {
 	BaseTemplateData
+
 	Header                 PageHeaderData
 	Flash                  BannerData
 	Exercise               domain.Exercise

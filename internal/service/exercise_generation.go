@@ -1,5 +1,5 @@
-// Package service: AI-backed exercise generation.
-//
+package service
+
 // This file owns the OpenAI-driven generator that fills in a freshly
 // named exercise's metadata (category, type, muscle groups, description,
 // resources). The decision tree in generateExerciseContent prefers the
@@ -7,7 +7,6 @@
 // response, schema validation failure) it falls back to a minimal
 // exercise so the user can edit the rest by hand. GenerateExercise
 // persists whichever exercise was produced.
-package service
 
 import (
 	"context"

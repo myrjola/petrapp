@@ -108,9 +108,12 @@ func Test_GetStartingWeight(t *testing.T) {
 	// Insert today's session with different set weights. The starting weight must
 	// remain anchored to the historical session, regardless of today's sets.
 	todayStr := today.Format("2006-01-02")
-	_, err = db.ReadWrite.ExecContext(ctx,
+	_, err = db.ReadWrite.ExecContext(
+		ctx,
 		"INSERT INTO workout_sessions (user_id, workout_date, started_at) VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))",
-		userID, todayStr)
+		userID,
+		todayStr,
+	)
 	if err != nil {
 		t.Fatalf("insert today's session: %v", err)
 	}
@@ -666,7 +669,8 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 		t.Fatalf("insert exercise: %v", err)
 	}
 	var exerciseID int
-	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Deload Test Press'").Scan(&exerciseID)
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Deload Test Press'").
+		Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("get exercise id: %v", err)
 	}

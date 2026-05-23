@@ -712,7 +712,7 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		LIMIT 1`,
 		userID, exerciseID, beforeDateStr).Scan(&weightKg, &periodType)
 	if errors.Is(err, sql.ErrNoRows) {
-		return domain.LatestStartingSet{}, nil //nolint:exhaustruct // Caller handles empty.
+		return domain.LatestStartingSet{}, nil
 	}
 	if err != nil {
 		return domain.LatestStartingSet{}, fmt.Errorf("query latest starting weight: %w", err)

@@ -156,7 +156,7 @@ func (s *Session) findSlot(slotID int) (*ExerciseSet, error) {
 func (s *Session) Slot(slotID int) (ExerciseSet, bool) {
 	slot, err := s.findSlot(slotID)
 	if err != nil {
-		return ExerciseSet{}, false //nolint:exhaustruct // Zero value for the not-found case.
+		return ExerciseSet{}, false
 	}
 	return *slot, true
 }

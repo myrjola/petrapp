@@ -13,6 +13,7 @@ import (
 
 type workoutTemplateData struct {
 	BaseTemplateData
+
 	Date            time.Time
 	WorkoutTypeName string
 	StatusLabel     string
@@ -47,12 +48,14 @@ type workoutExerciseDot struct {
 
 type workoutCompletionTemplateData struct {
 	BaseTemplateData
+
 	Date         time.Time
 	Difficulties []difficultyOption
 }
 
 type workoutNotFoundTemplateData struct {
 	BaseTemplateData
+
 	Date   time.Time
 	Header PageHeaderData
 	Flash  BannerData
@@ -399,6 +402,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 // exerciseSwapTemplateData contains data for the exercise swap template.
 type exerciseSwapTemplateData struct {
 	BaseTemplateData
+
 	Date              time.Time
 	Header            PageHeaderData
 	WorkoutExerciseID int
@@ -410,6 +414,7 @@ type exerciseSwapTemplateData struct {
 // exerciseAddTemplateData contains data for the exercise add template.
 type exerciseAddTemplateData struct {
 	BaseTemplateData
+
 	Date   time.Time
 	Header PageHeaderData
 	Cards  []ExerciseResultCardData

@@ -130,7 +130,9 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	if err != nil {
 		return fmt.Errorf("get progress chart: %w", err)
 	}
-	chartResp.Body.Close()
+	if closeErr := chartResp.Body.Close(); closeErr != nil {
+		return fmt.Errorf("close progress chart body: %w", closeErr)
+	}
 
 	logger.LogAttrs(ctx, slog.LevelDebug, "Workout scenario completed",
 		slog.String("user_id", user.UserID),
