@@ -19,7 +19,7 @@ var (
 // `envDefault:"value"` or else ErrEnvNotSet is returned.
 func Populate(v any, lookupEnv func(string) (string, bool)) error {
 	ptrRef := reflect.ValueOf(v)
-	if ptrRef.Kind() != reflect.Ptr {
+	if ptrRef.Kind() != reflect.Pointer {
 		return fmt.Errorf("%w: not pointer: %v", ErrInvalidValue, v)
 	}
 	ref := ptrRef.Elem()

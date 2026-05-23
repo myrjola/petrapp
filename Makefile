@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := info
 
 export GOTOOLCHAIN := auto
-GOLANGCI_LINT_VERSION := v2.11.4
+GOLANGCI_LINT_VERSION := v2.12.2
 
 # Default Fly app for ops targets. Override with FLY_APP=petra-staging for staging.
 FLY_APP ?= petra

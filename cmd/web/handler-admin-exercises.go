@@ -83,12 +83,12 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 	data := exerciseAdminTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Header:           PageHeaderData{Title: "Exercise Administration", Subtitle: ""},
-		Flash:            BannerData{Variant: "error", Message: app.popFlashError(r.Context())},
+		Flash:            BannerData{Variant: BannerVariantError, Message: app.popFlashError(r.Context())},
 		Exercises:        rows,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
 			Label:    "Exercise Name",
 			Name:     "name",
-			Type:     "text",
+			Type:     inputTypeText,
 			Required: true,
 			Hint:     "e.g., Bench Press, Deadlift, Squat",
 		},
@@ -134,19 +134,19 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 	data := exerciseEditTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Header:           PageHeaderData{Title: fmt.Sprintf("Edit Exercise: %s", exercise.Name), Subtitle: ""},
-		Flash:            BannerData{Variant: "error", Message: app.popFlashError(r.Context())},
+		Flash:            BannerData{Variant: BannerVariantError, Message: app.popFlashError(r.Context())},
 		Exercise:         exercise,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
 			Label:    "Name",
 			Name:     "name",
-			Type:     "text",
+			Type:     inputTypeText,
 			Value:    exercise.Name,
 			Required: true,
 		},
 		SecondsField: FieldData{ //nolint:exhaustruct // labelled number input; Max/Step/Pattern unused here.
 			Label:    "Default Starting Seconds",
 			Name:     "default_starting_seconds",
-			Type:     "number",
+			Type:     inputTypeNumber,
 			Value:    defaultSecondsValue,
 			Required: exercise.IsTimed(),
 			Hint:     "Number of seconds to hold on the first set for new users.",
@@ -155,7 +155,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		RepMinField: FieldData{ //nolint:exhaustruct // labelled number input; Hint/Step/Pattern unused here.
 			Label:    "Min Reps",
 			Name:     "rep_min",
-			Type:     "number",
+			Type:     inputTypeNumber,
 			Value:    repMinValue,
 			Required: !exercise.IsTimed(),
 			Min:      "1",
@@ -164,7 +164,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		RepMaxField: FieldData{ //nolint:exhaustruct // labelled number input; Hint/Step/Pattern unused here.
 			Label:    "Max Reps",
 			Name:     "rep_max",
-			Type:     "number",
+			Type:     inputTypeNumber,
 			Value:    repMaxValue,
 			Required: !exercise.IsTimed(),
 			Min:      "1",

@@ -291,7 +291,7 @@ func (db *Database) queryStringSlice(ctx context.Context, tx *sql.Tx, query stri
 	defer func() {
 		if err = rows.Close(); err != nil {
 			err = fmt.Errorf("close rows: %w", err)
-			db.logger.Error("could not close rows", slog.Any("error", err))
+			db.logger.ErrorContext(ctx, "could not close rows", slog.Any("error", err))
 		}
 	}()
 	for rows.Next() {
@@ -331,7 +331,7 @@ func (db *Database) queryChangedSchemas(
 	defer func() {
 		if err = rows.Close(); err != nil {
 			err = fmt.Errorf("close rows: %w", err)
-			db.logger.Error("could not close rows", slog.Any("error", err))
+			db.logger.ErrorContext(ctx, "could not close rows", slog.Any("error", err))
 		}
 	}()
 	for rows.Next() {

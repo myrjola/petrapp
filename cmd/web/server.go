@@ -17,6 +17,12 @@ import (
 
 const defaultTimeout = 2 * time.Second
 
+// Shutdown reasons logged when the server exits gracefully.
+const (
+	shutdownReasonSignal  = "signal"
+	shutdownReasonContext = "context"
+)
+
 // createListener creates a TCP listener and returns it together with the logical address.
 // The logical address uses the configured host (e.g. "localhost") and the actual bound port,
 // so that WebAuthn RP origins and the e2etest server URL agree even when port 0 is used.
@@ -73,9 +79,9 @@ func (app *application) configureAndStartServer(
 		var shutdownReason string
 		select {
 		case <-sigint:
-			shutdownReason = "signal"
+			shutdownReason = shutdownReasonSignal
 		case <-ctx.Done():
-			shutdownReason = "context"
+			shutdownReason = shutdownReasonContext
 		}
 
 		// Create a new context for logging since the original might be cancelled

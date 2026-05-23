@@ -12,6 +12,13 @@ import (
 // potentially sensitive scalar fields before logging.
 const redactedPlaceholder = "[redacted]"
 
+// Content types accepted by the Reporting API endpoint.
+const (
+	contentTypeCSPReport   = "application/csp-report"
+	contentTypeJSON        = "application/json"
+	contentTypeReportsJSON = "application/reports+json"
+)
+
 // scriptSampleFields lists payload keys whose values are inline script
 // fragments and must be replaced wholesale before logging.
 var scriptSampleFields = map[string]struct{}{ //nolint:gochecknoglobals // immutable lookup table
@@ -103,8 +110,8 @@ func stripURLQuery(raw string) string {
 func (app *application) reportingAPI(w http.ResponseWriter, r *http.Request) {
 	// Validate content type (should be application/csp-report, application/json, or application/reports+json)
 	contentType := r.Header.Get("Content-Type")
-	if contentType != "" && contentType != "application/csp-report" &&
-		contentType != "application/json" && contentType != "application/reports+json" {
+	if contentType != "" && contentType != contentTypeCSPReport &&
+		contentType != contentTypeJSON && contentType != contentTypeReportsJSON {
 		app.logger.LogAttrs(r.Context(), slog.LevelError, "Report with unexpected content type",
 			slog.String("content_type", contentType))
 	}

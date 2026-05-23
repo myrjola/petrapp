@@ -25,14 +25,14 @@ func (app *application) devErrorUXGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flash := BannerData{Variant: "error", Message: app.popFlashError(r.Context())}
+	flash := BannerData{Variant: BannerVariantError, Message: app.popFlashError(r.Context())}
 	data := errorUXTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		Flash:            flash,
 		BannerVariants: []BannerData{
-			{Variant: "error", Message: "Something went wrong. Please try again."},
-			{Variant: "success", Message: "Your changes have been saved."},
-			{Variant: "info", Message: "Heads up — this is informational."},
+			{Variant: BannerVariantError, Message: "Something went wrong. Please try again."},
+			{Variant: BannerVariantSuccess, Message: "Your changes have been saved."},
+			{Variant: BannerVariantInfo, Message: "Heads up — this is informational."},
 		},
 	}
 	app.render(w, r, http.StatusOK, "error-ux", data)

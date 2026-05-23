@@ -61,7 +61,7 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 		return nil, fmt.Errorf("apply fixtures: %w", err)
 	}
 
-	optimizerCtx, cancel := context.WithCancel(ctx) //nolint:gosec // cancel stored on db, invoked in Close.
+	optimizerCtx, cancel := context.WithCancel(ctx)
 	db.cancelOptimizer = cancel
 	db.optimizerDone = make(chan struct{})
 	go func() {

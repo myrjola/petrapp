@@ -66,7 +66,7 @@ WHERE user_id = ?`
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			h.logger.Error("could not close rows", "err", fmt.Errorf("close rows: %w", err))
+			h.logger.ErrorContext(ctx, "could not close rows", "err", fmt.Errorf("close rows: %w", err))
 		}
 	}()
 

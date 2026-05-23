@@ -1,5 +1,7 @@
 package domain
 
+import "slices"
+
 // defaultTargetValue is the fallback target value (reps) when no history is
 // available.
 const defaultTargetValue = 8
@@ -71,9 +73,9 @@ func BuildSetsForAdd(exercise Exercise, periodization PeriodizationType, isDeloa
 		return sets
 	}
 	var seedWeight float64
-	for i := len(historicalSets) - 1; i >= 0; i-- {
-		if historicalSets[i].WeightKg != nil {
-			seedWeight = *historicalSets[i].WeightKg
+	for _, v := range slices.Backward(historicalSets) {
+		if v.WeightKg != nil {
+			seedWeight = *v.WeightKg
 			break
 		}
 	}

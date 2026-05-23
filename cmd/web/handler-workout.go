@@ -69,7 +69,7 @@ func newWorkoutNotFoundTemplateData(
 			Title:    "Not in This Week's Plan",
 			Subtitle: "",
 		},
-		Flash: BannerData{Variant: "error", Message: flashMessage},
+		Flash: BannerData{Variant: BannerVariantError, Message: flashMessage},
 	}
 }
 
@@ -231,7 +231,7 @@ func newWorkoutTemplateData(
 		TotalCount:       total,
 		ProgressPercent:  progressPercent,
 		ProgressState:    progressState,
-		Flash:            BannerData{Variant: "error", Message: flashMessage},
+		Flash:            BannerData{Variant: BannerVariantError, Message: flashMessage},
 	}
 }
 

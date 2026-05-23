@@ -32,6 +32,9 @@ type exerciseJSONSchema struct {
 	muscleGroups []string
 }
 
+// JSON Schema keys ("type", "description", "string", "enum") are spec-fixed strings.
+//
+//nolint:goconst // see comment above; constants add no clarity here.
 func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 	schema := map[string]any{
 		"type": "object",

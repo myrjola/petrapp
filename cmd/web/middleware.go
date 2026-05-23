@@ -306,6 +306,7 @@ func (app *application) stampLastRequest(next http.Handler) http.Handler {
 func setInvalidationCookieOnPost(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
+			//nolint:gosec // G124: HttpOnly intentionally false; the cookie is read client-side in the pageshow handler.
 			http.SetCookie(w, &http.Cookie{
 				Name:  "inv_bfcache",
 				Value: rand.Text(),

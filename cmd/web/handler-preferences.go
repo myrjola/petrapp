@@ -123,7 +123,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		MesocycleLength:          prefs.MesocycleLength,
 		MesocycleLengthOptions:   []int{4, 5, 6, 7},
 		MesocycleAnchor:          prefs.MesocycleAnchor,
-		Flash:                    BannerData{Variant: "error", Message: app.popFlashError(ctx)},
+		Flash:                    BannerData{Variant: BannerVariantError, Message: app.popFlashError(ctx)},
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)

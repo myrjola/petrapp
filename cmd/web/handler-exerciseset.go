@@ -12,6 +12,10 @@ import (
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
+// signalFormField is both the POST form field name and the slog attribute key
+// for the signal value (too-heavy/too-light) attached to a recorded set.
+const signalFormField = "signal"
+
 type setDisplay struct {
 	Set          domain.Set
 	TargetStr    string // Pre-formatted target string (e.g. "5", "30s").
@@ -279,7 +283,7 @@ func (app *application) recordSetCompletionWithWeight(
 	weight = exercise.EncodeFormWeight(weight, r.PostForm.Get("assisted") != "")
 
 	var signal *domain.Signal
-	if raw := r.PostForm.Get("signal"); raw != "" {
+	if raw := r.PostForm.Get(signalFormField); raw != "" {
 		s := domain.Signal(raw)
 		signal = &s
 	}
@@ -305,7 +309,7 @@ func (app *application) recordSetCompletionWithWeight(
 		slog.String("date", params.Date.Format("2006-01-02")),
 		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
 		slog.Int("set_index", params.SetIndex),
-		slog.String("signal", signalStr),
+		slog.String(signalFormField, signalStr),
 		slog.Float64("weight", weight),
 		slog.Int("reps", reps))
 	return true
@@ -353,7 +357,7 @@ func (app *application) recordTimedSetCompletion(
 	}
 
 	var signal *domain.Signal
-	if raw := r.PostForm.Get("signal"); raw != "" {
+	if raw := r.PostForm.Get(signalFormField); raw != "" {
 		s := domain.Signal(raw)
 		signal = &s
 	}
@@ -372,7 +376,7 @@ func (app *application) recordTimedSetCompletion(
 		slog.String("date", params.Date.Format("2006-01-02")),
 		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
 		slog.Int("set_index", params.SetIndex),
-		slog.String("signal", signalStr),
+		slog.String(signalFormField, signalStr),
 		slog.Int("completed_seconds", completedSeconds))
 	return true
 }

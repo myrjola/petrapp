@@ -2,9 +2,23 @@ package main
 
 import "github.com/myrjola/petrapp/internal/domain"
 
+// Banner variants accepted by the `banner` component. Keep aligned with
+// the variant strings the template branches on.
+const (
+	BannerVariantError   = "error"
+	BannerVariantSuccess = "success"
+	BannerVariantInfo    = "info"
+)
+
+// HTML input type strings used by FieldData.Type.
+const (
+	inputTypeText   = "text"
+	inputTypeNumber = "number"
+)
+
 // BannerData is the dot for the `banner` component. Variant is one of
-// "error", "success", or "info"; the component renders nothing when
-// Message is empty.
+// BannerVariantError, BannerVariantSuccess, or BannerVariantInfo; the
+// component renders nothing when Message is empty.
 type BannerData struct {
 	Variant string
 	Message string

@@ -69,7 +69,7 @@ func redirect(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 
-	http.Redirect(w, r, path, http.StatusSeeOther)
+	http.Redirect(w, r, path, http.StatusSeeOther) //nolint:gosec // G710: path is handler-chosen, never user input.
 }
 
 // redirectReplace works like redirect, but signals to the stack navigator
@@ -84,7 +84,7 @@ func redirectReplace(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 
-	http.Redirect(w, r, path, http.StatusSeeOther)
+	http.Redirect(w, r, path, http.StatusSeeOther) //nolint:gosec // G710: path is handler-chosen, never user input.
 }
 
 const flashErrorKey = "flash_error"

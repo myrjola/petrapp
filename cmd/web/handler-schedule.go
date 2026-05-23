@@ -29,7 +29,7 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 		},
 		Weekdays:        preferencesToWeekdays(prefs),
 		DurationOptions: getWorkoutDurationOptions(),
-		Flash:           BannerData{Variant: "error", Message: app.popFlashError(ctx)},
+		Flash:           BannerData{Variant: BannerVariantError, Message: app.popFlashError(ctx)},
 	}
 
 	app.render(w, r, http.StatusOK, "schedule", data)
