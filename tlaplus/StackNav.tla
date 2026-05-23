@@ -31,21 +31,32 @@
 EXTENDS Naturals, Sequences, FiniteSets
 
 CONSTANTS
-    Urls,             \* Set of URLs the app exposes.
-    PageLocalUrls,    \* URLs whose page bypasses the global bfcache reload
-                      \* and runs its own pagereveal-based replace
-                      \* (today: /workouts/{date}).
-    InitialUrl,       \* The first URL the user lands on.
-    MaxHistory,       \* Bound on history length, for model checking.
-    MaxPosts,         \* Bound on number of POSTs.
-    CookieMayExpire   \* TRUE iff the inv_bfcache cookie may expire.
-                      \* Models the 60s MaxAge in middleware.go.
+    Urls,                 \* Set of URLs the app exposes.
+    PageLocalUrls,        \* URLs whose page bypasses the global bfcache
+                          \* reload and runs its own pagereveal-based
+                          \* replace (today: /workouts/{date}).
+    InitialUrl,           \* The first URL the user lands on.
+    MaxHistory,           \* Bound on history length, for model checking.
+    MaxPosts,             \* Bound on number of POSTs.
+    CookieMayExpire,      \* TRUE iff the inv_bfcache cookie may expire.
+                          \* Models the 60s MaxAge in middleware.go.
+    PrefetchEnabled,      \* TRUE iff the browser-prefetch action is
+                          \* enabled. Models the Speculation Rules block
+                          \* in ui/templates/base.gohtml that prefetches
+                          \* every /* link at conservative eagerness.
+    EagerPagerevealCheck  \* TRUE iff the staleness check runs on every
+                          \* page reveal (not just pageshow.persisted).
+                          \* This is the proposed mitigation -- today's
+                          \* main.js only checks on bfcache restore, so
+                          \* prefetch-promoted loads slip through.
 
 ASSUME PageLocalUrls \subseteq Urls
 ASSUME InitialUrl \in Urls
 ASSUME MaxHistory \in Nat /\ MaxHistory >= 1
 ASSUME MaxPosts \in Nat
 ASSUME CookieMayExpire \in BOOLEAN
+ASSUME PrefetchEnabled \in BOOLEAN
+ASSUME EagerPagerevealCheck \in BOOLEAN
 
 \* NIL is the sentinel for "no token". In JS the corresponding values are
 \* the empty string -- both the cookie (when absent) and the meta content
@@ -67,7 +78,16 @@ BfcacheSlot == [cached: BOOLEAN, token: Tokens]
 NoCache == [cached |-> FALSE, token |-> NIL]
 Cache(tok) == [cached |-> TRUE, token |-> tok]
 
-DocStates == {"Loading", "Loaded", "Bfcached"}
+\* Prefetch slot, one per URL. The Speculation Rules block in
+\* base.gohtml may issue a prefetch GET for any /* URL, and the response
+\* (with its baked invalidation-token meta) sits in a per-URL cache
+\* until either evicted or promoted to a real navigation.
+PrefetchSlot == [present: BOOLEAN, token: Tokens]
+
+NoPrefetch == [present |-> FALSE, token |-> NIL]
+Prefetched(tok) == [present |-> TRUE, token |-> tok]
+
+DocStates == {"Loading", "Loaded", "Bfcached", "PromotedPrefetch"}
 
 InFlightStates == {"None", "GetPending"}
 
@@ -76,12 +96,13 @@ VARIABLES
     idx,            \* Current entry index (1-based).
     docState,       \* Element of DocStates.
     bfcache,        \* Seq(BfcacheSlot) parallel to history.
+    prefetchCache,  \* Function from Urls to PrefetchSlot.
     serverToken,    \* Latest server token (incremented on POST).
     cookieToken,    \* Browser's cookie value (NIL or some token).
     inFlight        \* Element of InFlightStates.
 
-vars == <<history, idx, docState, bfcache, serverToken, cookieToken,
-          inFlight>>
+vars == <<history, idx, docState, bfcache, prefetchCache, serverToken,
+          cookieToken, inFlight>>
 
 (***************************************************************************)
 (* Helpers                                                                 *)
@@ -123,6 +144,7 @@ TypeOk ==
     /\ docState \in DocStates
     /\ bfcache \in Seq(BfcacheSlot)
     /\ Len(bfcache) = Len(history)
+    /\ prefetchCache \in [Urls -> PrefetchSlot]
     /\ serverToken \in Tokens
     /\ cookieToken \in Tokens
     /\ inFlight \in InFlightStates
@@ -132,6 +154,7 @@ Init ==
     /\ idx = 1
     /\ docState = "Loaded"
     /\ bfcache = <<NoCache>>
+    /\ prefetchCache = [u \in Urls |-> NoPrefetch]
     /\ serverToken = NIL
     /\ cookieToken = NIL
     /\ inFlight = "None"
@@ -147,14 +170,30 @@ ClickLink(targetUrl) ==
     /\ docState = "Loaded"
     /\ inFlight = "None"
     /\ idx < MaxHistory  \* respect history bound
-    /\ LET h2 == Append(Truncate(history, idx),
-                        [url |-> targetUrl, bakedToken |-> NIL])
+    /\ LET hit == prefetchCache[targetUrl].present
+           newEntry ==
+               IF hit
+               THEN [url        |-> targetUrl,
+                     bakedToken |-> prefetchCache[targetUrl].token]
+               ELSE [url |-> targetUrl, bakedToken |-> NIL]
+           h2 == Append(Truncate(history, idx), newEntry)
            b2 == Append(Truncate(StashBfcache(bfcache), idx), NoCache)
        IN  /\ history' = h2
            /\ bfcache' = b2
            /\ idx' = Len(h2)
-           /\ docState' = "Loading"
-           /\ inFlight' = "GetPending"
+           /\ IF hit
+              THEN \* Prefetched response is promoted into the current
+                   \* navigation: the document is constructed immediately,
+                   \* no network round trip. The meta token is whatever
+                   \* it was at prefetch time, which may be stale.
+                /\ docState' = "PromotedPrefetch"
+                /\ inFlight' = "None"
+                /\ prefetchCache' = [prefetchCache EXCEPT
+                                       ![targetUrl] = NoPrefetch]
+              ELSE \* No prefetch: fresh fetch.
+                /\ docState' = "Loading"
+                /\ inFlight' = "GetPending"
+                /\ prefetchCache' = prefetchCache
     /\ UNCHANGED <<serverToken, cookieToken>>
 
 (***************************************************************************)
@@ -173,7 +212,7 @@ GetResponse ==
                                bakedToken |-> serverToken]]
     /\ docState' = "Loaded"
     /\ inFlight' = "None"
-    /\ UNCHANGED <<idx, bfcache, serverToken, cookieToken>>
+    /\ UNCHANGED <<idx, bfcache, prefetchCache, serverToken, cookieToken>>
 
 (***************************************************************************)
 (* Browser back / forward button. Per the HTML spec, the previous         *)
@@ -202,7 +241,7 @@ Traverse(newIdx) ==
                                           bakedToken |-> NIL]]
             /\ docState' = "Loading"
             /\ inFlight' = "GetPending"
-    /\ UNCHANGED <<serverToken, cookieToken>>
+    /\ UNCHANGED <<prefetchCache, serverToken, cookieToken>>
 
 GoBack    == Traverse(idx - 1)
 GoForward == Traverse(idx + 1)
@@ -268,6 +307,12 @@ SubmitForm(targetUrl, isReplace) ==
                      /\ idx' = Len(h2)
                      /\ docState' = "Loading"
                      /\ inFlight' = "GetPending"
+    \* Programmatic navigation.navigate() in popOrPushTo does not
+    \* consume the speculation-rules prefetch cache: that cache is for
+    \* browser-initiated link navigations. The post-cookie-change Vary
+    \* on Cookie would, in any case, invalidate the prefetch for the
+    \* target URL. We conservatively leave the cache untouched here.
+    /\ UNCHANGED prefetchCache
 
 (***************************************************************************)
 (* On bfcache restore, the global pageshow.persisted handler runs         *)
@@ -282,8 +327,8 @@ PageshowFresh ==
     /\ docState = "Bfcached"
     /\ CurrentBaked = cookieToken
     /\ docState' = "Loaded"
-    /\ UNCHANGED <<history, idx, bfcache, serverToken, cookieToken,
-                   inFlight>>
+    /\ UNCHANGED <<history, idx, bfcache, prefetchCache, serverToken,
+                   cookieToken, inFlight>>
 
 (***************************************************************************)
 (* Tokens differ and the page has the default (global) bfcache handler.   *)
@@ -296,7 +341,8 @@ PageshowReload ==
     /\ CurrentUrl \notin PageLocalUrls
     /\ docState' = "Loading"
     /\ inFlight' = "GetPending"
-    /\ UNCHANGED <<history, idx, bfcache, serverToken, cookieToken>>
+    /\ UNCHANGED <<history, idx, bfcache, prefetchCache, serverToken,
+                   cookieToken>>
 
 (***************************************************************************)
 (* Page-local handler (workout.gohtml: dataset.bfcacheHandler = 'page-     *)
@@ -315,7 +361,7 @@ PageLocalReplace ==
     /\ bfcache' = [bfcache EXCEPT ![idx] = NoCache]
     /\ docState' = "Loading"
     /\ inFlight' = "GetPending"
-    /\ UNCHANGED <<idx, serverToken, cookieToken>>
+    /\ UNCHANGED <<idx, prefetchCache, serverToken, cookieToken>>
 
 (***************************************************************************)
 (* Cookie expiration. The inv_bfcache cookie has MaxAge 60s in production *)
@@ -327,7 +373,8 @@ CookieExpire ==
     /\ CookieMayExpire
     /\ cookieToken /= NIL
     /\ cookieToken' = NIL
-    /\ UNCHANGED <<history, idx, docState, bfcache, serverToken, inFlight>>
+    /\ UNCHANGED <<history, idx, docState, bfcache, prefetchCache,
+                   serverToken, inFlight>>
 
 (***************************************************************************)
 (* Browser may evict a non-current bfcache entry at any time. Per the     *)
@@ -339,8 +386,94 @@ BfcacheEvict ==
          /\ i /= idx
          /\ bfcache[i].cached
          /\ bfcache' = [bfcache EXCEPT ![i] = NoCache]
-    /\ UNCHANGED <<history, idx, docState, serverToken, cookieToken,
-                   inFlight>>
+    /\ UNCHANGED <<history, idx, docState, prefetchCache, serverToken,
+                   cookieToken, inFlight>>
+
+(***************************************************************************)
+(* Speculation Rules prefetch. The browser fires a GET for `url` at       *)
+(* `eagerness: conservative` (touchstart/pointerdown). The response,      *)
+(* baked with whatever inv_bfcache cookie the request carried, is parked  *)
+(* in the prefetch cache.                                                  *)
+(***************************************************************************)
+Prefetch(url) ==
+    /\ PrefetchEnabled
+    /\ ~prefetchCache[url].present
+    /\ prefetchCache' = [prefetchCache EXCEPT
+                           ![url] = Prefetched(serverToken)]
+    /\ UNCHANGED <<history, idx, docState, bfcache, serverToken,
+                   cookieToken, inFlight>>
+
+(***************************************************************************)
+(* Browser may evict a prefetched response (memory pressure, age, the     *)
+(* Vary: Cookie + must-revalidate combination invalidating it after a    *)
+(* POST changes the cookie). Modeled as non-deterministic.                *)
+(***************************************************************************)
+PrefetchEvict(url) ==
+    /\ prefetchCache[url].present
+    /\ prefetchCache' = [prefetchCache EXCEPT ![url] = NoPrefetch]
+    /\ UNCHANGED <<history, idx, docState, bfcache, serverToken,
+                   cookieToken, inFlight>>
+
+(***************************************************************************)
+(* After a prefetched response is promoted, the page is fully loaded but *)
+(* its meta token may not match the current cookie. Today's main.js gates*)
+(* the staleness check on pageshow.persisted (true only for bfcache      *)
+(* restores), so the prefetch case is silently accepted.                  *)
+(*                                                                         *)
+(* PromotedSettleNoCheck models that buggy path: the document is         *)
+(* declared "Loaded" without checking the meta token.                     *)
+(***************************************************************************)
+PromotedSettleNoCheck ==
+    /\ docState = "PromotedPrefetch"
+    /\ ~EagerPagerevealCheck
+    /\ CurrentUrl \notin PageLocalUrls
+    /\ docState' = "Loaded"
+    /\ UNCHANGED <<history, idx, bfcache, prefetchCache, serverToken,
+                   cookieToken, inFlight>>
+
+(***************************************************************************)
+(* With EagerPagerevealCheck (proposed mitigation: move the check from   *)
+(* `pageshow.persisted` to `pagereveal`, which fires on every navigation),*)
+(* the staleness comparison runs after every load. If meta == cookie the *)
+(* page is presumed fresh and settles.                                    *)
+(***************************************************************************)
+PromotedCheckFresh ==
+    /\ docState = "PromotedPrefetch"
+    /\ EagerPagerevealCheck \/ CurrentUrl \in PageLocalUrls
+    /\ CurrentBaked = cookieToken
+    /\ docState' = "Loaded"
+    /\ UNCHANGED <<history, idx, bfcache, prefetchCache, serverToken,
+                   cookieToken, inFlight>>
+
+(***************************************************************************)
+(* Mismatch on a non-page-local URL with the mitigation enabled: reload  *)
+(* exactly as the bfcache handler would.                                  *)
+(***************************************************************************)
+PromotedCheckReload ==
+    /\ docState = "PromotedPrefetch"
+    /\ EagerPagerevealCheck
+    /\ CurrentBaked /= cookieToken
+    /\ CurrentUrl \notin PageLocalUrls
+    /\ docState' = "Loading"
+    /\ inFlight' = "GetPending"
+    /\ UNCHANGED <<history, idx, bfcache, prefetchCache, serverToken,
+                   cookieToken>>
+
+(***************************************************************************)
+(* Page-local handler (workout.gohtml) already fires on every pagereveal,*)
+(* so the prefetch-promoted case is caught regardless of mitigation flag.*)
+(***************************************************************************)
+PromotedPageLocalReplace ==
+    /\ docState = "PromotedPrefetch"
+    /\ CurrentBaked /= cookieToken
+    /\ CurrentUrl \in PageLocalUrls
+    /\ history' = [history EXCEPT
+                     ![idx] = [url        |-> CurrentUrl,
+                               bakedToken |-> NIL]]
+    /\ bfcache' = [bfcache EXCEPT ![idx] = NoCache]
+    /\ docState' = "Loading"
+    /\ inFlight' = "GetPending"
+    /\ UNCHANGED <<idx, prefetchCache, serverToken, cookieToken>>
 
 (***************************************************************************)
 (* Next-state relation                                                     *)
@@ -357,17 +490,27 @@ Next ==
     \/ PageLocalReplace
     \/ CookieExpire
     \/ BfcacheEvict
+    \/ \E u \in Urls : Prefetch(u)
+    \/ \E u \in Urls : PrefetchEvict(u)
+    \/ PromotedSettleNoCheck
+    \/ PromotedCheckFresh
+    \/ PromotedCheckReload
+    \/ PromotedPageLocalReplace
 
-\* Fairness on the pageshow / reload / response actions: once they are
-\* enabled they must eventually fire. Without this, TLC could leave the
-\* document stuck in "Bfcached" or "Loading" forever and trivially refute
-\* every liveness claim.
+\* Fairness on the pageshow / reload / response / settle actions: once
+\* they are enabled they must eventually fire. Without this, TLC could
+\* leave the document stuck in a transient state forever and trivially
+\* refute every liveness claim.
 Spec ==
     Init /\ [][Next]_vars
          /\ WF_vars(GetResponse)
          /\ WF_vars(PageshowFresh)
          /\ WF_vars(PageshowReload)
          /\ WF_vars(PageLocalReplace)
+         /\ WF_vars(PromotedSettleNoCheck)
+         /\ WF_vars(PromotedCheckFresh)
+         /\ WF_vars(PromotedCheckReload)
+         /\ WF_vars(PromotedPageLocalReplace)
 
 (***************************************************************************)
 (* Properties                                                              *)
