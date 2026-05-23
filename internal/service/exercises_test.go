@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -938,6 +939,111 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 				w = *s.WeightKg
 			}
 			t.Errorf("set[%d] WeightKg: want 80.0 (from strength history), got %v", i, w)
+		}
+	}
+}
+
+func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
+	ctx, svc := setupTestService(t)
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+	var (
+		session     domain.Session
+		workoutDate time.Time
+		found       bool
+	)
+	for _, s := range sessions {
+		if len(s.ExerciseSets) > 0 {
+			session, workoutDate, found = s, s.Date, true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no workout day with exercises found in this week")
+	}
+	weID := session.ExerciseSets[0].ID
+
+	current, candidates, err := svc.ListSwapCandidates(ctx, workoutDate, weID, "")
+	if err != nil {
+		t.Fatalf("ListSwapCandidates: %v", err)
+	}
+	if current.ID != session.ExerciseSets[0].Exercise.ID {
+		t.Errorf("current.ID = %d, want %d", current.ID, session.ExerciseSets[0].Exercise.ID)
+	}
+
+	sessionIDs := make(map[int]bool, len(session.ExerciseSets))
+	for _, es := range session.ExerciseSets {
+		sessionIDs[es.Exercise.ID] = true
+	}
+	for _, c := range candidates {
+		if sessionIDs[c.ID] {
+			t.Errorf("candidate %q (id=%d) is already used by the session", c.Name, c.ID)
+		}
+	}
+	if len(candidates) == 0 {
+		t.Error("got 0 candidates; seed pool should leave at least one swap option after exclusions")
+	}
+
+	for i := 1; i < len(candidates); i++ {
+		prev := domain.SwapSimilarityScore(current, candidates[i-1])
+		cur := domain.SwapSimilarityScore(current, candidates[i])
+		if cur > prev {
+			t.Errorf("candidates not sorted by similarity desc at index %d: prev=%d cur=%d", i, prev, cur)
+			break
+		}
+	}
+}
+
+func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
+	ctx, svc := setupTestService(t)
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+	var (
+		session     domain.Session
+		workoutDate time.Time
+		found       bool
+	)
+	for _, s := range sessions {
+		if len(s.ExerciseSets) > 0 {
+			session, workoutDate, found = s, s.Date, true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no workout day with exercises found")
+	}
+	weID := session.ExerciseSets[0].ID
+
+	var candidates []domain.Exercise
+	_, candidates, err = svc.ListSwapCandidates(ctx, workoutDate, weID, "zzzzzzz")
+	if err != nil {
+		t.Fatalf("ListSwapCandidates(no-match): %v", err)
+	}
+	if len(candidates) != 0 {
+		t.Errorf("query 'zzzzzzz' returned %d candidates; want 0", len(candidates))
+	}
+
+	var all []domain.Exercise
+	_, all, err = svc.ListSwapCandidates(ctx, workoutDate, weID, "")
+	if err != nil {
+		t.Fatalf("ListSwapCandidates(unfiltered): %v", err)
+	}
+	var eFiltered []domain.Exercise
+	_, eFiltered, err = svc.ListSwapCandidates(ctx, workoutDate, weID, "e")
+	if err != nil {
+		t.Fatalf("ListSwapCandidates('e'): %v", err)
+	}
+	if len(eFiltered) > len(all) {
+		t.Errorf("'e'-filtered = %d, unfiltered = %d - filter cannot grow the set", len(eFiltered), len(all))
+	}
+	for _, c := range eFiltered {
+		if !strings.Contains(strings.ToLower(c.Name), "e") {
+			t.Errorf("'e'-filtered candidate %q does not contain 'e'", c.Name)
 		}
 	}
 }

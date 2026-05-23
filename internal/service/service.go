@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -35,6 +36,11 @@ type Service struct {
 	openaiAPIKey     string
 	scheduler        PushScheduler // nil-safe; methods no-op when nil.
 	maintenanceCache *maintenanceCache
+	// userLocks serializes operations that must not race per-user (today:
+	// RegenerateWeeklyPlanIfUnstarted). Keyed by user ID; entries are never
+	// evicted — the working set is the active-user count, which is small.
+	// Stored as *sync.Map (not value) so With* shallow copies share state.
+	userLocks *sync.Map // map[int]*sync.Mutex
 }
 
 // NewService creates a new workout service.
@@ -46,7 +52,17 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 		openaiAPIKey:     openaiAPIKey,
 		scheduler:        nil,
 		maintenanceCache: newMaintenanceCache(),
+		userLocks:        &sync.Map{},
 	}
+}
+
+// userMutex returns the per-user mutex, creating it on first access.
+func (s *Service) userMutex(userID int) *sync.Mutex {
+	if m, ok := s.userLocks.Load(userID); ok {
+		return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
+	}
+	m, _ := s.userLocks.LoadOrStore(userID, &sync.Mutex{})
+	return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
 }
 
 // Repos exposes the wired repositories so the notification.Scheduler can

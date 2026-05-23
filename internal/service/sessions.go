@@ -15,11 +15,21 @@ import (
 // that reflects the latest preferences, but only when no session has been started yet.
 // If any workout this week has a non-zero StartedAt the existing plan is left intact.
 //
-// The delete and generate steps are not wrapped in a single transaction. If the process
-// fails between the two, the week is left with no sessions. This is self-healing: the
-// next call to ResolveWeeklySchedule (e.g. on the home page redirect) detects zero
-// sessions and regenerates automatically.
+// The delete and generate steps are NOT wrapped in a single transaction. To
+// prevent two concurrent callers from both passing the no-started-session
+// check and racing on delete+generate, we serialize per-user via an
+// in-process mutex. Multi-process deployments would need a different
+// scheme (advisory lock or single-row sentinel); today's deployment is
+// single-machine (see fly.toml min_machines_running = 0, no horizontal
+// scaling configured).
+//
+// The self-heal via ResolveWeeklySchedule remains as defense-in-depth.
 func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	mu := s.userMutex(userID)
+	mu.Lock()
+	defer mu.Unlock()
+
 	monday := domain.MondayOf(time.Now())
 	sunday := monday.AddDate(0, 0, 6)
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -546,5 +547,52 @@ func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
 	defer fake.mu.Unlock()
 	if len(fake.scheduled) != 1 {
 		t.Errorf("Schedule calls = %d, want 1 (second call is a no-op)", len(fake.scheduled))
+	}
+}
+
+func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T) {
+	ctx, svc := setupTestService(t)
+
+	const goroutines = 8
+	var (
+		wg   sync.WaitGroup
+		errs = make(chan error, goroutines)
+	)
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			errs <- svc.RegenerateWeeklyPlanIfUnstarted(ctx)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Errorf("RegenerateWeeklyPlanIfUnstarted: %v", err)
+		}
+	}
+
+	// Verify the week was regenerated cleanly. Use the repo directly since
+	// Service has no public ListSessions wrapper.
+	monday := domain.MondayOf(time.Now())
+	sunday := monday.AddDate(0, 0, 6)
+	allSessions, err := svc.Repos().Sessions.List(ctx, monday)
+	if err != nil {
+		t.Fatalf("Sessions.List: %v", err)
+	}
+	thisWeek := 0
+	withExercises := 0
+	for _, s := range allSessions {
+		if !s.Date.After(sunday) {
+			thisWeek++
+			if len(s.ExerciseSets) > 0 {
+				withExercises++
+			}
+		}
+	}
+	if withExercises != 3 {
+		t.Errorf("after concurrent regenerate: got %d sessions with exercises, want 3 (Mon/Wed/Fri)", withExercises)
 	}
 }
