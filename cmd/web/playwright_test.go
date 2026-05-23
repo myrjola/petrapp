@@ -703,6 +703,117 @@ func Test_playwright_stacknav(t *testing.T) {
 	}
 }
 
+// Test_playwright_bfcache_staleness drives a flow where the home page (/)
+// is rendered before any POST (bakedToken == ""), then a POST rotates the
+// inv_bfcache cookie, then the user navigates back. The browser restores /
+// from bfcache (its rendered meta token is still ""), our pagereveal
+// handler detects the mismatch against the now-rotated cookie, and triggers
+// navigation.reload(). After the reload, meta should equal the cookie.
+//
+// This is regression protection for the listener wiring: if both
+// pageshow.persisted and pagereveal staleness paths regress simultaneously
+// (e.g. someone removes the listener), the assertion below fails. It does
+// not exercise the Speculation Rules prefetch path — that's the TLA+
+// spec's job (tlaplus/StackNav_Prefetch.cfg /
+// tlaplus/StackNav_PrefetchMitigated.cfg).
+func Test_playwright_bfcache_staleness(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping slow playwright bfcache staleness test")
+	}
+
+	page, serverURL := setupPlaywrightPage(t)
+	var err error
+
+	// Register and schedule today + tomorrow so today has a workout
+	// (matches the smoketest setup pattern around the midnight boundary).
+	if err = page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
+		t.Fatalf("expect /schedule after registration: %v", err)
+	}
+	testStart := time.Now()
+	todayWeekday := testStart.Weekday().String()
+	nextWeekday := testStart.AddDate(0, 0, 1).Weekday().String()
+	for _, day := range []string{todayWeekday, nextWeekday} {
+		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
+			Labels: &[]string{"1 hour"},
+		}); err != nil {
+			t.Fatalf("select %s duration: %v", day, err)
+		}
+	}
+	if err = page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Start Tracking"}).Click(); err != nil {
+		t.Fatalf("submit schedule: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect / after schedule submit: %v", err)
+	}
+
+	// At this point / is loaded with meta == current inv_bfcache cookie
+	// (the schedule POST already rotated it). Drive a second POST so the
+	// /-as-it-currently-sits will be bfcached BEFORE the rotation we care
+	// about. Click "Start Workout": POSTs /workouts/{today}/start and
+	// pushes /workouts/{today} on top of /.
+	if err = page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Start Workout"}).Click(); err != nil {
+		t.Fatalf("click Start Workout: %v", err)
+	}
+	workoutURLPattern := regexp.MustCompile(fmt.Sprintf(
+		`^%s/workouts/\d{4}-\d{2}-\d{2}$`, regexp.QuoteMeta(serverURL)))
+	if err = page.WaitForURL(workoutURLPattern); err != nil {
+		t.Fatalf("expect /workouts/{today} after Start Workout: %v", err)
+	}
+
+	// Snapshot the cookie that the Start Workout POST set. Used as the
+	// expected value to assert against after the back-nav-triggered reload.
+	cookieAfterPost, err := page.Evaluate(
+		`document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)?.[1] ?? ''`)
+	if err != nil {
+		t.Fatalf("read cookie after Start Workout: %v", err)
+	}
+	wantToken, _ := cookieAfterPost.(string)
+	if wantToken == "" {
+		t.Fatalf("inv_bfcache cookie not set after Start Workout POST")
+	}
+
+	// Navigate back to /. The browser restores it from bfcache with the
+	// pre-POST meta token (which was rotated when the schedule POST set the
+	// cookie, but the / snapshot in bfcache was captured BEFORE the Start
+	// Workout POST rotated it again). Mismatch -> pagereveal handler
+	// triggers navigation.reload(). After reload, meta == cookie.
+	if _, err = page.GoBack(); err != nil {
+		t.Fatalf("GoBack to /: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect / after GoBack: %v", err)
+	}
+
+	// Poll until the page's meta token equals the post-Start-Workout cookie.
+	// The bfcache snapshot has the OLD token; after the staleness-triggered
+	// reload, the freshly-fetched / will have the new token. If no listener
+	// fires the reload, this times out.
+	_, err = page.WaitForFunction(`
+		(want) => {
+			const meta = document.querySelector('meta[name=invalidation-token]')?.content ?? '';
+			return meta === want;
+		}
+	`, wantToken, playwright.PageWaitForFunctionOptions{
+		Timeout: playwright.Float(5000),
+	})
+	if err != nil {
+		// Failure path: dump current state to narrow the post-mortem.
+		state, _ := page.Evaluate(`() => ({
+			meta: document.querySelector('meta[name=invalidation-token]')?.content ?? null,
+			cookie: document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)?.[1] ?? null,
+			url: location.href,
+		})`)
+		t.Fatalf("post-bfcache reload did not converge meta to cookie within 5s: %v; state=%+v; want=%q",
+			err, state, wantToken)
+	}
+}
+
 // dumpNavDiagnostics logs the page URL, the Navigation API entry stack, the
 // current load state, and the page heading. Called from t.Fatalf paths whose
 // failure mode is "URL is not what we expected" — the dump narrows the
