@@ -463,6 +463,10 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 
 	// Set schedule to today only.
 	today := time.Now().Weekday()
+	// Petra's week ends Sunday; on Sunday there is no later day this week to schedule.
+	if today == time.Sunday {
+		t.Skip("Cannot run on Sunday: no remaining day in the current week")
+	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
@@ -478,10 +482,10 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 		t.Fatalf("Failed to start today's workout: %v", err)
 	}
 
-	// Add another weekday mid-week (a different day in this week).
-	addedDay := time.Now().Weekday() + 1
+	// Add another weekday mid-week — pick the next day this week (Sun follows Sat).
+	addedDay := today + 1
 	if addedDay > time.Saturday {
-		addedDay = time.Monday
+		addedDay = time.Sunday
 	}
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences (2nd): %v", err)
@@ -501,7 +505,9 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 		mondayOffset = -6
 	}
 	monday := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, mondayOffset)
-	addedDateStr := monday.AddDate(0, 0, int(addedDay-time.Monday)).Format("2006-01-02")
+	// Petra's week starts Monday; Sunday is the last day (offset 6).
+	offsetFromMonday := (int(addedDay) + 6) % 7
+	addedDateStr := monday.AddDate(0, 0, offsetFromMonday).Format("2006-01-02")
 
 	// Start the newly-scheduled day — this is the case that fails without lazy-create.
 	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+addedDateStr+"/start", nil); err != nil {
