@@ -6,7 +6,7 @@
 
 **Architecture:** A pure domain function `PlanRestPush` returns a `Schedule | Cancel | NoOp` decision based on the post-mutation `ExerciseSet` slot. The service layer wires it into both `RecordSet` and `MarkWarmupComplete`, layering on I/O (preferences, subscription count, JSON marshaling, scheduler call). The notification package, repository, schema, and service-worker wire format stay unchanged.
 
-**Tech Stack:** Go 1.24 (stdlib only for new code), SQLite (no schema changes), existing `internal/notification.Scheduler` for timer mechanics.
+**Tech Stack:** Go 1.26.3 (stdlib only for new code), SQLite (no schema changes), existing `internal/notification.Scheduler` for timer mechanics.
 
 **Spec:** [docs/superpowers/specs/2026-05-23-rest-push-policy-design.md](../specs/2026-05-23-rest-push-policy-design.md)
 
