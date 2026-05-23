@@ -77,3 +77,43 @@ func TestPushSubscriptions_InsertReplacesByEndpoint(t *testing.T) {
 		t.Errorf("P256dh = %q, want updated value", subs[0].P256dh)
 	}
 }
+
+func TestPushSubscriptions_DeleteAllByUser(t *testing.T) {
+	t.Parallel()
+	ctx, repos := setupTestRepos(t)
+
+	endpoints := []string{
+		"https://web.push.apple.com/a",
+		"https://web.push.apple.com/b",
+		"https://fcm.googleapis.com/wp/c",
+	}
+	for _, ep := range endpoints {
+		sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt populated by Insert.
+			Endpoint: ep,
+			P256dh:   "p",
+			Auth:     "a",
+		}
+		if _, err := repos.PushSubscriptions.Insert(ctx, sub); err != nil {
+			t.Fatalf("Insert %s: %v", ep, err)
+		}
+	}
+	count, err := repos.PushSubscriptions.CountByUser(ctx)
+	if err != nil {
+		t.Fatalf("CountByUser before: %v", err)
+	}
+	if count != len(endpoints) {
+		t.Fatalf("CountByUser before = %d, want %d", count, len(endpoints))
+	}
+
+	if err = repos.PushSubscriptions.DeleteAllByUser(ctx); err != nil {
+		t.Fatalf("DeleteAllByUser: %v", err)
+	}
+
+	count, err = repos.PushSubscriptions.CountByUser(ctx)
+	if err != nil {
+		t.Fatalf("CountByUser after: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("after DeleteAllByUser: CountByUser = %d, want 0", count)
+	}
+}
