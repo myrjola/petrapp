@@ -66,3 +66,10 @@ node_modules
 # Tailnet certs
 /*.crt
 /*.key
+
+# TLA+ TLC model-checker outputs (states dir per run, toolbox metadata,
+# parser/old backups).
+/tlaplus/states/
+*.toolbox/
+*.old
+*.tlatools-config
