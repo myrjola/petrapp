@@ -96,3 +96,92 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateWorkoutAction(t *testing.T) {
+	tests := []struct {
+		name             string
+		status           string
+		isToday          bool
+		wantNil          bool
+		wantStartWorkout bool
+		wantLabel        string
+	}{
+		{
+			name:             "today: scheduled, not started",
+			status:           statusToday,
+			isToday:          true,
+			wantNil:          false,
+			wantStartWorkout: true,
+			wantLabel:        "Start Workout",
+		},
+		{
+			name:             "in progress: continue without re-starting",
+			status:           statusInProgress,
+			isToday:          false,
+			wantNil:          false,
+			wantStartWorkout: false,
+			wantLabel:        "Continue Workout",
+		},
+		{
+			name:             "completed past day: view details",
+			status:           statusCompleted,
+			isToday:          false,
+			wantNil:          false,
+			wantStartWorkout: false,
+			wantLabel:        "View Details",
+		},
+		{
+			name:             "missed past day: clicking 'Start Late' must POST start",
+			status:           statusPastIncomplete,
+			isToday:          false,
+			wantNil:          false,
+			wantStartWorkout: true,
+			wantLabel:        "Start Late",
+		},
+		{
+			name:             "upcoming day: start early posts start",
+			status:           statusUpcoming,
+			isToday:          false,
+			wantNil:          false,
+			wantStartWorkout: true,
+			wantLabel:        "Start Early",
+		},
+		{
+			name:             "unscheduled day, today: start extra workout posts start",
+			status:           statusUnscheduled,
+			isToday:          true,
+			wantNil:          false,
+			wantStartWorkout: true,
+			wantLabel:        "Start Extra Workout",
+		},
+		{
+			name:             "unscheduled day, not today: no action",
+			status:           statusUnscheduled,
+			isToday:          false,
+			wantNil:          true,
+			wantStartWorkout: false,
+			wantLabel:        "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateWorkoutAction(tt.status, tt.isToday)
+			if tt.wantNil {
+				if got != nil {
+					t.Fatalf("calculateWorkoutAction() = %+v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("calculateWorkoutAction() = nil, want non-nil")
+			}
+			if got.StartWorkout != tt.wantStartWorkout {
+				t.Errorf("StartWorkout = %v, want %v", got.StartWorkout, tt.wantStartWorkout)
+			}
+			if got.Label != tt.wantLabel {
+				t.Errorf("Label = %q, want %q", got.Label, tt.wantLabel)
+			}
+		})
+	}
+}
