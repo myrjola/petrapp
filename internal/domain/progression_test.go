@@ -7,6 +7,8 @@ import (
 )
 
 func TestCurrentSet_FirstSet(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		periodization  domain.PeriodizationType
@@ -47,6 +49,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			p := domain.New(domain.Config{
 				Type:           tt.periodization,
 				RepMin:         tt.repMin,
@@ -66,6 +69,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 }
 
 func TestCurrentSet_SignalAdjustment(t *testing.T) {
+	t.Parallel()
+
 	const startWeight = 100.0
 
 	tests := []struct {
@@ -92,6 +97,7 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			p := domain.New(domain.Config{
 				Type:           domain.PeriodizationHypertrophy,
 				RepMin:         5,
@@ -113,6 +119,8 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 }
 
 func TestCurrentSet_TooHeavyRounding(t *testing.T) {
+	t.Parallel()
+
 	// 23kg: |w|*0.10 = 2.3, below the 2.5kg minimum step → 23 - 2.5 = 20.5
 	p := domain.New(domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
@@ -133,6 +141,8 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 }
 
 func TestCurrentSet_OverridePropagates(t *testing.T) {
+	t.Parallel()
+
 	// Recommended set 1 = 100kg. User overrides to 95kg and signals OnTarget.
 	// Set 2 recommendation must be 95kg (from actual), not 100kg.
 	p := domain.New(domain.Config{
@@ -154,6 +164,8 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 }
 
 func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
+	t.Parallel()
+
 	// User overrides set 2 to 90kg and signals TooLight.
 	// Set 3 must be 90 + 2.5 = 92.5kg.
 	p := domain.New(domain.Config{
@@ -180,6 +192,8 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 }
 
 func TestNewFromHistory_MatchesReplay(t *testing.T) {
+	t.Parallel()
+
 	config := domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
@@ -213,6 +227,8 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 }
 
 func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
+	t.Parallel()
+
 	config := domain.Config{
 		Type:           domain.PeriodizationStrength,
 		RepMin:         5,
@@ -229,6 +245,8 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 }
 
 func TestSetsCompleted(t *testing.T) {
+	t.Parallel()
+
 	p := domain.New(domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
@@ -261,6 +279,8 @@ func TestSetsCompleted(t *testing.T) {
 }
 
 func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		lastWeight float64
@@ -355,6 +375,7 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			p := domain.NewFromHistory(
 				domain.Config{
 					Type:           domain.PeriodizationStrength,
@@ -380,6 +401,8 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 // updating the switch in DeriveScheme will both fail this test and trip the
 // `exhaustive` linter on the package's internal switches.
 func TestExhaustivePeriodizationCoverage(t *testing.T) {
+	t.Parallel()
+
 	// Use a wide window so repMin/repMax don't mask any periodization branch.
 	const repMin, repMax = 5, 15
 	all := []domain.PeriodizationType{
@@ -394,6 +417,8 @@ func TestExhaustivePeriodizationCoverage(t *testing.T) {
 }
 
 func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
+	t.Parallel()
+
 	cfg := domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         8,
@@ -448,6 +473,8 @@ func TestAdjustedWeight_UnknownSignalDoesNotPanic(t *testing.T) {
 // a finite weight via the package's internal adjustedWeight switch (exercised
 // through CurrentSet).
 func TestExhaustiveSignalCoverage(t *testing.T) {
+	t.Parallel()
+
 	valid := []domain.Signal{
 		domain.SignalTooHeavy,
 		domain.SignalOnTarget,

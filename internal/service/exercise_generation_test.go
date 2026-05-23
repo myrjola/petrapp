@@ -12,6 +12,8 @@ import (
 // real ID. This guards the "no AI, still works" promise the GenerateExercise
 // doc comment makes.
 func Test_GenerateExercise_FallsBackWithoutAPIKey(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	got, err := svc.GenerateExercise(ctx, "Cossack Squat")

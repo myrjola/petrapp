@@ -10,6 +10,7 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
+//nolint:paralleltest // subtests sequentially promote the same user to admin.
 func Test_application_adminFeatureFlags(t *testing.T) {
 	var (
 		ctx = t.Context()
@@ -87,6 +88,7 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // subtests share an admin-promoted user and the maintenance flag DB row.
 func Test_application_maintenanceMode_integration(t *testing.T) {
 	var (
 		ctx = t.Context()

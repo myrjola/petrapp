@@ -8,6 +8,8 @@ import (
 )
 
 func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	// Two synthetic exercises sharing a secondary muscle group so we can verify
@@ -109,6 +111,8 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 }
 
 func Test_WeeklyMuscleGroupVolume_EmptyWeek(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	got, err := svc.WeeklyMuscleGroupVolume(ctx, nil)

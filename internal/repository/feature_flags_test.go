@@ -8,6 +8,8 @@ import (
 )
 
 func TestFeatureFlagRepository_GetMissingReturnsErrNotFound(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	_, err := repos.FeatureFlags.Get(ctx, domain.FeatureFlagName("nonexistent_flag"))
@@ -17,6 +19,8 @@ func TestFeatureFlagRepository_GetMissingReturnsErrNotFound(t *testing.T) {
 }
 
 func TestFeatureFlagRepository_SetThenGetRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	want := domain.FeatureFlag{Name: domain.FeatureFlagName("experimental_x"), Enabled: true}
@@ -33,6 +37,8 @@ func TestFeatureFlagRepository_SetThenGetRoundTrip(t *testing.T) {
 }
 
 func TestFeatureFlagRepository_SetUpsertsExisting(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	flagX := domain.FeatureFlag{Name: domain.FeatureFlagName("x"), Enabled: true}
@@ -53,6 +59,8 @@ func TestFeatureFlagRepository_SetUpsertsExisting(t *testing.T) {
 }
 
 func TestFeatureFlagRepository_ListSortedByName(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	for _, name := range []string{"zebra", "apple", "mango"} {

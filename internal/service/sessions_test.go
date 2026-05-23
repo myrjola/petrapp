@@ -17,6 +17,8 @@ import (
 )
 
 func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	sessions, err := svc.ResolveWeeklySchedule(ctx)
@@ -43,6 +45,8 @@ func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
 }
 
 func Test_ResolveWeeklySchedule_DoesNotRegenerateExistingSessions(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	sessions1, err := svc.ResolveWeeklySchedule(ctx)
@@ -66,6 +70,8 @@ func Test_ResolveWeeklySchedule_DoesNotRegenerateExistingSessions(t *testing.T) 
 }
 
 func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	// Generate this week's plan.
@@ -82,6 +88,8 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 }
 
 func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet
 
 	// Call directly without seeding via ResolveWeeklySchedule first.
@@ -102,6 +110,8 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T)
 }
 
 func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
 
 	// Generate the initial plan.
@@ -141,6 +151,8 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *tes
 }
 
 func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
 
 	sessions, err := svc.ResolveWeeklySchedule(ctx)
@@ -183,6 +195,8 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 }
 
 func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, _ := setupSessionForRecordSet(t)
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
 	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
@@ -208,6 +222,8 @@ func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
 }
 
 func Test_StartSession_CreatesAdHocSessionForUnscheduledToday(t *testing.T) {
+	t.Parallel()
+
 	// setupTestService sets Mon/Wed/Fri preferences. Pick a day this week
 	// the user has not scheduled (a Tuesday) and verify StartSession both
 	// creates the session and marks it started.
@@ -238,6 +254,8 @@ func Test_StartSession_CreatesAdHocSessionForUnscheduledToday(t *testing.T) {
 }
 
 func Test_StartSession_CreatesNewlyScheduledMidWeekDay(t *testing.T) {
+	t.Parallel()
+
 	// Mon/Wed/Fri prefs, start Monday, then change prefs to add Tuesday
 	// — RegenerateWeeklyPlanIfUnstarted will skip because Monday is started.
 	// StartSession on Tuesday must still succeed by creating the session.
@@ -284,6 +302,8 @@ func Test_StartSession_CreatesNewlyScheduledMidWeekDay(t *testing.T) {
 }
 
 func Test_StartSession_DoubleStartIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	// Two StartSession calls on the same unscheduled date must both succeed
 	// and leave exactly one started session. Simulates the lazy-create race
 	// via sequential calls (the second's Create returns ErrAlreadyExists and
@@ -313,13 +333,15 @@ func Test_StartSession_DoubleStartIsIdempotent(t *testing.T) {
 }
 
 func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -366,6 +388,8 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 }
 
 func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -403,6 +427,8 @@ func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
 }
 
 func Test_MarkWarmupComplete_NoSubscriptions_DoesNotSchedule(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, _, weID := setupSessionForRecordSet(t)
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
 	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
@@ -421,6 +447,8 @@ func Test_MarkWarmupComplete_NoSubscriptions_DoesNotSchedule(t *testing.T) {
 }
 
 func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	// Seed a second set so set 2 exists for the schedule target.
 	if _, err := db.ReadWrite.ExecContext(ctx,
@@ -470,6 +498,8 @@ func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
 }
 
 func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -517,6 +547,8 @@ func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testin
 }
 
 func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -551,6 +583,8 @@ func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
 }
 
 func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	const goroutines = 8

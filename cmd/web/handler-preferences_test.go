@@ -20,6 +20,8 @@ import (
 )
 
 func Test_application_preferences(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -135,6 +137,8 @@ func Test_application_preferences(t *testing.T) {
 // domain.Preferences{} literal in preferencesPOST that defaulted the column
 // to Go's zero-value and clobbered the persisted true.
 func Test_application_preferencesPOST_preservesRestNotificationsEnabled(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -183,6 +187,8 @@ func Test_application_preferencesPOST_preservesRestNotificationsEnabled(t *testi
 }
 
 func Test_application_exportUserData(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -330,6 +336,8 @@ func Test_application_exportUserData(t *testing.T) {
 }
 
 func Test_application_deleteUser(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -416,6 +424,8 @@ func Test_application_deleteUser(t *testing.T) {
 }
 
 func TestPreferencesPOST_RejectsEmptySchedule(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)

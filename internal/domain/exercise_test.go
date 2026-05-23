@@ -8,6 +8,8 @@ import (
 )
 
 func Test_Exercise_FormatSetValue(t *testing.T) {
+	t.Parallel()
+
 	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
 			ExerciseType: typ,
@@ -28,6 +30,7 @@ func Test_Exercise_FormatSetValue(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := tc.exercise.FormatSetValue(tc.value)
 			if got != tc.want {
 				t.Errorf("Exercise{%s}.FormatSetValue(%d) = %q, want %q",
@@ -38,6 +41,8 @@ func Test_Exercise_FormatSetValue(t *testing.T) {
 }
 
 func Test_Exercise_HasWeight(t *testing.T) {
+	t.Parallel()
+
 	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
 			ExerciseType: typ,
@@ -57,6 +62,7 @@ func Test_Exercise_HasWeight(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := tc.exercise.HasWeight()
 			if got != tc.want {
 				t.Errorf("Exercise{%s}.HasWeight() = %v, want %v",
@@ -67,6 +73,8 @@ func Test_Exercise_HasWeight(t *testing.T) {
 }
 
 func Test_Category_IsValid(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		c    domain.Category
@@ -80,6 +88,7 @@ func Test_Category_IsValid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tc.c.IsValid(); got != tc.want {
 				t.Errorf("Category(%q).IsValid() = %v, want %v", tc.c, got, tc.want)
 			}
@@ -88,6 +97,8 @@ func Test_Category_IsValid(t *testing.T) {
 }
 
 func Test_ExerciseType_IsValid(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		et   domain.ExerciseType
@@ -102,6 +113,7 @@ func Test_ExerciseType_IsValid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tc.et.IsValid(); got != tc.want {
 				t.Errorf("ExerciseType(%q).IsValid() = %v, want %v", tc.et, got, tc.want)
 			}
@@ -110,6 +122,8 @@ func Test_ExerciseType_IsValid(t *testing.T) {
 }
 
 func Test_Exercise_EncodeFormWeight(t *testing.T) {
+	t.Parallel()
+
 	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
 			ExerciseType: typ,
@@ -132,6 +146,7 @@ func Test_Exercise_EncodeFormWeight(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := tc.exercise.EncodeFormWeight(tc.input, tc.assisted)
 			if got != tc.want {
 				t.Errorf("Exercise{%s}.EncodeFormWeight(%v, %v) = %v, want %v",
@@ -142,6 +157,8 @@ func Test_Exercise_EncodeFormWeight(t *testing.T) {
 }
 
 func Test_Exercise_FormatSetDescription(t *testing.T) {
+	t.Parallel()
+
 	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
 			ExerciseType: typ,
@@ -184,6 +201,7 @@ func Test_Exercise_FormatSetDescription(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := tc.exercise.FormatSetDescription(tc.set)
 			if got != tc.want {
 				t.Errorf("Exercise{%s}.FormatSetDescription(...) = %q, want %q",
@@ -194,6 +212,8 @@ func Test_Exercise_FormatSetDescription(t *testing.T) {
 }
 
 func Test_Category_Label(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		category domain.Category
@@ -205,6 +225,7 @@ func Test_Category_Label(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tc.category.Label(); got != tc.want {
 				t.Errorf("Label() = %q, want %q", got, tc.want)
 			}
@@ -213,6 +234,8 @@ func Test_Category_Label(t *testing.T) {
 }
 
 func Test_SetTarget_AbsWeightKg(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		t    domain.SetTarget
@@ -224,6 +247,7 @@ func Test_SetTarget_AbsWeightKg(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tc.t.AbsWeightKg(); got != tc.want {
 				t.Errorf("SetTarget{%v}.AbsWeightKg() = %v, want %v", tc.t.WeightKg, got, tc.want)
 			}
@@ -232,6 +256,8 @@ func Test_SetTarget_AbsWeightKg(t *testing.T) {
 }
 
 func Test_Exercise_SetValueUnit(t *testing.T) {
+	t.Parallel()
+
 	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
 			ExerciseType: typ,
@@ -251,6 +277,7 @@ func Test_Exercise_SetValueUnit(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := tc.exercise.SetValueUnit()
 			if got != tc.want {
 				t.Errorf("Exercise{%s}.SetValueUnit() = %q, want %q",
@@ -261,6 +288,8 @@ func Test_Exercise_SetValueUnit(t *testing.T) {
 }
 
 func Test_Exercise_Validate(t *testing.T) {
+	t.Parallel()
+
 	intPtr := func(n int) *int { return &n }
 	validWeighted := func() domain.Exercise {
 		return domain.Exercise{ //nolint:exhaustruct // test builder sets only the validated fields.
@@ -339,6 +368,7 @@ func Test_Exercise_Validate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			err := tc.exercise.Validate()
 			if !tc.wantErr {
 				if err != nil {

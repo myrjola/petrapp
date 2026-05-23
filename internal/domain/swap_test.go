@@ -8,6 +8,8 @@ import (
 
 //nolint:exhaustruct // Test exercises omit unused fields (ID, Name, ExerciseType, DescriptionMarkdown).
 func TestSwapSimilarityScore(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		current domain.Exercise
@@ -144,6 +146,7 @@ func TestSwapSimilarityScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := domain.SwapSimilarityScore(tt.current, tt.other); got != tt.want {
 				t.Errorf("SwapSimilarityScore(current, other) = %d, want %d", got, tt.want)
 			}
@@ -153,6 +156,8 @@ func TestSwapSimilarityScore(t *testing.T) {
 
 //nolint:exhaustruct // Test exercises omit unused fields (ID, Name, ExerciseType, DescriptionMarkdown).
 func TestSwapSimilarityScore_isSymmetric(t *testing.T) {
+	t.Parallel()
+
 	a := domain.Exercise{
 		Category:              domain.CategoryUpper,
 		PrimaryMuscleGroups:   []string{"Chest", "Triceps"},

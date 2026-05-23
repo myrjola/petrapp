@@ -13,6 +13,8 @@ import (
 // until someone runs `cmd/stresstest` against a deployed app and watches every scenario
 // fail. If any of the scenarios stop matching the current templates, this test breaks.
 func Test_loadtest_scenarios_inProcess(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 
@@ -22,22 +24,26 @@ func Test_loadtest_scenarios_inProcess(t *testing.T) {
 	}
 
 	t.Run("Auth", func(t *testing.T) {
+		t.Parallel()
+
 		client, clientErr := e2etest.NewClient(server.URL(), "localhost", server.URL())
 		if clientErr != nil {
 			t.Fatalf("new client: %v", clientErr)
 		}
-		if err = loadtest.RunAuthFlow(ctx, client); err != nil {
-			t.Fatalf("auth flow: %v", err)
+		if authErr := loadtest.RunAuthFlow(ctx, client); authErr != nil {
+			t.Fatalf("auth flow: %v", authErr)
 		}
 	})
 
 	t.Run("WorkoutScenario", func(t *testing.T) {
+		t.Parallel()
+
 		user, regErr := loadtest.RegisterAndAuthenticateUser(ctx, server.URL(), "localhost", 1, logger)
 		if regErr != nil {
 			t.Fatalf("register user: %v", regErr)
 		}
-		if err = loadtest.WorkoutScenario(ctx, user, logger); err != nil {
-			t.Fatalf("workout scenario: %v", err)
+		if scenarioErr := loadtest.WorkoutScenario(ctx, user, logger); scenarioErr != nil {
+			t.Fatalf("workout scenario: %v", scenarioErr)
 		}
 	})
 }

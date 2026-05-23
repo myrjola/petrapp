@@ -12,6 +12,8 @@ import (
 )
 
 func Test_PushSubscribe_RoundTrip(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {

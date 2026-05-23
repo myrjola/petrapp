@@ -35,6 +35,8 @@ func (w *timeoutResponseWriter) SetWriteDeadline(_ time.Time) error {
 }
 
 func Test_application_timeout(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		sleepMS  int
@@ -69,6 +71,8 @@ func Test_application_timeout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			synctest.Test(t, func(t *testing.T) {
 				// Create a minimal application for testing
 				app := &application{ //nolint:exhaustruct // this is a test

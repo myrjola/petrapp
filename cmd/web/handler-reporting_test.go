@@ -11,6 +11,7 @@ import (
 	"testing"
 )
 
+//nolint:paralleltest // subtests share a single logBuffer (Reset between cases).
 func Test_application_reportingAPI(t *testing.T) {
 	// Create a minimal application for testing with a logger that captures output
 	var logBuffer bytes.Buffer
@@ -175,6 +176,8 @@ func Test_application_reportingAPI(t *testing.T) {
 }
 
 func Test_application_reportingAPI_readError(t *testing.T) {
+	t.Parallel()
+
 	// Create a minimal application for testing
 	var logBuffer bytes.Buffer
 	app := &application{ //nolint:exhaustruct // this is a test
@@ -204,6 +207,8 @@ func Test_application_reportingAPI_readError(t *testing.T) {
 }
 
 func Test_application_reportingAPI_requestSizeLimit(t *testing.T) {
+	t.Parallel()
+
 	// Create a minimal application for testing
 	var logBuffer bytes.Buffer
 	app := &application{ //nolint:exhaustruct // this is a test

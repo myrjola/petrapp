@@ -7,6 +7,8 @@ import (
 )
 
 func TestSignal_Label(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		signal domain.Signal
 		want   string
@@ -18,6 +20,7 @@ func TestSignal_Label(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.signal), func(t *testing.T) {
+			t.Parallel()
 			if got := tt.signal.Label(); got != tt.want {
 				t.Errorf("Label() = %q, want %q", got, tt.want)
 			}
@@ -26,6 +29,8 @@ func TestSignal_Label(t *testing.T) {
 }
 
 func TestSignal_Glyph(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		signal domain.Signal
 		want   string
@@ -37,6 +42,7 @@ func TestSignal_Glyph(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.signal), func(t *testing.T) {
+			t.Parallel()
 			if got := tt.signal.Glyph(); got != tt.want {
 				t.Errorf("Glyph() = %q, want %q", got, tt.want)
 			}

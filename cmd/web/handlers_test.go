@@ -13,6 +13,8 @@ import (
 // per-request Funcs() overrides don't bleed across goroutines) while reusing
 // the cached parsed tree (the cache's whole point).
 func Test_pageTemplate_cachesAndReturnsCloneInProdMode(t *testing.T) {
+	t.Parallel()
+
 	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
 	if err != nil {
 		t.Fatalf("resolve template path: %v", err)
@@ -53,6 +55,8 @@ func Test_pageTemplate_cachesAndReturnsCloneInProdMode(t *testing.T) {
 // Test_pageTemplate_skipsCacheInDevMode verifies that dev mode re-parses on
 // every call so template edits are reflected on the next refresh.
 func Test_pageTemplate_skipsCacheInDevMode(t *testing.T) {
+	t.Parallel()
+
 	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
 	if err != nil {
 		t.Fatalf("resolve template path: %v", err)
@@ -71,6 +75,8 @@ func Test_pageTemplate_skipsCacheInDevMode(t *testing.T) {
 }
 
 func Test_formatFloat(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input float64
 		want  string
@@ -84,6 +90,8 @@ func Test_formatFloat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%v", tt.input), func(t *testing.T) {
+			t.Parallel()
+
 			if got := formatFloat(tt.input); got != tt.want {
 				t.Errorf("formatFloat(%v) = %q, want %q", tt.input, got, tt.want)
 			}

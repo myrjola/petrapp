@@ -8,6 +8,8 @@ import (
 )
 
 func TestWeekInBlock(t *testing.T) {
+	t.Parallel()
+
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC) // Monday
 
 	tests := []struct {
@@ -26,6 +28,7 @@ func TestWeekInBlock(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := domain.WeekInBlock(tt.date, anchor, tt.length); got != tt.want {
 				t.Errorf("WeekInBlock(%s, %s, %d) = %d, want %d",
 					tt.date.Format("2006-01-02"), anchor.Format("2006-01-02"), tt.length, got, tt.want)
@@ -35,6 +38,8 @@ func TestWeekInBlock(t *testing.T) {
 }
 
 func TestIsDeloadWeek(t *testing.T) {
+	t.Parallel()
+
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC) // Monday
 
 	tests := []struct {
@@ -53,6 +58,7 @@ func TestIsDeloadWeek(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			a := anchor
 			if tt.name == "zero anchor returns false" {
 				a = time.Time{}
@@ -65,6 +71,8 @@ func TestIsDeloadWeek(t *testing.T) {
 }
 
 func TestIsDeloadWeek_LengthBounds(t *testing.T) {
+	t.Parallel()
+
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
 	for _, length := range []int{0, 1, -1} {
 		if got := domain.IsDeloadWeek(anchor, anchor, length, true); got {

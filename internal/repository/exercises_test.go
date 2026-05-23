@@ -23,6 +23,8 @@ func newTestExercise() domain.Exercise {
 }
 
 func TestExerciseRepository_GetMissingReturnsErrNotFound(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	_, err := repos.Exercises.Get(ctx, 999_999)
@@ -32,6 +34,8 @@ func TestExerciseRepository_GetMissingReturnsErrNotFound(t *testing.T) {
 }
 
 func TestExerciseRepository_CreateAssignsID(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	created, err := repos.Exercises.Create(ctx, newTestExercise())
@@ -44,6 +48,8 @@ func TestExerciseRepository_CreateAssignsID(t *testing.T) {
 }
 
 func TestExerciseRepository_CreateThenGetRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	created, err := repos.Exercises.Create(ctx, newTestExercise())
@@ -69,6 +75,8 @@ func TestExerciseRepository_CreateThenGetRoundTrip(t *testing.T) {
 }
 
 func TestExerciseRepository_UpdatePersistsChanges(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	created, err := repos.Exercises.Create(ctx, newTestExercise())
@@ -96,6 +104,8 @@ func TestExerciseRepository_UpdatePersistsChanges(t *testing.T) {
 }
 
 func TestExerciseRepository_UpdateRollsBackOnError(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	created, err := repos.Exercises.Create(ctx, newTestExercise())

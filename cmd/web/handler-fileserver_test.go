@@ -11,6 +11,8 @@ import (
 )
 
 func Test_fileServer_servesExistingFile(t *testing.T) {
+	t.Parallel()
+
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -31,6 +33,8 @@ func Test_fileServer_servesExistingFile(t *testing.T) {
 }
 
 func Test_fileServer_missingFileReturnsCustom404(t *testing.T) {
+	t.Parallel()
+
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -70,6 +74,8 @@ func Test_fileServer_missingFileReturnsCustom404(t *testing.T) {
 // require a hand-crafted net.Conn to bypass URL normalization. Skipping.
 
 func Test_fileServer_devModeUsesNoStoreCacheControl(t *testing.T) {
+	t.Parallel()
+
 	// testLookupEnv does not set FLY_APP_NAME, so app.devMode is true.
 	// In dev the static file server must disable browser caching so that
 	// edits to ui/static/main.css and main.js are visible on refresh.

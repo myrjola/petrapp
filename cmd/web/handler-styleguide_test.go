@@ -8,6 +8,8 @@ import (
 )
 
 func Test_application_styleguide(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)

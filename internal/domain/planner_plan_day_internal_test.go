@@ -46,6 +46,8 @@ func newPlanDayPlanner(t *testing.T, p Preferences) *Planner {
 }
 
 func TestPlanner_PlanDay_IsolatedDateDefaultsToFullBody(t *testing.T) {
+	t.Parallel()
+
 	// Empty prefs → isolated date → adjacency rule yields CategoryFullBody.
 	wp := newPlanDayPlanner(t, Preferences{}) //nolint:exhaustruct // all zero on purpose.
 	wed := date(monday2026Date(), 2)
@@ -64,6 +66,8 @@ func TestPlanner_PlanDay_IsolatedDateDefaultsToFullBody(t *testing.T) {
 }
 
 func TestPlanner_PlanDay_AdjacencyToScheduledTomorrowPicksLower(t *testing.T) {
+	t.Parallel()
+
 	// Prefs: Tue scheduled. For Mon (yesterday is Sun=off, tomorrow is Tue=on)
 	// the adjacency rule yields CategoryLower — Lower whenever tomorrow is
 	// scheduled, regardless of today.
@@ -80,6 +84,8 @@ func TestPlanner_PlanDay_AdjacencyToScheduledTomorrowPicksLower(t *testing.T) {
 }
 
 func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *testing.T) {
+	t.Parallel()
+
 	// Mon, Wed, Fri scheduled. Plan(monday) assigns periodization by workoutDays index:
 	// Mon=idx0 first, Wed=idx1 second, Fri=idx2 first. PlanDay must agree for each.
 	p := prefs(time.Monday, time.Wednesday, time.Friday)
@@ -104,6 +110,8 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *te
 }
 
 func TestPlanner_PlanDay_AvoidsUsedExercises(t *testing.T) {
+	t.Parallel()
+
 	// Force the upper-only pool by picking Tue with Mon and Wed scheduled.
 	// Then mark exercises 1,2 as used; only id 3 (Overhead Press) remains.
 	p := prefs(time.Monday, time.Wednesday)
@@ -123,6 +131,8 @@ func TestPlanner_PlanDay_AvoidsUsedExercises(t *testing.T) {
 }
 
 func TestPlanner_PlanDay_UsesPrefsExerciseCountWhenScheduled(t *testing.T) {
+	t.Parallel()
+
 	// Long-day prefs (90 min) on Wednesday yields exercisesLong (4).
 	p := Preferences{WednesdayMinutes: 90} //nolint:exhaustruct // only Wednesday duration is relevant to this test.
 	wp := newPlanDayPlanner(t, p)
@@ -138,6 +148,8 @@ func TestPlanner_PlanDay_UsesPrefsExerciseCountWhenScheduled(t *testing.T) {
 }
 
 func TestPlanner_PlanDay_EmptyCategoryPoolReturnsError(t *testing.T) {
+	t.Parallel()
+
 	// Pool contains only Upper and FullBody. Pick a day whose category is Lower:
 	// tomorrow is on (gives Lower) → schedule Mon+Tue, ask for Mon.
 	// Remove all Lower exercises from the pool to trigger the error.
@@ -161,6 +173,8 @@ func TestPlanner_PlanDay_EmptyCategoryPoolReturnsError(t *testing.T) {
 }
 
 func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *testing.T) {
+	t.Parallel()
+
 	// Mon+Sun schedule. Plan assigns Mon→idx0, Sun→idx1. PlanDay must agree
 	// for Sunday — regression test for the Sunday=0 weekday-arithmetic bug.
 	p := prefs(time.Monday, time.Sunday)

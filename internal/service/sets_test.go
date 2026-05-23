@@ -19,13 +19,15 @@ import (
 )
 
 func Test_RecordSetCompletion(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -160,6 +162,8 @@ func (e *erroringScheduler) CancelForWorkout(_ context.Context, _ int, _ time.Ti
 }
 
 func Test_RecordSet_SchedulesRestPush(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	// Seed a second incomplete set so the just-completed one isn't the last.
 	if _, err := db.ReadWrite.ExecContext(ctx,
@@ -205,6 +209,8 @@ func Test_RecordSet_SchedulesRestPush(t *testing.T) {
 }
 
 func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -236,6 +242,8 @@ func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 // instead of per-slot. After the fix the policy returns Cancel for the
 // just-finished slot.
 func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	// Seed a SECOND exercise slot with one incomplete set so the session
 	// still has work after finishing the first slot's only set.
@@ -302,6 +310,8 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 // recorded value on an already-complete set is bookkeeping, not progress —
 // no Schedule and no Cancel calls should reach the scheduler.
 func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -349,6 +359,8 @@ func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
 // Test_UpdateSetWeight_DoesNotTouchScheduler locks in the same invariant
 // for weight edits.
 func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -386,6 +398,8 @@ func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
 // !wasComplete guard: re-recording an already-complete set produces no
 // new scheduler interactions.
 func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	// Seed a second set so the first completion schedules a push.
 	if _, err := db.ReadWrite.ExecContext(ctx,
@@ -496,6 +510,8 @@ func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, 
 }
 
 func Test_RecordSet_FailedSchedule_LogsUserAndExerciseID(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, userID, weID := setupSessionForRecordSet(t)
 	// Seed an incomplete second set so the just-completed one isn't the last,
 	// which means PlanRestPush returns Schedule (not Cancel).

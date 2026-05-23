@@ -9,6 +9,8 @@ import (
 )
 
 func TestValidationError(t *testing.T) {
+	t.Parallel()
+
 	err := error(domain.ValidationError{Message: "name is required"})
 
 	if err.Error() != "name is required" {

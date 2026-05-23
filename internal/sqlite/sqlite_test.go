@@ -16,13 +16,15 @@ import (
 // the read-only *sql.DB must reject INSERT/UPDATE statements regardless of
 // how the URI's mode= parameters are arranged.
 func TestNewDatabase_ReadOnlyHandleRejectsWrites(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	_, err = db.ReadOnly.ExecContext(ctx,
 		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?)",
@@ -60,6 +62,8 @@ func (w *blockingWriter) Write(p []byte) (int, error) {
 // writer's t.Cleanup hook and panic with "attempted to write after test
 // completion".
 func TestNewDatabase_CloseWaitsForBackgroundOptimizer(t *testing.T) {
+	t.Parallel()
+
 	w := &blockingWriter{active: atomic.Int32{}, delay: 100 * time.Millisecond}
 	logger := slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
 		AddSource:   false,

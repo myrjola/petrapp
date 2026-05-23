@@ -23,6 +23,8 @@ func newTestExerciseFor(t *testing.T) domain.Exercise {
 }
 
 func TestSessionRepository_GetMissingReturnsErrNotFound(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	missing := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -33,6 +35,8 @@ func TestSessionRepository_GetMissingReturnsErrNotFound(t *testing.T) {
 }
 
 func TestSessionRepository_CreateBatchThenGetHydratesExercise(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -75,6 +79,8 @@ func TestSessionRepository_CreateBatchThenGetHydratesExercise(t *testing.T) {
 }
 
 func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -134,6 +140,8 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 }
 
 func TestSessionRepository_UpdatePreservesSlotID(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -187,6 +195,8 @@ func TestSessionRepository_UpdatePreservesSlotID(t *testing.T) {
 }
 
 func TestSessionRepository_UpdateRollsBackOnError(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -226,6 +236,8 @@ func TestSessionRepository_UpdateRollsBackOnError(t *testing.T) {
 }
 
 func TestSessionRepository_UpdatePropagatesDomainSentinel(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -258,6 +270,8 @@ func TestSessionRepository_UpdatePropagatesDomainSentinel(t *testing.T) {
 }
 
 func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	date := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
@@ -279,6 +293,8 @@ func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
 }
 
 func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -347,6 +363,8 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 }
 
 func TestSessionRepository_Create_InsertsSingleSession(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -386,6 +404,8 @@ func TestSessionRepository_Create_InsertsSingleSession(t *testing.T) {
 }
 
 func TestSessionRepository_Create_ConflictReturnsErrAlreadyExists(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -415,6 +435,8 @@ func TestSessionRepository_Create_ConflictReturnsErrAlreadyExists(t *testing.T) 
 }
 
 func TestSessionRepository_CreateBatch_ConflictReturnsErrAlreadyExists(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
@@ -445,6 +467,8 @@ func TestSessionRepository_CreateBatch_ConflictReturnsErrAlreadyExists(t *testin
 }
 
 func TestSessionRepository_DeleteWeek(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	monday := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)

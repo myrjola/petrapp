@@ -48,6 +48,8 @@ func prefs(days ...time.Weekday) Preferences {
 }
 
 func TestDetermineCategory(t *testing.T) {
+	t.Parallel()
+
 	monday := monday2026Date()
 	tests := []struct {
 		name     string
@@ -89,6 +91,7 @@ func TestDetermineCategory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			wp := NewPlanner(tt.prefs, nil, nil)
 			got := wp.determineCategory(tt.date)
 			if got != tt.expected {
@@ -99,7 +102,10 @@ func TestDetermineCategory(t *testing.T) {
 }
 
 func TestFirstSessionPeriodizationType(t *testing.T) {
+	t.Parallel()
+
 	t.Run("consecutive weeks alternate for odd exercise count", func(t *testing.T) {
+		t.Parallel()
 		// Mon/Wed/Fri at 60 min = 3 exercises each = 9 exercises/week (odd).
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
 		wp := NewPlanner(p, nil, nil)
@@ -116,6 +122,7 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 	})
 
 	t.Run("consecutive weeks alternate for even exercise count", func(t *testing.T) {
+		t.Parallel()
 		// Mon/Wed at 60 min = 3 exercises each = 6 exercises/week (even).
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewPlanner(p, nil, nil)
@@ -132,6 +139,7 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 	})
 
 	t.Run("determinism", func(t *testing.T) {
+		t.Parallel()
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
 		wp := NewPlanner(p, nil, nil)
 
@@ -203,6 +211,8 @@ func minimalTargets() []MuscleGroupTarget {
 }
 
 func TestAllocateMuscleGroups(t *testing.T) {
+	t.Parallel()
+
 	// Mon(Lower), Tue(Upper), Thu(Full Body) schedule.
 	monday := monday2026Date()
 	p := prefs(time.Monday, time.Tuesday, time.Thursday)
@@ -255,11 +265,14 @@ func TestAllocateMuscleGroups(t *testing.T) {
 }
 
 func TestSelectExercisesForDay(t *testing.T) {
+	t.Parallel()
+
 	p := prefs(time.Monday, time.Tuesday, time.Thursday)
 	wp := NewPlanner(p, minimalExercises(), minimalTargets())
 	wp.rng = rand.New(rand.NewPCG(42, 0)) // fixed seed for determinism
 
 	t.Run("lower day only selects lower exercises", func(t *testing.T) {
+		t.Parallel()
 		sets := wp.selectExercisesForDay(CategoryLower, []string{"Quads", "Hamstrings"}, 2)
 		if len(sets) != 2 {
 			t.Fatalf("want 2 exercise sets, got %d", len(sets))
@@ -273,6 +286,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 	})
 
 	t.Run("upper day only selects upper exercises", func(t *testing.T) {
+		t.Parallel()
 		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest", "Lats"}, 2)
 		for _, es := range sets {
 			ex := findExercise(wp.Exercises, es.Exercise.ID)
@@ -283,6 +297,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 	})
 
 	t.Run("full body day can select any category", func(t *testing.T) {
+		t.Parallel()
 		sets := wp.selectExercisesForDay(CategoryFullBody, []string{"Hamstrings", "Chest"}, 3)
 		categorySet := make(map[Category]bool)
 		for _, es := range sets {
@@ -296,6 +311,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 	})
 
 	t.Run("rep-based exercise set count comes from DeriveScheme", func(t *testing.T) {
+		t.Parallel()
 		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest"}, 1)
 		if len(sets) != 1 {
 			t.Fatalf("want 1 exercise set, got %d", len(sets))
@@ -308,6 +324,7 @@ func TestSelectExercisesForDay(t *testing.T) {
 	})
 
 	t.Run("strength periodization sets correct target value", func(t *testing.T) {
+		t.Parallel()
 		sets := wp.selectExercisesForDay(CategoryUpper, nil, 1)
 		expectedReps := DeriveScheme(5, 10, PeriodizationStrength, false).TargetReps
 		for _, s := range sets[0].Sets {
@@ -319,7 +336,10 @@ func TestSelectExercisesForDay(t *testing.T) {
 }
 
 func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no primary muscle group overlap within session", func(t *testing.T) {
+		t.Parallel()
 		// Exercise pool: multiple exercises that could target overlapping muscles.
 		exercises := []Exercise{
 			{ //nolint:exhaustruct // Test exercises omit unused display fields.
@@ -373,6 +393,7 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 	})
 
 	t.Run("skip priority muscle group when no non-conflicting exercise available", func(t *testing.T) {
+		t.Parallel()
 		// Exercise pool: all Chest exercises have overlapping primary muscles.
 		exercises := []Exercise{
 			{ //nolint:exhaustruct // Test exercises omit unused display fields.
@@ -429,7 +450,10 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 }
 
 func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
+	t.Parallel()
+
 	t.Run("exercise used earlier in week is skipped", func(t *testing.T) {
+		t.Parallel()
 		exercises := []Exercise{
 			{ //nolint:exhaustruct // Test exercises omit unused display fields.
 				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
@@ -474,6 +498,7 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 	})
 
 	t.Run("plan() does not repeat exercises across days", func(t *testing.T) {
+		t.Parallel()
 		exercises := minimalExercises() // Use existing test fixture.
 		targets := minimalTargets()
 
@@ -506,7 +531,10 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 }
 
 func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns fewer exercises if constraints can't be fully satisfied", func(t *testing.T) {
+		t.Parallel()
 		// Exercise pool: only 2 non-overlapping exercises available.
 		exercises := []Exercise{
 			{ //nolint:exhaustruct // Test exercises omit unused display fields.
@@ -617,6 +645,8 @@ func findExercise(exercises []Exercise, id int) Exercise {
 }
 
 func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
+	t.Parallel()
+
 	// Anchor on the same Monday we'll plan: week 0 of length 4 would NOT be a
 	// deload (we want length-1 → 3, so plan on a date that is anchor + 21 days).
 	anchor := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC) // Monday
@@ -691,6 +721,8 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 }
 
 func TestPlanner_NonDeloadWeekUnchanged(t *testing.T) {
+	t.Parallel()
+
 	anchor := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC)
 	planMonday := anchor.AddDate(0, 0, 7) // week 1 → not a deload
 
@@ -723,11 +755,14 @@ func TestPlanner_NonDeloadWeekUnchanged(t *testing.T) {
 }
 
 func TestPlan(t *testing.T) {
+	t.Parallel()
+
 	monday := monday2026Date()
 	exercises := minimalExercises()
 	targets := minimalTargets()
 
 	t.Run("returns error for non-Monday start date", func(t *testing.T) {
+		t.Parallel()
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewPlanner(p, exercises, targets)
 		_, err := wp.Plan(date(monday, 1)) // Tuesday.
@@ -737,6 +772,7 @@ func TestPlan(t *testing.T) {
 	})
 
 	t.Run("returns error when no workout days scheduled", func(t *testing.T) {
+		t.Parallel()
 		wp := NewPlanner(prefs(), exercises, targets)
 		_, err := wp.Plan(monday)
 		if err == nil {
@@ -745,6 +781,7 @@ func TestPlan(t *testing.T) {
 	})
 
 	t.Run("returns one session per scheduled day", func(t *testing.T) {
+		t.Parallel()
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
@@ -759,6 +796,7 @@ func TestPlan(t *testing.T) {
 	})
 
 	t.Run("session dates match scheduled weekdays", func(t *testing.T) {
+		t.Parallel()
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
@@ -776,6 +814,7 @@ func TestPlan(t *testing.T) {
 	})
 
 	t.Run("each session has correct exercise count for duration", func(t *testing.T) {
+		t.Parallel()
 		// 60 min → 3 exercises.
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewPlanner(p, exercises, targets)
@@ -793,6 +832,7 @@ func TestPlan(t *testing.T) {
 	})
 
 	t.Run("consecutive sessions alternate periodization", func(t *testing.T) {
+		t.Parallel()
 		p := prefs(time.Monday, time.Tuesday)
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(3, 0))
@@ -811,6 +851,8 @@ func TestPlan(t *testing.T) {
 }
 
 func TestMondayOf_UsesLocalCalendarAnchoredToUTC(t *testing.T) {
+	t.Parallel()
+
 	helsinki, err := time.LoadLocation("Europe/Helsinki")
 	if err != nil {
 		t.Fatalf("load Europe/Helsinki: %v", err)
@@ -852,6 +894,7 @@ func TestMondayOf_UsesLocalCalendarAnchoredToUTC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := MondayOf(tt.in)
 			if !got.Equal(tt.want) {
 				t.Errorf("MondayOf(%s) = %s, want %s", tt.in, got, tt.want)

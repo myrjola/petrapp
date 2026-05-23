@@ -17,6 +17,8 @@ import (
 // (e.g.) time_based exercises because the natural-language instructions
 // exclude that option.
 func TestExerciseGenerator_PromptCoversSchema(t *testing.T) {
+	t.Parallel()
+
 	muscleGroups := []string{"quadriceps"}
 	eg := newExerciseGenerator("dummy-key", muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
 	prompt := eg.baseExercisePrompt("Plank")
@@ -49,6 +51,8 @@ func TestExerciseGenerator_PromptCoversSchema(t *testing.T) {
 // returns a 400 from the chat completions API and silently drops every
 // generated exercise into the placeholder fallback path.
 func TestExerciseJSONSchema_StrictMode(t *testing.T) {
+	t.Parallel()
+
 	raw, err := exerciseJSONSchema{muscleGroups: []string{"quadriceps"}}.MarshalJSON()
 	if err != nil {
 		t.Fatalf("marshal schema: %v", err)
@@ -74,6 +78,8 @@ func TestExerciseJSONSchema_StrictMode(t *testing.T) {
 }
 
 func TestExerciseGenerator_Generate(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -86,6 +92,8 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 	eg := newExerciseGenerator(openaiAPIKey, muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
 
 	t.Run("Successful generation", func(t *testing.T) {
+		t.Parallel()
+
 		exercise, err := eg.Generate(t.Context(), "Squat")
 
 		if err != nil {
@@ -117,6 +125,8 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 // TestExerciseGenerator_GenerateEmptyName asserts the cheap pre-check fires
 // before any API call — empty input never reaches OpenAI.
 func TestExerciseGenerator_GenerateEmptyName(t *testing.T) {
+	t.Parallel()
+
 	eg := newExerciseGenerator("dummy-key", []string{"quadriceps"},
 		testhelpers.NewLogger(testhelpers.NewWriter(t)))
 	if _, err := eg.Generate(t.Context(), ""); err == nil {
@@ -125,6 +135,8 @@ func TestExerciseGenerator_GenerateEmptyName(t *testing.T) {
 }
 
 func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
+	t.Parallel()
+
 	eg := newExerciseGenerator("dummy-key", []string{"quadriceps", "glutes"},
 		testhelpers.NewLogger(testhelpers.NewWriter(t)))
 	tests := []struct {
@@ -139,6 +151,8 @@ func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := eg.validateMuscleGroups(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateMuscleGroups(%v) err=%v, wantErr=%v", tt.input, err, tt.wantErr)
@@ -148,6 +162,8 @@ func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
 }
 
 func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
+	t.Parallel()
+
 	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
 	resources := []domain.Resource{
 		{Title: "Real video", URL: "https://youtube.com/real"},
@@ -155,6 +171,8 @@ func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 	}
 
 	t.Run("replaces existing Resources section", func(t *testing.T) {
+		t.Parallel()
+
 		input := "## Instructions\n1. Step one\n\n## Resources\n" +
 			"- [Old video](https://example.com/video)\n" +
 			"- [Old guide](https://example.com/guide)\n"
@@ -172,6 +190,8 @@ func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 	})
 
 	t.Run("appends Resources section when missing", func(t *testing.T) {
+		t.Parallel()
+
 		input := "## Instructions\n1. Step one\n"
 		got := eg.updateResourcesInDescription(input, resources)
 
@@ -185,6 +205,8 @@ func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 }
 
 func TestCreateMinimalExercise(t *testing.T) {
+	t.Parallel()
+
 	ex := createMinimalExercise("Goblet Squat")
 
 	if ex.Name != "Goblet Squat" {

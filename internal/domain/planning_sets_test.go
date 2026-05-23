@@ -7,6 +7,8 @@ import (
 )
 
 func Test_BuildPlannedSets(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		exercise      domain.Exercise
@@ -83,6 +85,7 @@ func Test_BuildPlannedSets(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			got := domain.BuildPlannedSets(tc.exercise, tc.periodization, false)
 			if len(got) != tc.wantSetCount {
 				t.Fatalf("len = %d, want %d", len(got), tc.wantSetCount)
@@ -109,6 +112,8 @@ func Test_BuildPlannedSets(t *testing.T) {
 }
 
 func Test_BuildSetsForAdd(t *testing.T) {
+	t.Parallel()
+
 	weightPtr := func(w float64) *float64 { return &w }
 
 	weighted := domain.Exercise{ //nolint:exhaustruct // Only fields read by BuildSetsForAdd are set.
@@ -132,6 +137,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	}
 
 	t.Run("weighted with no history allocates zero-valued weight pointer", func(t *testing.T) {
+		t.Parallel()
 		sets := domain.BuildSetsForAdd(weighted, domain.PeriodizationStrength, false, nil)
 		if len(sets) != 4 {
 			t.Fatalf("len = %d, want 4", len(sets))
@@ -146,6 +152,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	})
 
 	t.Run("weighted seeds from most recent non-nil historical weight", func(t *testing.T) {
+		t.Parallel()
 		history := []domain.Set{
 			{WeightKg: weightPtr(60), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 			{WeightKg: weightPtr(62.5), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
@@ -160,6 +167,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	})
 
 	t.Run("weighted with history of all-nil weights allocates zero", func(t *testing.T) {
+		t.Parallel()
 		history := []domain.Set{
 			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 			{WeightKg: nil, TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
@@ -173,6 +181,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	})
 
 	t.Run("assisted preserves negative seed weight", func(t *testing.T) {
+		t.Parallel()
 		history := []domain.Set{
 			{WeightKg: weightPtr(-20), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
@@ -185,6 +194,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	})
 
 	t.Run("bodyweight leaves WeightKg nil regardless of history", func(t *testing.T) {
+		t.Parallel()
 		history := []domain.Set{
 			{WeightKg: weightPtr(100), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
@@ -197,6 +207,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	})
 
 	t.Run("time-based leaves WeightKg nil regardless of history", func(t *testing.T) {
+		t.Parallel()
 		history := []domain.Set{
 			{WeightKg: weightPtr(100), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
@@ -209,6 +220,7 @@ func Test_BuildSetsForAdd(t *testing.T) {
 	})
 
 	t.Run("each set gets independent weight pointer", func(t *testing.T) {
+		t.Parallel()
 		history := []domain.Set{
 			{WeightKg: weightPtr(80), TargetValue: 0, CompletedValue: nil, CompletedAt: nil, Signal: nil},
 		}
@@ -224,6 +236,8 @@ func Test_BuildSetsForAdd(t *testing.T) {
 }
 
 func TestBuildPlannedSets_Deload(t *testing.T) {
+	t.Parallel()
+
 	ex := domain.Exercise{ //nolint:exhaustruct // Only the planning fields are read.
 		ExerciseType: domain.ExerciseTypeWeighted,
 		RepMin:       new(8),

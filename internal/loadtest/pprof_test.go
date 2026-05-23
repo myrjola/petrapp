@@ -14,6 +14,8 @@ import (
 )
 
 func TestCapturePprofProfile_writesSeekableFile(t *testing.T) {
+	t.Parallel()
+
 	body := []byte("fake pprof body")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/profile", func(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +60,8 @@ func TestCapturePprofProfile_writesSeekableFile(t *testing.T) {
 }
 
 func TestWriteJSONReport_roundTrips(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	rec := NewRecorder()
 	rec.Record(http.MethodGet, "/x", http.StatusOK, 5*time.Millisecond)
@@ -80,6 +84,8 @@ func TestWriteJSONReport_roundTrips(t *testing.T) {
 }
 
 func TestCapturePprofProfile_returnsErrorOnNon200(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadGateway)
 	}))

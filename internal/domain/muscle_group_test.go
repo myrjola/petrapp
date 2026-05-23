@@ -8,6 +8,8 @@ import (
 )
 
 func Test_WeeklyMuscleGroupVolume_PlannedAndCompleted(t *testing.T) {
+	t.Parallel()
+
 	chest := domain.Exercise{ //nolint:exhaustruct // test fixture only needs these fields
 		ID:                  1,
 		Name:                "Bench Press",

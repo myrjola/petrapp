@@ -8,6 +8,8 @@ import (
 )
 
 func TestPreferencesRepository_GetEmptyReturnsZeroValue(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	got, err := repos.Preferences.Get(ctx)
@@ -51,6 +53,8 @@ func TestPreferences_RestNotificationsEnabled_RoundTrip(t *testing.T) {
 }
 
 func TestPreferencesRepository_SetThenGetRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	set := domain.Preferences{ //nolint:exhaustruct // Untouched days stay zero.
@@ -75,6 +79,8 @@ func TestPreferencesRepository_SetThenGetRoundTrip(t *testing.T) {
 }
 
 func TestPreferencesRepository_SetUpdatesExisting(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	if err := repos.Preferences.Set(ctx, domain.Preferences{ //nolint:exhaustruct // First write.
@@ -103,6 +109,8 @@ func TestPreferencesRepository_SetUpdatesExisting(t *testing.T) {
 }
 
 func TestPreferencesRepository_DeloadFields(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)

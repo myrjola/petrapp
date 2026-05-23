@@ -15,15 +15,17 @@ import (
 )
 
 func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer func(db *sqlite.Database) {
+	t.Cleanup(func() {
 		_ = db.Close()
-	}(db)
+	})
 
 	// Insert a user first
 	var userID int
@@ -150,13 +152,15 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 }
 
 func Test_UpdateExercise_RejectsInvalidExercise(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	svc := service.NewService(db, logger, "")
 
@@ -179,13 +183,15 @@ func Test_UpdateExercise_RejectsInvalidExercise(t *testing.T) {
 }
 
 func Test_GenerateExercise_RejectsEmptyName(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	svc := service.NewService(db, logger, "")
 
@@ -201,15 +207,17 @@ func Test_GenerateExercise_RejectsEmptyName(t *testing.T) {
 
 // Test_AddExercise tests adding a new exercise to a workout.
 func Test_AddExercise(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer func(db *sqlite.Database) {
+	t.Cleanup(func() {
 		_ = db.Close()
-	}(db)
+	})
 
 	// Create a test user ID
 	webauthnUserID := []byte("test-user-id")
@@ -279,6 +287,8 @@ func Test_AddExercise(t *testing.T) {
 
 	// Test adding a new exercise
 	t.Run("Add exercise to existing workout", func(t *testing.T) {
+		t.Parallel()
+
 		// Count exercise sets before adding
 		var countBefore int
 		var errCount error
@@ -346,6 +356,8 @@ func Test_AddExercise(t *testing.T) {
 
 	// Test adding an exercise that's already in the workout
 	t.Run("Add duplicate exercise to workout", func(t *testing.T) {
+		t.Parallel()
+
 		// Try to add exercise 1 which is already in the workout
 		_, err = svc.AddExercise(ctx, today, exercise1ID)
 		if err == nil {
@@ -356,6 +368,8 @@ func Test_AddExercise(t *testing.T) {
 	// Test adding an exercise to a non-existent workout (should return a
 	// user-facing ValidationError).
 	t.Run("Add exercise to non-existent workout", func(t *testing.T) {
+		t.Parallel()
+
 		// Set a future date for a workout that doesn't exist yet
 		futureDate := today.AddDate(0, 0, 7) // 1 week in the future
 
@@ -399,13 +413,15 @@ func Test_AddExercise(t *testing.T) {
 // Test_AddExercise_UsesMostRecentHistoricalWeight verifies findHistoricalSets
 // returns the most recent prior session's sets, not the oldest match.
 func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -499,13 +515,15 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 // `historicalSets != nil` check and persisted zero sets, so the user saw
 // a blank exercise page when adding or swapping to plank.
 func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -592,13 +610,15 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 // previous exercise's rep target. Regression for the same orphaned-history
 // case as Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds.
 func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -713,13 +733,15 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 //   - Hypertrophy → DeriveScheme(3, 6, Hypertrophy).TargetReps == 6, TargetSets == 3
 //   - Strength    → DeriveScheme(3, 6, Strength).TargetReps    == 3, TargetSets == 4
 func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -758,6 +780,8 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create a fresh dated session for each sub-test using distinct dates.
 			sessionDate := today.AddDate(0, 0, 0)
 			sessionDateStr := dateStr
@@ -811,13 +835,15 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 //   - Hypertrophy swap → TargetValue == 6, TargetSets == 3
 //   - Historical weight (80kg) is preserved; periodization-wrong TargetValue (3) is overridden.
 func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -944,6 +970,8 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 }
 
 func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	sessions, err := svc.ResolveWeeklySchedule(ctx)
@@ -998,6 +1026,8 @@ func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
 }
 
 func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 	sessions, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {

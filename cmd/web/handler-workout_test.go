@@ -13,6 +13,8 @@ import (
 )
 
 func Test_application_addWorkout(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -85,6 +87,8 @@ func Test_application_addWorkout(t *testing.T) {
 }
 
 func Test_application_workoutNotFound(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -145,6 +149,8 @@ func Test_application_workoutNotFound(t *testing.T) {
 // (case-insensitive) when ?q= is set, echoes the query into the search input,
 // and renders an empty state when nothing matches.
 func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -273,6 +279,8 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 // The user lands back on the workout-not-found page with role="alert"
 // banner content.
 func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -368,6 +376,8 @@ func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
 }
 
 func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -412,6 +422,8 @@ func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
 }
 
 func TestWorkoutFeedbackPOST_BadDifficultyParamReturns404(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -445,6 +457,8 @@ func TestWorkoutFeedbackPOST_BadDifficultyParamReturns404(t *testing.T) {
 }
 
 func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document

@@ -116,6 +116,8 @@ func setupPlaywrightPage(t *testing.T) (playwright.Page, string) {
 //
 // `PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/web/`.
 func Test_playwright_smoketest(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping slow playwright smoke test")
 	}
@@ -357,6 +359,8 @@ func Test_playwright_smoketest(t *testing.T) {
 //     client replaces /add-exercise with the new exercise's DETAIL, back goes
 //     to the workout overview.
 func Test_playwright_stacknav(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping slow playwright stacknav test")
 	}
@@ -719,6 +723,8 @@ func Test_playwright_stacknav(t *testing.T) {
 // spec's job (tlaplus/StackNav_Prefetch.cfg /
 // tlaplus/StackNav_PrefetchMitigated.cfg).
 func Test_playwright_bfcache_staleness(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping slow playwright bfcache staleness test")
 	}

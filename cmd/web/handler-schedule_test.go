@@ -13,6 +13,8 @@ import (
 // during onboarding before users could reach /preferences, so every new
 // user lost the default-true silently.
 func Test_application_schedulePOST_preservesRestNotificationsEnabled(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)

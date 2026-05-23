@@ -60,6 +60,7 @@ linters:
     - nolintlint
     - nonamedreturns
     - nosprintfhostport
+    - paralleltest
     - perfsprint
     - prealloc
     - predeclared
@@ -193,6 +194,8 @@ linters:
         - prometheus.LinearBuckets
     nakedret:
       max-func-lines: 0
+    paralleltest:
+      ignore-missing-subtests: true
     nolintlint:
       require-explanation: true
       require-specific: true

@@ -17,6 +17,8 @@ import (
 )
 
 func Test_application_exerciseSet(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -270,6 +272,8 @@ func Test_application_exerciseSet(t *testing.T) {
 // for navigating-back-after-swap hitting 404), and that completed sets recorded
 // against the previous exercise do not carry over.
 func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -392,6 +396,8 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 // when ?q= is set, echoes the query into the search input, and renders an empty
 // state when nothing matches.
 func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -525,6 +531,8 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 }
 
 func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		err error
@@ -613,6 +621,8 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 // tie-breaks. Reads muscle-group data from the test DB so the assertion
 // tracks fixture changes automatically.
 func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -773,6 +783,8 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 }
 
 func Test_application_exerciseSet_assisted_storage(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -929,6 +941,8 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 // weighted set renders a rest countdown chip with a future
 // data-rest-end-at-ms timestamp.
 func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -1029,6 +1043,8 @@ func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
 // TestExerciseSetGET_DeloadHidesSignalButtons verifies that the exercise-set page for a
 // deload session renders the deload banner, no signal buttons, and a "Done!" button.
 func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -1143,6 +1159,8 @@ func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {
 }
 
 func Test_computeSetActive(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                 string
 		warmupComplete       bool
@@ -1217,6 +1235,8 @@ func Test_computeSetActive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := computeSetActive(
 				tt.warmupComplete, tt.completed, tt.index, tt.firstIncompleteIndex, tt.editingIndex, tt.isEditing)
 			if got != tt.want {
@@ -1233,6 +1253,8 @@ func Test_computeSetActive(t *testing.T) {
 // time-based it carries one figure span with the target value and a .unit span
 // reading "sec", with no weight span anywhere on the card.
 func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document
@@ -1340,6 +1362,8 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 // the runner. Non-active and non-time-based cards do not match this branch
 // of the template, so the negative case is enforced structurally.
 func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
+	t.Parallel()
+
 	var (
 		ctx = t.Context()
 		doc *goquery.Document

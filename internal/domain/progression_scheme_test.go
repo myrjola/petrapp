@@ -7,6 +7,8 @@ import (
 )
 
 func TestDeriveScheme(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		repMin        int
@@ -49,6 +51,7 @@ func TestDeriveScheme(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, false)
 			if got.TargetReps != tt.wantReps {
 				t.Errorf("TargetReps: want %d, got %d", tt.wantReps, got.TargetReps)
@@ -64,6 +67,8 @@ func TestDeriveScheme(t *testing.T) {
 }
 
 func TestDeriveSchemePanicOnUnknownPeriodization(t *testing.T) {
+	t.Parallel()
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("expected panic for unknown PeriodizationType")
@@ -134,6 +139,7 @@ func TestRestSecondsFor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			got := domain.RestSecondsFor(tt.ex, tt.pt, false)
 			if got != tt.want {
 				t.Errorf("RestSecondsFor() = %d, want %d", got, tt.want)
@@ -143,6 +149,8 @@ func TestRestSecondsFor(t *testing.T) {
 }
 
 func TestDeriveScheme_Deload(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		repMin, repMax  int
@@ -157,6 +165,7 @@ func TestDeriveScheme_Deload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, true)
 			if got.TargetReps != tt.wantTargetReps {
 				t.Errorf("TargetReps = %d, want %d (deload always uses repMax)", got.TargetReps, tt.wantTargetReps)
@@ -176,6 +185,8 @@ func TestDeriveScheme_Deload(t *testing.T) {
 }
 
 func TestRestSecondsFor_Deload(t *testing.T) {
+	t.Parallel()
+
 	ex := domain.Exercise{ //nolint:exhaustruct // Only fields read by RestSecondsFor are set.
 		ExerciseType: domain.ExerciseTypeWeighted,
 		RepMin:       new(8),

@@ -6,6 +6,8 @@ import (
 )
 
 func TestMuscleGroupTargetRepository_ListReturnsSeededTargets(t *testing.T) {
+	t.Parallel()
+
 	ctx, repos := setupTestRepos(t)
 
 	got, err := repos.MuscleTargets.List(ctx)

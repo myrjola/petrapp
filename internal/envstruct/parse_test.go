@@ -10,6 +10,8 @@ import (
 )
 
 func TestPopulate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		v         any
@@ -99,6 +101,8 @@ func TestPopulate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := envstruct.Populate(tt.v, tt.lookupEnv)
 
 			if tt.wantErr != nil && !errors.Is(err, tt.wantErr) {

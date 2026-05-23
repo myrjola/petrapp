@@ -21,6 +21,8 @@ func prodLookupEnv(key string) (string, bool) {
 }
 
 func Test_application_devErrorUX_render(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -67,6 +69,8 @@ func Test_application_devErrorUX_render(t *testing.T) {
 }
 
 func Test_application_devErrorUX_gated_outside_dev_mode(t *testing.T) {
+	t.Parallel()
+
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), prodLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -88,6 +92,8 @@ func Test_application_devErrorUX_gated_outside_dev_mode(t *testing.T) {
 }
 
 func Test_application_devErrorUX_triggerValidation_surfacesMessage(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -116,6 +122,8 @@ func Test_application_devErrorUX_triggerValidation_surfacesMessage(t *testing.T)
 }
 
 func Test_application_devErrorUX_triggerSystem_surfacesGenericMessage(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
@@ -144,6 +152,8 @@ func Test_application_devErrorUX_triggerSystem_surfacesGenericMessage(t *testing
 }
 
 func Test_application_home_devLinks_devMode(t *testing.T) {
+	t.Parallel()
+
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -162,6 +172,8 @@ func Test_application_home_devLinks_devMode(t *testing.T) {
 }
 
 func Test_application_home_devLinks_hiddenOutsideDevMode(t *testing.T) {
+	t.Parallel()
+
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), prodLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
@@ -180,6 +192,8 @@ func Test_application_home_devLinks_hiddenOutsideDevMode(t *testing.T) {
 }
 
 func Test_application_devErrorUX_triggerUnknownKind_returns404(t *testing.T) {
+	t.Parallel()
+
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)

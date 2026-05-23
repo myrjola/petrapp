@@ -7,6 +7,8 @@ import (
 )
 
 func TestConvertWeight(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		weight   float64
@@ -116,6 +118,7 @@ func TestConvertWeight(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := domain.ConvertWeight(tt.weight, tt.fromReps, tt.toReps)
 			if got != tt.want {
 				t.Errorf("ConvertWeight(%v, %d, %d) = %v; want %v",

@@ -23,6 +23,7 @@ func testLookupEnv(key string) (string, bool) {
 	}
 }
 
+//nolint:paralleltest // sequential subtests share session state.
 func Test_application_home(t *testing.T) {
 	var (
 		ctx = t.Context()
@@ -155,6 +156,8 @@ func checkButtonPresence(t *testing.T, doc *goquery.Document, buttonText string,
 }
 
 func Test_crossOriginProtection(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
 	if err != nil {

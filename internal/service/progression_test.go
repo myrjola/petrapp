@@ -13,13 +13,15 @@ import (
 )
 
 func Test_GetStartingWeight(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -185,13 +187,15 @@ func Test_GetStartingWeight(t *testing.T) {
 // (8 reps), since more reps require more machine assistance for the same
 // relative intensity.
 func Test_GetStartingWeight_Assisted(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -267,13 +271,15 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 }
 
 func Test_GetStartingSeconds(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	if err = db.ReadWrite.QueryRowContext(ctx,
@@ -369,13 +375,15 @@ func Test_GetStartingSeconds(t *testing.T) {
 }
 
 func Test_BuildTimedProgression(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	if err = db.ReadWrite.QueryRowContext(ctx,
@@ -458,13 +466,15 @@ func Test_BuildTimedProgression(t *testing.T) {
 }
 
 func Test_BuildProgression(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -547,13 +557,15 @@ func Test_BuildProgression(t *testing.T) {
 }
 
 func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -644,13 +656,15 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 // hypertrophy constant). Before this fix the workout UI displayed "8 reps" even
 // though the planner had persisted target_value=6.
 func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,
@@ -716,13 +730,15 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 }
 
 func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
-	defer func() { _ = db.Close() }()
+	t.Cleanup(func() { _ = db.Close() })
 
 	var userID int
 	err = db.ReadWrite.QueryRowContext(ctx,

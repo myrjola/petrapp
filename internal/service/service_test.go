@@ -8,6 +8,8 @@ import (
 )
 
 func Test_SaveUserPreferences_SnapsAnchorOnEnable(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	// Anchor starts zero. Enable deload and confirm anchor lands on a Monday >= today.
@@ -35,6 +37,8 @@ func Test_SaveUserPreferences_SnapsAnchorOnEnable(t *testing.T) {
 }
 
 func Test_SaveUserPreferences_NoSnapWhenAnchorAlreadySet(t *testing.T) {
+	t.Parallel()
+
 	ctx, svc := setupTestService(t)
 
 	existing := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC)

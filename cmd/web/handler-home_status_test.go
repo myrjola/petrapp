@@ -8,6 +8,8 @@ import (
 )
 
 func TestDetermineWorkoutStatus(t *testing.T) {
+	t.Parallel()
+
 	now := time.Now()
 	newSession := func(startedAt, completedAt time.Time) domain.Session {
 		return domain.Session{
@@ -89,6 +91,8 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := determineWorkoutStatus(tt.session, tt.isScheduled, tt.completedSets, tt.totalSets)
 			if got != tt.want {
 				t.Errorf("determineWorkoutStatus() = %q, want %q", got, tt.want)
@@ -98,6 +102,8 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 }
 
 func TestCalculateWorkoutAction(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name             string
 		status           string
@@ -174,6 +180,8 @@ func TestCalculateWorkoutAction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := calculateWorkoutAction(tt.status, tt.isToday)
 			if tt.wantNil {
 				if got != nil {

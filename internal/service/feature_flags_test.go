@@ -38,6 +38,8 @@ func newCachedFeatureFlagService(
 // SQL (bypassing SetFeatureFlag's invalidate hook) and checking the cached
 // answer stays the same.
 func Test_Service_IsMaintenanceModeEnabled_cachesAcrossReads(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, svc := newCachedFeatureFlagService(t, time.Minute)
 
 	if svc.IsMaintenanceModeEnabled(ctx) {
@@ -60,6 +62,8 @@ func Test_Service_IsMaintenanceModeEnabled_cachesAcrossReads(t *testing.T) {
 // guarantee: writes that go through SetFeatureFlag drop the cache entry so
 // the very next read observes the new value.
 func Test_Service_SetFeatureFlag_invalidatesMaintenanceCache(t *testing.T) {
+	t.Parallel()
+
 	ctx, _, svc := newCachedFeatureFlagService(t, time.Minute)
 
 	// Prime the cache with "disabled".
@@ -81,6 +85,8 @@ func Test_Service_SetFeatureFlag_invalidatesMaintenanceCache(t *testing.T) {
 // is dropped once its TTL has elapsed, so an out-of-band toggle eventually
 // propagates without manual invalidation.
 func Test_Service_IsMaintenanceModeEnabled_ttlExpiry(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, svc := newCachedFeatureFlagService(t, 10*time.Millisecond)
 
 	if svc.IsMaintenanceModeEnabled(ctx) {
@@ -103,6 +109,8 @@ func Test_Service_IsMaintenanceModeEnabled_ttlExpiry(t *testing.T) {
 // goes straight to the database. This is what the e2e tests rely on so they
 // can flip the flag via raw SQL without an invalidation hook.
 func Test_Service_IsMaintenanceModeEnabled_zeroTTLDisablesCache(t *testing.T) {
+	t.Parallel()
+
 	ctx, db, svc := newCachedFeatureFlagService(t, 0)
 
 	if svc.IsMaintenanceModeEnabled(ctx) {

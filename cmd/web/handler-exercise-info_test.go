@@ -11,6 +11,7 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
+//nolint:paralleltest // Setup subtest registers a user that later subtests rely on.
 func Test_application_exerciseInfo(t *testing.T) {
 	var (
 		ctx = t.Context()

@@ -11,6 +11,10 @@ import (
 	"github.com/myrjola/petrapp/internal/flightrecorder"
 )
 
+// Flight recorder tests cannot run in parallel: runtime/trace.NewFlightRecorder
+// is process-global and refuses concurrent enables.
+//
+//nolint:paralleltest // runtime/trace.NewFlightRecorder is a process-global singleton.
 func TestService_StartStop(t *testing.T) {
 	// Create temporary trace directory
 	traceDir := t.TempDir()
@@ -37,6 +41,7 @@ func TestService_StartStop(t *testing.T) {
 	service.Stop(ctx)
 }
 
+//nolint:paralleltest // runtime/trace.NewFlightRecorder is a process-global singleton.
 func TestService_CaptureTimeoutTrace(t *testing.T) {
 	// Create temporary trace directory
 	traceDir := t.TempDir()
@@ -82,6 +87,7 @@ func TestService_CaptureTimeoutTrace(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // runtime/trace.NewFlightRecorder is a process-global singleton.
 func TestService_CooldownPreventsCapture(t *testing.T) {
 	// This test is simplified since we can't access private fields from external package
 	// We'll test that the service can start and stop without errors
@@ -125,6 +131,8 @@ func TestService_CooldownPreventsCapture(t *testing.T) {
 
 // TestService_CapturesIntoNewlyCreatedDirectory ensures the directory created
 // by New() is writable so subsequent trace files can actually be written.
+//
+//nolint:paralleltest // runtime/trace.NewFlightRecorder is a process-global singleton.
 func TestService_CapturesIntoNewlyCreatedDirectory(t *testing.T) {
 	traceDir := filepath.Join(t.TempDir(), "traces")
 

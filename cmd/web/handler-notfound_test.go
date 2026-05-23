@@ -10,6 +10,11 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
+// Subtests share a single registered client and depend on each other, so this
+// test cannot run its subtests in parallel and keeping the parent sequential
+// avoids the tparallel mismatch.
+//
+//nolint:paralleltest // sequential subtests share session state.
 func Test_application_notFound(t *testing.T) {
 	var (
 		ctx = t.Context()
@@ -156,6 +161,7 @@ func Test_application_notFound(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // sequential subtests share session state.
 func Test_application_notFound_template_content(t *testing.T) {
 	var (
 		ctx = t.Context()

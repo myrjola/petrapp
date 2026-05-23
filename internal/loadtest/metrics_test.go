@@ -17,6 +17,8 @@ func httptestServerReturning(t *testing.T, status int) *httptest.Server {
 }
 
 func TestRecorder_Snapshot_aggregatesPerNormalizedRoute(t *testing.T) {
+	t.Parallel()
+
 	rec := NewRecorder()
 	// Three GETs to two different dates should collapse to one /workouts/{date} bucket.
 	rec.Record(http.MethodGet, "/workouts/2026-05-18", http.StatusOK, 10*time.Millisecond)
@@ -51,6 +53,8 @@ func TestRecorder_Snapshot_aggregatesPerNormalizedRoute(t *testing.T) {
 }
 
 func TestRecorder_Snapshot_countsErrorsByClass(t *testing.T) {
+	t.Parallel()
+
 	rec := NewRecorder()
 	rec.Record(http.MethodGet, "/x", http.StatusOK, time.Millisecond)
 	rec.Record(http.MethodGet, "/x", http.StatusBadRequest, time.Millisecond)
@@ -73,6 +77,8 @@ func TestRecorder_Snapshot_countsErrorsByClass(t *testing.T) {
 }
 
 func TestNormalizePath(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]string{
 		"/":                                 "/",
 		"/preferences":                      "/preferences",
@@ -100,6 +106,8 @@ func routeKeys(s *Snapshot) []string {
 }
 
 func TestRecordingTransport_records(t *testing.T) {
+	t.Parallel()
+
 	srv := httptestServerReturning(t, http.StatusOK)
 	defer srv.Close()
 

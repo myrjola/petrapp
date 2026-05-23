@@ -7,6 +7,8 @@ import (
 )
 
 func Test_redirect_StackNavRequest_Returns200WithXLocation(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
 	r.Header.Set("X-Requested-With", "stacknav")
@@ -28,6 +30,8 @@ func Test_redirect_StackNavRequest_Returns200WithXLocation(t *testing.T) {
 }
 
 func Test_redirect_PlainRequest_Returns303SeeOther(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
 
@@ -45,6 +49,8 @@ func Test_redirect_PlainRequest_Returns303SeeOther(t *testing.T) {
 }
 
 func Test_redirectReplace_StackNavRequest_SetsXLocationAndXReplaceURL(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
 	r.Header.Set("X-Requested-With", "stacknav")
@@ -69,6 +75,8 @@ func Test_redirectReplace_StackNavRequest_SetsXLocationAndXReplaceURL(t *testing
 }
 
 func Test_redirectReplace_PlainRequest_Returns303SeeOtherWithoutXReplace(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
 

@@ -10,6 +10,7 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
+//nolint:paralleltest // Setup subtest registers + promotes an admin that later subtests rely on.
 func Test_application_adminExercises(t *testing.T) {
 	var (
 		ctx = t.Context()
