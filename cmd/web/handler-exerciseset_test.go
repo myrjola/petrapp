@@ -1040,6 +1040,89 @@ func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
 	}
 }
 
+// Test_ExerciseSet_RestChipAfterWarmupComplete verifies that after marking
+// warmup complete (with no sets submitted yet) the first set's active card
+// shows a rest countdown chip clocked from the warmup completion time. The
+// rest push is already scheduled at warmup-complete; the on-screen chip
+// should match.
+func Test_ExerciseSet_RestChipAfterWarmupComplete(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	var slotURL string
+	doc.Find("a.exercise").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		if href, exists := s.Attr("href"); exists {
+			slotURL = href
+			return false
+		}
+		return true
+	})
+	if slotURL == "" {
+		t.Fatal("no exercise found on workout page")
+	}
+
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("get exercise: %v", err)
+	}
+
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark done')").Length() > 0
+	}).First()
+	if warmupForm.Length() == 0 {
+		t.Fatal("warmup form not found")
+	}
+	warmupAction, exists := warmupForm.Attr("action")
+	if !exists {
+		t.Fatal("warmup form has no action")
+	}
+	if doc, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+		t.Fatalf("warmup complete: %v", err)
+	}
+
+	chip := doc.Find(".exercise-set.active .rest-chip[data-rest-end-at-ms]")
+	if chip.Length() == 0 {
+		t.Fatal("expected .rest-chip in the first active set card after warmup completes")
+	}
+	endAtStr, exists := chip.Attr("data-rest-end-at-ms")
+	if !exists {
+		t.Fatal("rest chip missing data-rest-end-at-ms attribute")
+	}
+	endAtMs, err := strconv.ParseInt(endAtStr, 10, 64)
+	if err != nil {
+		t.Fatalf("parse data-rest-end-at-ms: %v", err)
+	}
+	if endAtMs < time.Now().UnixMilli() {
+		t.Errorf("data-rest-end-at-ms = %d is in the past", endAtMs)
+	}
+}
+
 // TestExerciseSetGET_DeloadHidesSignalButtons verifies that the exercise-set page for a
 // deload session renders the deload banner, no signal buttons, and a "Done!" button.
 func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {

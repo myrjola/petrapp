@@ -182,13 +182,19 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lastCompletedAt := getLastCompletedAt(exerciseSet.Sets)
+	// The rest clock zero point is the most recent of WarmupCompletedAt and
+	// the last set completion — mirrors PlanRestPush, which schedules a push
+	// from the same point on either trigger.
+	restClockStart := getLastCompletedAt(exerciseSet.Sets)
+	if restClockStart == nil {
+		restClockStart = exerciseSet.WarmupCompletedAt
+	}
 
 	var restEndAtMs int64
-	if lastCompletedAt != nil {
+	if restClockStart != nil {
 		restSeconds := domain.RestSecondsFor(exerciseSet.Exercise, session.PeriodizationType, false)
 		if restSeconds > 0 {
-			restEnd := lastCompletedAt.Add(time.Duration(restSeconds) * time.Second)
+			restEnd := restClockStart.Add(time.Duration(restSeconds) * time.Second)
 			if restEnd.After(time.Now()) {
 				restEndAtMs = restEnd.UnixMilli()
 			}
