@@ -29,9 +29,12 @@ func (p Preferences) Sunday() bool    { return p.SundayMinutes > 0 }
 
 // IsEmpty reports whether no workout days are scheduled.
 func (p Preferences) IsEmpty() bool {
-	return p.MondayMinutes == 0 && p.TuesdayMinutes == 0 && p.WednesdayMinutes == 0 &&
-		p.ThursdayMinutes == 0 && p.FridayMinutes == 0 && p.SaturdayMinutes == 0 &&
-		p.SundayMinutes == 0
+	for d := time.Sunday; d <= time.Saturday; d++ {
+		if p.IsWorkoutDay(d) {
+			return false
+		}
+	}
+	return true
 }
 
 // MinutesForDay returns the planned workout duration in minutes for the
