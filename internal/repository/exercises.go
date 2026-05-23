@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -252,13 +253,22 @@ func (r *sqliteExerciseRepository) insertMuscleGroups(
 	muscleGroups []string,
 	isPrimary bool,
 ) error {
-	for _, muscleGroup := range muscleGroups {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
-			VALUES (?, ?, ?)`,
-			exerciseID, muscleGroup, isPrimary); err != nil {
-			return fmt.Errorf("insert muscle group %s: %w", muscleGroup, err)
-		}
+	if len(muscleGroups) == 0 {
+		return nil
+	}
+	// One statement: VALUES (?, ?, ?), (?, ?, ?), ...
+	const colsPerRow = 3 // exercise_id, muscle_group_name, is_primary
+	placeholders := strings.Repeat("(?, ?, ?),", len(muscleGroups))
+	placeholders = placeholders[:len(placeholders)-1] // trim trailing comma
+	args := make([]any, 0, len(muscleGroups)*colsPerRow)
+	for _, mg := range muscleGroups {
+		args = append(args, exerciseID, mg, isPrimary)
+	}
+	//nolint:gosec // placeholders is built from a count, not user input
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO exercise_muscle_groups (exercise_id, muscle_group_name, is_primary)
+		VALUES `+placeholders, args...); err != nil {
+		return fmt.Errorf("insert muscle groups: %w", err)
 	}
 	return nil
 }
