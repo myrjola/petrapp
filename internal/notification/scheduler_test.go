@@ -285,7 +285,7 @@ func (m *inMemScheduledPushRepo) ListAll(_ context.Context) ([]domain.ScheduledP
 func TestScheduler_DispatchFailure_LogsUserID(t *testing.T) {
 	t.Parallel()
 
-	var logBuf bytes.Buffer
+	var logBuf syncBuffer
 	//nolint:exhaustruct // AddSource/ReplaceAttr zero.
 	handlerOpts := &slog.HandlerOptions{Level: slog.LevelDebug}
 	logger := slog.New(slog.NewTextHandler(&logBuf, handlerOpts))
@@ -317,8 +317,15 @@ func TestScheduler_DispatchFailure_LogsUserID(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatalf("dispatch never fired")
 	}
-	// Give the scheduler a moment to log after Dispatch returns.
-	time.Sleep(50 * time.Millisecond)
+	// Poll for the dispatch-failure log line rather than sleeping; the
+	// scheduler logs from a time.AfterFunc goroutine after Dispatch returns.
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(logBuf.String(), "push dispatch failed") {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 
 	out := logBuf.String()
 	if !strings.Contains(out, "user_id=7") {
@@ -330,4 +337,23 @@ func TestScheduler_DispatchFailure_LogsUserID(t *testing.T) {
 	if !strings.Contains(out, "push dispatch failed") {
 		t.Errorf("log missing dispatch failure message; got:\n%s", out)
 	}
+}
+
+// syncBuffer is a goroutine-safe bytes.Buffer for capturing log output
+// in tests where the scheduler writes from a timer goroutine.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
