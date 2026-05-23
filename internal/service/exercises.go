@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -114,6 +116,69 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 	}
 
 	return nil, nil
+}
+
+// ListSwapCandidates returns the exercises eligible to replace the given
+// slot in the given session, filtered by an optional case-insensitive query
+// substring and sorted by similarity to the current exercise (descending),
+// then by name (ascending). Excludes the current exercise and any exercise
+// already used in the same session — those would collide with the UNIQUE
+// constraint on workout_exercise.
+//
+// Returns domain.ErrSlotNotFound when workoutExerciseID does not match a
+// slot in the session for the given date.
+func (s *Service) ListSwapCandidates(
+	ctx context.Context,
+	date time.Time,
+	workoutExerciseID int,
+	query string,
+) (domain.Exercise, []domain.Exercise, error) {
+	session, err := s.GetSession(ctx, date)
+	if err != nil {
+		return domain.Exercise{}, nil, fmt.Errorf("get session: %w", err)
+	}
+
+	var current domain.Exercise
+	currentFound := false
+	existing := make(map[int]bool, len(session.ExerciseSets))
+	for _, es := range session.ExerciseSets {
+		existing[es.Exercise.ID] = true
+		if es.ID == workoutExerciseID {
+			current = es.Exercise
+			currentFound = true
+		}
+	}
+	if !currentFound {
+		return domain.Exercise{}, nil, fmt.Errorf("slot %d: %w", workoutExerciseID, domain.ErrSlotNotFound)
+	}
+
+	all, err := s.ListExercises(ctx)
+	if err != nil {
+		return domain.Exercise{}, nil, fmt.Errorf("list exercises: %w", err)
+	}
+
+	queryLower := strings.ToLower(query)
+	candidates := make([]domain.Exercise, 0, len(all))
+	for _, ex := range all {
+		if ex.ID == current.ID || existing[ex.ID] {
+			continue
+		}
+		if queryLower != "" && !strings.Contains(strings.ToLower(ex.Name), queryLower) {
+			continue
+		}
+		candidates = append(candidates, ex)
+	}
+
+	sort.SliceStable(candidates, func(i, j int) bool {
+		si := domain.SwapSimilarityScore(current, candidates[i])
+		sj := domain.SwapSimilarityScore(current, candidates[j])
+		if si != sj {
+			return si > sj
+		}
+		return candidates[i].Name < candidates[j].Name
+	})
+
+	return current, candidates, nil
 }
 
 // FindCompatibleExercises returns all exercises except the specified one.

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -326,55 +325,19 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	session, err := app.service.GetSession(r.Context(), date)
+	current, candidates, err := app.service.ListSwapCandidates(r.Context(), date, workoutExerciseID, query)
 	if err != nil {
+		if errors.Is(err, domain.ErrSlotNotFound) {
+			app.notFound(w, r)
+			return
+		}
 		app.serverError(w, r, err)
 		return
 	}
-
-	currentSlot, found := findExerciseSetInSession(&session, workoutExerciseID)
-	if !found {
-		app.notFound(w, r)
-		return
-	}
-
-	// Map of exercises already used in this workout — they're filtered out below
-	// so the user can't pick one that would collide with the UNIQUE constraint.
-	existingExerciseIDs := make(map[int]bool)
-	for _, exerciseSet := range session.ExerciseSets {
-		existingExerciseIDs[exerciseSet.Exercise.ID] = true
-	}
-
-	allExercises, err := app.service.ListExercises(r.Context())
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
-	queryLower := strings.ToLower(query)
-	var compatibleExercises []domain.Exercise
-	for _, exercise := range allExercises {
-		if exercise.ID == currentSlot.Exercise.ID || existingExerciseIDs[exercise.ID] {
-			continue
-		}
-		if queryLower != "" && !strings.Contains(strings.ToLower(exercise.Name), queryLower) {
-			continue
-		}
-		compatibleExercises = append(compatibleExercises, exercise)
-	}
-
-	sort.SliceStable(compatibleExercises, func(i, j int) bool {
-		si := domain.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[i])
-		sj := domain.SwapSimilarityScore(currentSlot.Exercise, compatibleExercises[j])
-		if si != sj {
-			return si > sj
-		}
-		return compatibleExercises[i].Name < compatibleExercises[j].Name
-	})
 
 	dateStr := date.Format("2006-01-02")
-	cards := make([]ExerciseResultCardData, 0, len(compatibleExercises))
-	for _, ex := range compatibleExercises {
+	cards := make([]ExerciseResultCardData, 0, len(candidates))
+	for _, ex := range candidates {
 		cards = append(cards, ExerciseResultCardData{
 			Exercise:    ex,
 			FormAction:  fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
@@ -388,7 +351,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		Date:              date,
 		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: ""},
 		WorkoutExerciseID: workoutExerciseID,
-		CurrentExercise:   currentSlot.Exercise,
+		CurrentExercise:   current,
 		Cards:             cards,
 		Query:             query,
 	}
