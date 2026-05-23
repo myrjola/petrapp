@@ -735,39 +735,6 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
-	if err != nil {
-		t.Fatalf("create db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-
-	var userID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
-		[]byte("derive-user"), "Derive User").Scan(&userID)
-	if err != nil {
-		t.Fatalf("insert user: %v", err)
-	}
-	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
-	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
-
-	svc := service.NewService(db, logger, "")
-
-	// Deadlift-like exercise: rep_min=3, rep_max=6.
-	var deadliftID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
-		 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
-		"Test Deadlift Derive").Scan(&deadliftID)
-	if err != nil {
-		t.Fatalf("insert deadlift: %v", err)
-	}
-
-	today := time.Now()
-	dateStr := today.Format("2006-01-02")
-
 	tests := []struct {
 		name            string
 		periodization   string
@@ -780,15 +747,42 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Each subtest builds its own in-memory database so the parallel
+			// runs don't contend on the same SQLite handle.
 			t.Parallel()
 
-			// Create a fresh dated session for each sub-test using distinct dates.
-			sessionDate := today.AddDate(0, 0, 0)
-			sessionDateStr := dateStr
-			if tt.periodization == "strength" {
-				sessionDate = today.AddDate(0, 0, 1)
-				sessionDateStr = sessionDate.Format("2006-01-02")
+			ctx := t.Context()
+			logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+			db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+			if err != nil {
+				t.Fatalf("create db: %v", err)
 			}
+			t.Cleanup(func() { _ = db.Close() })
+
+			var userID int
+			err = db.ReadWrite.QueryRowContext(ctx,
+				"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+				[]byte("derive-user-"+tt.periodization), "Derive User").Scan(&userID)
+			if err != nil {
+				t.Fatalf("insert user: %v", err)
+			}
+			ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+			ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+			svc := service.NewService(db, logger, "")
+
+			// Deadlift-like exercise: rep_min=3, rep_max=6.
+			var deadliftID int
+			err = db.ReadWrite.QueryRowContext(ctx,
+				`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
+				 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+				"Test Deadlift Derive").Scan(&deadliftID)
+			if err != nil {
+				t.Fatalf("insert deadlift: %v", err)
+			}
+
+			sessionDate := time.Now()
+			sessionDateStr := sessionDate.Format("2006-01-02")
 
 			if _, err = db.ReadWrite.ExecContext(ctx,
 				"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, ?)",
@@ -800,9 +794,9 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 				t.Fatalf("AddExercise: %v", err)
 			}
 
-			session, errGet := svc.GetSession(ctx, sessionDate)
-			if errGet != nil {
-				t.Fatalf("GetSession: %v", errGet)
+			session, err := svc.GetSession(ctx, sessionDate)
+			if err != nil {
+				t.Fatalf("GetSession: %v", err)
 			}
 
 			var sets []domain.Set
