@@ -483,3 +483,14 @@ func TestSessionRepository_DeleteWeek(t *testing.T) {
 		}
 	}
 }
+
+func TestGetLatestSuccessfulSecondsBefore_NoRows_ReturnsNotFound(t *testing.T) {
+	t.Parallel()
+	ctx, repos := setupTestRepos(t)
+
+	// No exercise_sets seeded for exercise 99999 → must surface ErrNotFound.
+	_, err := repos.Sessions.GetLatestSuccessfulSecondsBefore(ctx, 99999, time.Now())
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("err = %v, want domain.ErrNotFound", err)
+	}
+}

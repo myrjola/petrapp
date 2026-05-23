@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -72,16 +73,17 @@ func (s *Service) GetStartingSeconds(
 		return 0, fmt.Errorf("exercise %d is not time_based", exerciseID)
 	}
 	seconds, err := s.repos.Sessions.GetLatestSuccessfulSecondsBefore(ctx, exerciseID, beforeDate)
-	if err != nil {
+	switch {
+	case err == nil:
+		return seconds, nil
+	case errors.Is(err, domain.ErrNotFound):
+		if exercise.DefaultStartingSeconds == nil {
+			return 0, fmt.Errorf("time_based exercise %d has no default_starting_seconds", exerciseID)
+		}
+		return *exercise.DefaultStartingSeconds, nil
+	default:
 		return 0, fmt.Errorf("get latest successful seconds: %w", err)
 	}
-	if seconds > 0 {
-		return seconds, nil
-	}
-	if exercise.DefaultStartingSeconds == nil {
-		return 0, fmt.Errorf("time_based exercise %d has no default_starting_seconds", exerciseID)
-	}
-	return *exercise.DefaultStartingSeconds, nil
 }
 
 // BuildProgression constructs a domain.Progression for the given exercise

@@ -747,7 +747,7 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 		LIMIT 1`,
 		userID, exerciseID, formatDate(beforeDate)).Scan(&seconds)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, nil
+		return 0, domain.ErrNotFound
 	}
 	if err != nil {
 		return 0, fmt.Errorf("query latest successful seconds: %w", err)
