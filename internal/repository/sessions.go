@@ -612,7 +612,7 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
 		SELECT we.workout_date, es.weight_kg, es.target_value,
-		       es.completed_value, es.completed_at, we.warmup_completed_at, es.signal
+		       es.completed_value, es.completed_at, es.signal
 		FROM workout_exercise we
 		JOIN exercise_sets es ON es.workout_exercise_id = we.id
 		WHERE we.workout_user_id = ? AND we.exercise_id = ? AND we.workout_date >= ?
@@ -663,14 +663,13 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 
 func scanHistoryRow(rows *sql.Rows) (string, domain.Set, error) {
 	var (
-		workoutDateStr       string
-		set                  domain.Set
-		completedAtStr       sql.NullString
-		warmupCompletedAtStr sql.NullString // unused but selected to match Scan arity.
-		signalStr            sql.NullString
+		workoutDateStr string
+		set            domain.Set
+		completedAtStr sql.NullString
+		signalStr      sql.NullString
 	)
 	if err := rows.Scan(&workoutDateStr, &set.WeightKg, &set.TargetValue,
-		&set.CompletedValue, &completedAtStr, &warmupCompletedAtStr, &signalStr); err != nil {
+		&set.CompletedValue, &completedAtStr, &signalStr); err != nil {
 		return "", domain.Set{}, fmt.Errorf("scan exercise set row: %w", err)
 	}
 	if err := parseCompletedAtTimestamp(completedAtStr, &set); err != nil {
