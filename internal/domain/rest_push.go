@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// restPushLeadSeconds is how far before the actual rest end the push fires.
+// A heads-up gives the user time to put down their phone and set up before
+// the next set is due — the on-screen "Ready" chime in sets-container.gohtml
+// still marks the actual end of rest.
+const restPushLeadSeconds = 10
+
 // RestPushAction discriminates the three things the scheduler may be asked
 // to do for a slot after a state change.
 type RestPushAction int
@@ -74,7 +80,7 @@ func PlanRestPush(
 	setsTotal := len(slot.Sets)
 	return RestPushDecision{
 		Action: RestPushActionSchedule,
-		FireAt: completedAt.Add(time.Duration(restSeconds) * time.Second),
+		FireAt: completedAt.Add(time.Duration(restSeconds-restPushLeadSeconds) * time.Second),
 		Payload: RestPushPayload{
 			Title:         "Rest over",
 			Body:          fmt.Sprintf("Time for set %d of %d — %s", nextSetNumber, setsTotal, slot.Exercise.Name),

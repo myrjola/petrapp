@@ -78,7 +78,7 @@ func TestPlanRestPush(t *testing.T) {
 			pt: domain.PeriodizationStrength,
 			want: domain.RestPushDecision{
 				Action: domain.RestPushActionSchedule,
-				FireAt: completedAt.Add(180 * time.Second),
+				FireAt: completedAt.Add(170 * time.Second),
 				Payload: domain.RestPushPayload{
 					Title:         "Rest over",
 					Body:          "Time for set 1 of 3 — Squat",
@@ -97,7 +97,7 @@ func TestPlanRestPush(t *testing.T) {
 			pt: domain.PeriodizationStrength,
 			want: domain.RestPushDecision{
 				Action: domain.RestPushActionSchedule,
-				FireAt: completedAt.Add(180 * time.Second),
+				FireAt: completedAt.Add(170 * time.Second),
 				Payload: domain.RestPushPayload{
 					Title:         "Rest over",
 					Body:          "Time for set 3 of 3 — Squat",
@@ -127,7 +127,7 @@ func TestPlanRestPush(t *testing.T) {
 			isDeload: true,
 			want: domain.RestPushDecision{
 				Action: domain.RestPushActionSchedule,
-				FireAt: completedAt.Add(90 * time.Second),
+				FireAt: completedAt.Add(80 * time.Second),
 				Payload: domain.RestPushPayload{
 					Title:         "Rest over",
 					Body:          "Time for set 1 of 2 — Bicep Curl",
