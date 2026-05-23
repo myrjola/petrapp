@@ -293,15 +293,44 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
 }
 
 // MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
+// Schedules a rest push announcing set 1 when the warmup transitions from
+// not-done to done, the user has push enabled, and at least one subscription
+// exists. Re-clicking when the warmup is already done is a no-op on the
+// push side (the underlying domain mutation still refreshes the timestamp,
+// preserving prior behavior).
 func (s *Service) MarkWarmupComplete(
 	ctx context.Context,
 	date time.Time,
 	workoutExerciseID int,
 ) error {
+	var (
+		wasComplete   bool
+		postSlot      domain.ExerciseSet
+		postSlotOK    bool
+		periodization domain.PeriodizationType
+		sessionDeload bool
+	)
+	now := time.Now().UTC()
+
 	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		return sess.MarkWarmupComplete(workoutExerciseID, time.Now().UTC())
+		if slot, ok := sess.Slot(workoutExerciseID); ok {
+			wasComplete = slot.WarmupCompletedAt != nil
+		}
+		periodization = sess.PeriodizationType
+		sessionDeload = sess.IsDeload
+
+		if mErr := sess.MarkWarmupComplete(workoutExerciseID, now); mErr != nil {
+			return mErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
+		}
+		postSlot, postSlotOK = sess.Slot(workoutExerciseID)
+		return nil
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
+	}
+
+	if !wasComplete && postSlotOK {
+		userID := contexthelpers.AuthenticatedUserID(ctx)
+		s.applyRestPushDecision(ctx, userID, workoutExerciseID, postSlot, periodization, sessionDeload, now)
 	}
 	return nil
 }

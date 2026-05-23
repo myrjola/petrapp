@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -360,5 +361,190 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 			t.Errorf("sessions[%d] and sessions[%d] have the same periodization type %q; want alternating",
 				i-1, i, types[i])
 		}
+	}
+}
+
+func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/warmup', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+		t.Fatalf("MarkWarmupComplete: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 1 {
+		t.Fatalf("Schedule calls = %d, want 1", len(fake.scheduled))
+	}
+	if fake.scheduled[0].WorkoutExerciseID != weID {
+		t.Errorf("WorkoutExerciseID = %d, want %d", fake.scheduled[0].WorkoutExerciseID, weID)
+	}
+	if !strings.Contains(fake.scheduled[0].Payload, `"set_number":1`) {
+		t.Errorf("payload = %q, want set_number=1", fake.scheduled[0].Payload)
+	}
+}
+
+func Test_MarkWarmupComplete_NoSubscriptions_DoesNotSchedule(t *testing.T) {
+	ctx, db, _, weID := setupSessionForRecordSet(t)
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+		t.Fatalf("MarkWarmupComplete: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 0 {
+		t.Errorf("Schedule calls = %d, want 0 (no subscriptions)", len(fake.scheduled))
+	}
+}
+
+func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	// Seed a second set so set 2 exists for the schedule target.
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
+		 VALUES (?, 2, 100.0, 5)`, weID,
+	); err != nil {
+		t.Fatalf("seed second set: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/warmup-after-set1', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	weight := 100.0
+	sig := domain.SignalOnTarget
+	// Complete set 1 first.
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+	// Now click warmup-complete (out-of-order user behavior, but legal).
+	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+		t.Fatalf("MarkWarmupComplete: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 2 {
+		t.Fatalf("Schedule calls = %d, want 2 (one for set 1 complete, one for warmup)", len(fake.scheduled))
+	}
+	if !strings.Contains(fake.scheduled[1].Payload, `"set_number":2`) {
+		t.Errorf("second payload = %q, want set_number=2 (warmup plans for first incomplete)",
+			fake.scheduled[1].Payload)
+	}
+}
+
+func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/warmup-done', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	weight := 100.0
+	sig := domain.SignalOnTarget
+	// Complete the only set, then call warmup-complete on an exhausted slot.
+	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+	fake.mu.Lock()
+	preScheduleCount := len(fake.scheduled)
+	preCancelCount := len(fake.cancels)
+	fake.mu.Unlock()
+
+	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+		t.Fatalf("MarkWarmupComplete: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != preScheduleCount {
+		t.Errorf("Schedule calls after warmup = %d, want %d (no schedule when all done)",
+			len(fake.scheduled), preScheduleCount)
+	}
+	// Warmup on an all-done slot triggers a Cancel from the policy.
+	if len(fake.cancels) != preCancelCount+1 {
+		t.Errorf("Cancel calls after warmup = %d, want %d", len(fake.cancels), preCancelCount+1)
+	}
+}
+
+func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
+	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+		 VALUES (?, 'https://example.test/wp/warmup-dup', 'p', 'a')`, userID,
+	); err != nil {
+		t.Fatalf("seed subscription: %v", err)
+	}
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_preferences (user_id, rest_notifications_enabled) VALUES (?, 1)
+		 ON CONFLICT(user_id) DO UPDATE SET rest_notifications_enabled = 1`, userID,
+	); err != nil {
+		t.Fatalf("seed preferences: %v", err)
+	}
+
+	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
+	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+		WithScheduler(fake)
+
+	date := time.Now().UTC().Truncate(24 * time.Hour)
+	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+		t.Fatalf("first MarkWarmupComplete: %v", err)
+	}
+	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+		t.Fatalf("second MarkWarmupComplete: %v", err)
+	}
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	if len(fake.scheduled) != 1 {
+		t.Errorf("Schedule calls = %d, want 1 (second call is a no-op)", len(fake.scheduled))
 	}
 }

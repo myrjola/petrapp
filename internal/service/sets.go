@@ -56,66 +56,70 @@ func (s *Service) RecordSet(
 	completedValue int,
 ) error {
 	var (
-		wasComplete        bool
-		exercise           domain.Exercise
-		periodization      domain.PeriodizationType
-		sessionIsDeload    bool
-		completedSetNumber int
-		setsTotal          int
-		hasMoreAfter       bool
+		wasComplete   bool
+		postSlot      domain.ExerciseSet
+		postSlotOK    bool
+		periodization domain.PeriodizationType
+		sessionDeload bool
 	)
 	now := time.Now().UTC()
 
 	err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
 		if slot, ok := sess.Slot(workoutExerciseID); ok && setIndex >= 0 && setIndex < len(slot.Sets) {
 			wasComplete = slot.Sets[setIndex].CompletedAt != nil
-			exercise = slot.Exercise
-			completedSetNumber = setIndex + 1
-			setsTotal = len(slot.Sets)
 		}
 		periodization = sess.PeriodizationType
-		sessionIsDeload = sess.IsDeload
+		sessionDeload = sess.IsDeload
 
 		if recErr := sess.RecordSet(workoutExerciseID, setIndex, signal, weightKg, completedValue, now); recErr != nil {
 			// Domain sentinels propagate unchanged so callers can errors.Is at the call site;
 			// the outer `if err != nil` wraps for diagnostic context.
 			return recErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
 		}
-		hasMoreAfter = sess.HasIncompleteSets()
+		postSlot, postSlotOK = sess.Slot(workoutExerciseID)
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
 
-	if !wasComplete && hasMoreAfter {
-		s.maybeSchedulePush(
-			ctx, workoutExerciseID, exercise, periodization, sessionIsDeload, completedSetNumber, setsTotal, now,
-		)
+	if !wasComplete && postSlotOK {
+		userID := contexthelpers.AuthenticatedUserID(ctx)
+		s.applyRestPushDecision(ctx, userID, workoutExerciseID, postSlot, periodization, sessionDeload, now)
 	}
 	return nil
 }
 
-// maybeSchedulePush schedules a rest-over push if every precondition holds:
-// the user has push enabled, has at least one subscription, and the exercise's
-// derivation yields a positive RestSeconds. The completion itself is already
-// persisted, so failures here just mean the user won't get a notification.
-func (s *Service) maybeSchedulePush(
+// applyRestPushDecision runs the rest-push policy against the post-mutation
+// slot and acts on the result. The completion itself is already persisted,
+// so failures here just mean the user won't get a notification — never
+// propagate.
+func (s *Service) applyRestPushDecision(
 	ctx context.Context,
-	workoutExerciseID int,
-	exercise domain.Exercise,
+	userID, workoutExerciseID int,
+	slot domain.ExerciseSet,
 	periodization domain.PeriodizationType,
 	isDeload bool,
-	completedSetNumber, setsTotal int,
 	completedAt time.Time,
 ) {
 	if s.scheduler == nil {
 		return
 	}
-	restSeconds := domain.RestSecondsFor(exercise, periodization, isDeload)
-	if restSeconds <= 0 {
+	decision := domain.PlanRestPush(slot, periodization, isDeload, completedAt)
+	switch decision.Action {
+	case domain.RestPushActionNoOp:
 		return
+	case domain.RestPushActionCancel:
+		if err := s.scheduler.Cancel(ctx, workoutExerciseID); err != nil {
+			s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: cancel failed",
+				slog.Int("workout_exercise_id", workoutExerciseID),
+				slog.Any("error", err))
+		}
+		return
+	case domain.RestPushActionSchedule:
+		// fall through
 	}
+
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: get preferences failed",
@@ -134,11 +138,6 @@ func (s *Service) maybeSchedulePush(
 	if subCount == 0 {
 		return
 	}
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	fireAt := completedAt.Add(time.Duration(restSeconds) * time.Second)
-	// nextSetNumber is the upcoming set the notification is announcing. The
-	// completion that triggered scheduling means the next set is the rest's reason.
-	nextSetNumber := completedSetNumber + 1
 
 	payloadBytes, err := json.Marshal(struct {
 		Title        string `json:"title"`
@@ -148,12 +147,12 @@ func (s *Service) maybeSchedulePush(
 		SetsTotal    int    `json:"sets_total"`
 		FireAtMS     int64  `json:"fire_at_ms"`
 	}{
-		Title:        "Rest over",
-		Body:         fmt.Sprintf("Time for set %d of %d — %s", nextSetNumber, setsTotal, exercise.Name),
-		ExerciseName: exercise.Name,
-		SetNumber:    nextSetNumber,
-		SetsTotal:    setsTotal,
-		FireAtMS:     fireAt.UnixMilli(),
+		Title:        decision.Payload.Title,
+		Body:         decision.Payload.Body,
+		ExerciseName: decision.Payload.ExerciseName,
+		SetNumber:    decision.Payload.NextSetNumber,
+		SetsTotal:    decision.Payload.SetsTotal,
+		FireAtMS:     decision.FireAt.UnixMilli(),
 	})
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: marshal payload",
@@ -164,7 +163,7 @@ func (s *Service) maybeSchedulePush(
 	push := domain.ScheduledPush{ //nolint:exhaustruct // ID and CreatedAt assigned by the repository at insert time.
 		UserID:            userID,
 		WorkoutExerciseID: workoutExerciseID,
-		FireAt:            fireAt,
+		FireAt:            decision.FireAt,
 		Payload:           string(payloadBytes),
 	}
 	if err = s.scheduler.Schedule(ctx, push); err != nil {
