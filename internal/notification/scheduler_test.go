@@ -1,8 +1,11 @@
 package notification_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -277,4 +280,54 @@ func (m *inMemScheduledPushRepo) ListAll(_ context.Context) ([]domain.ScheduledP
 		out = append(out, v)
 	}
 	return out, nil
+}
+
+func TestScheduler_DispatchFailure_LogsUserID(t *testing.T) {
+	t.Parallel()
+
+	var logBuf bytes.Buffer
+	//nolint:exhaustruct // AddSource/ReplaceAttr zero.
+	handlerOpts := &slog.HandlerOptions{Level: slog.LevelDebug}
+	logger := slog.New(slog.NewTextHandler(&logBuf, handlerOpts))
+	repo := newInMemoryScheduledPushRepo()
+	dispatchErr := errors.New("push gateway down")
+	dispatched := make(chan struct{})
+	scheduler := notification.NewScheduler(notification.SchedulerConfig{
+		Repo: repo,
+		Dispatch: func(_ context.Context, _ domain.ScheduledPush) error {
+			close(dispatched)
+			return dispatchErr
+		},
+		Logger: logger,
+		Now:    time.Now,
+	})
+
+	push := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
+		UserID:            7,
+		WorkoutExerciseID: 314,
+		FireAt:            time.Now().Add(30 * time.Millisecond),
+		Payload:           `{}`,
+	}
+	if err := scheduler.Schedule(context.Background(), push); err != nil {
+		t.Fatalf("Schedule: %v", err)
+	}
+
+	select {
+	case <-dispatched:
+	case <-time.After(time.Second):
+		t.Fatalf("dispatch never fired")
+	}
+	// Give the scheduler a moment to log after Dispatch returns.
+	time.Sleep(50 * time.Millisecond)
+
+	out := logBuf.String()
+	if !strings.Contains(out, "user_id=7") {
+		t.Errorf("log missing user_id=7; got:\n%s", out)
+	}
+	if !strings.Contains(out, "workout_exercise_id=314") {
+		t.Errorf("log missing workout_exercise_id=314; got:\n%s", out)
+	}
+	if !strings.Contains(out, "push dispatch failed") {
+		t.Errorf("log missing dispatch failure message; got:\n%s", out)
+	}
 }
