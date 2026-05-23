@@ -307,10 +307,19 @@ func setInvalidationCookieOnPost(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			http.SetCookie(w, &http.Cookie{
-				Name:     "inv_bfcache",
-				Value:    rand.Text(),
-				Path:     "/",
-				MaxAge:   60, //nolint:mnd // Lives long enough for a back-button after a POST to detect staleness.
+				Name:  "inv_bfcache",
+				Value: rand.Text(),
+				Path:  "/",
+				// Must outlive any browser's bfcache retention window so the
+				// pageshow staleness check can compare the rendered token
+				// against a still-present cookie. Chrome retains bfcache up
+				// to ~10 minutes, Safari up to ~30 minutes; one hour leaves
+				// margin. With a shorter MaxAge the cookie can disappear
+				// before the user returns to a pre-POST bfcached page, the
+				// JS handler reads both rendered and current as "" and
+				// declares the stale snapshot "fresh" -- the staleness bug
+				// surfaced by tlaplus/StackNav_CookieExpire.cfg.
+				MaxAge:   60 * 60, //nolint:mnd // See comment above.
 				SameSite: http.SameSiteLaxMode,
 				Secure:   true,
 				HttpOnly: false, // Read client-side in the pageshow handler to compare against the rendered snapshot.

@@ -94,7 +94,7 @@
             <li><code>session</code> - HTTP-only session cookie that maintains your authenticated state. Persists
                 across browser restarts and expires up to 7 days after it is issued.
             </li>
-            <li><code>inv_bfcache</code> - Short-lived (60 seconds) cookie set after each form submission. Browsers
+            <li><code>inv_bfcache</code> - Short-lived (one hour) cookie set after each form submission. Browsers
                 may show a stale snapshot of a page from their back/forward cache when you navigate back after
                 submitting a form; comparing this cookie to a token rendered into the page lets the client detect
                 staleness and reload. It contains a random value that does not identify you and is readable by
