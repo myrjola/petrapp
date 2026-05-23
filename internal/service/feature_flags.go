@@ -79,7 +79,7 @@ func (s *Service) WithMaintenanceCacheTTL(ttl time.Duration) *Service {
 }
 
 // GetFeatureFlag retrieves a feature flag by name.
-func (s *Service) GetFeatureFlag(ctx context.Context, name string) (domain.FeatureFlag, error) {
+func (s *Service) GetFeatureFlag(ctx context.Context, name domain.FeatureFlagName) (domain.FeatureFlag, error) {
 	flag, err := s.repos.FeatureFlags.Get(ctx, name)
 	if err != nil {
 		return domain.FeatureFlag{}, fmt.Errorf("get feature flag %s: %w", name, err)
@@ -93,7 +93,7 @@ func (s *Service) IsMaintenanceModeEnabled(ctx context.Context) bool {
 	if enabled, ok := s.maintenanceCache.load(); ok {
 		return enabled
 	}
-	flag, err := s.repos.FeatureFlags.Get(ctx, "maintenance_mode")
+	flag, err := s.repos.FeatureFlags.Get(ctx, domain.FeatureFlagMaintenanceMode)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			// Missing row is the steady state — cache it as "disabled" so we
@@ -125,7 +125,7 @@ func (s *Service) SetFeatureFlag(ctx context.Context, flag domain.FeatureFlag) e
 	if err := s.repos.FeatureFlags.Set(ctx, flag); err != nil {
 		return fmt.Errorf("set feature flag %s: %w", flag.Name, err)
 	}
-	if flag.Name == "maintenance_mode" {
+	if flag.Name == domain.FeatureFlagMaintenanceMode {
 		s.maintenanceCache.invalidate()
 	}
 	return nil

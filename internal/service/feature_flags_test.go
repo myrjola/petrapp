@@ -67,7 +67,8 @@ func Test_Service_SetFeatureFlag_invalidatesMaintenanceCache(t *testing.T) {
 		t.Fatalf("expected maintenance disabled on a fresh DB")
 	}
 
-	if err := svc.SetFeatureFlag(ctx, domain.FeatureFlag{Name: "maintenance_mode", Enabled: true}); err != nil {
+	maintenanceFlag := domain.FeatureFlag{Name: domain.FeatureFlagMaintenanceMode, Enabled: true}
+	if err := svc.SetFeatureFlag(ctx, maintenanceFlag); err != nil {
 		t.Fatalf("SetFeatureFlag: %v", err)
 	}
 

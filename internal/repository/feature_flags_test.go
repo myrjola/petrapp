@@ -10,7 +10,7 @@ import (
 func TestFeatureFlagRepository_GetMissingReturnsErrNotFound(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
-	_, err := repos.FeatureFlags.Get(ctx, "nonexistent_flag")
+	_, err := repos.FeatureFlags.Get(ctx, domain.FeatureFlagName("nonexistent_flag"))
 	if !errors.Is(err, domain.ErrNotFound) {
 		t.Errorf("want domain.ErrNotFound, got %v", err)
 	}
@@ -19,11 +19,11 @@ func TestFeatureFlagRepository_GetMissingReturnsErrNotFound(t *testing.T) {
 func TestFeatureFlagRepository_SetThenGetRoundTrip(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
-	want := domain.FeatureFlag{Name: "experimental_x", Enabled: true}
+	want := domain.FeatureFlag{Name: domain.FeatureFlagName("experimental_x"), Enabled: true}
 	if err := repos.FeatureFlags.Set(ctx, want); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
-	got, err := repos.FeatureFlags.Get(ctx, "experimental_x")
+	got, err := repos.FeatureFlags.Get(ctx, domain.FeatureFlagName("experimental_x"))
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -35,13 +35,15 @@ func TestFeatureFlagRepository_SetThenGetRoundTrip(t *testing.T) {
 func TestFeatureFlagRepository_SetUpsertsExisting(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
-	if err := repos.FeatureFlags.Set(ctx, domain.FeatureFlag{Name: "x", Enabled: true}); err != nil {
+	flagX := domain.FeatureFlag{Name: domain.FeatureFlagName("x"), Enabled: true}
+	if err := repos.FeatureFlags.Set(ctx, flagX); err != nil {
 		t.Fatalf("first Set: %v", err)
 	}
-	if err := repos.FeatureFlags.Set(ctx, domain.FeatureFlag{Name: "x", Enabled: false}); err != nil {
+	flagX.Enabled = false
+	if err := repos.FeatureFlags.Set(ctx, flagX); err != nil {
 		t.Fatalf("second Set: %v", err)
 	}
-	got, err := repos.FeatureFlags.Get(ctx, "x")
+	got, err := repos.FeatureFlags.Get(ctx, domain.FeatureFlagName("x"))
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -54,7 +56,8 @@ func TestFeatureFlagRepository_ListSortedByName(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
 	for _, name := range []string{"zebra", "apple", "mango"} {
-		if err := repos.FeatureFlags.Set(ctx, domain.FeatureFlag{Name: name, Enabled: true}); err != nil {
+		flag := domain.FeatureFlag{Name: domain.FeatureFlagName(name), Enabled: true}
+		if err := repos.FeatureFlags.Set(ctx, flag); err != nil {
 			t.Fatalf("Set %s: %v", name, err)
 		}
 	}
@@ -68,8 +71,8 @@ func TestFeatureFlagRepository_ListSortedByName(t *testing.T) {
 	inserted := map[string]bool{"apple": true, "mango": true, "zebra": true}
 	var filtered []string
 	for _, f := range got {
-		if inserted[f.Name] {
-			filtered = append(filtered, f.Name)
+		if inserted[string(f.Name)] {
+			filtered = append(filtered, string(f.Name))
 		}
 	}
 	want := []string{"apple", "mango", "zebra"}

@@ -18,14 +18,17 @@ func newSQLiteFeatureFlagRepository(db *sqlite.Database) *sqliteFeatureFlagRepos
 	return &sqliteFeatureFlagRepository{baseRepository: newBaseRepository(db)}
 }
 
-func (r *sqliteFeatureFlagRepository) Get(ctx context.Context, name string) (domain.FeatureFlag, error) {
+func (r *sqliteFeatureFlagRepository) Get(
+	ctx context.Context, name domain.FeatureFlagName,
+) (domain.FeatureFlag, error) {
 	var flag domain.FeatureFlag
 	var enabled int
+	var nameStr string
 
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT name, enabled
 		FROM feature_flags
-		WHERE name = ?`, name).Scan(&flag.Name, &enabled)
+		WHERE name = ?`, string(name)).Scan(&nameStr, &enabled)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.FeatureFlag{}, domain.ErrNotFound
@@ -34,6 +37,7 @@ func (r *sqliteFeatureFlagRepository) Get(ctx context.Context, name string) (dom
 		return domain.FeatureFlag{}, fmt.Errorf("query feature flag %s: %w", name, err)
 	}
 
+	flag.Name = domain.FeatureFlagName(nameStr)
 	flag.Enabled = enabled == 1
 	return flag, nil
 }
@@ -48,7 +52,7 @@ func (r *sqliteFeatureFlagRepository) Set(ctx context.Context, flag domain.Featu
 		INSERT INTO feature_flags (name, enabled)
 		VALUES (?, ?)
 		ON CONFLICT (name) DO UPDATE SET enabled = excluded.enabled`,
-		flag.Name, enabled); err != nil {
+		string(flag.Name), enabled); err != nil {
 		return fmt.Errorf("save feature flag %s: %w", flag.Name, err)
 	}
 	return nil
@@ -72,9 +76,11 @@ func (r *sqliteFeatureFlagRepository) List(ctx context.Context) (_ []domain.Feat
 	for rows.Next() {
 		var flag domain.FeatureFlag
 		var enabled int
-		if scanErr := rows.Scan(&flag.Name, &enabled); scanErr != nil {
+		var nameStr string
+		if scanErr := rows.Scan(&nameStr, &enabled); scanErr != nil {
 			return nil, fmt.Errorf("scan feature flag: %w", scanErr)
 		}
+		flag.Name = domain.FeatureFlagName(nameStr)
 		flag.Enabled = enabled == 1
 		flags = append(flags, flag)
 	}

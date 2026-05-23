@@ -45,7 +45,7 @@ func (app *application) adminFeatureFlagTogglePOST(w http.ResponseWriter, r *htt
 	}
 
 	// Get current flag state
-	flag, err := app.service.GetFeatureFlag(r.Context(), name)
+	flag, err := app.service.GetFeatureFlag(r.Context(), domain.FeatureFlagName(name))
 	if err != nil {
 		app.serverError(w, r, err)
 		return

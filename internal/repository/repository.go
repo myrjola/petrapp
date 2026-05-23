@@ -103,7 +103,7 @@ type PreferencesRepository interface {
 
 // FeatureFlagRepository persists boolean feature toggles by name.
 type FeatureFlagRepository interface {
-	Get(ctx context.Context, name string) (domain.FeatureFlag, error)
+	Get(ctx context.Context, name domain.FeatureFlagName) (domain.FeatureFlag, error)
 	Set(ctx context.Context, flag domain.FeatureFlag) error
 	List(ctx context.Context) ([]domain.FeatureFlag, error)
 }
