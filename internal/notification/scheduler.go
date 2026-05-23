@@ -170,11 +170,14 @@ func (s *Scheduler) fire(selfBox **time.Timer, push domain.ScheduledPush) {
 
 	if err := s.cfg.Dispatch(ctx, push); err != nil {
 		s.cfg.Logger.LogAttrs(ctx, slog.LevelWarn, "push dispatch failed",
+			slog.Int("user_id", push.UserID),
 			slog.Int("workout_exercise_id", push.WorkoutExerciseID),
 			slog.Any("error", err))
 	}
 	if err := s.cfg.Repo.Delete(ctx, push.ID); err != nil {
 		s.cfg.Logger.LogAttrs(ctx, slog.LevelWarn, "delete scheduled push row after fire",
+			slog.Int("user_id", push.UserID),
+			slog.Int("workout_exercise_id", push.WorkoutExerciseID),
 			slog.Int("id", push.ID),
 			slog.Any("error", err))
 	}

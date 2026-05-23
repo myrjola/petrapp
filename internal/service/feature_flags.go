@@ -40,6 +40,12 @@ func newMaintenanceCache() *maintenanceCache {
 
 // load returns the cached value if caching is enabled and the entry has not
 // expired. ok=false means the caller must re-read from the database.
+//
+// Safety: the atomic.Pointer.Load gives a self-consistent snapshot — the
+// captured *maintenanceState cannot mutate. A concurrent store or
+// invalidate that runs between Load and the time check is irrelevant: this
+// caller is allowed to use a snapshot up to ttl old, by definition of the
+// cache.
 func (c *maintenanceCache) load() (bool, bool) {
 	if c.ttl <= 0 {
 		return false, false

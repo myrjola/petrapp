@@ -21,17 +21,11 @@ func (s *Service) UpsertPushSubscription(
 
 // DeletePushSubscription removes the authenticated user's subscription
 // identified by endpoint. Empty endpoint deletes all subscriptions for the
-// user.
+// user in a single atomic statement.
 func (s *Service) DeletePushSubscription(ctx context.Context, endpoint string) error {
 	if endpoint == "" {
-		subs, err := s.repos.PushSubscriptions.ListByUser(ctx)
-		if err != nil {
-			return fmt.Errorf("list push subscriptions: %w", err)
-		}
-		for _, sub := range subs {
-			if err = s.repos.PushSubscriptions.DeleteByID(ctx, sub.ID); err != nil {
-				return fmt.Errorf("delete push subscription: %w", err)
-			}
+		if err := s.repos.PushSubscriptions.DeleteAllByUser(ctx); err != nil {
+			return fmt.Errorf("delete all push subscriptions: %w", err)
 		}
 		return nil
 	}

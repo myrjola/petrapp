@@ -93,7 +93,8 @@ func (s *Service) RecordSet(
 // applyRestPushDecision runs the rest-push policy against the post-mutation
 // slot and acts on the result. The completion itself is already persisted,
 // so failures here just mean the user won't get a notification — never
-// propagate.
+// propagate. Every log line carries user_id + workout_exercise_id so
+// triage can filter by either.
 func (s *Service) applyRestPushDecision(
 	ctx context.Context,
 	userID, workoutExerciseID int,
@@ -105,6 +106,7 @@ func (s *Service) applyRestPushDecision(
 	if s.scheduler == nil {
 		return
 	}
+
 	decision := domain.PlanRestPush(slot, periodization, isDeload, completedAt)
 	switch decision.Action {
 	case domain.RestPushActionNoOp:
@@ -112,6 +114,7 @@ func (s *Service) applyRestPushDecision(
 	case domain.RestPushActionCancel:
 		if err := s.scheduler.Cancel(ctx, workoutExerciseID); err != nil {
 			s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: cancel failed",
+				slog.Int("user_id", userID),
 				slog.Int("workout_exercise_id", workoutExerciseID),
 				slog.Any("error", err))
 		}
@@ -123,6 +126,8 @@ func (s *Service) applyRestPushDecision(
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: get preferences failed",
+			slog.Int("user_id", userID),
+			slog.Int("workout_exercise_id", workoutExerciseID),
 			slog.Any("error", err))
 		return
 	}
@@ -132,6 +137,8 @@ func (s *Service) applyRestPushDecision(
 	subCount, err := s.repos.PushSubscriptions.CountByUser(ctx)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: count subscriptions failed",
+			slog.Int("user_id", userID),
+			slog.Int("workout_exercise_id", workoutExerciseID),
 			slog.Any("error", err))
 		return
 	}
@@ -156,6 +163,8 @@ func (s *Service) applyRestPushDecision(
 	})
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: marshal payload",
+			slog.Int("user_id", userID),
+			slog.Int("workout_exercise_id", workoutExerciseID),
 			slog.Any("error", err))
 		return
 	}
@@ -168,6 +177,8 @@ func (s *Service) applyRestPushDecision(
 	}
 	if err = s.scheduler.Schedule(ctx, push); err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: schedule failed",
+			slog.Int("user_id", userID),
+			slog.Int("workout_exercise_id", workoutExerciseID),
 			slog.Any("error", err))
 	}
 }

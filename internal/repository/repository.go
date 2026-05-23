@@ -119,6 +119,10 @@ type PushSubscriptionRepository interface {
 	Insert(ctx context.Context, sub domain.PushSubscription) (domain.PushSubscription, error)
 	DeleteByEndpoint(ctx context.Context, endpoint string) error
 	DeleteByID(ctx context.Context, id int) error
+	// DeleteAllByUser removes every subscription for the authenticated user in
+	// a single statement. Used by the service layer when the caller asks to
+	// delete all of their own devices (e.g. logout).
+	DeleteAllByUser(ctx context.Context) error
 	ListByUser(ctx context.Context) ([]domain.PushSubscription, error)
 	CountByUser(ctx context.Context) (int, error)
 }

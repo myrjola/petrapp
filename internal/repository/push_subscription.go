@@ -75,6 +75,19 @@ func (r *sqlitePushSubscriptionRepository) DeleteByID(ctx context.Context, id in
 	return nil
 }
 
+// DeleteAllByUser removes every subscription belonging to the authenticated
+// user. One statement so callers don't have to wrap the loop in a tx.
+func (r *sqlitePushSubscriptionRepository) DeleteAllByUser(ctx context.Context) error {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	if _, err := r.db.ReadWrite.ExecContext(ctx,
+		`DELETE FROM push_subscriptions WHERE user_id = ?`,
+		userID,
+	); err != nil {
+		return fmt.Errorf("delete all push subscriptions: %w", err)
+	}
+	return nil
+}
+
 func (r *sqlitePushSubscriptionRepository) ListByUser(ctx context.Context) (_ []domain.PushSubscription, err error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
