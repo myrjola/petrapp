@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -36,7 +37,7 @@ func fetchMuscleGroupsByExerciseID(
 	ctx context.Context,
 	q queryer,
 	ids []int,
-) (map[int]muscleGroups, error) {
+) (_ map[int]muscleGroups, err error) {
 	if len(ids) == 0 {
 		return map[int]muscleGroups{}, nil
 	}
@@ -58,7 +59,9 @@ func fetchMuscleGroupsByExerciseID(
 		return nil, fmt.Errorf("query muscle groups: %w", err)
 	}
 	defer func() {
-		_ = rows.Close()
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close muscle group rows: %w", closeErr))
+		}
 	}()
 
 	byExercise := make(map[int]muscleGroups, len(ids))
