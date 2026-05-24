@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="prefs center stack">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.prefs) {
                 :scope {
                     padding: var(--size-4) var(--size-4) var(--size-9);
@@ -423,7 +423,7 @@
                 </div>
             </div>
 
-            <script {{ nonce }}>
+            <script {{ $.Nonce }}>
                 (() => {
                     const root = document.querySelector('[data-rest-notifications]');
                     if (!root) return;

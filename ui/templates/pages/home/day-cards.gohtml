@@ -2,7 +2,7 @@
 
 {{ define "day-cards" }}
     <section class="weekly-schedule stack" aria-label="Weekly schedule">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.weekly-schedule) {
                 :scope {
                     gap: var(--size-2);
@@ -281,7 +281,7 @@
         {{ end }}
 
         {{- /* Per-day progress widths — emitted from a nonce'd <style> so CSP is happy. */ -}}
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.weekly-schedule) {
                 {{ range .Days }}
                     {{ if .ShouldShowProgress }}

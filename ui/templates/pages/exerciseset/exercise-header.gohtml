@@ -2,7 +2,7 @@
 
 {{ define "exercise-header" }}
     <header class="exercise-brief stack">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.exercise-brief) {
                 :scope {
                     gap: var(--size-3);

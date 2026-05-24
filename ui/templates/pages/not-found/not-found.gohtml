@@ -1,7 +1,7 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.BaseTemplateData*/ -}}
 
 {{ define "page" }}
-    <style {{ nonce }}>
+    <style {{ $.Nonce }}>
         @scope {
             .not-found-container {
                 display: flex;
@@ -61,7 +61,7 @@
                 <a href="/" class="btn">Go Home</a>
                 <button type="button" class="btn btn--ghost">
                     <span>Go Back</span>
-                    <script {{ nonce }}>
+                    <script {{ $.Nonce }}>
                       document.currentScript.parentElement.addEventListener('click', function () {
                         if (window.history.length > 1) {
                           window.history.back()

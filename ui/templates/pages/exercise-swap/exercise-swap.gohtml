@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="stack">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     margin: var(--size-4);
@@ -15,7 +15,7 @@
         {{ template "page-header" .Header }}
 
         <section class="current-exercise">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.current-exercise) {
                     :scope {
                         background: var(--stone-1);
@@ -56,7 +56,7 @@
         {{ template "exercise-search" .Query }}
 
         <section class="alternative-exercises">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.alternative-exercises) {
                     :scope {
                         h2 {

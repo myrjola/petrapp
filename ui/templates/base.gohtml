@@ -10,20 +10,20 @@
         <meta name="invalidation-token" content="{{ .InvalidationToken }}"/>
         <title>Petra</title>
         <meta name="description" content="Personal trainer in your pocket."/>
-        <link rel="stylesheet" {{ nonce }} href="/main.css"/>
+        <link rel="stylesheet" {{ $.Nonce }} href="/main.css"/>
         <link rel="icon" href="/logo.svg"/>
         <link rel="mask-icon" href="/logo.svg" color="#000"/>
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
         <link rel="manifest" href="/manifest.json"/>
         <meta name="theme-color" content="#1c1813"/>
-        <script type="importmap" {{ nonce }}>
+        <script type="importmap" {{ $.Nonce }}>
             {
               "imports": {
                 "webauthn": "/webauthn.js"
               }
             }
         </script>
-        <script type="speculationrules" {{ nonce }}>
+        <script type="speculationrules" {{ $.Nonce }}>
             {
               "prefetch": [{
                 "where": {
@@ -33,8 +33,8 @@
               }]
             }
         </script>
-        <script {{nonce}} src="/main.js"></script>
-        <script {{nonce}}>
+        <script {{ $.Nonce }} src="/main.js"></script>
+        <script {{ $.Nonce }}>
             if ('serviceWorker' in navigator) {
                 registerServiceWorker().catch(() => { /* ignore — push is opt-in */ });
             }
@@ -43,7 +43,7 @@
     <body>
     <div id="loading-bar" aria-hidden="true"></div>
     <div id="loading-announce" role="status" aria-live="polite" class="sr-only"></div>
-    <style {{ nonce }}>
+    <style {{ $.Nonce }}>
         @scope (#js-flash) {
             :scope {
                 margin: var(--size-3);

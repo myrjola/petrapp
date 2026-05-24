@@ -3,7 +3,7 @@
 {{ define "warmup" }}
     {{ if not .ExerciseSet.WarmupCompletedAt }}
         <div class="warmup-row cluster" role="region" aria-label="Warmup">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.warmup-row) {
                     :scope {
                         gap: var(--size-3);
@@ -44,7 +44,7 @@
         </div>
     {{ else }}
         <div class="warmup-done" role="status">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.warmup-done) {
                     :scope {
                         font-family: var(--font-mono);
