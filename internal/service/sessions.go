@@ -112,9 +112,18 @@ func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) erro
 	}
 
 	planner := domain.NewPlanner(prefs, exercises, targets)
-	plannedSessions, err := planner.Plan(monday)
+	plan, err := planner.Plan(monday)
 	if err != nil {
 		return fmt.Errorf("plan week: %w", err)
+	}
+	// Temporary adapter: flatten the WeekPlan to the legacy []Session shape so
+	// CreateBatch keeps working. The next refactor step rewrites this helper to
+	// persist the WeekPlan directly.
+	plannedSessions := make([]domain.Session, 0, 7)
+	for i := range plan.Sessions {
+		if len(plan.Sessions[i].ExerciseSets) > 0 {
+			plannedSessions = append(plannedSessions, plan.Sessions[i])
+		}
 	}
 
 	for i := range plannedSessions {
