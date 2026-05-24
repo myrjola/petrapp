@@ -815,7 +815,7 @@ func TestPlan(t *testing.T) {
 
 	t.Run("each session has correct exercise count for duration", func(t *testing.T) {
 		t.Parallel()
-		// 60 min → 3 exercises.
+		// 60 min: strength → 3 exercises, hypertrophy → 4 exercises.
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(2, 0))
@@ -825,8 +825,13 @@ func TestPlan(t *testing.T) {
 			t.Fatalf("Plan returned error: %v", err)
 		}
 		for _, sess := range sessions {
-			if len(sess.ExerciseSets) != exercisesMedium {
-				t.Errorf("60-min session: want %d exercises, got %d", exercisesMedium, len(sess.ExerciseSets))
+			want := exercisesMedium
+			if sess.PeriodizationType == PeriodizationHypertrophy && !sess.IsDeload {
+				want = exercisesMediumHypertrophy
+			}
+			if len(sess.ExerciseSets) != want {
+				t.Errorf("60-min %s session: want %d exercises, got %d",
+					sess.PeriodizationType, want, len(sess.ExerciseSets))
 			}
 		}
 	})
