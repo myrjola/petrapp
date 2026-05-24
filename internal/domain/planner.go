@@ -12,9 +12,11 @@ const (
 	minutesLong   = 90
 	minutesMedium = 60
 
-	exercisesLong   = 4
-	exercisesMedium = 3
-	exercisesShort  = 2
+	exercisesLong              = 4
+	exercisesLongHypertrophy   = 5
+	exercisesMedium            = 3
+	exercisesMediumHypertrophy = 4
+	exercisesShort             = 2
 
 	maxMuscleGroupDaysPerWeek = 2
 	numPeriodizationTypes     = 2
@@ -89,7 +91,7 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 		if isDeload {
 			pt = PeriodizationHypertrophy
 		}
-		n := exercisesPerSession(wp.Prefs, day.Weekday())
+		n := exercisesPerSession(wp.Prefs, day.Weekday(), pt, isDeload)
 		exerciseSets := wp.selectExercisesForDayWithPeriodization(
 			categories[day],
 			dayMuscleGroups[day],
@@ -128,12 +130,6 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday())
 	}
 
-	// Exercise count: from prefs if the day is scheduled, otherwise medium.
-	n := exercisesPerSession(wp.Prefs, date.Weekday())
-	if n == 0 {
-		n = exercisesMedium
-	}
-
 	// Periodization: replicate the weekly planner's per-day alternation.
 	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
 	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
@@ -164,6 +160,17 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 		pt = PeriodizationHypertrophy
 	}
 
+	// Exercise count: from prefs if the day is scheduled, otherwise medium
+	// (bumped to medium-hypertrophy when the ad-hoc day is hypertrophy and
+	// not deload, matching the scheduled-day rule).
+	n := exercisesPerSession(wp.Prefs, date.Weekday(), pt, isDeload)
+	if n == 0 {
+		n = exercisesMedium
+		if pt == PeriodizationHypertrophy && !isDeload {
+			n = exercisesMediumHypertrophy
+		}
+	}
+
 	used := weekUsedExerciseIDs
 	if used == nil {
 		used = make(map[int]bool)
@@ -180,12 +187,22 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 	}, nil
 }
 
-// exercisesPerSession returns how many exercises to include based on session duration.
-func exercisesPerSession(prefs Preferences, weekday time.Weekday) int {
+// exercisesPerSession returns how many exercises to include based on session
+// duration and periodization. Hypertrophy non-deload sessions of >= 60 min
+// get one extra exercise to use the working-set time budget more fully;
+// strength and deload sessions keep their base counts.
+func exercisesPerSession(prefs Preferences, weekday time.Weekday, pt PeriodizationType, isDeload bool) int {
+	hyperBonus := pt == PeriodizationHypertrophy && !isDeload
 	switch minutes := prefs.MinutesForDay(weekday); {
 	case minutes >= minutesLong:
+		if hyperBonus {
+			return exercisesLongHypertrophy
+		}
 		return exercisesLong
 	case minutes >= minutesMedium:
+		if hyperBonus {
+			return exercisesMediumHypertrophy
+		}
 		return exercisesMedium
 	case minutes > 0:
 		return exercisesShort
@@ -211,20 +228,6 @@ func (wp *Planner) determineCategory(date time.Time) Category {
 		return CategoryUpper
 	}
 	return CategoryFullBody
-}
-
-// exercisesPerWeek sums the exercise count across all scheduled days.
-//
-//nolint:unused // kept for future extensibility.
-func (wp *Planner) exercisesPerWeek() int {
-	total := 0
-	for _, wd := range []time.Weekday{
-		time.Monday, time.Tuesday, time.Wednesday,
-		time.Thursday, time.Friday, time.Saturday, time.Sunday,
-	} {
-		total += exercisesPerSession(wp.Prefs, wd)
-	}
-	return total
 }
 
 // firstSessionPeriodizationType derives the periodization type for the first session of the
