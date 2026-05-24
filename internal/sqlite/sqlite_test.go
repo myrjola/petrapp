@@ -127,32 +127,27 @@ func TestNewDatabase_ConcurrentReadsAndWritesDoNotLock(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make(chan error, 2*iterations)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := range iterations {
-			if _, err := db.ReadWrite.ExecContext(ctx,
+	wg.Go(func() {
+		for range iterations {
+			if _, writeErr := db.ReadWrite.ExecContext(ctx,
 				"UPDATE users SET display_name = ? WHERE id = ?",
-				"updated", userID); err != nil {
-				errs <- err
+				"updated", userID); writeErr != nil {
+				errs <- writeErr
 				return
 			}
-			_ = i
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range iterations {
 			var name string
-			if err := db.ReadOnly.QueryRowContext(ctx,
-				"SELECT display_name FROM users WHERE id = ?", userID).Scan(&name); err != nil {
-				errs <- err
+			if readErr := db.ReadOnly.QueryRowContext(ctx,
+				"SELECT display_name FROM users WHERE id = ?", userID).Scan(&name); readErr != nil {
+				errs <- readErr
 				return
 			}
 		}
-	}()
+	})
 
 	wg.Wait()
 	close(errs)
