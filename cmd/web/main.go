@@ -193,6 +193,12 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		lastRequestAt:   notif.lastRequestAt,
 	}
 
+	// Wire the shim-aware error surface so DB / lookup failures inside
+	// the webauthn middleware navigate to /error instead of producing a
+	// silent 500 + reload. See docs/superpowers/specs/
+	// 2026-05-24-servererror-shim-aware-design.md.
+	webAuthnHandler.InternalErrorHandler = app.serverError
+
 	routes, err := app.routes()
 	if err != nil {
 		return fmt.Errorf("initialize routes: %w", err)
