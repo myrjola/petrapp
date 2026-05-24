@@ -711,3 +711,34 @@ func Test_Session_SwitchToDeload_Idempotent(t *testing.T) {
 		t.Error("SwitchToDeload cleared IsDeload on already-deload session")
 	}
 }
+
+func Test_Session_ClearDeload_ClearsFlag(t *testing.T) {
+	t.Parallel()
+
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
+		Date:     time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
+		IsDeload: true,
+	}
+
+	if err := sess.ClearDeload(); err != nil {
+		t.Fatalf("ClearDeload: %v", err)
+	}
+	if sess.IsDeload {
+		t.Error("ClearDeload did not set IsDeload to false")
+	}
+}
+
+func Test_Session_ClearDeload_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
+		Date: time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	if err := sess.ClearDeload(); err != nil {
+		t.Fatalf("ClearDeload (already clear): %v", err)
+	}
+	if sess.IsDeload {
+		t.Error("ClearDeload toggled IsDeload to true on already-clear session")
+	}
+}

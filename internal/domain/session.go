@@ -145,6 +145,14 @@ func (s *Session) SwitchToDeload() error {
 	return nil
 }
 
+// ClearDeload marks the session as a non-deload session going forward.
+// Counterpart to SwitchToDeload; used by RestartMesocycleAnchor to undo
+// an ad-hoc early deload. Idempotent.
+func (s *Session) ClearDeload() error {
+	s.IsDeload = false
+	return nil
+}
+
 // Slot returns a copy of the exercise slot identified by slotID; ok is false
 // when no slot matches. It is a read accessor for callers that need to
 // inspect slot state — e.g. the service layer capturing pre-mutation data
