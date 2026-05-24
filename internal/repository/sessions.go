@@ -84,7 +84,7 @@ func (r *sqliteSessionRepository) Update(
 	if err = r.deleteSession(ctx, tx, date); err != nil {
 		return err
 	}
-	if err = r.insertSession(ctx, tx, session); err != nil {
+	if err = r.insertSessionInTx(ctx, tx, session); err != nil {
 		return err
 	}
 
@@ -108,7 +108,7 @@ func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []do
 		}
 	}()
 	for _, sess := range sessions {
-		if err = r.insertSession(ctx, tx, sess); err != nil {
+		if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
 			// Only the workout_sessions PK conflict (duplicate date for this user) maps to
 			// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
 			// those are programming errors, not concurrent-insert races.
@@ -138,7 +138,7 @@ func (r *sqliteSessionRepository) Create(ctx context.Context, sess domain.Sessio
 			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
 		}
 	}()
-	if err = r.insertSession(ctx, tx, sess); err != nil {
+	if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
 		// Only the workout_sessions PK conflict (duplicate date for this user) maps to
 		// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
 		// those are programming errors, not concurrent-insert races.
@@ -539,14 +539,22 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 	return seconds, nil
 }
 
-func (r *sqliteSessionRepository) DeleteWeek(ctx context.Context, monday time.Time) error {
+func (r *sqliteSessionRepository) DeleteWeek(ctx context.Context, monday time.Time) (err error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
-	sunday := monday.AddDate(0, 0, 6)
-	if _, err := r.db.ReadWrite.ExecContext(ctx, `
-		DELETE FROM workout_sessions
-		WHERE user_id = ? AND workout_date >= ? AND workout_date <= ?`,
-		userID, formatDate(monday), formatDate(sunday)); err != nil {
-		return fmt.Errorf("delete week sessions: %w", err)
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+	if err = r.deleteWeekInTx(ctx, tx, userID, monday); err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit delete week: %w", err)
 	}
 	return nil
 }
@@ -618,13 +626,15 @@ func (r baseRepository) listSessionRows(
 }
 
 // listSessionRowsBetween returns sessions whose workout_date is in [from, to]
-// inclusive, oldest first. ExerciseSets is left nil — caller hydrates.
+// inclusive, oldest first. ExerciseSets is left nil — caller hydrates. Takes a
+// queryer so WeekPlanRepository.Update can read inside its open transaction.
 func (r baseRepository) listSessionRowsBetween(
 	ctx context.Context,
+	q queryer,
 	userID int,
 	from, to time.Time,
 ) (_ []domain.Session, err error) {
-	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+	rows, err := q.QueryContext(ctx, `
 		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date BETWEEN ? AND ?
@@ -708,25 +718,6 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 	session.ExerciseSets = exerciseSets
 
 	return session, nil
-}
-
-func (r *sqliteSessionRepository) insertSession(ctx context.Context, tx *sql.Tx, sess domain.Session) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	dateStr := formatDate(sess.Date)
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO workout_sessions (
-			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		userID, dateStr, sess.DifficultyRating,
-		formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
-		sess.PeriodizationType, sess.IsDeload); err != nil {
-		return fmt.Errorf("insert session: %w", err)
-	}
-	if err := r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); err != nil {
-		return fmt.Errorf("save exercise sets: %w", err)
-	}
-	return nil
 }
 
 func (r *sqliteSessionRepository) deleteSession(ctx context.Context, tx *sql.Tx, date time.Time) error {
@@ -830,58 +821,4 @@ func (r baseRepository) loadExerciseSetsSince(
 		byDate[dates[i]] = append(byDate[dates[i]], slots[i])
 	}
 	return byDate, nil
-}
-
-// saveExerciseSets writes the workout_exercise rows and their child
-// exercise_sets for a session. Pre-existing IDs are preserved so URL-stable
-// slot IDs survive delete-and-reinsert cycles in Update; new aggregates
-// (ID == 0) get an auto-assigned id.
-func (r *sqliteSessionRepository) saveExerciseSets(
-	ctx context.Context,
-	tx *sql.Tx,
-	date time.Time,
-	exerciseSets []domain.ExerciseSet,
-) error {
-	dateStr := formatDate(date)
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-
-	for _, exerciseSet := range exerciseSets {
-		var idArg any
-		if exerciseSet.ID > 0 {
-			idArg = exerciseSet.ID
-		}
-		var warmupArg any
-		if exerciseSet.WarmupCompletedAt != nil {
-			warmupArg = formatTimestamp(*exerciseSet.WarmupCompletedAt)
-		}
-		var weID int
-		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO workout_exercise (
-				id, workout_user_id, workout_date, exercise_id, warmup_completed_at
-			) VALUES (?, ?, ?, ?, ?)
-			RETURNING id`,
-			idArg, userID, dateStr, exerciseSet.Exercise.ID, warmupArg).Scan(&weID); err != nil {
-			return fmt.Errorf("insert workout exercise: %w", err)
-		}
-		for i, set := range exerciseSet.Sets {
-			var completedAtStr any
-			if set.CompletedAt != nil {
-				completedAtStr = formatTimestamp(*set.CompletedAt)
-			}
-			var signalValue any
-			if set.Signal != nil {
-				signalValue = string(*set.Signal)
-			}
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO exercise_sets (
-					workout_exercise_id, set_number,
-					weight_kg, target_value, completed_value, completed_at, signal
-				) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-				weID, i+1,
-				set.WeightKg, set.TargetValue, set.CompletedValue, completedAtStr, signalValue); err != nil {
-				return fmt.Errorf("insert exercise set: %w", err)
-			}
-		}
-	}
-	return nil
 }

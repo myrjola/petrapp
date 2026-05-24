@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,9 +25,66 @@ func newSQLiteWeekPlanRepository(db *sqlite.Database) *sqliteWeekPlanRepository 
 // domain.ErrNotFound when no workout_sessions row exists for the week.
 func (r *sqliteWeekPlanRepository) Get(ctx context.Context, monday time.Time) (domain.WeekPlan, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
+	return r.getInTx(ctx, r.db.ReadOnly, userID, monday)
+}
+
+// Update loads the WeekPlan for monday inside a single transaction, runs fn,
+// then persists the result via delete-then-reinsert across the week's date
+// range. Slot IDs are preserved via INSERT ... RETURNING id (same trick as
+// SessionRepository.Update). Domain sentinels returned by fn propagate
+// unchanged so callers can errors.Is against them.
+func (r *sqliteWeekPlanRepository) Update(
+	ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error,
+) (err error) {
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+
+	wp, err := r.getInTx(ctx, tx, userID, monday)
+	if err != nil {
+		return fmt.Errorf("get week for update: %w", err)
+	}
+
+	if err = fn(&wp); err != nil {
+		return err
+	}
+
+	if err = r.deleteWeekInTx(ctx, tx, userID, monday); err != nil {
+		return fmt.Errorf("delete week for rewrite: %w", err)
+	}
+	for i := range wp.Sessions {
+		sess := wp.Sessions[i]
+		if isRestDayPlaceholder(sess) {
+			continue
+		}
+		if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
+			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit week: %w", err)
+	}
+	return nil
+}
+
+// getInTx loads the WeekPlan using q as the queryer. When q is a *sql.Tx the
+// read sees a consistent snapshot under SQLite's BEGIN IMMEDIATE locking,
+// which is what Update relies on for atomic read-modify-write.
+func (r *sqliteWeekPlanRepository) getInTx(
+	ctx context.Context, q queryer, userID int, monday time.Time,
+) (domain.WeekPlan, error) {
 	sunday := monday.AddDate(0, 0, 6)
 
-	sessionRows, err := r.listSessionRowsBetween(ctx, userID, monday, sunday)
+	sessionRows, err := r.listSessionRowsBetween(ctx, q, userID, monday, sunday)
 	if err != nil {
 		return domain.WeekPlan{}, fmt.Errorf("list session rows for week: %w", err)
 	}
@@ -39,7 +98,7 @@ func (r *sqliteWeekPlanRepository) Get(ctx context.Context, monday time.Time) (d
 	// bound, so it may pull in slots from later weeks. That's wasted I/O but
 	// functionally fine: we only key into the resulting map by dates that fall
 	// inside this week, so out-of-range entries are ignored.
-	setsByDate, err := r.loadExerciseSetsSince(ctx, r.db.ReadOnly, userID, monday)
+	setsByDate, err := r.loadExerciseSetsSince(ctx, q, userID, monday)
 	if err != nil {
 		return domain.WeekPlan{}, fmt.Errorf("load exercise sets for week: %w", err)
 	}
@@ -58,4 +117,15 @@ func (r *sqliteWeekPlanRepository) Get(ctx context.Context, monday time.Time) (d
 		wp.Sessions[offset] = sess
 	}
 	return wp, nil
+}
+
+// isRestDayPlaceholder reports whether sess has no persistent state worth
+// writing (no slots, no lifecycle, no deload flag). Used by Update to skip
+// pure rest-day placeholders during the reinsert pass.
+func isRestDayPlaceholder(sess domain.Session) bool {
+	return len(sess.ExerciseSets) == 0 &&
+		sess.StartedAt.IsZero() &&
+		sess.CompletedAt.IsZero() &&
+		sess.DifficultyRating == nil &&
+		!sess.IsDeload
 }

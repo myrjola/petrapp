@@ -79,3 +79,78 @@ func TestWeekPlanRepository_Get_HydratesScheduledDays(t *testing.T) {
 		t.Error("Wednesday should be scheduled")
 	}
 }
+
+func TestWeekPlanRepository_Update_CommitsOnNil(t *testing.T) {
+	t.Parallel()
+	ctx, db, repos := setupTestReposWithDB(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	seedScheduledSession(ctx, t, db, monday)
+	err := repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		return wp.Start(monday, time.Now().UTC())
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	reloaded, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if reloaded.Sessions[0].StartedAt.IsZero() {
+		t.Error("Start should have persisted")
+	}
+}
+
+func TestWeekPlanRepository_Update_RollsBackOnError(t *testing.T) {
+	t.Parallel()
+	ctx, db, repos := setupTestReposWithDB(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	seedScheduledSession(ctx, t, db, monday)
+	sentinel := errors.New("rollback me")
+	err := repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		_ = wp.Start(monday, time.Now().UTC())
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("Update: got %v, want sentinel", err)
+	}
+	reloaded, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get after rollback: %v", err)
+	}
+	if !reloaded.Sessions[0].StartedAt.IsZero() {
+		t.Error("rollback should have left StartedAt unset")
+	}
+}
+
+func TestWeekPlanRepository_Update_PreservesSlotIDs(t *testing.T) {
+	t.Parallel()
+	ctx, db, repos := setupTestReposWithDB(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	seedScheduledSession(ctx, t, db, monday)
+
+	wp, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(wp.Sessions[0].ExerciseSets) == 0 {
+		t.Fatalf("seed should have produced a slot")
+	}
+	originalSlotID := wp.Sessions[0].ExerciseSets[0].ID
+
+	err = repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		return wp.Start(monday, time.Now().UTC())
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	reloaded, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get after update: %v", err)
+	}
+	if reloaded.Sessions[0].ExerciseSets[0].ID != originalSlotID {
+		t.Errorf(
+			"slot ID changed: got %d, want %d",
+			reloaded.Sessions[0].ExerciseSets[0].ID, originalSlotID,
+		)
+	}
+}
