@@ -77,6 +77,7 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		Header: PageHeaderData{
 			Title:    exercise.Name,
 			Subtitle: "",
+			Nonce:    "",
 		},
 		WorkoutExerciseID: workoutExerciseID,
 		Exercise:          exercise,

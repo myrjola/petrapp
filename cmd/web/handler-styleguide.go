@@ -122,13 +122,14 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		FontWeights:      rangeNames("font-weight", 1, scaleFontWeightMax),
 		Radii:            append(rangeNames("radius", 1, scaleRadiusMax), "radius-round"),
 		BannerExamples: []BannerData{
-			{Variant: BannerVariantError, Message: "Something went wrong. Please try again."},
-			{Variant: BannerVariantSuccess, Message: "Your changes have been saved."},
-			{Variant: BannerVariantInfo, Message: "Heads up — this is informational."},
+			{Variant: BannerVariantError, Message: "Something went wrong. Please try again.", Nonce: ""},
+			{Variant: BannerVariantSuccess, Message: "Your changes have been saved.", Nonce: ""},
+			{Variant: BannerVariantInfo, Message: "Heads up — this is informational.", Nonce: ""},
 		},
 		PageHeaderExample: PageHeaderData{
 			Title:    "Page title",
 			Subtitle: "An optional subtitle that explains the page.",
+			Nonce:    "",
 		},
 		FieldExamples: []FieldData{
 			{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.

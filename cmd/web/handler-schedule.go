@@ -27,10 +27,11 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 		Header: PageHeaderData{
 			Title:    "Set Up Your Schedule",
 			Subtitle: "Choose which days you'll be going to the gym",
+			Nonce:    "",
 		},
 		Weekdays:        preferencesToWeekdays(prefs),
 		DurationOptions: getWorkoutDurationOptions(),
-		Flash:           BannerData{Variant: BannerVariantError, Message: app.popFlashError(ctx)},
+		Flash:           BannerData{Variant: BannerVariantError, Message: app.popFlashError(ctx), Nonce: ""},
 	}
 
 	app.render(w, r, http.StatusOK, "schedule", data)

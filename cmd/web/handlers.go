@@ -172,6 +172,7 @@ func (app *application) privacy(w http.ResponseWriter, r *http.Request) {
 		Header: PageHeaderData{
 			Title:    "Privacy & Security",
 			Subtitle: "",
+			Nonce:    "",
 		},
 	}
 

@@ -84,9 +84,13 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 
 	data := exerciseAdminTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
-		Header:           PageHeaderData{Title: "Exercise Administration", Subtitle: ""},
-		Flash:            BannerData{Variant: BannerVariantError, Message: app.popFlashError(r.Context())},
-		Exercises:        rows,
+		Header:           PageHeaderData{Title: "Exercise Administration", Subtitle: "", Nonce: ""},
+		Flash: BannerData{
+			Variant: BannerVariantError,
+			Message: app.popFlashError(r.Context()),
+			Nonce:   "",
+		},
+		Exercises: rows,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
 			Label:    "Exercise Name",
 			Name:     "name",
@@ -135,9 +139,17 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 
 	data := exerciseEditTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
-		Header:           PageHeaderData{Title: fmt.Sprintf("Edit Exercise: %s", exercise.Name), Subtitle: ""},
-		Flash:            BannerData{Variant: BannerVariantError, Message: app.popFlashError(r.Context())},
-		Exercise:         exercise,
+		Header: PageHeaderData{
+			Title:    fmt.Sprintf("Edit Exercise: %s", exercise.Name),
+			Subtitle: "",
+			Nonce:    "",
+		},
+		Flash: BannerData{
+			Variant: BannerVariantError,
+			Message: app.popFlashError(r.Context()),
+			Nonce:   "",
+		},
+		Exercise: exercise,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
 			Label:    "Name",
 			Name:     "name",

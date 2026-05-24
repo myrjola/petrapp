@@ -71,8 +71,9 @@ func newWorkoutNotFoundTemplateData(
 		Header: PageHeaderData{
 			Title:    "Not in This Week's Plan",
 			Subtitle: "",
+			Nonce:    "",
 		},
-		Flash: BannerData{Variant: BannerVariantError, Message: flashMessage},
+		Flash: BannerData{Variant: BannerVariantError, Message: flashMessage, Nonce: ""},
 	}
 }
 
@@ -234,7 +235,7 @@ func newWorkoutTemplateData(
 		TotalCount:       total,
 		ProgressPercent:  progressPercent,
 		ProgressState:    progressState,
-		Flash:            BannerData{Variant: BannerVariantError, Message: flashMessage},
+		Flash:            BannerData{Variant: BannerVariantError, Message: flashMessage, Nonce: ""},
 	}
 }
 
@@ -342,17 +343,19 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	cards := make([]ExerciseResultCardData, 0, len(candidates))
 	for _, ex := range candidates {
 		cards = append(cards, ExerciseResultCardData{
-			Exercise:    ex,
-			FormAction:  fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
-			FieldName:   "new_exercise_id",
-			ButtonLabel: "Swap to this exercise",
+			Exercise:        ex,
+			FormAction:      fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
+			FieldName:       "new_exercise_id",
+			ButtonLabel:     "Swap to this exercise",
+			DescriptionHTML: "",
+			Nonce:           "",
 		})
 	}
 
 	data := exerciseSwapTemplateData{
 		BaseTemplateData:  newBaseTemplateData(r),
 		Date:              date,
-		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: ""},
+		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: "", Nonce: ""},
 		WorkoutExerciseID: workoutExerciseID,
 		CurrentExercise:   current,
 		Cards:             cards,
@@ -467,10 +470,12 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	cards := make([]ExerciseResultCardData, 0, len(availableExercises))
 	for _, ex := range availableExercises {
 		cards = append(cards, ExerciseResultCardData{
-			Exercise:    ex,
-			FormAction:  fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
-			FieldName:   "exercise_id",
-			ButtonLabel: "Add this exercise",
+			Exercise:        ex,
+			FormAction:      fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
+			FieldName:       "exercise_id",
+			ButtonLabel:     "Add this exercise",
+			DescriptionHTML: "",
+			Nonce:           "",
 		})
 	}
 
@@ -480,6 +485,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 		Header: PageHeaderData{
 			Title:    "Add Exercise",
 			Subtitle: "",
+			Nonce:    "",
 		},
 		Cards: cards,
 		Query: query,

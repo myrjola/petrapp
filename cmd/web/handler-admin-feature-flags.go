@@ -29,6 +29,7 @@ func (app *application) adminFeatureFlagsGET(w http.ResponseWriter, r *http.Requ
 		Header: PageHeaderData{
 			Title:    "Feature Flags Administration",
 			Subtitle: "",
+			Nonce:    "",
 		},
 		FeatureFlags: flags,
 	}
