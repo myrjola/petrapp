@@ -111,29 +111,51 @@ func (s *Service) Stop(ctx context.Context) {
 // CaptureTimeoutTrace captures a trace when a request times out.
 // It respects the cooldown period to avoid overwhelming the filesystem.
 func (s *Service) CaptureTimeoutTrace(ctx context.Context) {
-	// Check cooldown period
+	s.captureTrace(ctx, "timeout")
+}
+
+// CaptureSlowRequestTrace captures a trace when a request completes but
+// crossed the user-noticeable-delay threshold. Shares the cooldown with
+// CaptureTimeoutTrace so a slow request that escalates into a 503 does
+// not produce two near-identical dumps.
+func (s *Service) CaptureSlowRequestTrace(ctx context.Context, duration time.Duration) {
+	s.captureTrace(ctx, "slow", slog.Duration("duration", duration))
+}
+
+// baseCapturedTraceLogAttrs is the number of attributes always present on
+// the "captured trace" success log line (trigger, file, bytes). Used to
+// pre-size the slice that callers extend with trigger-specific attrs.
+const baseCapturedTraceLogAttrs = 3
+
+// captureTrace is the shared implementation behind CaptureTimeoutTrace and
+// CaptureSlowRequestTrace. prefix becomes the trace filename prefix and a
+// log attribute identifying which trigger fired. extraAttrs are appended
+// to the success log line so callers can surface trigger-specific context.
+func (s *Service) captureTrace(ctx context.Context, prefix string, extraAttrs ...slog.Attr) {
+	// Check cooldown period.
 	now := time.Now().Unix()
 	lastCapture := s.lastCapture.Load()
 
 	if lastCapture > 0 && time.Unix(now, 0).Sub(time.Unix(lastCapture, 0)) < cooldownDuration {
 		s.logger.LogAttrs(ctx, slog.LevelDebug, "skipping trace capture due to cooldown",
+			slog.String("trigger", prefix),
 			slog.Time("last_capture", time.Unix(lastCapture, 0)),
 			slog.Duration("remaining_cooldown", cooldownDuration-time.Unix(now, 0).Sub(time.Unix(lastCapture, 0))))
 		return
 	}
 
-	// Update last capture time atomically
+	// Update last capture time atomically.
 	if !s.lastCapture.CompareAndSwap(lastCapture, now) {
-		// Another goroutine updated the timestamp, respect that
+		// Another goroutine updated the timestamp, respect that.
 		return
 	}
 
-	// Generate filename with timestamp and request info
+	// Generate filename with timestamp and trigger prefix.
 	timestamp := time.Unix(now, 0).UTC().Format("20060102-150405")
-	filename := fmt.Sprintf("timeout-%s.trace", timestamp)
+	filename := fmt.Sprintf("%s-%s.trace", prefix, timestamp)
 	fPath := filepath.Join(s.tracesDirectory, filename)
 
-	// Create and write the trace file
+	// Create and write the trace file.
 	file, err := os.Create(fPath)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelError, "failed to create trace file",
@@ -149,7 +171,7 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context) {
 		}
 	}()
 
-	// Write the flight recorder trace to file
+	// Write the flight recorder trace to file.
 	bytesWritten, err := s.flightRecorder.WriteTo(file)
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelError, "failed to write trace",
@@ -158,7 +180,12 @@ func (s *Service) CaptureTimeoutTrace(ctx context.Context) {
 		return
 	}
 
-	s.logger.LogAttrs(ctx, slog.LevelWarn, "captured timeout trace",
+	attrs := make([]slog.Attr, 0, baseCapturedTraceLogAttrs+len(extraAttrs))
+	attrs = append(attrs,
+		slog.String("trigger", prefix),
 		slog.String("file", fPath),
-		slog.Int64("bytes", bytesWritten))
+		slog.Int64("bytes", bytesWritten),
+	)
+	attrs = append(attrs, extraAttrs...)
+	s.logger.LogAttrs(ctx, slog.LevelWarn, "captured trace", attrs...)
 }

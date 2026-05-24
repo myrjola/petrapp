@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/flightrecorder"
 )
@@ -161,5 +162,79 @@ func TestService_CapturesIntoNewlyCreatedDirectory(t *testing.T) {
 	}
 	if len(entries) == 0 {
 		t.Fatal("expected a trace file in the newly created directory")
+	}
+}
+
+//nolint:paralleltest // runtime/trace.NewFlightRecorder is a process-global singleton.
+func TestService_CaptureSlowRequestTrace(t *testing.T) {
+	traceDir := t.TempDir()
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	service, err := flightrecorder.New(flightrecorder.Config{
+		Logger:          logger,
+		MinAge:          0,
+		MaxBytes:        0,
+		TracesDirectory: traceDir,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	if err = service.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer service.Stop(ctx)
+
+	service.CaptureSlowRequestTrace(ctx, 750*time.Millisecond)
+
+	entries, err := os.ReadDir(traceDir)
+	if err != nil {
+		t.Fatalf("failed to read trace directory: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected exactly one trace file, got %d", len(entries))
+	}
+	filename := entries[0].Name()
+	if !strings.HasPrefix(filename, "slow-") {
+		t.Errorf("expected filename to start with 'slow-', got %s", filename)
+	}
+	if !strings.HasSuffix(filename, ".trace") {
+		t.Errorf("expected filename to end with '.trace', got %s", filename)
+	}
+}
+
+//nolint:paralleltest // runtime/trace.NewFlightRecorder is a process-global singleton.
+func TestService_CooldownIsSharedAcrossCaptureKinds(t *testing.T) {
+	traceDir := t.TempDir()
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	service, err := flightrecorder.New(flightrecorder.Config{
+		Logger:          logger,
+		MinAge:          0,
+		MaxBytes:        0,
+		TracesDirectory: traceDir,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	if err = service.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer service.Stop(ctx)
+
+	// First capture fires; the second should be blocked by the shared cooldown
+	// even though it is a different capture kind.
+	service.CaptureTimeoutTrace(ctx)
+	service.CaptureSlowRequestTrace(ctx, 600*time.Millisecond)
+
+	entries, err := os.ReadDir(traceDir)
+	if err != nil {
+		t.Fatalf("failed to read trace directory: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("expected cooldown to prevent the second capture, got %d files", len(entries))
 	}
 }
