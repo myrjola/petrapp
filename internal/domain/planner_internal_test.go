@@ -945,3 +945,50 @@ func Test_StartOfDay_TruncatesToUTCMidnight(t *testing.T) {
 		})
 	}
 }
+
+func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
+	t.Parallel()
+
+	// Build a Preferences value where each weekday carries a different minutes
+	// value, so the test can pick a weekday to control the minutes input.
+	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and mesocycle fields irrelevant.
+		MondayMinutes:    minutesLong,   // 90
+		TuesdayMinutes:   minutesMedium, // 60
+		WednesdayMinutes: 45,
+		ThursdayMinutes:  0,
+		FridayMinutes:    0,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
+	}
+
+	tests := []struct {
+		name     string
+		weekday  time.Weekday
+		pt       PeriodizationType
+		isDeload bool
+		want     int
+	}{
+		{"90 strength non-deload", time.Monday, PeriodizationStrength, false, exercisesLong},
+		{"90 hypertrophy non-deload", time.Monday, PeriodizationHypertrophy, false, exercisesLongHypertrophy},
+		{"90 hypertrophy deload", time.Monday, PeriodizationHypertrophy, true, exercisesLong},
+		{"60 strength non-deload", time.Tuesday, PeriodizationStrength, false, exercisesMedium},
+		{"60 hypertrophy non-deload", time.Tuesday, PeriodizationHypertrophy, false, exercisesMediumHypertrophy},
+		{"60 hypertrophy deload", time.Tuesday, PeriodizationHypertrophy, true, exercisesMedium},
+		{"45 strength non-deload", time.Wednesday, PeriodizationStrength, false, exercisesShort},
+		{"45 hypertrophy non-deload", time.Wednesday, PeriodizationHypertrophy, false, exercisesShort},
+		{"45 hypertrophy deload", time.Wednesday, PeriodizationHypertrophy, true, exercisesShort},
+		{"0 strength", time.Thursday, PeriodizationStrength, false, 0},
+		{"0 hypertrophy", time.Thursday, PeriodizationHypertrophy, false, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := exercisesPerSession(p, tt.weekday, tt.pt, tt.isDeload)
+			if got != tt.want {
+				t.Errorf("exercisesPerSession(weekday=%s, pt=%s, deload=%v) = %d, want %d",
+					tt.weekday, tt.pt, tt.isDeload, got, tt.want)
+			}
+		})
+	}
+}
