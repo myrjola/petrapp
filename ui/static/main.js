@@ -133,6 +133,14 @@ function clearLoad() {
 
 if ('navigation' in window) {
     navigation.addEventListener('navigate', async (e) => {
+        console.log('[navbug navigate]', {
+            destUrl: e.destination.url,
+            navType: e.navigationType,
+            userInitiated: e.userInitiated,
+            hasFormData: !!e.formData,
+            currentUrl: location.href,
+            currIdx: navigation.currentEntry?.index,
+        })
         if (e.hashChange || e.downloadRequest) return
         if (new URL(e.destination.url).origin !== location.origin) return
 
@@ -288,9 +296,15 @@ document.addEventListener('click', (e) => {
     for (let i = navigation.currentEntry.index - 1; i >= 0; i--) {
         if (sameUrl(new URL(entries[i].url), target)) {
             e.preventDefault()
+            console.log('[navbug back-button] traverseTo', { href: link.href,
+                fromIdx: navigation.currentEntry?.index, toIdx: i, toUrl: entries[i].url })
             // If the entry was pruned between our read of entries() and the
             // traverse, fall back to a normal navigation rather than no-op.
-            navigation.traverseTo(entries[i].key).committed.catch(() => location.assign(link.href))
+            navigation.traverseTo(entries[i].key).committed.catch((err) => {
+                console.log('[navbug back-button] .catch fired -> location.assign', {
+                    href: link.href, currentUrl: location.href, err: String(err) })
+                location.assign(link.href)
+            })
             return
         }
     }
@@ -349,11 +363,22 @@ window.addEventListener('pageshow', (event) => {
 //
 // Verified by tlaplus/StackNav_PrefetchMitigated.cfg.
 window.addEventListener('pagereveal', () => {
-    if (document.body.dataset.bfcacheHandler === 'page-local') return
     const meta = document.querySelector('meta[name="invalidation-token"]')
     const rendered = meta ? meta.content : ''
     const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
     const current = m ? m[1] : ''
+    const act = navigation.activation
+    console.log('[navbug pagereveal]', {
+        url: location.href,
+        pageLocal: document.body.dataset.bfcacheHandler === 'page-local',
+        rendered, current, mismatch: rendered !== current,
+        navType: act?.navigationType,
+        fromIdx: act?.from?.index, fromUrl: act?.from?.url,
+        entryIdx: act?.entry?.index, entryUrl: act?.entry?.url,
+        currIdx: navigation.currentEntry?.index,
+    })
+    if (document.body.dataset.bfcacheHandler === 'page-local') return
     if (rendered === current) return
+    console.log('[navbug pagereveal] -> navigation.reload()')
     navigation.reload()
 })
