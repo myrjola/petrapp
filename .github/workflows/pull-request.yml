@@ -23,6 +23,14 @@ jobs:
             ~/.cache/ms-playwright-go
           key: playwright-${{ hashFiles('go.sum') }}
 
+      - name: Cache golangci-lint analysis results
+        uses: actions/cache@v5
+        with:
+          path: .cache/golangci-lint
+          key: golangci-lint-${{ runner.os }}-${{ hashFiles('Makefile', '.golangci.yml', 'go.sum') }}
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-
+
       - name: Build
         run: make ci
 
