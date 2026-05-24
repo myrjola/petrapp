@@ -45,7 +45,7 @@ Non-negotiables that hold even for non-visual changes:
 
 **ALWAYS prefer inline scripts in templates over static JavaScript files.**
 
-- Include JavaScript directly in template files using `<script {{ nonce }}>` tags
+- Include JavaScript directly in template files using `<script {{ $.Nonce }}>` tags
 - Inline scripts provide better developer experience (no cache busting needed)
 - Static files in `/ui/static/` are cached with fingerprinted filenames for performance
 - Changing static files requires renaming them to bust the cache
@@ -119,11 +119,12 @@ they're touched, so the bar to escape the primitives is highest there.
 
 **Partials** (call via `{{ template "name" <dot> }}`):
 
-- `back-link` — "← Back" anchor wired to the Navigation API. Dot: an href
-  string.
+- `back-link` — "← Back" anchor wired to the Navigation API. Dot:
+  `cmd/web.BackLinkData` (`Href`, `Nonce`); construct via the `backLink`
+  template helper that builds it from the page's `$.Nonce`.
   ```gohtml
-  {{ template "back-link" "/" }}
-  {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
+  {{ template "back-link" (backLink "/" $.Nonce) }}
+  {{ template "back-link" (backLink (printf "/workouts/%s" (.Date.Format "2006-01-02")) $.Nonce) }}
   ```
 - `banner` — server-message display (flash errors, notices). Dot:
   `cmd/web.BannerData` (`Variant` ∈ `error`/`success`/`info`, `Message`).
@@ -160,7 +161,7 @@ new component, and assert it in `cmd/web/handler-styleguide_test.go`.
 
 ### Styling Components
 
-- **Colocate styles with markup.** Emit a `<style {{ nonce }}>` block as a sibling immediately preceding the component root (not inside it — `<style>` is metadata content and is non-conforming inside interactive content like `<a>`, `<button>`, or form controls)
+- **Colocate styles with markup.** Emit a `<style {{ .Nonce }}>` block as a sibling immediately preceding the component root (not inside it — `<style>` is metadata content and is non-conforming inside interactive content like `<a>`, `<button>`, or form controls)
 - Use `@scope (<selector>) { :scope { ... } }` with a class or data attribute that uniquely identifies the component root. Example: `@scope (.back-link) { :scope { ... } }`
 - Pages that render their own elements matching the same selector will still override the component's rules via their own unlayered inline `<style>` blocks — unlayered wins by cascade proximity / source order
 - The whole component — markup and styles — lives in one file. Delete the file to delete the feature; nothing to hunt down in `main.css`
@@ -169,26 +170,30 @@ new component, and assert it in `cmd/web/handler-styleguide_test.go`.
 
 ## Available Template Functions
 
-### Security Functions (Always Available)
+### Security helpers (data-driven)
 
-- `{{ nonce }}` - CSP nonce attribute for style/script tags (required for CSP compliance)
-- `{{ mdToHTML "markdown content" }}` - Convert markdown to HTML
+CSP nonces are passed through data, not via a template function:
+
+- In page templates and `base.gohtml`, reference `{{ $.Nonce }}` — `$` reaches the page-data root even from inside `{{ range }}` / `{{ with }}` blocks.
+- In component partials, the component's dot struct carries a `Nonce template.HTMLAttr` field; reference it as `{{ .Nonce }}`. Callers populate it from their surrounding `BaseTemplateData.Nonce`.
+
+Markdown rendering happens in the handler — pre-render to `template.HTML` and pass it on the data struct. There is no `mdToHTML` template function.
 
 ### Important Security Requirements
 
-- **All `<style>` and `<script>` tags must carry `{{ nonce }}`** so the CSP nonce-allowlist accepts them.
+- **All `<style>` and `<script>` tags must carry their `Nonce` (`{{ .Nonce }}` inside a component, `{{ $.Nonce }}` inside a page)** so the CSP nonce-allowlist accepts them.
 - **Never use inline `style="..."` attributes on elements.** The CSP `style-src` directive uses a nonce, and once a nonce is present in CSP Level 3 the `'unsafe-inline'` keyword is ignored even for style attributes — the browser silently drops the rule. Nonces apply to `<style>` elements, not to attributes; there is no way to "nonce" an inline attribute.
-  - **For dynamic CSS values driven by template data** (e.g. one rule per token, or a value that depends on a handler-prepared list): emit the rules from inside a nonce'd `<style>` block by ranging over the data, then reference them from the markup as plain class names. See `ui/templates/pages/styleguide/styleguide.gohtml` for a worked example — it generates `.bg-{token}`, `.w-{token}`, `.fs-{token}` etc. inside `<style {{ nonce }}>` and the markup just uses the class.
-  - **For one-off dynamic values** (e.g. a unique `view-transition-name` per row): same approach — emit a single rule inside a `<style {{ nonce }}>` adjacent to the element, scoped via `@scope` or a unique class/data-attribute.
+  - **For dynamic CSS values driven by template data** (e.g. one rule per token, or a value that depends on a handler-prepared list): emit the rules from inside a nonce'd `<style>` block by ranging over the data, then reference them from the markup as plain class names. See `ui/templates/pages/styleguide/styleguide.gohtml` for a worked example — it generates `.bg-{token}`, `.w-{token}`, `.fs-{token}` etc. inside `<style {{ $.Nonce }}>` and the markup just uses the class.
+  - **For one-off dynamic values** (e.g. a unique `view-transition-name` per row): same approach — emit a single rule inside a `<style {{ $.Nonce }}>` adjacent to the element, scoped via `@scope` or a unique class/data-attribute.
 
 Example:
 
 ```gohtml
-<style {{ nonce }}>
+<style {{ $.Nonce }}>
     /* CSS here */
 </style>
 
-<script {{ nonce }}>
+<script {{ $.Nonce }}>
     /* JS here */
 </script>
 ```
@@ -224,7 +229,7 @@ Dynamic `import()` of bare specifiers resolved through the `<script type="import
 
 ### Inline scripts are still preferred
 
-The "JavaScript in Templates" guidance above is unchanged. The nonce on `<script {{ nonce }}>` authorizes the inline JS itself; Trusted Types is a separate runtime constraint on what that JS does. Inline scripts must follow the same DOM-construction and script-URL rules — there's no relaxation for being inline.
+The "JavaScript in Templates" guidance above is unchanged. The nonce on `<script {{ $.Nonce }}>` authorizes the inline JS itself; Trusted Types is a separate runtime constraint on what that JS does. Inline scripts must follow the same DOM-construction and script-URL rules — there's no relaxation for being inline.
 
 ### Client-only error surface (`#js-flash`)
 
@@ -243,7 +248,7 @@ client surface as a true last resort.
 ### Scoped CSS Pattern
 
 - Use `@scope` at-rules for page-specific component styles
-- Place scoped styles directly in template files with nonce attribute
+- Place scoped styles directly in template files; reference `{{ $.Nonce }}` (or `{{ .Nonce }}` in components) on the `<style>` tag
 - Avoid global CSS classes for page-specific styling
 - Only add to `main.css` if truly global and reusable
 
@@ -251,7 +256,7 @@ client surface as a true last resort.
 
 ```gohtml
 <div class="exercise-list">
-    <style {{ nonce }}>
+    <style {{ $.Nonce }}>
         @scope {
             :scope {
                 display: flex;
@@ -444,7 +449,7 @@ Inline `printf` for one-off URL construction is idiomatic:
 Pre-build URLs in the handler only when the same URL appears in several places
 on the page or the path depends on non-trivial logic.
 
-When a template fails to render: missing function ⇒ check `contextTemplateFuncs`
+When a template fails to render: missing function ⇒ check `templateFuncs`
 in `cmd/web/handlers.go` and consider moving the logic to data preparation; nil
 pointer ⇒ validate the data shape in the handler; unexpected-token ⇒ check
 scoped CSS blocks for unclosed braces.
