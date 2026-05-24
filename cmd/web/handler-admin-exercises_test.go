@@ -31,7 +31,7 @@ func Test_application_adminExercises(t *testing.T) {
 			t.Fatalf("Failed to register: %v", err)
 		}
 
-		// Assert that the user is not an admin: mustAdmin redirects to /.
+		// Assert that the user is not an admin: mustAdmin redirects to /forbidden.
 		httpClient := *client.HTTPClient() // shallow copy preserves jar + transport.
 		httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -51,7 +51,7 @@ func Test_application_adminExercises(t *testing.T) {
 		if got, want := resp.StatusCode, http.StatusSeeOther; got != want {
 			t.Fatalf("Got status code %d, want %d", got, want)
 		}
-		if got, want := resp.Header.Get("Location"), "/"; got != want {
+		if got, want := resp.Header.Get("Location"), "/forbidden"; got != want {
 			t.Fatalf("Got Location %q, want %q", got, want)
 		}
 

@@ -30,7 +30,7 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 	}
 
 	t.Run("Feature flags admin is gated to admin users only", func(t *testing.T) {
-		// Non-admin user should be redirected to / by mustAdmin.
+		// Non-admin user should be redirected to /forbidden by mustAdmin.
 		httpClient := *client.HTTPClient() // shallow copy preserves jar + transport.
 		httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -51,8 +51,8 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 		if resp.StatusCode != http.StatusSeeOther {
 			t.Errorf("Expected 303 redirect for non-admin user, got %d", resp.StatusCode)
 		}
-		if loc := resp.Header.Get("Location"); loc != "/" {
-			t.Errorf("Expected Location: / for non-admin user, got %q", loc)
+		if loc := resp.Header.Get("Location"); loc != "/forbidden" {
+			t.Errorf("Expected Location: /forbidden for non-admin user, got %q", loc)
 		}
 	})
 

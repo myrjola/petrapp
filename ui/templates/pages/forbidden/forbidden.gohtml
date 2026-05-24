@@ -1,0 +1,65 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.BaseTemplateData*/ -}}
+
+{{ define "page" }}
+    <style {{ nonce }}>
+        @scope {
+            .forbidden-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100dvh;
+                padding: var(--size-4);
+                text-align: center;
+                background: var(--color-surface);
+            }
+
+            .forbidden-content {
+                max-width: var(--size-15);
+                padding: var(--size-8) var(--size-6);
+            }
+
+            .forbidden-title {
+                font-size: var(--font-size-6);
+                font-weight: var(--font-weight-7);
+                color: var(--color-text-primary);
+                margin-bottom: var(--size-2);
+                line-height: var(--font-lineheight-1);
+            }
+
+            .forbidden-subtitle {
+                font-size: var(--font-size-4);
+                font-weight: var(--font-weight-5);
+                color: var(--color-text-secondary);
+                margin-bottom: var(--size-4);
+                line-height: var(--font-lineheight-1);
+            }
+
+            .forbidden-message {
+                font-size: var(--font-size-2);
+                color: var(--color-text-secondary);
+                margin-bottom: var(--size-6);
+                line-height: var(--font-lineheight-3);
+            }
+
+            .forbidden-actions {
+                gap: var(--size-3);
+                justify-content: center;
+            }
+        }
+    </style>
+
+    <div class="forbidden-container">
+        <div class="forbidden-content card">
+            <h1 class="forbidden-title">403</h1>
+            <h2 class="forbidden-subtitle">Forbidden</h2>
+            <p class="forbidden-message">
+                You don't have permission to access this page. If you believe this
+                is a mistake, please contact an administrator.
+            </p>
+            <div class="forbidden-actions cluster">
+                <a href="/" class="btn">Go Home</a>
+            </div>
+        </div>
+    </div>
+{{ end }}

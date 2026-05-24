@@ -117,7 +117,7 @@ func Test_application_timeout(t *testing.T) {
 	}
 }
 
-func Test_mustAdmin_AuthenticatedNonAdmin_RedirectsToHome(t *testing.T) {
+func Test_mustAdmin_AuthenticatedNonAdmin_RedirectsToForbidden(t *testing.T) {
 	t.Parallel()
 
 	app := &application{} //nolint:exhaustruct // this is a test
@@ -138,8 +138,8 @@ func Test_mustAdmin_AuthenticatedNonAdmin_RedirectsToHome(t *testing.T) {
 	if got := w.Code; got != http.StatusSeeOther {
 		t.Errorf("status = %d, want %d", got, http.StatusSeeOther)
 	}
-	if got := w.Header().Get("Location"); got != "/" {
-		t.Errorf("Location = %q, want /", got)
+	if got := w.Header().Get("Location"); got != "/forbidden" {
+		t.Errorf("Location = %q, want /forbidden", got)
 	}
 }
 

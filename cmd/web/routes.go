@@ -71,23 +71,20 @@ func (app *application) routes() (*http.ServeMux, error) {
 	// Privacy page
 	mux.Handle("GET /privacy", app.sessionStack(http.HandlerFunc(app.privacy)))
 
-	// Developer-only design-token reference. Gated inside the handler on app.devMode
-	// so prod returns 404; route is registered unconditionally to keep startup simple.
-	mux.Handle("GET /dev/styleguide", app.sessionStack(http.HandlerFunc(app.styleguideGET)))
-
-	// Developer-only error-UX showcase. Same dev-mode gating as /dev/styleguide.
-	// See docs/superpowers/specs/2026-05-19-dev-error-ux-showcase-design.md.
-	mux.Handle("GET /dev/error-ux", app.sessionStack(http.HandlerFunc(app.devErrorUXGET)))
-	mux.Handle("POST /dev/error-ux/trigger/{kind}",
-		app.sessionStack(http.HandlerFunc(app.devErrorUXTriggerPOST)))
-	mux.Handle("GET /dev/error-ux/server-error",
-		app.sessionStack(http.HandlerFunc(app.devErrorUXServerErrorGET)))
+	// Developer-only routes. Registered unconditionally; the handlers gate
+	// on app.devMode so prod returns 404.
+	app.registerDevRoutes(mux)
 
 	// Catastrophic-failure surface. Reached either by GET (a browser hitting
 	// a stale link) or by the JS shim navigating after serverError on a POST.
 	// Sits on sessionStack — must be reachable from authenticated and
 	// unauthenticated states alike.
 	mux.Handle("GET /error", app.sessionStack(http.HandlerFunc(app.errorGET)))
+
+	// Access-denied surface. Reached when middleware bounces the user away
+	// from a route they can't enter (currently mustAdmin for non-admin
+	// authenticated users). Same reachability as /error.
+	mux.Handle("GET /forbidden", app.sessionStack(http.HandlerFunc(app.forbiddenGET)))
 
 	// Home route (most specific)
 	mux.Handle("GET /{$}", app.sessionStack(http.HandlerFunc(app.home)))
@@ -100,4 +97,17 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("/", fileServerHandler)
 
 	return mux, nil
+}
+
+// registerDevRoutes registers developer-only routes. Each handler gates on
+// app.devMode so prod returns 404; routes are registered unconditionally
+// to keep startup simple. See docs/superpowers/specs/2026-05-19-dev-error-ux-showcase-design.md
+// for the error-UX showcase.
+func (app *application) registerDevRoutes(mux *http.ServeMux) {
+	mux.Handle("GET /dev/styleguide", app.sessionStack(http.HandlerFunc(app.styleguideGET)))
+	mux.Handle("GET /dev/error-ux", app.sessionStack(http.HandlerFunc(app.devErrorUXGET)))
+	mux.Handle("POST /dev/error-ux/trigger/{kind}",
+		app.sessionStack(http.HandlerFunc(app.devErrorUXTriggerPOST)))
+	mux.Handle("GET /dev/error-ux/server-error",
+		app.sessionStack(http.HandlerFunc(app.devErrorUXServerErrorGET)))
 }

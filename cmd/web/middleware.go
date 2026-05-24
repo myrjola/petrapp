@@ -199,16 +199,21 @@ func (app *application) mustAuthenticate(next http.Handler) http.Handler {
 	})
 }
 
-// mustAdmin asserts that the user is an admin. Non-admin (or
-// unauthenticated) requests are redirected to /. The shim-aware
-// redirect() turns this into a 200 + X-Location navigation on the JS
-// fetch path and a plain 303 elsewhere.
+// mustAdmin asserts that the user is an admin. Unauthenticated requests
+// are bounced to / so the user can log in. Authenticated non-admin
+// requests get the 403 forbidden page so they understand the access
+// gate, not a silent home-page redirect. The shim-aware redirect()
+// turns either into a 200 + X-Location navigation on the JS fetch path
+// and a plain 303 elsewhere.
 func (app *application) mustAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		isAuthenticated := contexthelpers.IsAuthenticated(r.Context())
-		isAdmin := contexthelpers.IsAdmin(r.Context())
-		if !isAuthenticated || !isAdmin {
+		if !isAuthenticated {
 			redirect(w, r, "/")
+			return
+		}
+		if !contexthelpers.IsAdmin(r.Context()) {
+			redirect(w, r, "/forbidden")
 			return
 		}
 		next.ServeHTTP(w, r)
