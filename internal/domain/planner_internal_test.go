@@ -997,3 +997,52 @@ func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
 		})
 	}
 }
+
+func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
+	t.Parallel()
+
+	// Anchor on a strength-first Monday so the alternation is deterministic.
+	monday := monday2026Date()
+	pl := &Planner{} //nolint:exhaustruct // only firstSessionPeriodizationType is used.
+	if pl.firstSessionPeriodizationType(monday) != PeriodizationStrength {
+		monday = monday.AddDate(0, 0, 7)
+	}
+
+	// Two 60-min days with no adjacent workout day so both are CategoryFullBody
+	// (per determineCategory). FullBody days accept all exercise categories,
+	// so the planner can draw freely from the 8-exercise minimalExercises()
+	// pool to fill 3 + 4 = 7 unique slots.
+	// Strength-first alternation on a 2-day week → [strength, hypertrophy] →
+	// [exercisesMedium=3, exercisesMediumHypertrophy=4] under the new bump rule.
+	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and mesocycle fields irrelevant.
+		MondayMinutes:    minutesMedium,
+		TuesdayMinutes:   0,
+		WednesdayMinutes: 0,
+		ThursdayMinutes:  minutesMedium,
+		FridayMinutes:    0,
+		SaturdayMinutes:  0,
+		SundayMinutes:    0,
+	}
+	wp := NewPlanner(p, minimalExercises(), minimalTargets())
+	wp.rng = rand.New(rand.NewPCG(7, 0))
+
+	sessions, err := wp.Plan(monday)
+	if err != nil {
+		t.Fatalf("Plan returned error: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("want 2 sessions, got %d", len(sessions))
+	}
+
+	wantCount := []int{exercisesMedium, exercisesMediumHypertrophy}
+	wantPT := []PeriodizationType{PeriodizationStrength, PeriodizationHypertrophy}
+	for i, sess := range sessions {
+		if sess.PeriodizationType != wantPT[i] {
+			t.Errorf("session %d periodization: want %s, got %s", i, wantPT[i], sess.PeriodizationType)
+		}
+		if got := len(sess.ExerciseSets); got != wantCount[i] {
+			t.Errorf("session %d (%s) exercise count: want %d, got %d",
+				i, sess.PeriodizationType, wantCount[i], got)
+		}
+	}
+}
