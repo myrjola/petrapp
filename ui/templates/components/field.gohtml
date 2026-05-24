@@ -10,7 +10,7 @@
         {{ template "field" .NameField }}
 */ -}}
 {{- define "field" -}}
-    <style {{ nonce }}>
+    <style {{ .Nonce }}>
         @scope (.field) {
             :scope {
                 display: flex;
