@@ -83,6 +83,12 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("GET /dev/error-ux/server-error",
 		app.sessionStack(http.HandlerFunc(app.devErrorUXServerErrorGET)))
 
+	// Catastrophic-failure surface. Reached either by GET (a browser hitting
+	// a stale link) or by the JS shim navigating after serverError on a POST.
+	// Sits on sessionStack — must be reachable from authenticated and
+	// unauthenticated states alike.
+	mux.Handle("GET /error", app.sessionStack(http.HandlerFunc(app.errorGET)))
+
 	// Home route (most specific)
 	mux.Handle("GET /{$}", app.sessionStack(http.HandlerFunc(app.home)))
 
