@@ -358,7 +358,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 			FormAction:      fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
 			FieldName:       "new_exercise_id",
 			ButtonLabel:     "Swap to this exercise",
-			DescriptionHTML: "",
+			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
 			Nonce:           base.Nonce,
 		})
 	}
@@ -486,7 +486,7 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 			FormAction:      fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
 			FieldName:       "exercise_id",
 			ButtonLabel:     "Add this exercise",
-			DescriptionHTML: "",
+			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
 			Nonce:           base.Nonce,
 		})
 	}

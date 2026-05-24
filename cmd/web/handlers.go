@@ -50,7 +50,7 @@ func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncM
 			return template.HTMLAttr(nonce) //nolint:gosec // we trust the nonce since it's not provided by user.
 		},
 		"mdToHTML": func(markdown string) template.HTML {
-			return app.renderMarkdownToHTML(ctx, markdown)
+			return markdownToHTML(ctx, app.logger, markdown)
 		},
 		"formatFloat": formatFloat,
 		"sub":         func(a, b int) int { return a - b },
