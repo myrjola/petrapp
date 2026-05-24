@@ -140,8 +140,30 @@ Every POST handler ends in exactly one of:
 | Call | When | Effect |
 |---|---|---|
 | `redirect(w, r, url)` | Success | 200 + `X-Location` (stacknav) or 303 (plain); client navigates |
-| `app.userError(w, r, err, safeURL)` | Any user-visible failure on an in-flight action | Routes by error type, calls `putFlashError`, then `redirect(w, r, safeURL)` |
-| `app.serverError(w, r, err)` | True full-page failure (template render, broken session, no safe URL exists) | Logs and renders `error.gohtml` 500. Rare. |
+| `app.userError(w, r, err, safeURL)` | Any failure on an in-flight POST | Routes by error type, calls `putFlashError`, then `redirect(w, r, safeURL)` |
+| `app.serverError(w, r, err)` | GET failures, or the POST escape hatch when the safe URL itself is broken | Logs and renders `error.gohtml` 500 |
+
+#### Why `serverError` on POST is silent failure
+
+The stack-navigator JS shim (`ui/static/main.js`) intercepts every form
+POST, replays it via `fetch`, and on any non-200 response calls
+`location.reload()` — CSP / Trusted Types block injecting the response
+body in place. The reload lands on the page the form lived on, and
+`serverError` does not write to the flash, so there is no banner. The
+user sees "button did nothing."
+
+This means `serverError` on a POST is only the right call when the safe
+URL itself is also broken (template render of the form page is what
+failed). In that case the reload's GET also 500s and `error.gohtml`
+renders directly. Every other POST failure belongs in `userError` so
+the flash → banner → safe URL flow produces visible state — even when
+no plausible per-flow safe URL exists, fall back to `/` rather than
+`serverError`.
+
+On GET handlers `serverError` remains the right floor: the browser
+renders the 500 body directly, no shim is involved.
+
+#### `userError` semantics
 
 `userError` is the single helper for *both* `domain.ValidationError` and unexpected
 system errors on inline actions. It dispatches on the error type:
@@ -176,6 +198,10 @@ produce a redirect loop.
 > putFlashError(ve.Message); redirect(formURL) }` pattern — that's fine,
 > functionally equivalent, and they migrate opportunistically when next
 > touched. Don't expect every form handler to call `userError` today.
+>
+> Handlers that fall through to `app.serverError(w, r, err)` on the
+> non-`ValidationError` branch (e.g. `workoutCompletePOST` today) are
+> the migration priority — they are the silent-failure cases above.
 
 #### Other patterns
 
