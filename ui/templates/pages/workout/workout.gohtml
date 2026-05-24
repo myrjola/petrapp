@@ -442,10 +442,11 @@
                   })
                 </script>
                 <script {{ nonce }}>
-                  // Opt out of main.js's global bfcache reload (ui/static/main.js:300+);
-                  // we handle invalidation here with a replace navigation that participates
-                  // in cross-document view transitions. The dataset write happens at parse
-                  // time, before pageshow fires.
+                  // Opt out of main.js's global pagereveal staleness reload
+                  // (the pagereveal listener in ui/static/main.js that reads
+                  // dataset.bfcacheHandler); we handle invalidation here with a replace
+                  // navigation that participates in cross-document view transitions.
+                  // The dataset write happens at parse time, before pagereveal fires.
                   document.body.dataset.bfcacheHandler = 'page-local'
 
                   // Cache-buster query used to keep navigation.navigate(SAME_URL, ...) from

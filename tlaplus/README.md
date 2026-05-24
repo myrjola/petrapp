@@ -208,14 +208,21 @@ This is verified by `StackNav_PrefetchMitigated.cfg`
 
 ### Fix counterexample 1 (cookie expiration): make the freshness signal not depend on cookie presence
 
-The 60-second `MaxAge` on `inv_bfcache` in `middleware.go:313` is the
-root cause. Three options, in increasing invasiveness:
+The finite `MaxAge` on `inv_bfcache` in `middleware.go` was the root
+cause. Three options were considered, in increasing invasiveness:
 
 1. **Bump the MaxAge** to comfortably exceed any plausible bfcache
-   retention window. Chrome retains bfcache up to ~10 minutes; Safari up
-   to ~30 minutes. Setting `MaxAge: 60 * 60` (one hour) closes the
-   practical window. The model treats `CookieMayExpire = FALSE` as
-   equivalent to "cookie outlives any bfcache snapshot."
+   retention window. Chrome retains bfcache up to ~10 minutes; Safari
+   up to ~30 minutes. An hour-long `MaxAge` closes the typical window
+   but a tab left idle past the MaxAge can still observe false-fresh
+   if the browser kept the bfcache snapshot alive (mobile background
+   tabs woken later, "continue where you left off" restores). The
+   tightest form of Option 1 is to drop `MaxAge` entirely — emit a
+   *session cookie*. A session cookie outlives any bfcache snapshot
+   by construction: bfcache lives in the renderer process and is
+   cleared no later than browser restart, while a session cookie is
+   cleared no earlier than session end. The model's
+   `CookieMayExpire = FALSE` assumption then holds in practice.
 
 2. **Bake an absolute timestamp** into the meta tag (a server-issued
    monotonic counter or unix-millis), and have the JS check
@@ -232,8 +239,12 @@ root cause. Three options, in increasing invasiveness:
    bfcache, and bfcache is fundamentally a "saved render, may be
    stale" optimization. Saves all the cookie machinery.
 
-Option 1 is the smallest change and probably enough. Option 3 is the
-cleanest. Option 2 is overkill.
+**Chosen: Option 1 in its session-cookie form.** Smallest patch
+(`middleware.go` drops the `MaxAge` line) and pins
+`CookieMayExpire = FALSE` in practice. Option 2 remains overkill;
+Option 3 (cleanest in the abstract) was rejected because it would
+forfeit bfcache's instant back-navigation benefit on every non-opted-
+out page.
 
 ### Tighten what the model proved is unnecessary
 

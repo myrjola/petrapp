@@ -727,10 +727,11 @@ func Test_playwright_stacknav(t *testing.T) {
 // handler detects the mismatch against the now-rotated cookie, and triggers
 // navigation.reload(). After the reload, meta should equal the cookie.
 //
-// This is regression protection for the listener wiring: if both
-// pageshow.persisted and pagereveal staleness paths regress simultaneously
-// (e.g. someone removes the listener), the assertion below fails. It does
-// not exercise the Speculation Rules prefetch path — that's the TLA+
+// This is regression protection for the listener wiring: if the
+// pagereveal staleness check regresses (e.g. someone removes the listener
+// or reverts it back to pageshow.persisted, which would miss
+// prefetch-promoted loads), the assertion below fails. It does not
+// exercise the Speculation Rules prefetch path — that's the TLA+
 // spec's job (tlaplus/StackNav_Prefetch.cfg /
 // tlaplus/StackNav_PrefetchMitigated.cfg).
 func Test_playwright_bfcache_staleness(t *testing.T) {
