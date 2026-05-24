@@ -353,3 +353,47 @@ func (s *Service) MarkWarmupComplete(
 	}
 	return nil
 }
+
+// StartDeloadNow flips IsDeload to true on every current-week session
+// dated today or later that is not already fully completed, then snaps
+// the mesocycle anchor to next Monday. Used when the user needs
+// recovery off-schedule (e.g. returning from sickness). Undone by
+// RestartMesocycleAnchor, which clears the same set of flips.
+//
+// No mutex: each per-session Update is its own transaction, the closure
+// re-checks Status() != SessionCompleted before mutating, and a
+// double-press is idempotent.
+func (s *Service) StartDeloadNow(ctx context.Context) error {
+	monday := domain.MondayOf(time.Now())
+	today := domain.StartOfDay(time.Now())
+
+	sessions, err := s.repos.Sessions.List(ctx, monday)
+	if err != nil {
+		return fmt.Errorf("list sessions for current week: %w", err)
+	}
+
+	for _, sess := range sessions {
+		if sess.Date.Before(today) {
+			continue
+		}
+		err = s.repos.Sessions.Update(ctx, sess.Date, func(latest *domain.Session) error {
+			if latest.Status() == domain.SessionCompleted {
+				return nil
+			}
+			return latest.SwitchToDeload()
+		})
+		if err != nil {
+			return fmt.Errorf("flip deload for %s: %w", sess.Date.Format(time.DateOnly), err)
+		}
+	}
+
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+	prefs.MesocycleAnchor = nextMonday(time.Now().UTC())
+	if err = s.repos.Preferences.Set(ctx, prefs); err != nil {
+		return fmt.Errorf("save preferences: %w", err)
+	}
+	return nil
+}

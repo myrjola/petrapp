@@ -670,3 +670,150 @@ func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T
 		t.Errorf("after concurrent regenerate: got %d sessions with exercises, want 3 (Mon/Wed/Fri)", withExercises)
 	}
 }
+
+func Test_StartDeloadNow_FlipsTodayAndFutureNonCompletedSessions(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc := setupTestService(t) // Mon/Wed/Fri 60 min
+
+	// Enable deload so the button is permissible; anchor it to this week's
+	// Monday so the planner treats this week as accumulation week 0 (not a
+	// natural deload week).
+	prefs, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences: %v", err)
+	}
+	monday := domain.MondayOf(time.Now())
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 5
+	prefs.MesocycleAnchor = monday
+	if err = svc.SaveUserPreferences(ctx, prefs); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+
+	// Materialise the week's sessions.
+	if _, err = svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Sanity: no session should be a natural-cadence deload yet.
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule (re-list): %v", err)
+	}
+	for i, s := range sessions {
+		if s.IsDeload {
+			t.Fatalf("session[%d] (%s) unexpectedly already deload", i, s.Date.Weekday())
+		}
+	}
+
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow: %v", err)
+	}
+
+	sessions, err = svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after StartDeloadNow: %v", err)
+	}
+
+	today := domain.StartOfDay(time.Now())
+	for i, s := range sessions {
+		if len(s.ExerciseSets) == 0 {
+			continue // rest day
+		}
+		isForwardLooking := !s.Date.Before(today)
+		if isForwardLooking && !s.IsDeload {
+			t.Errorf("session[%d] (%s, %s) should be deload (today or later, not completed)",
+				i, s.Date.Weekday(), s.Date.Format(time.DateOnly))
+		}
+		if !isForwardLooking && s.IsDeload {
+			t.Errorf("session[%d] (%s, %s) should NOT be deload (past)",
+				i, s.Date.Weekday(), s.Date.Format(time.DateOnly))
+		}
+	}
+}
+
+func Test_StartDeloadNow_SnapsAnchorToNextMonday(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc := setupTestService(t)
+
+	prefs, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences: %v", err)
+	}
+	monday := domain.MondayOf(time.Now())
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 5
+	prefs.MesocycleAnchor = monday
+	if err = svc.SaveUserPreferences(ctx, prefs); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+	if _, err = svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow: %v", err)
+	}
+
+	got, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences after StartDeloadNow: %v", err)
+	}
+	if !got.MesocycleAnchor.After(monday) {
+		t.Errorf("MesocycleAnchor = %v; want a Monday strictly after %v",
+			got.MesocycleAnchor, monday)
+	}
+	if got.MesocycleAnchor.Weekday() != time.Monday {
+		t.Errorf("MesocycleAnchor weekday = %v; want Monday", got.MesocycleAnchor.Weekday())
+	}
+	if !got.MesocycleAnchor.Equal(monday.AddDate(0, 0, 7)) {
+		t.Errorf("MesocycleAnchor = %v; want %v (next Monday)",
+			got.MesocycleAnchor, monday.AddDate(0, 0, 7))
+	}
+}
+
+func Test_StartDeloadNow_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc := setupTestService(t)
+
+	prefs, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences: %v", err)
+	}
+	monday := domain.MondayOf(time.Now())
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 5
+	prefs.MesocycleAnchor = monday
+	if err = svc.SaveUserPreferences(ctx, prefs); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+	if _, err = svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow first call: %v", err)
+	}
+	first, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after first: %v", err)
+	}
+
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow second call: %v", err)
+	}
+	second, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after second: %v", err)
+	}
+
+	for i := range first {
+		if first[i].IsDeload != second[i].IsDeload {
+			t.Errorf("session[%d] IsDeload flipped between calls: %v -> %v",
+				i, first[i].IsDeload, second[i].IsDeload)
+		}
+	}
+}
