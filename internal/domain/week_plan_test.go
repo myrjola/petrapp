@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -121,5 +122,30 @@ func TestWeekPlan_ClearDeloadFromToday(t *testing.T) {
 	}
 	if wp.Sessions[2].IsDeload || wp.Sessions[4].IsDeload {
 		t.Error("today and future should be cleared")
+	}
+}
+
+func TestWeekPlan_Dispatchers_NotFound(t *testing.T) {
+	t.Parallel()
+	wp := newWeekPlan()
+	outOfWeek := monday().AddDate(0, 0, 8)
+	if err := wp.Start(outOfWeek, time.Now()); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("Start out-of-week: got %v, want ErrNotFound", err)
+	}
+	if err := wp.Complete(outOfWeek, time.Now()); !errors.Is(err, domain.ErrNotFound) {
+		t.Errorf("Complete out-of-week: got %v, want ErrNotFound", err)
+	}
+}
+
+func TestWeekPlan_Dispatchers_DelegateToSession(t *testing.T) {
+	t.Parallel()
+	wp := newWeekPlan()
+	wp.Sessions[2] = sessionOn(2, false, false, false)
+	now := monday().AddDate(0, 0, 2).Add(10 * time.Hour)
+	if err := wp.Start(wp.Sessions[2].Date, now); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if wp.Sessions[2].StartedAt.IsZero() {
+		t.Error("Start should set StartedAt on the underlying session")
 	}
 }

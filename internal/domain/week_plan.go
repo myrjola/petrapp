@@ -112,3 +112,89 @@ func (wp *WeekPlan) ClearDeloadFromToday(today time.Time) error {
 	}
 	return nil
 }
+
+// Start marks the session for date as begun. Returns ErrNotFound when no
+// session exists for date.
+func (wp *WeekPlan) Start(date time.Time, now time.Time) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.Start(now)
+}
+
+// Complete marks the session for date as finished. Returns ErrNotFound when no
+// session exists for date.
+func (wp *WeekPlan) Complete(date time.Time, now time.Time) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.Complete(now)
+}
+
+// SetDifficulty records the post-session difficulty rating.
+func (wp *WeekPlan) SetDifficulty(date time.Time, rating int) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.SetDifficulty(rating)
+}
+
+// MarkWarmupComplete records the warmup completion timestamp for the slot.
+func (wp *WeekPlan) MarkWarmupComplete(date time.Time, slotID int, now time.Time) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.MarkWarmupComplete(slotID, now)
+}
+
+// RecordSet records the completion of a single set.
+func (wp *WeekPlan) RecordSet(
+	date time.Time, slotID, setIndex int,
+	signal *Signal, weightKg *float64, completedValue int, now time.Time,
+) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.RecordSet(slotID, setIndex, signal, weightKg, completedValue, now)
+}
+
+// UpdateSetWeight overwrites the weight on a single set within a slot.
+func (wp *WeekPlan) UpdateSetWeight(date time.Time, slotID, setIndex int, weightKg float64) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.UpdateSetWeight(slotID, setIndex, weightKg)
+}
+
+// UpdateCompletedValue records the actual reps (or seconds) on a set.
+func (wp *WeekPlan) UpdateCompletedValue(date time.Time, slotID, setIndex, value int, now time.Time) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.UpdateCompletedValue(slotID, setIndex, value, now)
+}
+
+// SwapExerciseInSlot replaces the exercise occupying the slot.
+func (wp *WeekPlan) SwapExerciseInSlot(date time.Time, slotID int, newEx Exercise, sets []Set) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.SwapExerciseInSlot(slotID, newEx, sets)
+}
+
+// AddExercise appends a new exercise slot to the session for date.
+func (wp *WeekPlan) AddExercise(date time.Time, ex Exercise, sets []Set) error {
+	s := wp.SessionOn(date)
+	if s == nil {
+		return ErrNotFound
+	}
+	return s.AddExercise(ex, sets)
+}
