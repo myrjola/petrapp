@@ -116,3 +116,72 @@ func Test_application_timeout(t *testing.T) {
 		})
 	}
 }
+
+func Test_mustAdmin_AuthenticatedNonAdmin_RedirectsToHome(t *testing.T) {
+	t.Parallel()
+
+	app := &application{} //nolint:exhaustruct // this is a test
+	called := false
+	handler := app.mustAdmin(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/admin/exercises", nil)
+	r = contexthelpers.AuthenticateContext(r, 42, false /* not admin */)
+
+	handler.ServeHTTP(w, r)
+
+	if called {
+		t.Error("inner handler should NOT have been called for a non-admin user")
+	}
+	if got := w.Code; got != http.StatusSeeOther {
+		t.Errorf("status = %d, want %d", got, http.StatusSeeOther)
+	}
+	if got := w.Header().Get("Location"); got != "/" {
+		t.Errorf("Location = %q, want /", got)
+	}
+}
+
+func Test_mustAdmin_Unauthenticated_RedirectsToHome(t *testing.T) {
+	t.Parallel()
+
+	app := &application{} //nolint:exhaustruct // this is a test
+	called := false
+	handler := app.mustAdmin(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/admin/exercises", nil)
+	// No authentication context set.
+
+	handler.ServeHTTP(w, r)
+
+	if called {
+		t.Error("inner handler should NOT have been called for an unauthenticated user")
+	}
+	if got := w.Code; got != http.StatusSeeOther {
+		t.Errorf("status = %d, want %d", got, http.StatusSeeOther)
+	}
+}
+
+func Test_mustAdmin_AuthenticatedAdmin_CallsNext(t *testing.T) {
+	t.Parallel()
+
+	app := &application{} //nolint:exhaustruct // this is a test
+	called := false
+	handler := app.mustAdmin(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/admin/exercises", nil)
+	r = contexthelpers.AuthenticateContext(r, 1, true /* admin */)
+
+	handler.ServeHTTP(w, r)
+
+	if !called {
+		t.Error("inner handler MUST be called for an admin user")
+	}
+}

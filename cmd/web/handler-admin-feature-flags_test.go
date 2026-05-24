@@ -30,14 +30,29 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 	}
 
 	t.Run("Feature flags admin is gated to admin users only", func(t *testing.T) {
-		// Non-admin user should be rejected by mustAdminStack with 401.
-		resp, getErr := client.Get(ctx, "/admin/feature-flags")
+		// Non-admin user should be redirected to / by mustAdmin.
+		httpClient := *client.HTTPClient() // shallow copy preserves jar + transport.
+		httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet,
+			server.URL()+"/admin/feature-flags", nil)
+		if reqErr != nil {
+			t.Fatalf("Build feature-flags request: %v", reqErr)
+		}
+		resp, getErr := httpClient.Do(req)
 		if getErr != nil {
 			t.Fatalf("Failed to get response: %v", getErr)
 		}
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Fatalf("Close response body: %v", cerr)
+		}
 
-		if resp.StatusCode != http.StatusUnauthorized {
-			t.Errorf("Expected 401 for non-admin user, got %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusSeeOther {
+			t.Errorf("Expected 303 redirect for non-admin user, got %d", resp.StatusCode)
+		}
+		if loc := resp.Header.Get("Location"); loc != "/" {
+			t.Errorf("Expected Location: / for non-admin user, got %q", loc)
 		}
 	})
 

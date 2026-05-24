@@ -31,13 +31,28 @@ func Test_application_adminExercises(t *testing.T) {
 			t.Fatalf("Failed to register: %v", err)
 		}
 
-		// Assert that the user is not an admin expect 401
+		// Assert that the user is not an admin: mustAdmin redirects to /.
+		httpClient := *client.HTTPClient() // shallow copy preserves jar + transport.
+		httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		var req *http.Request
+		if req, err = http.NewRequestWithContext(ctx, http.MethodGet,
+			server.URL()+"/admin/exercises", nil); err != nil {
+			t.Fatalf("Build admin exercises request: %v", err)
+		}
 		var resp *http.Response
-		if resp, err = client.Get(ctx, "/admin/exercises"); err != nil {
+		if resp, err = httpClient.Do(req); err != nil {
 			t.Fatalf("Failed to get admin exercises page: %v", err)
 		}
-		if got, want := resp.StatusCode, http.StatusUnauthorized; got != want {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Fatalf("Close response body: %v", cerr)
+		}
+		if got, want := resp.StatusCode, http.StatusSeeOther; got != want {
 			t.Fatalf("Got status code %d, want %d", got, want)
+		}
+		if got, want := resp.Header.Get("Location"), "/"; got != want {
+			t.Fatalf("Got Location %q, want %q", got, want)
 		}
 
 		// Promote user to admin
