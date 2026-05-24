@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -28,20 +29,13 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 		switch {
 		case errors.Is(err, sql.ErrNoRows): // Do not authenticate if user does not exist.
 		case err != nil:
-			h.logger.LogAttrs(r.Context(), slog.LevelError, "unable to fetch user", slog.Any("error", err))
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			h.internalError(w, r, fmt.Errorf("fetch user role: %w", err))
 			return
 		default:
 			// Get the integer user ID for context
 			intUserID, err = h.getUserIntegerID(ctx, webauthnUserID)
 			if err != nil {
-				h.logger.LogAttrs(
-					r.Context(),
-					slog.LevelError,
-					"unable to fetch user integer ID",
-					slog.Any("error", err),
-				)
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				h.internalError(w, r, fmt.Errorf("fetch user integer ID: %w", err))
 				return
 			}
 			r = contexthelpers.AuthenticateContext(r, intUserID, role == roleAdmin)
