@@ -905,3 +905,43 @@ func TestMondayOf_UsesLocalCalendarAnchoredToUTC(t *testing.T) {
 		})
 	}
 }
+
+func Test_StartOfDay_TruncatesToUTCMidnight(t *testing.T) {
+	t.Parallel()
+
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatalf("LoadLocation: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		in   time.Time
+		want time.Time
+	}{
+		{
+			name: "UTC noon collapses to UTC midnight",
+			in:   time.Date(2026, 5, 24, 12, 30, 0, 0, time.UTC),
+			want: time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "UTC midnight is fixed point",
+			in:   time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC),
+			want: time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "Local late-evening uses local calendar date",
+			in:   time.Date(2026, 5, 24, 23, 30, 0, 0, loc),
+			want: time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := StartOfDay(tc.in)
+			if !got.Equal(tc.want) {
+				t.Errorf("StartOfDay(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}

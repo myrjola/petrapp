@@ -502,3 +502,12 @@ func MondayOf(date time.Time) time.Time {
 	}
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, offset)
 }
+
+// StartOfDay returns the UTC midnight of date's calendar day. Mirrors
+// MondayOf's UTC-anchored-but-calendar-date-from-local behaviour so the
+// result compares cleanly against session dates loaded from the database
+// (which time.Parse always returns in UTC).
+func StartOfDay(date time.Time) time.Time {
+	y, m, d := date.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
