@@ -903,3 +903,131 @@ func Test_StartDeloadNow_SkipsCompletedToday(t *testing.T) {
 		t.Errorf("no future scheduled session flipped to deload; loop must continue past completed today")
 	}
 }
+
+// Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight is a single
+// cross-layer behavioural assertion: after StartDeloadNow flips today's
+// session's IsDeload flag, BuildProgression's recommendation for an exercise
+// in that session must equal GetDeloadStartingWeight (90% of the most-recent
+// hypertrophy working weight, snapped to the weight grid) and be strictly
+// less than the pre-flip recommendation.
+//
+// Determinism: setupTestService uses Mon/Wed/Fri. The test needs today to be
+// a scheduled workout day with at least one weighted exercise; otherwise the
+// pre-condition for BuildProgression isn't met and we t.Skip.
+func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc, db := setupTestServiceWithDB(t) // Mon/Wed/Fri 60 min
+
+	// Enable deload and anchor to this week's Monday so the planner treats
+	// the current week as accumulation week 0 (not a natural-cadence deload).
+	prefs, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences: %v", err)
+	}
+	monday := domain.MondayOf(time.Now())
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 5
+	prefs.MesocycleAnchor = monday
+	if err = svc.SaveUserPreferences(ctx, prefs); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Pick today's session if it's a workout day with a weighted exercise.
+	today := domain.StartOfDay(time.Now())
+	var todaySess *domain.Session
+	for i, s := range sessions {
+		if s.Date.Equal(today) && len(s.ExerciseSets) > 0 {
+			todaySess = &sessions[i]
+			break
+		}
+	}
+	if todaySess == nil {
+		t.Skip("today is a rest day in Mon/Wed/Fri schedule; no session to evaluate")
+	}
+	if todaySess.IsDeload {
+		t.Fatalf("today's session unexpectedly already deload (week-0 setup should produce accumulation)")
+	}
+
+	// Find a weighted exercise — non-weighted exercises (bodyweight, time-based)
+	// don't carry a per-set weight, so BuildProgression's WeightKg comparison
+	// would be meaningless for them.
+	exerciseID := 0
+	for _, es := range todaySess.ExerciseSets {
+		if es.Exercise.HasWeight() {
+			exerciseID = es.Exercise.ID
+			break
+		}
+	}
+	if exerciseID == 0 {
+		t.Skip("today's session has no weighted exercise; cannot assert weight progression")
+	}
+
+	// Seed two weeks ago: one completed hypertrophy session with 80 kg on_target.
+	// GetDeloadStartingWeight will return 80 × 0.9 = 72.0 (already on the 0.5 grid).
+	priorMonday := monday.AddDate(0, 0, -14)
+	priorStr := priorMonday.Format("2006-01-02")
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, ?, 'hypertrophy')`,
+		userID, priorStr, priorMonday.Format("2006-01-02T15:04:05.000Z"))
+	if err != nil {
+		t.Fatalf("insert prior hypertrophy session: %v", err)
+	}
+	var weID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
+		userID, priorStr, exerciseID).Scan(&weID)
+	if err != nil {
+		t.Fatalf("insert prior workout_exercise: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		 weight_kg, target_value, completed_value, completed_at, signal)
+		 VALUES (?, 1, 80.0, 8, 8, ?, 'on_target')`,
+		weID, priorMonday.Format("2006-01-02T15:04:05.000Z"))
+	if err != nil {
+		t.Fatalf("insert prior exercise_sets: %v", err)
+	}
+
+	// Capture the pre-flip recommendation (non-deload path).
+	progBefore, err := svc.BuildProgression(ctx, today, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression before flip: %v", err)
+	}
+	weightBefore := progBefore.CurrentSet().WeightKg
+
+	// Flip the session into deload.
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow: %v", err)
+	}
+
+	// Capture the post-flip recommendation (deload path).
+	progAfter, err := svc.BuildProgression(ctx, today, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression after flip: %v", err)
+	}
+	weightAfter := progAfter.CurrentSet().WeightKg
+
+	// Expected: GetDeloadStartingWeight for the same exercise/date.
+	expected, err := svc.GetDeloadStartingWeight(ctx, exerciseID, today)
+	if err != nil {
+		t.Fatalf("GetDeloadStartingWeight: %v", err)
+	}
+
+	if weightAfter != expected {
+		t.Errorf("post-flip CurrentSet WeightKg = %v; want %v (GetDeloadStartingWeight)",
+			weightAfter, expected)
+	}
+	if !(weightAfter < weightBefore) {
+		t.Errorf("expected deload weight to be strictly less than non-deload: %v (deload) vs %v (pre)",
+			weightAfter, weightBefore)
+	}
+}

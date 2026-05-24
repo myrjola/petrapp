@@ -16,6 +16,16 @@ import (
 
 func setupTestService(t *testing.T) (context.Context, *service.Service) {
 	t.Helper()
+	ctx, svc, _ := setupTestServiceWithDB(t)
+	return ctx, svc
+}
+
+// setupTestServiceWithDB is like setupTestService but additionally returns the
+// *sqlite.Database handle so tests that need to seed prior workout history
+// (e.g. completed hypertrophy sessions to satisfy GetDeloadStartingWeight) can
+// run direct SQL against the same in-memory database the service uses.
+func setupTestServiceWithDB(t *testing.T) (context.Context, *service.Service, *sqlite.Database) {
+	t.Helper()
 	ctx := t.Context()
 	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
@@ -43,7 +53,7 @@ func setupTestService(t *testing.T) (context.Context, *service.Service) {
 	}); err != nil {
 		t.Fatalf("save preferences: %v", err)
 	}
-	return ctx, svc
+	return ctx, svc, db
 }
 
 func extractExerciseIDs(session domain.Session) []int {
