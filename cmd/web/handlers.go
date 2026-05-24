@@ -96,13 +96,38 @@ func (app *application) parsePageTemplate(pageName string) (*template.Template, 
 	return t, nil
 }
 
+// renderBufPool reuses template-output buffers across requests.
+//
+//nolint:gochecknoglobals // sync.Pool must be package-scoped to share across handler invocations.
+var renderBufPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
+
+// maxPooledBufBytes caps the capacity of buffers we return to the
+// pool, so a pathologically large render does not pin memory forever.
+const maxPooledBufBytes = 1 << 20
+
+// putRenderBuf returns buf to renderBufPool, dropping it if its
+// capacity is above maxPooledBufBytes.
+func putRenderBuf(buf *bytes.Buffer) {
+	if buf.Cap() > maxPooledBufBytes {
+		return
+	}
+	buf.Reset()
+	renderBufPool.Put(buf)
+}
+
+// renderToBuf executes pageName's template into a buffer drawn from
+// renderBufPool. Callers MUST hand the buffer back to putRenderBuf
+// after they are done with it.
 func (app *application) renderToBuf(_ context.Context, file string, data any) (*bytes.Buffer, error) {
 	t, err := app.pageTemplate(file)
 	if err != nil {
 		return nil, fmt.Errorf("retrieve page template %s: %w", file, err)
 	}
-	buf := new(bytes.Buffer)
+	buf, _ := renderBufPool.Get().(*bytes.Buffer)
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {
+		putRenderBuf(buf)
 		return nil, fmt.Errorf("execute template %s: %w", file, err)
 	}
 	return buf, nil
@@ -126,6 +151,7 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 	w.WriteHeader(status)
 
 	_, _ = buf.WriteTo(w)
+	putRenderBuf(buf)
 }
 
 type privacyTemplateData struct {

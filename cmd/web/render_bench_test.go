@@ -42,6 +42,6 @@ func BenchmarkRenderHome(b *testing.B) {
 		if rerr != nil {
 			b.Fatalf("render: %v", rerr)
 		}
-		buf.Reset()
+		putRenderBuf(buf)
 	}
 }
