@@ -37,6 +37,13 @@ type WebAuthnHandler struct {
 	webAuthn       *webauthn.WebAuthn
 	sessionManager *scs.SessionManager
 	database       *sqlite.Database
+
+	// InternalErrorHandler, when set, owns the response on any internal
+	// failure inside this package (DB lookup errors, etc.). Wired by the
+	// caller after construction so this package stays unaware of the
+	// stack-navigator wire protocol. When nil, the fallback is a plain
+	// 500 via http.Error.
+	InternalErrorHandler func(w http.ResponseWriter, r *http.Request, err error)
 }
 
 func New(
@@ -113,7 +120,7 @@ func New(
 		return nil, fmt.Errorf("new webauthn: %w", err)
 	}
 
-	return &WebAuthnHandler{
+	return &WebAuthnHandler{ //nolint:exhaustruct // InternalErrorHandler is wired by the caller after construction.
 		logger:         logger,
 		webAuthn:       webAuthn,
 		sessionManager: sessionManager,
@@ -293,4 +300,17 @@ func (h *WebAuthnHandler) findUserHandler(ctx context.Context) webauthn.Discover
 	return func(_, userID []byte) (webauthn.User, error) {
 		return h.getUser(ctx, userID)
 	}
+}
+
+// internalError surfaces a non-recoverable server-side failure. If the
+// caller wired InternalErrorHandler (typically app.serverError), it owns
+// the response — including stack-navigator-aware navigation to /error.
+// Otherwise we fall back to a plain 500.
+func (h *WebAuthnHandler) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	if h.InternalErrorHandler != nil {
+		h.InternalErrorHandler(w, r, err)
+		return
+	}
+	h.logger.LogAttrs(r.Context(), slog.LevelError, "internal error", slog.Any("error", err))
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
