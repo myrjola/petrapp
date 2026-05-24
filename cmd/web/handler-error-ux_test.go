@@ -121,7 +121,7 @@ func Test_application_devErrorUX_triggerValidation_surfacesMessage(t *testing.T)
 	}
 }
 
-func Test_application_devErrorUX_triggerSystem_surfacesGenericMessage(t *testing.T) {
+func Test_application_devErrorUX_triggerSystem_navigatesToErrorPage(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -132,22 +132,41 @@ func Test_application_devErrorUX_triggerSystem_surfacesGenericMessage(t *testing
 	}
 	client := server.Client()
 
-	doc, err := client.GetDoc(ctx, "/dev/error-ux")
-	if err != nil {
+	// GET first so we have a session + a Referer that resolves to /dev/error-ux.
+	if _, err = client.GetDoc(ctx, "/dev/error-ux"); err != nil {
 		t.Fatalf("Failed to get /dev/error-ux: %v", err)
 	}
 
-	doc, err = client.SubmitForm(ctx, doc, "/dev/error-ux/trigger/system", nil)
+	// POST the system trigger directly with the stacknav header so we exercise
+	// the shim wire contract. SubmitForm follows redirects; here we want to
+	// observe the X-Location header on the response, not the followed page.
+	target := server.URL() + "/dev/error-ux/trigger/system"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(""))
 	if err != nil {
-		t.Fatalf("Failed to submit system trigger: %v", err)
+		t.Fatalf("Build POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Requested-With", "stacknav")
+	req.Header.Set("Referer", server.URL()+"/dev/error-ux")
+
+	httpClient := *client.HTTPClient()
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST system trigger: %v", err)
+	}
+	if cerr := resp.Body.Close(); cerr != nil {
+		t.Fatalf("Close response body: %v", cerr)
 	}
 
-	banner := doc.Find(".banner.banner--error[role='alert']")
-	if banner.Length() == 0 {
-		t.Fatal("expected an error banner with role=alert after system trigger")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
-	if !strings.Contains(banner.Text(), "Couldn't complete that action") {
-		t.Errorf("system banner missing generic message; got %q", banner.Text())
+	want := "/error?from=%2Fdev%2Ferror-ux"
+	if got := resp.Header.Get("X-Location"); got != want {
+		t.Errorf("X-Location = %q, want %q", got, want)
 	}
 }
 

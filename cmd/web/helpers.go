@@ -45,32 +45,29 @@ func (app *application) serverError(w http.ResponseWriter, r *http.Request, err 
 	})
 }
 
-// userError surfaces a failure of an in-flight user action through the
-// flash + banner flow and redirects the client to safeURL. Use it instead
-// of serverError when there is a meaningful page to land the user on.
+// userError surfaces a failure of an in-flight user action.
 //
 // Routing:
-//   - domain.ValidationError → flash with ve.Message (safe to display).
-//   - any other error → log at ERROR and flash a generic message.
+//   - domain.ValidationError → flash with ve.Message and redirect to safeURL.
+//     The safe URL's GET handler pops the flash and renders the banner.
+//   - any other error → delegate to serverError. On the shim path that
+//     navigates the user to /error (catastrophic-failure UX); on the
+//     non-shim path it renders error.gohtml with a 500.
 //
-// safeURL must point at a GET handler known to render successfully AND
-// that pops + renders the flash. Do NOT pass an action endpoint
-// (e.g. ".../complete"), and do not default to r.Referer() — it is
-// unreliable on direct POSTs.
+// safeURL is only used on the validation branch. It must point at a GET
+// handler known to render successfully AND that pops + renders the flash.
+// See cmd/web/CLAUDE.md "userError semantics" for the rationale and the
+// list of currently-supported safe URLs.
 func (app *application) userError(
 	w http.ResponseWriter, r *http.Request, err error, safeURL string,
 ) {
 	var ve domain.ValidationError
-	var msg string
 	if errors.As(err, &ve) {
-		msg = ve.Message
-	} else {
-		app.logger.LogAttrs(r.Context(), slog.LevelError,
-			"user-facing server error", slog.Any("error", err))
-		msg = "Couldn't complete that action. Please try again."
+		app.putFlashError(r.Context(), ve.Message)
+		redirect(w, r, safeURL)
+		return
 	}
-	app.putFlashError(r.Context(), msg)
-	redirect(w, r, safeURL)
+	app.serverError(w, r, err)
 }
 
 func (app *application) notFound(w http.ResponseWriter, r *http.Request) {

@@ -8,7 +8,21 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/alexedwards/scs/v2"
+	"github.com/alexedwards/scs/v2/memstore"
+	"github.com/myrjola/petrapp/internal/domain"
 )
+
+// newTestSessionManager builds an in-memory scs session manager for tests
+// that need to round-trip flash messages. The session is not persisted;
+// each test gets a fresh empty store.
+func newTestSessionManager(t *testing.T) *scs.SessionManager {
+	t.Helper()
+	sm := scs.New()
+	sm.Store = memstore.New()
+	return sm
+}
 
 // newTestApplicationForTemplateRender returns a minimal *application ready to
 // render templates against the on-disk ui/templates tree. Used by tests that
@@ -192,6 +206,73 @@ func Test_serverError_NonStackNavRequest_Renders500Body(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "Something went wrong") {
 		t.Errorf("expected the error page body, got %q", w.Body.String())
+	}
+}
+
+func Test_userError_ValidationError_FlashesAndRedirects(t *testing.T) {
+	t.Parallel()
+
+	app := &application{ //nolint:exhaustruct // only fields touched by userError matter here.
+		logger:         slog.New(slog.DiscardHandler),
+		sessionManager: newTestSessionManager(t),
+	}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/whatever", nil)
+	ctx, err := app.sessionManager.Load(r.Context(), "")
+	if err != nil {
+		t.Fatalf("session load: %v", err)
+	}
+	r = r.WithContext(ctx)
+
+	ve := domain.ValidationError{Message: "Name must be 1–50 characters."}
+	app.userError(w, r, ve, "/safe")
+
+	if got := w.Code; got != http.StatusSeeOther {
+		t.Errorf("status = %d, want %d", got, http.StatusSeeOther)
+	}
+	if got := w.Header().Get("Location"); got != "/safe" {
+		t.Errorf("Location = %q, want /safe", got)
+	}
+	// The flash must be populated for the safe URL's GET to surface the banner.
+	if got := app.popFlashError(r.Context()); got != "Name must be 1–50 characters." {
+		t.Errorf("flash = %q, want validation message", got)
+	}
+}
+
+func Test_userError_NonValidation_StackNav_DelegatesToServerError(t *testing.T) {
+	t.Parallel()
+
+	app := &application{ //nolint:exhaustruct // only fields touched by userError matter here.
+		logger:         slog.New(slog.DiscardHandler),
+		sessionManager: newTestSessionManager(t),
+	}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/workouts/2026-05-24/add-exercise", nil)
+	r.Header.Set("X-Requested-With", "stacknav")
+	r.Header.Set("Referer", "https://example.test/workouts/2026-05-24")
+	r.Host = "example.test"
+	ctx, err := app.sessionManager.Load(r.Context(), "")
+	if err != nil {
+		t.Fatalf("session load: %v", err)
+	}
+	r = r.WithContext(ctx)
+
+	app.userError(w, r, errors.New("db hiccup"), "/workouts/2026-05-24")
+
+	// Shim path: serverError handles it.
+	if got := w.Code; got != http.StatusOK {
+		t.Errorf("status = %d, want %d (delegation to serverError shim path)", got, http.StatusOK)
+	}
+	want := "/error?from=%2Fworkouts%2F2026-05-24"
+	if got := w.Header().Get("X-Location"); got != want {
+		t.Errorf("X-Location = %q, want %q", got, want)
+	}
+	// Flash must NOT be populated — the banner-on-safe-URL UX is intentionally
+	// abandoned for non-validation errors.
+	if got := app.popFlashError(r.Context()); got != "" {
+		t.Errorf("flash = %q, want empty (non-validation must not flash)", got)
 	}
 }
 
