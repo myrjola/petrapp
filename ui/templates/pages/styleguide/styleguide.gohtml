@@ -454,7 +454,7 @@
 
             <h3>Back link</h3>
             <div class="component-sample">
-                {{ template "back-link" "/dev/styleguide" }}
+                {{ template "back-link" (backLink "/dev/styleguide" $.Nonce) }}
             </div>
         </section>
     </main>

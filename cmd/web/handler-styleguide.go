@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 )
 
@@ -105,50 +106,80 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 	colorTokens = append(colorTokens, yellows...)
 	colorTokens = append(colorTokens, semantics...)
 
+	base := newBaseTemplateData(r)
 	data := styleguideTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Grays:            grays,
-		Stones:           stones,
-		Clays:            clays,
-		Skies:            skies,
-		Limes:            limes,
-		Reds:             reds,
-		Yellows:          yellows,
-		SemanticColors:   semantics,
-		ColorTokens:      colorTokens,
-		Sizes:            rangeNames("size", 1, scaleSizeMax),
-		FontSizes:        append([]string{"font-size-00"}, rangeNames("font-size", 0, scaleFontSizeMax)...),
-		FluidFontSizes:   rangeNames("font-size-fluid", 0, scaleFluidFontMax),
-		FontWeights:      rangeNames("font-weight", 1, scaleFontWeightMax),
-		Radii:            append(rangeNames("radius", 1, scaleRadiusMax), "radius-round"),
-		BannerExamples: []BannerData{
-			{Variant: BannerVariantError, Message: "Something went wrong. Please try again.", Nonce: ""},
-			{Variant: BannerVariantSuccess, Message: "Your changes have been saved.", Nonce: ""},
-			{Variant: BannerVariantInfo, Message: "Heads up — this is informational.", Nonce: ""},
-		},
-		PageHeaderExample: PageHeaderData{
-			Title:    "Page title",
-			Subtitle: "An optional subtitle that explains the page.",
-			Nonce:    "",
-		},
-		FieldExamples: []FieldData{
-			{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
-				Label:    "Exercise name",
-				Name:     "styleguide-name",
-				Type:     inputTypeText,
-				Required: true,
-				Hint:     "Shown to you when picking exercises.",
-			},
-			{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
-				Label: "Target reps",
-				Name:  "styleguide-reps",
-				Type:  inputTypeNumber,
-				Value: "8",
-				Min:   "1",
-				Max:   "30",
-				Step:  "1",
-			},
-		},
+		BaseTemplateData:  base,
+		Grays:             grays,
+		Stones:            stones,
+		Clays:             clays,
+		Skies:             skies,
+		Limes:             limes,
+		Reds:              reds,
+		Yellows:           yellows,
+		SemanticColors:    semantics,
+		ColorTokens:       colorTokens,
+		Sizes:             rangeNames("size", 1, scaleSizeMax),
+		FontSizes:         append([]string{"font-size-00"}, rangeNames("font-size", 0, scaleFontSizeMax)...),
+		FluidFontSizes:    rangeNames("font-size-fluid", 0, scaleFluidFontMax),
+		FontWeights:       rangeNames("font-weight", 1, scaleFontWeightMax),
+		Radii:             append(rangeNames("radius", 1, scaleRadiusMax), "radius-round"),
+		BannerExamples:    styleguideBannerExamples(base.Nonce),
+		PageHeaderExample: styleguidePageHeaderExample(base.Nonce),
+		FieldExamples:     styleguideFieldExamples(base.Nonce),
 	}
 	app.render(w, r, http.StatusOK, "styleguide", data)
+}
+
+// styleguideBannerExamples returns the three banner variants demoed on the styleguide page.
+func styleguideBannerExamples(nonce template.HTMLAttr) []BannerData {
+	return []BannerData{
+		{
+			Variant: BannerVariantError,
+			Message: "Something went wrong. Please try again.",
+			Nonce:   nonce,
+		},
+		{
+			Variant: BannerVariantSuccess,
+			Message: "Your changes have been saved.",
+			Nonce:   nonce,
+		},
+		{
+			Variant: BannerVariantInfo,
+			Message: "Heads up — this is informational.",
+			Nonce:   nonce,
+		},
+	}
+}
+
+// styleguidePageHeaderExample returns the page-header example demoed on the styleguide page.
+func styleguidePageHeaderExample(nonce template.HTMLAttr) PageHeaderData {
+	return PageHeaderData{
+		Title:    "Page title",
+		Subtitle: "An optional subtitle that explains the page.",
+		Nonce:    nonce,
+	}
+}
+
+// styleguideFieldExamples returns the field examples demoed on the styleguide page.
+func styleguideFieldExamples(nonce template.HTMLAttr) []FieldData {
+	return []FieldData{
+		{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
+			Label:    "Exercise name",
+			Name:     "styleguide-name",
+			Type:     inputTypeText,
+			Required: true,
+			Hint:     "Shown to you when picking exercises.",
+			Nonce:    nonce,
+		},
+		{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
+			Label: "Target reps",
+			Name:  "styleguide-reps",
+			Type:  inputTypeNumber,
+			Value: "8",
+			Min:   "1",
+			Max:   "30",
+			Step:  "1",
+			Nonce: nonce,
+		},
+	}
 }

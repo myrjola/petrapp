@@ -109,12 +109,13 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	base := newBaseTemplateData(r)
 	data := preferencesTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Header: PageHeaderData{
 			Title:    "Weekly Schedule",
 			Subtitle: "Select the days you're planning to go to the gym",
-			Nonce:    "",
+			Nonce:    base.Nonce,
 		},
 		Weekdays:                 preferencesToWeekdays(prefs),
 		DurationOptions:          getWorkoutDurationOptions(),
@@ -125,7 +126,11 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		MesocycleLength:          prefs.MesocycleLength,
 		MesocycleLengthOptions:   []int{4, 5, 6, 7},
 		MesocycleAnchor:          prefs.MesocycleAnchor,
-		Flash:                    BannerData{Variant: BannerVariantError, Message: app.popFlashError(ctx), Nonce: ""},
+		Flash: BannerData{
+			Variant: BannerVariantError,
+			Message: app.popFlashError(ctx),
+			Nonce:   base.Nonce,
+		},
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)

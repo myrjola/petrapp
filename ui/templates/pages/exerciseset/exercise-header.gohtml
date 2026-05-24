@@ -102,7 +102,7 @@
             data-workout-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
 
         <div class="brief-nav">
-            {{ template "back-link" (printf "/workouts/%s" (.Date.Format "2006-01-02")) }}
+            {{ template "back-link" (backLink (printf "/workouts/%s" (.Date.Format "2006-01-02")) $.Nonce) }}
             <div class="brief-actions">
                 <a class="brief-action"
                    href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/info"

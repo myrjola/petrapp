@@ -24,12 +24,13 @@ func (app *application) adminFeatureFlagsGET(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	base := newBaseTemplateData(r)
 	data := featureFlagsAdminTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Header: PageHeaderData{
 			Title:    "Feature Flags Administration",
 			Subtitle: "",
-			Nonce:    "",
+			Nonce:    base.Nonce,
 		},
 		FeatureFlags: flags,
 	}

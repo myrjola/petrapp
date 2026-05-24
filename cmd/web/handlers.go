@@ -33,6 +33,12 @@ func (app *application) baseTemplateFuncs() template.FuncMap {
 		"mdToHTML":    func(_ string) template.HTML { return "" },
 		"formatFloat": formatFloat,
 		"sub":         func(a, b int) int { return a - b },
+		"backLink": func(href string, nonce template.HTMLAttr) BackLinkData {
+			return BackLinkData{Href: href, Nonce: nonce}
+		},
+		"exerciseSearch": func(query string, nonce template.HTMLAttr) ExerciseSearchData {
+			return ExerciseSearchData{Query: query, Nonce: nonce}
+		},
 	}
 }
 
@@ -167,12 +173,13 @@ type privacyTemplateData struct {
 }
 
 func (app *application) privacy(w http.ResponseWriter, r *http.Request) {
+	base := newBaseTemplateData(r)
 	data := privacyTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Header: PageHeaderData{
 			Title:    "Privacy & Security",
 			Subtitle: "",
-			Nonce:    "",
+			Nonce:    base.Nonce,
 		},
 	}
 

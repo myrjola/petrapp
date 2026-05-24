@@ -82,13 +82,18 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 		})
 	}
 
+	base := newBaseTemplateData(r)
 	data := exerciseAdminTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Header:           PageHeaderData{Title: "Exercise Administration", Subtitle: "", Nonce: ""},
+		BaseTemplateData: base,
+		Header: PageHeaderData{
+			Title:    "Exercise Administration",
+			Subtitle: "",
+			Nonce:    base.Nonce,
+		},
 		Flash: BannerData{
 			Variant: BannerVariantError,
 			Message: app.popFlashError(r.Context()),
-			Nonce:   "",
+			Nonce:   base.Nonce,
 		},
 		Exercises: rows,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
@@ -97,6 +102,7 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 			Type:     inputTypeText,
 			Required: true,
 			Hint:     "e.g., Bench Press, Deadlift, Squat",
+			Nonce:    base.Nonce,
 		},
 	}
 
@@ -137,17 +143,18 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		repMaxValue = strconv.Itoa(*exercise.RepMax)
 	}
 
+	base := newBaseTemplateData(r)
 	data := exerciseEditTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Header: PageHeaderData{
 			Title:    fmt.Sprintf("Edit Exercise: %s", exercise.Name),
 			Subtitle: "",
-			Nonce:    "",
+			Nonce:    base.Nonce,
 		},
 		Flash: BannerData{
 			Variant: BannerVariantError,
 			Message: app.popFlashError(r.Context()),
-			Nonce:   "",
+			Nonce:   base.Nonce,
 		},
 		Exercise: exercise,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
@@ -156,6 +163,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 			Type:     inputTypeText,
 			Value:    exercise.Name,
 			Required: true,
+			Nonce:    base.Nonce,
 		},
 		SecondsField: FieldData{ //nolint:exhaustruct // labelled number input; Max/Step/Pattern unused here.
 			Label:    "Default Starting Seconds",
@@ -165,6 +173,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 			Required: exercise.IsTimed(),
 			Hint:     "Number of seconds to hold on the first set for new users.",
 			Min:      "1",
+			Nonce:    base.Nonce,
 		},
 		RepMinField: FieldData{ //nolint:exhaustruct // labelled number input; Hint/Step/Pattern unused here.
 			Label:    "Min Reps",
@@ -174,6 +183,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 			Required: !exercise.IsTimed(),
 			Min:      "1",
 			Max:      "50",
+			Nonce:    base.Nonce,
 		},
 		RepMaxField: FieldData{ //nolint:exhaustruct // labelled number input; Hint/Step/Pattern unused here.
 			Label:    "Max Reps",
@@ -183,6 +193,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 			Required: !exercise.IsTimed(),
 			Min:      "1",
 			Max:      "50",
+			Nonce:    base.Nonce,
 		},
 		CategoryOptions:        buildCategoryOptions(exercise.Category),
 		TypeOptions:            buildTypeOptions(exercise.ExerciseType),

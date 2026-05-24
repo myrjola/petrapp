@@ -71,13 +71,14 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	// Check if the user is admin.
 	isAdmin := contexthelpers.IsAdmin(r.Context())
 
+	base := newBaseTemplateData(r)
 	data := exerciseInfoTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Date:             date,
 		Header: PageHeaderData{
 			Title:    exercise.Name,
 			Subtitle: "",
-			Nonce:    "",
+			Nonce:    base.Nonce,
 		},
 		WorkoutExerciseID: workoutExerciseID,
 		Exercise:          exercise,

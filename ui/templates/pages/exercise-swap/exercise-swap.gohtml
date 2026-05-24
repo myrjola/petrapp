@@ -11,7 +11,7 @@
             }
         </style>
 
-        {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
+        {{ template "back-link" (backLink (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) $.Nonce) }}
         {{ template "page-header" .Header }}
 
         <section class="current-exercise">
@@ -53,7 +53,7 @@
             </div>
         </section>
 
-        {{ template "exercise-search" .Query }}
+        {{ template "exercise-search" (exerciseSearch .Query $.Nonce) }}
 
         <section class="alternative-exercises">
             <style {{ $.Nonce }}>

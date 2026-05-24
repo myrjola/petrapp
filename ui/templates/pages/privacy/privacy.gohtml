@@ -43,7 +43,7 @@
             }
         </style>
 
-        {{ template "back-link" "/" }}
+        {{ template "back-link" (backLink "/" $.Nonce) }}
 
         {{ template "page-header" .Header }}
 
