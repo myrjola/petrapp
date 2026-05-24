@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="center">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     padding: var(--size-8) var(--size-5);
@@ -43,7 +43,7 @@
             }
         </style>
 
-        {{ template "back-link" "/" }}
+        {{ template "back-link" (backLink "/" $.Nonce) }}
 
         {{ template "page-header" .Header }}
 

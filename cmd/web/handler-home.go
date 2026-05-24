@@ -425,9 +425,10 @@ func muscleStatus(planned float64, target int) string {
 }
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
+	base := newBaseTemplateData(r)
 	data := homeTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
-		Header:           PageHeaderData{Title: "This Week", Subtitle: ""},
+		BaseTemplateData: base,
+		Header:           PageHeaderData{Title: "This Week", Subtitle: "", Nonce: base.Nonce},
 		Days:             nil,
 		MuscleBalance:    muscleBalanceView{Regions: nil},
 		WeekInBlock:      0,

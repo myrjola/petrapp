@@ -40,12 +40,14 @@ Guidelines for working with HTTP handlers, routing, middleware, and web server c
 - Transform all data in handlers before passing to templates - avoid complex template logic
 - Use `newBaseTemplateData(r)` to populate the embed from request context
 
-`BaseTemplateData` (defined in `templates.go`) exposes two fields that every page template can read:
+`BaseTemplateData` (defined in `templates.go`) exposes four fields that every page template can read:
 
 - `Authenticated bool` — set from `contexthelpers.IsAuthenticated(r.Context())`
 - `IsAdmin bool` — set from `contexthelpers.IsAdmin(r.Context())`
+- `InvalidationToken string` — set from the `inv_bfcache` cookie
+- `Nonce template.HTMLAttr` — the CSP nonce, pre-formatted as `nonce="<value>"`. Reference as `{{ $.Nonce }}` in page templates and `{{ .Nonce }}` in components (whose dot structs each carry their own `Nonce` field).
 
-The CSP nonce and CSRF plumbing do **not** travel on this struct — the nonce is injected as a template function (`{{ nonce }}`) via `contextTemplateFuncs` in `handlers.go`, and CSRF is handled in middleware. Anything that renders outside `app.render(...)` needs to wire those in explicitly.
+CSRF protection is handled in middleware and does not appear on this struct.
 
 Example:
 

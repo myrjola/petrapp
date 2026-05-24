@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="stack">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     margin: var(--size-4);
@@ -11,11 +11,11 @@
             }
         </style>
 
-        {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
+        {{ template "back-link" (backLink (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) $.Nonce) }}
         {{ template "page-header" .Header }}
 
         <section class="current-exercise">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.current-exercise) {
                     :scope {
                         background: var(--stone-1);
@@ -53,10 +53,10 @@
             </div>
         </section>
 
-        {{ template "exercise-search" .Query }}
+        {{ template "exercise-search" (exerciseSearch .Query $.Nonce) }}
 
         <section class="alternative-exercises">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.alternative-exercises) {
                     :scope {
                         h2 {

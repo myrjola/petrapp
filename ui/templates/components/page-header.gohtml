@@ -8,7 +8,7 @@
         {{ template "page-header" .Header }}
 */ -}}
 {{- define "page-header" -}}
-    <style {{ nonce }}>
+    <style {{ .Nonce }}>
         @scope (.page-header) {
             :scope {
                 display: flex;

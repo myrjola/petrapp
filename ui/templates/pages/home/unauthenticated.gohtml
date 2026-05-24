@@ -1,7 +1,7 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.homeTemplateData*/ -}}
 
 {{ define "unauthenticated" }}
-    <style {{ nonce }}>
+    <style {{ $.Nonce }}>
         @scope {
             :scope {
                 min-height: 100dvh;
@@ -47,7 +47,7 @@
     </style>
 
     <main class="landing">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.landing) {
                 :scope {
                     position: relative;
@@ -275,7 +275,7 @@
                 <button type="submit" class="cta__primary">
                     Begin training<span class="arrow" aria-hidden="true">→</span>
                 </button>
-                <script {{ nonce }}>
+                <script {{ $.Nonce }}>
                   (async (form = me()) => {
                     const {registerUser} = await import("webauthn")
                     form.addEventListener("submit", registerUser)
@@ -288,7 +288,7 @@
                 <button type="submit" class="cta__secondary">
                     <span class="muted">Already a member?</span>Sign in →
                 </button>
-                <script {{ nonce }}>
+                <script {{ $.Nonce }}>
                   (async (form = me()) => {
                     const {loginUser} = await import("webauthn")
                     form.addEventListener("submit", loginUser)
@@ -299,7 +299,7 @@
     </main>
 
     <footer>
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     padding:

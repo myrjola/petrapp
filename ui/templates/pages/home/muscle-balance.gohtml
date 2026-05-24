@@ -3,7 +3,7 @@
 {{ define "muscle-balance" }}
     {{ if .MuscleBalance.Regions }}
         <section class="muscle-balance" aria-labelledby="muscle-balance-heading">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.muscle-balance) {
                     :scope {
                         display: flex;

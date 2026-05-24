@@ -1,6 +1,10 @@
 package main
 
-import "github.com/myrjola/petrapp/internal/domain"
+import (
+	"html/template"
+
+	"github.com/myrjola/petrapp/internal/domain"
+)
 
 // Banner variants accepted by the `banner` component. Keep aligned with
 // the variant strings the template branches on.
@@ -22,6 +26,7 @@ const (
 type BannerData struct {
 	Variant string
 	Message string
+	Nonce   template.HTMLAttr
 }
 
 // PageHeaderData is the dot for the `page-header` component. Subtitle is
@@ -29,6 +34,7 @@ type BannerData struct {
 type PageHeaderData struct {
 	Title    string
 	Subtitle string
+	Nonce    template.HTMLAttr
 }
 
 // FieldData is the dot for the `field` component — a labelled single text
@@ -48,13 +54,30 @@ type FieldData struct {
 	Max      string
 	Step     string
 	Pattern  string
+	Nonce    template.HTMLAttr
 }
 
 // ExerciseResultCardData drives the components/exercise-result-card partial,
-// shared by the Add and Swap exercise pages.
+// shared by the Add and Swap exercise pages. DescriptionHTML carries the
+// pre-rendered markdown description so templates don't need to invoke the
+// markdown pipeline at render time.
 type ExerciseResultCardData struct {
-	Exercise    domain.Exercise
-	FormAction  string // POST target for the add/swap form
-	FieldName   string // hidden input name ("exercise_id" or "new_exercise_id")
-	ButtonLabel string // submit button text
+	Exercise        domain.Exercise
+	FormAction      string        // POST target for the add/swap form
+	FieldName       string        // hidden input name ("exercise_id" or "new_exercise_id")
+	ButtonLabel     string        // submit button text
+	DescriptionHTML template.HTML // pre-rendered exercise description markdown
+	Nonce           template.HTMLAttr
+}
+
+// BackLinkData is the dot for the `back-link` component.
+type BackLinkData struct {
+	Href  string
+	Nonce template.HTMLAttr
+}
+
+// ExerciseSearchData is the dot for the `exercise-search` component.
+type ExerciseSearchData struct {
+	Query string
+	Nonce template.HTMLAttr
 }

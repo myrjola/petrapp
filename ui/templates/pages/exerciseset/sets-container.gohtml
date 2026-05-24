@@ -3,7 +3,7 @@
 {{ define "sets-container" }}
     <div class="sets-container stack{{ if not .ExerciseSet.WarmupCompletedAt }} disabled{{ end }}"
          aria-label="Exercise sets"{{ if not .ExerciseSet.WarmupCompletedAt }} aria-disabled="true"{{ end }}>
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.sets-container) {
                 :scope {
                     gap: var(--size-2);
@@ -375,7 +375,7 @@
         </style>
 
         {{ if .IsDeload }}
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.deload-banner) {
                 :scope {
                     margin: 0;
@@ -499,7 +499,7 @@
                         </div>
                         <button type="button" class="btn btn--focus btn--block timed-runner-start"
                                 data-timed-runner-start hidden>Start timer</button>
-                        <style {{ nonce }}>
+                        <style {{ $.Nonce }}>
                             @scope (.timed-runner) {
                                 :scope {
                                     display: flex;
@@ -582,7 +582,7 @@
                                 </fieldset>
                             {{ end }}
                         </form>
-                        <script {{ nonce }}>
+                        <script {{ $.Nonce }}>
                             (() => {
                                 const root = document.querySelector('[data-timed-runner]');
                                 const startBtn = document.querySelector('[data-timed-runner-start]');
@@ -798,7 +798,7 @@
 
             {{ if $isActive }}
                 {{ if and (gt $.RestEndAtMs 0) (eq $index $.FirstIncompleteIndex) }}
-                <script {{ nonce }}>
+                <script {{ $.Nonce }}>
                     (() => {
                         const chips = document.querySelectorAll('.exercise-set.active .rest-chip[data-rest-end-at-ms]');
                         if (chips.length === 0) return;

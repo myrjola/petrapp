@@ -1,5 +1,5 @@
 {{ define "page" }}
-    <style {{ nonce }}>
+    <style {{ $.Nonce }}>
         @scope {
             .error-container {
                 display: flex;
@@ -50,7 +50,7 @@
                 {{ if .From }}
                     <a href="{{ .From }}" class="btn btn--ghost error-back-link">
                         <span>← Back</span>
-                        <script {{ nonce }}>
+                        <script {{ $.Nonce }}>
                             // Progressive enhancement: step one entry back instead
                             // of issuing a fresh GET to the .From href. The previous
                             // doc is typically in bfcache, so back() restores form

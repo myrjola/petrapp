@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="page-container stack" role="main" aria-label="Exercise Set Workout">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     gap: var(--size-5);
@@ -19,7 +19,7 @@
             }
         </style>
 
-        <script {{ nonce }}>
+        <script {{ $.Nonce }}>
           document.addEventListener("DOMContentLoaded", function () {
             const form = document.getElementById(`form-{{ $.EditingIndex }}`)
             if (form) {

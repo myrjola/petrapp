@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main>
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     max-width: 56rem;
@@ -193,7 +193,7 @@
                     <button id="simulate-network-failure" type="button" class="btn btn--block btn--quiet action">
                         Simulate network failure
                     </button>
-                    <script {{ nonce }}>
+                    <script {{ $.Nonce }}>
                       (() => {
                         const btn = document.getElementById('simulate-network-failure')
                         const flash = document.getElementById('js-flash')

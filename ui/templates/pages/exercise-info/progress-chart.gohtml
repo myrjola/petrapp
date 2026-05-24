@@ -2,7 +2,7 @@
 
 {{ define "progress-chart" }}
     <div class="progress-timeline" aria-label="Progress of {{ .Exercise.Name }}">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.progress-timeline) {
                 :scope {
                     display: flex;

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ type BaseTemplateData struct {
 	Authenticated     bool
 	IsAdmin           bool
 	InvalidationToken string
+	Nonce             template.HTMLAttr
 }
 
 func newBaseTemplateData(r *http.Request) BaseTemplateData {
@@ -24,6 +26,9 @@ func newBaseTemplateData(r *http.Request) BaseTemplateData {
 		Authenticated:     contexthelpers.IsAuthenticated(r.Context()),
 		IsAdmin:           contexthelpers.IsAdmin(r.Context()),
 		InvalidationToken: token,
+		Nonce: template.HTMLAttr( //nolint:gosec // we trust the nonce since it's not provided by user.
+			fmt.Sprintf("nonce=%q", contexthelpers.CSPNonce(r.Context())),
+		),
 	}
 }
 

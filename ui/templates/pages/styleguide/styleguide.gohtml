@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main>
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope {
                 :scope {
                     max-width: 64rem;
@@ -370,7 +370,7 @@
             <h2>Sheet dialog</h2>
             <div class="component-sample">
                 <button type="button" class="btn btn--ghost btn--sm">
-                    <script {{ nonce }}>
+                    <script {{ $.Nonce }}>
                       me().addEventListener('click', () => {
                         document.getElementById('styleguide-sheet-dialog').showModal()
                       })
@@ -454,7 +454,7 @@
 
             <h3>Back link</h3>
             <div class="component-sample">
-                {{ template "back-link" "/dev/styleguide" }}
+                {{ template "back-link" (backLink "/dev/styleguide" $.Nonce) }}
             </div>
         </section>
     </main>

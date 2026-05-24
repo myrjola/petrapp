@@ -65,14 +65,20 @@ type workoutNotFoundTemplateData struct {
 func newWorkoutNotFoundTemplateData(
 	r *http.Request, date time.Time, flashMessage string,
 ) workoutNotFoundTemplateData {
+	base := newBaseTemplateData(r)
 	return workoutNotFoundTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Date:             date,
 		Header: PageHeaderData{
 			Title:    "Not in This Week's Plan",
 			Subtitle: "",
+			Nonce:    base.Nonce,
 		},
-		Flash: BannerData{Variant: BannerVariantError, Message: flashMessage},
+		Flash: BannerData{
+			Variant: BannerVariantError,
+			Message: flashMessage,
+			Nonce:   base.Nonce,
+		},
 	}
 }
 
@@ -222,8 +228,9 @@ func newWorkoutTemplateData(
 		exerciseViews = append(exerciseViews, newWorkoutExerciseView(i+1, es))
 	}
 
+	base := newBaseTemplateData(r)
 	return workoutTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Date:             date,
 		WorkoutTypeName:  session.WorkoutType().Label(),
 		StatusLabel:      statusLabel,
@@ -234,7 +241,11 @@ func newWorkoutTemplateData(
 		TotalCount:       total,
 		ProgressPercent:  progressPercent,
 		ProgressState:    progressState,
-		Flash:            BannerData{Variant: BannerVariantError, Message: flashMessage},
+		Flash: BannerData{
+			Variant: BannerVariantError,
+			Message: flashMessage,
+			Nonce:   base.Nonce,
+		},
 	}
 }
 
@@ -338,21 +349,24 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	base := newBaseTemplateData(r)
 	dateStr := date.Format("2006-01-02")
 	cards := make([]ExerciseResultCardData, 0, len(candidates))
 	for _, ex := range candidates {
 		cards = append(cards, ExerciseResultCardData{
-			Exercise:    ex,
-			FormAction:  fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
-			FieldName:   "new_exercise_id",
-			ButtonLabel: "Swap to this exercise",
+			Exercise:        ex,
+			FormAction:      fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
+			FieldName:       "new_exercise_id",
+			ButtonLabel:     "Swap to this exercise",
+			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
+			Nonce:           base.Nonce,
 		})
 	}
 
 	data := exerciseSwapTemplateData{
-		BaseTemplateData:  newBaseTemplateData(r),
+		BaseTemplateData:  base,
 		Date:              date,
-		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: ""},
+		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: "", Nonce: base.Nonce},
 		WorkoutExerciseID: workoutExerciseID,
 		CurrentExercise:   current,
 		Cards:             cards,
@@ -463,23 +477,27 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 		availableExercises = append(availableExercises, exercise)
 	}
 
+	base := newBaseTemplateData(r)
 	dateStr := date.Format("2006-01-02")
 	cards := make([]ExerciseResultCardData, 0, len(availableExercises))
 	for _, ex := range availableExercises {
 		cards = append(cards, ExerciseResultCardData{
-			Exercise:    ex,
-			FormAction:  fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
-			FieldName:   "exercise_id",
-			ButtonLabel: "Add this exercise",
+			Exercise:        ex,
+			FormAction:      fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
+			FieldName:       "exercise_id",
+			ButtonLabel:     "Add this exercise",
+			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
+			Nonce:           base.Nonce,
 		})
 	}
 
 	data := exerciseAddTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Date:             date,
 		Header: PageHeaderData{
 			Title:    "Add Exercise",
 			Subtitle: "",
+			Nonce:    base.Nonce,
 		},
 		Cards: cards,
 		Query: query,

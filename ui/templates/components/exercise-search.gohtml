@@ -1,7 +1,8 @@
-{{- /* exercise-search: search form shared by the Add and Swap exercise pages. Dot: the query string. */ -}}
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.ExerciseSearchData*/ -}}
+{{- /* exercise-search: search form shared by the Add and Swap exercise pages. Dot: cmd/web.ExerciseSearchData. */ -}}
 {{ define "exercise-search" }}
     <section class="exercise-search">
-        <style {{ nonce }}>
+        <style {{ .Nonce }}>
             @scope (.exercise-search) {
                 input[type="search"] {
                     flex: 1;
@@ -18,7 +19,7 @@
             <input id="exercise-search-q"
                    type="search"
                    name="q"
-                   value="{{ . }}"
+                   value="{{ .Query }}"
                    placeholder="Search exercises…"
                    autocomplete="off"
                    inputmode="search">

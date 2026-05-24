@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="workout">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.workout) {
                 :scope {
                     display: flex;
@@ -128,7 +128,7 @@
                 <div class="workout-meta">
                     <div class="workout-progress">
                         <div class="workout-progress-bar">
-                            <style {{ nonce }}>
+                            <style {{ $.Nonce }}>
                                 @scope (.workout-progress-bar) {
                                     .workout-progress-fill { width: {{ .ProgressPercent }}%; }
                                 }
@@ -144,7 +144,7 @@
             {{ template "banner" .Flash }}
 
             <div class="exercise-list">
-                <style {{ nonce }}>
+                <style {{ $.Nonce }}>
                     @scope (.exercise-list) {
                         .exercise {
                             display: grid;
@@ -325,7 +325,7 @@
                     }
                 </style>
 
-                <style {{ nonce }}>
+                <style {{ $.Nonce }}>
                     /* Per-card view-transition-names are gated on the state-refresh
                        context so cards stay part of the page snapshot during forward
                        and backward navigations (where the existing title morph
@@ -394,7 +394,7 @@
                     Add exercise
                 </a>
 
-                <script {{ nonce }}>
+                <script {{ $.Nonce }}>
                   const exercisePagePattern = new URLPattern(`/workouts/:date/exercises/:exerciseId`, window.origin)
 
                   const extractWorkoutExerciseIdFromUrl = (url) => {
@@ -441,7 +441,7 @@
                     element.style.viewTransitionName = ''
                   })
                 </script>
-                <script {{ nonce }}>
+                <script {{ $.Nonce }}>
                   // Opt out of main.js's global pagereveal staleness reload
                   // (the pagereveal listener in ui/static/main.js that reads
                   // dataset.bfcacheHandler); we handle invalidation here with a replace
@@ -501,7 +501,7 @@
         </div>
 
         <footer class="workout-finish">
-            <style {{ nonce }}>
+            <style {{ $.Nonce }}>
                 @scope (.workout-finish) {
                     :scope {
                         margin-top: auto;

@@ -22,15 +22,21 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	base := newBaseTemplateData(r)
 	data := scheduleTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Header: PageHeaderData{
 			Title:    "Set Up Your Schedule",
 			Subtitle: "Choose which days you'll be going to the gym",
+			Nonce:    base.Nonce,
 		},
 		Weekdays:        preferencesToWeekdays(prefs),
 		DurationOptions: getWorkoutDurationOptions(),
-		Flash:           BannerData{Variant: BannerVariantError, Message: app.popFlashError(ctx)},
+		Flash: BannerData{
+			Variant: BannerVariantError,
+			Message: app.popFlashError(ctx),
+			Nonce:   base.Nonce,
+		},
 	}
 
 	app.render(w, r, http.StatusOK, "schedule", data)

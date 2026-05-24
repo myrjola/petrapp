@@ -9,7 +9,7 @@
 */ -}}
 {{- define "banner" -}}
     {{- if .Message -}}
-        <style {{ nonce }}>
+        <style {{ .Nonce }}>
             @scope (.banner) {
                 :scope {
                     padding: var(--size-2) var(--size-3);

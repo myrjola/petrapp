@@ -16,6 +16,21 @@ import (
 	"github.com/yuin/goldmark"
 )
 
+// markdownToHTML renders Markdown to template.HTML. On error it logs
+// and returns a fallback paragraph; goldmark.Convert into a bytes.Buffer
+// does not error in practice, but the defensive branch matches prior
+// behaviour.
+func markdownToHTML(ctx context.Context, logger *slog.Logger, md string) template.HTML {
+	gm := goldmark.New()
+	var buf bytes.Buffer
+	if err := gm.Convert([]byte(md), &buf); err != nil {
+		logger.LogAttrs(ctx, slog.LevelError, "failed to render markdown",
+			slog.Any("error", err))
+		return "<p>Error rendering markdown content.</p>"
+	}
+	return template.HTML(buf.String()) //nolint:gosec // markdown renderer output is trusted.
+}
+
 // exerciseInfoTemplateData contains data for the exercise info template.
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
@@ -26,6 +41,7 @@ type exerciseInfoTemplateData struct {
 	Exercise          domain.Exercise
 	IsAdmin           bool
 	ProgressPoints    []ExerciseProgressDataPoint
+	DescriptionHTML   template.HTML
 }
 
 // exerciseInfoGET handles GET requests to view exercise information.
@@ -71,35 +87,23 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 	// Check if the user is admin.
 	isAdmin := contexthelpers.IsAdmin(r.Context())
 
+	base := newBaseTemplateData(r)
 	data := exerciseInfoTemplateData{
-		BaseTemplateData: newBaseTemplateData(r),
+		BaseTemplateData: base,
 		Date:             date,
 		Header: PageHeaderData{
 			Title:    exercise.Name,
 			Subtitle: "",
+			Nonce:    base.Nonce,
 		},
 		WorkoutExerciseID: workoutExerciseID,
 		Exercise:          exercise,
 		IsAdmin:           isAdmin,
 		ProgressPoints:    progressData,
+		DescriptionHTML:   markdownToHTML(r.Context(), app.logger, exercise.DescriptionMarkdown),
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-info", data)
-}
-
-// renderMarkdownToHTML converts Markdown string to HTML.
-func (app *application) renderMarkdownToHTML(ctx context.Context, markdown string) template.HTML {
-	md := goldmark.New()
-
-	var buf bytes.Buffer
-	if err := md.Convert([]byte(markdown), &buf); err != nil {
-		app.logger.LogAttrs(ctx, slog.LevelError, "failed to render markdown",
-			slog.Any("error", err))
-		return "<p>Error rendering markdown content.</p>"
-	}
-
-	// Returning as template.HTML tells Go this is safe HTML that doesn't need escaping
-	return template.HTML(buf.String()) //nolint:gosec // we trust the markdown renderer
 }
 
 // ExerciseProgressDataPoint represents a single data point for the exercise chart.

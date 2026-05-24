@@ -2,7 +2,7 @@
 
 {{ define "page" }}
     <main class="exercise-info-page">
-        <style {{ nonce }}>
+        <style {{ $.Nonce }}>
             @scope (.exercise-info-page) {
                 :scope {
                     display: flex;
@@ -324,7 +324,7 @@
         </style>
 
         <div class="top-row">
-            {{ template "back-link" (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) }}
+            {{ template "back-link" (backLink (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) $.Nonce) }}
             {{ if .IsAdmin }}
                 <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
             {{ end }}
@@ -362,7 +362,7 @@
         </section>
 
         <section class="prose">
-            {{ mdToHTML .Exercise.DescriptionMarkdown }}
+            {{ .DescriptionHTML }}
         </section>
 
         <section class="progress">
