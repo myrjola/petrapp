@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 )
 
 // formatFloat formats a float to remove trailing zeros and unnecessary precision.
@@ -21,16 +19,10 @@ func formatFloat(f float64) string {
 	return strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
-// baseTemplateFuncs returns the base template.FuncMap with safe zero-value
-// implementations for context-dependent functions. Real implementations are
-// bound per-request in contextTemplateFuncs and override these defaults via
-// (*template.Template).Funcs. The signatures must match the real ones so
-// templates parsed with the base set can also be executed with it (a panic
-// here would surface as a 500 in any code path that forgets to rebind).
-func (app *application) baseTemplateFuncs() template.FuncMap {
+// templateFuncs returns the funcs registered at parse time. All entries
+// are stateless and safe to share across goroutines.
+func templateFuncs() template.FuncMap {
 	return template.FuncMap{
-		"nonce":       func() template.HTMLAttr { return "" },
-		"mdToHTML":    func(_ string) template.HTML { return "" },
 		"formatFloat": formatFloat,
 		"sub":         func(a, b int) int { return a - b },
 		"backLink": func(href string, nonce template.HTMLAttr) BackLinkData {
@@ -42,24 +34,9 @@ func (app *application) baseTemplateFuncs() template.FuncMap {
 	}
 }
 
-// contextTemplateFuncs returns template.FuncMap with context-dependent function implementations.
-func (app *application) contextTemplateFuncs(ctx context.Context) template.FuncMap {
-	nonce := fmt.Sprintf("nonce=\"%s\"", contexthelpers.CSPNonce(ctx))
-	return template.FuncMap{
-		"nonce": func() template.HTMLAttr {
-			return template.HTMLAttr(nonce) //nolint:gosec // we trust the nonce since it's not provided by user.
-		},
-		"mdToHTML": func(markdown string) template.HTML {
-			return markdownToHTML(ctx, app.logger, markdown)
-		},
-		"formatFloat": formatFloat,
-		"sub":         func(a, b int) int { return a - b },
-	}
-}
-
 // templateCache memoizes parsed page templates so each request doesn't
-// re-read template files from disk and re-parse them. Cloned per render so
-// request-scoped Funcs don't bleed across goroutines.
+// re-read template files from disk and re-parse them. The cached
+// templates are read-only after first execute and safe to share.
 type templateCache struct {
 	mu sync.RWMutex
 	m  map[string]*template.Template
@@ -81,41 +58,33 @@ func (c *templateCache) set(name string, t *template.Template) {
 	c.m[name] = t
 }
 
-// pageTemplate returns a template ready to execute for the given page name.
+// pageTemplate returns the parsed template for the given page name.
 //
-// pageName corresponds to directory inside ui/templates/pages folder. It has to include a template named "page".
-// Shared component templates from ui/templates/components are also parsed and available to every page.
+// pageName corresponds to the directory inside ui/templates/pages. It
+// must include a template named "page".
 //
-// In dev mode (no FLY_APP_NAME) templates are parsed fresh on every call so a
-// template edit is reflected on the next refresh. In production the parsed
-// template is cached and a clone is returned so per-request Funcs() overrides
-// don't race with concurrent renders.
+// In dev mode (no FLY_APP_NAME) templates are parsed fresh on every
+// call so a template edit is reflected on the next refresh. In
+// production the parsed template is cached and reused across requests.
+// The cached template is never mutated after the first Execute, so it
+// is safe to share across goroutines.
 func (app *application) pageTemplate(pageName string) (*template.Template, error) {
 	if app.devMode {
 		return app.parsePageTemplate(pageName)
 	}
 	if cached := app.parsedTemplates.get(pageName); cached != nil {
-		clone, err := cached.Clone()
-		if err != nil {
-			return nil, fmt.Errorf("clone template %s: %w", pageName, err)
-		}
-		return clone, nil
+		return cached, nil
 	}
 	parsed, err := app.parsePageTemplate(pageName)
 	if err != nil {
 		return nil, err
 	}
 	app.parsedTemplates.set(pageName, parsed)
-	clone, err := parsed.Clone()
-	if err != nil {
-		return nil, fmt.Errorf("clone template %s: %w", pageName, err)
-	}
-	return clone, nil
+	return parsed, nil
 }
 
 func (app *application) parsePageTemplate(pageName string) (*template.Template, error) {
-	// We need to initialize the FuncMap before parsing the files. These will be overridden in the render function.
-	t := template.New(pageName).Funcs(app.baseTemplateFuncs())
+	t := template.New(pageName).Funcs(templateFuncs())
 	t, err := t.ParseFS(app.templateFS,
 		"base.gohtml",
 		"components/*.gohtml",
@@ -127,22 +96,15 @@ func (app *application) parsePageTemplate(pageName string) (*template.Template, 
 	return t, nil
 }
 
-func (app *application) renderToBuf(ctx context.Context, file string, data any) (*bytes.Buffer, error) {
-	var (
-		err error
-		t   *template.Template
-	)
-
-	if t, err = app.pageTemplate(file); err != nil {
+func (app *application) renderToBuf(_ context.Context, file string, data any) (*bytes.Buffer, error) {
+	t, err := app.pageTemplate(file)
+	if err != nil {
 		return nil, fmt.Errorf("retrieve page template %s: %w", file, err)
 	}
-
 	buf := new(bytes.Buffer)
-	t.Funcs(app.contextTemplateFuncs(ctx))
 	if err = t.ExecuteTemplate(buf, "base", data); err != nil {
 		return nil, fmt.Errorf("execute template %s: %w", file, err)
 	}
-
 	return buf, nil
 }
 
