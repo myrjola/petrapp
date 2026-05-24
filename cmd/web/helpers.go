@@ -14,7 +14,10 @@ import (
 
 func (app *application) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	app.logger.LogAttrs(r.Context(), slog.LevelError, "server error", slog.Any("error", err))
-	app.render(w, r, http.StatusInternalServerError, "error", nil)
+	app.render(w, r, http.StatusInternalServerError, "error", errorTemplateData{
+		BaseTemplateData: newBaseTemplateData(r),
+		From:             "",
+	})
 }
 
 // userError surfaces a failure of an in-flight user action through the

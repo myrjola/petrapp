@@ -47,14 +47,9 @@
                 Please try again or return to the home page.
             </p>
             <div class="error-actions cluster">
-                <button type="button" class="btn btn--ghost">
-                    <span>Retry</span>
-                    <script {{ nonce }}>
-                      document.currentScript.parentElement.addEventListener('click', function () {
-                        location.reload()
-                      })
-                    </script>
-                </button>
+                {{ if .From }}
+                    <a href="{{ .From }}" class="btn btn--ghost error-back-link">← Back</a>
+                {{ end }}
                 <a href="/" class="btn">Go Home</a>
             </div>
         </div>
