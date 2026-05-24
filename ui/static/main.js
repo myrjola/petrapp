@@ -298,13 +298,21 @@ document.addEventListener('click', (e) => {
             e.preventDefault()
             console.log('[navbug back-button] traverseTo', { href: link.href,
                 fromIdx: navigation.currentEntry?.index, toIdx: i, toUrl: entries[i].url })
-            // If the entry was pruned between our read of entries() and the
-            // traverse, fall back to a normal navigation rather than no-op.
-            navigation.traverseTo(entries[i].key).committed.catch((err) => {
-                console.log('[navbug back-button] .catch fired -> location.assign', {
-                    href: link.href, currentUrl: location.href, err: String(err) })
-                location.assign(link.href)
-            })
+            // No .committed.catch fallback. The previous fallback —
+            // .catch(() => location.assign(link.href)) — was intended to
+            // handle the TOCTOU case where the entry was pruned between
+            // our read of entries() and the traverse. It also fired on
+            // ANY committed rejection, including the cross-bfcache one
+            // that produced the navbug: a traverseTo issued from a doc
+            // that subsequently goes into bfcache leaves .committed
+            // pending until the doc is restored; the first navigation
+            // initiated from the restored doc (e.g. our pagereveal
+            // staleness reload) supersedes it, and the .catch then fires
+            // location.assign with the closure-captured back-target URL,
+            // pushing a spurious history entry. Dropping the fallback
+            // means the rare entry-pruned case becomes a no-op click
+            // (user can click again) rather than history corruption.
+            navigation.traverseTo(entries[i].key)
             return
         }
     }
