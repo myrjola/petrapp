@@ -48,7 +48,28 @@
             </p>
             <div class="error-actions cluster">
                 {{ if .From }}
-                    <a href="{{ .From }}" class="btn btn--ghost error-back-link">← Back</a>
+                    <a href="{{ .From }}" class="btn btn--ghost error-back-link">
+                        <span>← Back</span>
+                        <script {{ nonce }}>
+                            // Progressive enhancement: step one entry back instead
+                            // of issuing a fresh GET to the .From href. The previous
+                            // doc is typically in bfcache, so back() restores form
+                            // state and scroll position instantly; the fresh GET path
+                            // would not. The href stays as the no-JS / no-history
+                            // fallback.
+                            //
+                            // history.back() is synchronous to invoke, no .committed
+                            // promise to attach a fallback .catch to — sidesteps the
+                            // deferred-firing navbug modelled in
+                            // tlaplus/StackNav_BackCatchBug.cfg.
+                            document.currentScript.parentElement.addEventListener('click', function (e) {
+                                if (window.history.length > 1) {
+                                    e.preventDefault()
+                                    window.history.back()
+                                }
+                            })
+                        </script>
+                    </a>
                 {{ end }}
                 <a href="/" class="btn">Go Home</a>
             </div>

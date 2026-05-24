@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
@@ -84,6 +85,17 @@ func Test_application_errorGET_withSafeFromParam_rendersBackLink(t *testing.T) {
 	}
 	if href, _ := link.Attr("href"); href != "/workouts/2026-05-24" {
 		t.Errorf("back link href = %q, want %q", href, "/workouts/2026-05-24")
+	}
+	// Progressive enhancement: a child <script> upgrades the click to
+	// history.back() so the previous doc restores from bfcache (preserving
+	// form state) instead of triggering a fresh GET to the href. The href
+	// is the no-JS / no-history fallback and must stay.
+	script := link.Find("script").First()
+	if script.Length() == 0 {
+		t.Fatal("expected a progressive-enhancement <script> inside the back link")
+	}
+	if body := script.Text(); !strings.Contains(body, "history.back()") {
+		t.Errorf("enhancement script must call history.back(); got: %q", body)
 	}
 	// Retry button is gone — its inline reload script bypassed CSP / Trusted
 	// Types only because it lived in this template. Removing the button
