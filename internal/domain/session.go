@@ -136,6 +136,15 @@ func (s *Session) SetDifficulty(rating int) error {
 	return nil
 }
 
+// SwitchToDeload marks the session as a deload session going forward.
+// Sets recorded prior to this call retain their stored values; the next
+// progression recommendation will be derived from GetDeloadStartingWeight
+// rather than GetStartingWeight. Idempotent.
+func (s *Session) SwitchToDeload() error {
+	s.IsDeload = true
+	return nil
+}
+
 // Slot returns a copy of the exercise slot identified by slotID; ok is false
 // when no slot matches. It is a read accessor for callers that need to
 // inspect slot state — e.g. the service layer capturing pre-mutation data

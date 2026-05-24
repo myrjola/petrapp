@@ -680,3 +680,34 @@ func TestSessionHasIncompleteSets(t *testing.T) {
 		})
 	}
 }
+
+func Test_Session_SwitchToDeload_SetsFlag(t *testing.T) {
+	t.Parallel()
+
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
+		Date: time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
+	}
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload: %v", err)
+	}
+	if !sess.IsDeload {
+		t.Error("SwitchToDeload did not set IsDeload to true")
+	}
+}
+
+func Test_Session_SwitchToDeload_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
+		Date:     time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
+		IsDeload: true,
+	}
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload (already deload): %v", err)
+	}
+	if !sess.IsDeload {
+		t.Error("SwitchToDeload cleared IsDeload on already-deload session")
+	}
+}
