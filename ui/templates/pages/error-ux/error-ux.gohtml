@@ -166,14 +166,17 @@
                     <span class="tag">C · System</span>
                     <h2>Unexpected system error</h2>
                     <p>
-                        Anything else — DB hiccup, plumbing fault.
-                        <code>userError</code> logs the underlying error and
-                        flashes a generic message; the user keeps their place
-                        instead of getting a silent reload.
+                        A non-validation error from a service call. Falls
+                        through <code>userError</code> to
+                        <code>serverError</code>, which on a JS-shim POST
+                        navigates to the <code>/error</code>
+                        catastrophic-failure page. Without the shim (curl,
+                        no-JS), the same path renders <code>error.gohtml</code>
+                        with a 500.
                     </p>
                     <form class="action" method="post" action="/dev/error-ux/trigger/system">
                         <button type="submit" class="btn btn--block btn--danger">
-                            Trigger system error
+                            Trigger navigation to /error
                         </button>
                     </form>
                 </article>
