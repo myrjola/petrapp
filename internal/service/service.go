@@ -106,8 +106,35 @@ func (s *Service) SaveUserPreferences(ctx context.Context, prefs domain.Preferen
 }
 
 // RestartMesocycleAnchor snaps the mesocycle anchor to the next Monday,
-// effectively restarting the deload cycle from that date.
+// effectively restarting the deload cycle from that date. Additionally
+// clears IsDeload on every current-week session dated today or later
+// that is not already fully completed, so an accidental StartDeloadNow
+// press can be fully undone with one click.
+//
+//nolint:dupl // mirror of StartDeloadNow; kept separate intentionally (ClearDeload vs SwitchToDeload, distinct intent).
 func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
+	monday := domain.MondayOf(time.Now())
+	today := domain.StartOfDay(time.Now())
+
+	sessions, err := s.repos.Sessions.List(ctx, monday)
+	if err != nil {
+		return fmt.Errorf("list sessions for current week: %w", err)
+	}
+	for _, sess := range sessions {
+		if sess.Date.Before(today) {
+			continue
+		}
+		err = s.repos.Sessions.Update(ctx, sess.Date, func(latest *domain.Session) error {
+			if latest.Status() == domain.SessionCompleted {
+				return nil
+			}
+			return latest.ClearDeload()
+		})
+		if err != nil {
+			return fmt.Errorf("clear deload for %s: %w", sess.Date.Format(time.DateOnly), err)
+		}
+	}
+
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
 		return fmt.Errorf("get preferences: %w", err)

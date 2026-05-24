@@ -363,6 +363,8 @@ func (s *Service) MarkWarmupComplete(
 // No mutex: each per-session Update is its own transaction, the closure
 // re-checks Status() != SessionCompleted before mutating, and a
 // double-press is idempotent.
+//
+//nolint:dupl // mirror of RestartMesocycleAnchor; kept separate intentionally (SwitchToDeload vs ClearDeload, distinct intent).
 func (s *Service) StartDeloadNow(ctx context.Context) error {
 	monday := domain.MondayOf(time.Now())
 	today := domain.StartOfDay(time.Now())

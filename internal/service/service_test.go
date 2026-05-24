@@ -66,3 +66,47 @@ func Test_SaveUserPreferences_NoSnapWhenAnchorAlreadySet(t *testing.T) {
 		t.Errorf("MesocycleAnchor = %s, want %s", got.MesocycleAnchor, existing)
 	}
 }
+
+func Test_RestartMesocycleAnchor_ClearsCurrentWeekDeloadAfterStartDeloadNow(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc := setupTestService(t)
+
+	prefs, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences: %v", err)
+	}
+	monday := domain.MondayOf(time.Now())
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 5
+	prefs.MesocycleAnchor = monday
+	if err = svc.SaveUserPreferences(ctx, prefs); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+	if _, err = svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow: %v", err)
+	}
+	if err = svc.RestartMesocycleAnchor(ctx); err != nil {
+		t.Fatalf("RestartMesocycleAnchor: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after restart: %v", err)
+	}
+
+	today := domain.StartOfDay(time.Now())
+	for i, s := range sessions {
+		if len(s.ExerciseSets) == 0 {
+			continue
+		}
+		if !s.Date.Before(today) && s.IsDeload {
+			t.Errorf("session[%d] (%s) should be cleared after restart, still IsDeload",
+				i, s.Date.Weekday())
+		}
+	}
+}
