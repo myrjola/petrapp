@@ -4,6 +4,11 @@
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v2.12.2
 
+# Per-worktree golangci-lint cache. The cache stores diagnostics keyed by file
+# content hash and records absolute paths in the cached results; sharing one
+# cache across worktrees causes stale-path WARNs after a worktree is removed.
+export GOLANGCI_LINT_CACHE := $(CURDIR)/.cache/golangci-lint
+
 # Default Fly app for ops targets. Override with FLY_APP=petra-staging for staging.
 FLY_APP ?= petra
 # Path of the production database on the Fly machine.

@@ -56,6 +56,7 @@ node_modules
 /bin/
 /dockerdata
 /repomix-output.txt
+/.cache/
 .githooks
 .air
 /web
