@@ -753,8 +753,7 @@
                                         inputmode="numeric"
                                         pattern="[0-9]*"
                                         name="completed_value"
-                                        placeholder="{{ $setDisplay.TargetStr }}"
-                                        {{ if $set.CompletedValue }}value="{{ $setDisplay.CompletedStr }}"{{ end }}
+                                        value="{{ if $set.CompletedValue }}{{ $setDisplay.CompletedStr }}{{ else }}{{ $setDisplay.TargetStr }}{{ end }}"
                                         required
                                         {{ if $set.CompletedValue }}disabled{{ end }}
                                         class="reps-input"
