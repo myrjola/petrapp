@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -529,5 +530,128 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 	}
 	if doc.Find("a.exercise").Length() == 0 {
 		t.Error("Expected exercises on newly-scheduled day's workout page after lazy-create")
+	}
+}
+
+// Test_application_workoutCompletePOST_unstartedSession_navigatesToErrorPage
+// covers the canonical silent-failure case from the 2026-05-24 shim-aware
+// design. POST /workouts/{today}/complete before /start returns
+// domain.ErrNotStarted from Session.Complete, which workoutCompletePOST
+// passes to serverError. With the shim header set, serverError must reply
+// 200 + X-Location: /error?from=/workouts/{today} so the JS shim navigates
+// the user to the error page instead of silently reloading the workout.
+func Test_application_workoutCompletePOST_unstartedSession_navigatesToErrorPage(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// Schedule today so a session exists. We deliberately do NOT call /start.
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	prefsDoc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Get preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences", formData); err != nil {
+		t.Fatalf("Submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	target := server.URL() + "/workouts/" + today + "/complete"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("Build POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Requested-With", "stacknav")
+	req.Header.Set("Referer", server.URL()+"/workouts/"+today)
+
+	httpClient := *client.HTTPClient() // shallow copy preserves jar.
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /complete: %v", err)
+	}
+	if cerr := resp.Body.Close(); cerr != nil {
+		t.Fatalf("Close response body: %v", cerr)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200 (shim-aware serverError)", resp.StatusCode)
+	}
+	wantLoc := "/error?from=%2Fworkouts%2F" + today
+	if got := resp.Header.Get("X-Location"); got != wantLoc {
+		t.Errorf("X-Location = %q, want %q", got, wantLoc)
+	}
+}
+
+// Test_application_workoutCompletePOST_unstartedSession_noShimHeader_500s
+// covers the same scenario without the shim header — a curl-style client.
+// serverError should fall through to the 500 + error.gohtml body path.
+func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_500s(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	prefsDoc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("Get preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences", formData); err != nil {
+		t.Fatalf("Submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	target := server.URL() + "/workouts/" + today + "/complete"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("Build POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// No X-Requested-With.
+
+	httpClient := *client.HTTPClient()
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /complete: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500 (non-shim path)", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	if !strings.Contains(string(body), "Something went wrong") {
+		t.Errorf("expected the error page body, got %q", string(body))
 	}
 }
