@@ -221,6 +221,46 @@ func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
 	}
 }
 
+// Test_CompleteSession_UnstartedSession_AutoStartsAndCompletes covers the
+// retroactive-finish flow: a user navigates to a past scheduled workout that
+// they performed in real life but never marked started in the app, and clicks
+// "Finish workout". CompleteSession must succeed by auto-starting the session
+// inside the same transaction. Before 2026-05-24 this returned ErrNotStarted
+// and the handler routed the user to /error — see the prod logs referenced in
+// the fix commit.
+func Test_CompleteSession_UnstartedSession_AutoStartsAndCompletes(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	// Pick a scheduled workout (Monday, index 0) and complete it WITHOUT
+	// calling StartSession first — the production "session not started" path.
+	date := sessions[0].Date
+
+	if err = svc.CompleteSession(ctx, date); err != nil {
+		t.Fatalf("CompleteSession on unstarted session: %v", err)
+	}
+
+	sess, err := svc.GetSession(ctx, date)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if sess.StartedAt.IsZero() {
+		t.Error("StartedAt is zero after auto-start; CompleteSession should have started the session")
+	}
+	if sess.CompletedAt.IsZero() {
+		t.Error("CompletedAt is zero; CompleteSession should have completed the session")
+	}
+	if got := sess.Status(); got != domain.SessionCompleted {
+		t.Errorf("Status = %q, want %q", got, domain.SessionCompleted)
+	}
+}
+
 func Test_StartSession_CreatesAdHocSessionForUnscheduledToday(t *testing.T) {
 	t.Parallel()
 

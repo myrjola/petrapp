@@ -275,10 +275,19 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	return nil
 }
 
-// CompleteSession marks a workout session as completed.
+// CompleteSession marks a workout session as completed. When the session
+// has not been started yet — e.g. a user retroactively logging a workout
+// they performed in real life — Start is invoked first inside the same
+// transaction so completion always succeeds.
 func (s *Service) CompleteSession(ctx context.Context, date time.Time) error {
 	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		return sess.Complete(time.Now())
+		now := time.Now()
+		if sess.StartedAt.IsZero() {
+			if err := sess.Start(now); err != nil {
+				return fmt.Errorf("auto-start before complete: %w", err)
+			}
+		}
+		return sess.Complete(now)
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}

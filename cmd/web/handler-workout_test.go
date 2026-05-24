@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -533,14 +532,15 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 	}
 }
 
-// Test_application_workoutCompletePOST_unstartedSession_navigatesToErrorPage
-// covers the canonical silent-failure case from the 2026-05-24 shim-aware
-// design. POST /workouts/{today}/complete before /start returns
-// domain.ErrNotStarted from Session.Complete, which workoutCompletePOST
-// passes to serverError. With the shim header set, serverError must reply
-// 200 + X-Location: /error?from=/workouts/{today} so the JS shim navigates
-// the user to the error page instead of silently reloading the workout.
-func Test_application_workoutCompletePOST_unstartedSession_navigatesToErrorPage(t *testing.T) {
+// Test_application_workoutCompletePOST_unstartedSession_shimHeader_redirectsToCompletionForm
+// covers the retroactive-finish flow on the JS shim path: a user POSTs
+// /workouts/{today}/complete on a scheduled-but-unstarted session.
+// CompleteSession auto-starts inside the same transaction (see
+// service.CompleteSession), so the handler succeeds and the shim receives
+// 200 + X-Location: /workouts/{today}/complete (the feedback form).
+func Test_application_workoutCompletePOST_unstartedSession_shimHeader_redirectsToCompletionForm(
+	t *testing.T,
+) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -589,18 +589,20 @@ func Test_application_workoutCompletePOST_unstartedSession_navigatesToErrorPage(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		t.Errorf("status = %d, want 200 (shim-aware serverError)", resp.StatusCode)
+		t.Errorf("status = %d, want 200 (shim-aware redirect)", resp.StatusCode)
 	}
-	wantLoc := "/error?from=%2Fworkouts%2F" + today
+	wantLoc := "/workouts/" + today + "/complete"
 	if got := resp.Header.Get("X-Location"); got != wantLoc {
 		t.Errorf("X-Location = %q, want %q", got, wantLoc)
 	}
 }
 
-// Test_application_workoutCompletePOST_unstartedSession_noShimHeader_500s
-// covers the same scenario without the shim header — a curl-style client.
-// serverError should fall through to the 500 + error.gohtml body path.
-func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_500s(t *testing.T) {
+// Test_application_workoutCompletePOST_unstartedSession_noShimHeader_redirectsToCompletionForm
+// covers the same retroactive-finish flow for a plain (no JS shim) client:
+// the server falls through to a 303 See Other pointing at the feedback form.
+func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_redirectsToCompletionForm(
+	t *testing.T,
+) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -644,14 +646,11 @@ func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_500s(t *
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("status = %d, want 500 (non-shim path)", resp.StatusCode)
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Errorf("status = %d, want 303 (plain redirect)", resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read body: %v", err)
-	}
-	if !strings.Contains(string(body), "Something went wrong") {
-		t.Errorf("expected the error page body, got %q", string(body))
+	wantLoc := "/workouts/" + today + "/complete"
+	if got := resp.Header.Get("Location"); got != wantLoc {
+		t.Errorf("Location = %q, want %q", got, wantLoc)
 	}
 }
