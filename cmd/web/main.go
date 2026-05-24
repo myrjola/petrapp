@@ -180,24 +180,17 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 	go notif.idleMonitor.Run(ctx)
 
-	app := application{
-		logger:          logger,
-		webAuthnHandler: webAuthnHandler,
-		sessionManager:  sessionManager,
-		templateFS:      os.DirFS(htmlTemplatePath),
-		parsedTemplates: newTemplateCache(),
-		service:         notif.svc,
-		flightRecorder:  flightRecorderService,
-		devMode:         cfg.FlyAppName == "",
-		vapidPublicKey:  cfg.VAPIDPublic,
-		lastRequestAt:   notif.lastRequestAt,
-	}
-
-	// Wire the shim-aware error surface so DB / lookup failures inside
-	// the webauthn middleware navigate to /error instead of producing a
-	// silent 500 + reload. See docs/superpowers/specs/
-	// 2026-05-24-servererror-shim-aware-design.md.
-	webAuthnHandler.InternalErrorHandler = app.serverError
+	app := newApplication(
+		logger,
+		webAuthnHandler,
+		sessionManager,
+		htmlTemplatePath,
+		notif.svc,
+		flightRecorderService,
+		cfg.FlyAppName == "",
+		cfg.VAPIDPublic,
+		notif.lastRequestAt,
+	)
 
 	routes, err := app.routes()
 	if err != nil {
@@ -205,6 +198,36 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 
 	return app.configureAndStartServer(ctx, listener, actualAddr, cfg.TLSCert, cfg.TLSKey, routes)
+}
+
+// newApplication builds the *application and wires webauthnhandler's
+// InternalErrorHandler to the shim-aware serverError so DB / lookup failures
+// inside that middleware navigate to /error instead of producing a silent 500.
+func newApplication(
+	logger *slog.Logger,
+	webAuthnHandler *webauthnhandler.WebAuthnHandler,
+	sessionManager *scs.SessionManager,
+	htmlTemplatePath string,
+	svc *service.Service,
+	flightRecorderService *flightrecorder.Service,
+	devMode bool,
+	vapidPublicKey string,
+	lastRequestAt *atomic.Int64,
+) *application {
+	app := &application{
+		logger:          logger,
+		webAuthnHandler: webAuthnHandler,
+		sessionManager:  sessionManager,
+		templateFS:      os.DirFS(htmlTemplatePath),
+		parsedTemplates: newTemplateCache(),
+		service:         svc,
+		flightRecorder:  flightRecorderService,
+		devMode:         devMode,
+		vapidPublicKey:  vapidPublicKey,
+		lastRequestAt:   lastRequestAt,
+	}
+	webAuthnHandler.InternalErrorHandler = app.serverError
+	return app
 }
 
 const (
