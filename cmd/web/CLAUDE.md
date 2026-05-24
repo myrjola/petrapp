@@ -235,6 +235,25 @@ produce a redirect loop.
 - Let the service layer handle business validation; handlers handle HTTP
   concerns.
 
+### Middleware error paths
+
+Three middleware paths used to silently 500 (or 401) on the JS-shim
+path. They now route through the shim-aware helpers:
+
+- `recoverPanic` → `app.serverError`. Panics navigate to `/error` on
+  shim POSTs and render the 500 inline otherwise.
+- `mustAdmin` → `redirect(w, r, "/")`. Non-admins are bounced to home;
+  the 401 status code has been retired.
+- `webauthnhandler.AuthenticateMiddleware` → injected
+  `InternalErrorHandler` (wired to `app.serverError` in `main.go`).
+  DB lookup failures land on `/error` instead of producing a silent
+  500.
+
+The injection point on `webauthnhandler` keeps the package unaware of
+the stack-navigator wire protocol. If you add another middleware in
+that package, route its internal errors through `h.internalError` and
+they will inherit the same UX.
+
 ### Client-side error surface (`#js-flash`)
 
 `#js-flash` is the JS shim's last-resort surface for client-only `fetch`
