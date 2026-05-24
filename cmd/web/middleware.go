@@ -8,11 +8,17 @@ import (
 	"net/http"
 	"runtime/debug"
 	"runtime/trace"
+	"strings"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/logging"
 )
+
+// slowRequestThreshold is the duration above which a non-admin request is
+// considered user-noticeable and triggers a flight recorder dump. 500ms
+// matches the Web Vitals INP "poor" threshold.
+const slowRequestThreshold = 500 * time.Millisecond
 
 type statusResponseWriter struct {
 	http.ResponseWriter
@@ -158,18 +164,26 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 			next.ServeHTTP(sw, r)
 		}
 
-		// Log request completion
+		// Log request completion.
+		duration := time.Since(start)
 		level := slog.LevelInfo
 		if sw.statusCode >= http.StatusInternalServerError {
 			level = slog.LevelError
 		}
 		app.logger.LogAttrs(r.Context(), level, "request completed",
-			slog.Int("status_code", sw.statusCode), slog.Duration("duration", time.Since(start)))
+			slog.Int("status_code", sw.statusCode), slog.Duration("duration", duration))
 
-		// If we have a flight recorder, capture a trace if the request timed out.
-		flightRecorderCtx := context.WithoutCancel(ctx)
-		if sw.statusCode == http.StatusServiceUnavailable && app.flightRecorder != nil {
-			go app.flightRecorder.CaptureTimeoutTrace(flightRecorderCtx)
+		// Capture a flight recorder dump for timed-out or user-noticeably-slow
+		// requests. Admin routes are exempt because their 30s timeout budget
+		// covers intentionally slow external calls.
+		if app.flightRecorder != nil {
+			flightRecorderCtx := context.WithoutCancel(ctx)
+			switch {
+			case sw.statusCode == http.StatusServiceUnavailable:
+				go app.flightRecorder.CaptureTimeoutTrace(flightRecorderCtx)
+			case duration >= slowRequestThreshold && !strings.HasPrefix(path, "/admin/"):
+				go app.flightRecorder.CaptureSlowRequestTrace(flightRecorderCtx, duration)
+			}
 		}
 	})
 }
