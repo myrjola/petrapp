@@ -817,3 +817,89 @@ func Test_StartDeloadNow_Idempotent(t *testing.T) {
 		}
 	}
 }
+
+// Test_StartDeloadNow_SkipsCompletedToday covers the orchestrator closure's
+// Status() != SessionCompleted re-check — the spec's central race-avoidance
+// argument. Between List returning a snapshot and Update running, a concurrent
+// caller may have completed the session; the closure must not flip it then.
+//
+// Determinism: setupTestService uses a Mon/Wed/Fri schedule. The test needs
+// (a) today to be a scheduled workout day so we can complete it, and (b) at
+// least one scheduled workout strictly after today to prove the loop kept
+// going. Today is Friday or weekend → no future scheduled workout this week
+// → t.Skip.
+func Test_StartDeloadNow_SkipsCompletedToday(t *testing.T) {
+	t.Parallel()
+
+	ctx, svc := setupTestService(t) // Mon/Wed/Fri 60 min
+
+	prefs, err := svc.GetUserPreferences(ctx)
+	if err != nil {
+		t.Fatalf("GetUserPreferences: %v", err)
+	}
+	monday := domain.MondayOf(time.Now())
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 5
+	prefs.MesocycleAnchor = monday
+	if err = svc.SaveUserPreferences(ctx, prefs); err != nil {
+		t.Fatalf("SaveUserPreferences: %v", err)
+	}
+
+	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	today := domain.StartOfDay(time.Now())
+	todayIdx := -1
+	futureWorkoutDays := 0
+	for i, s := range sessions {
+		if s.Date.Equal(today) && len(s.ExerciseSets) > 0 {
+			todayIdx = i
+		}
+		if s.Date.After(today) && len(s.ExerciseSets) > 0 {
+			futureWorkoutDays++
+		}
+	}
+	if todayIdx == -1 {
+		t.Skip("today is a rest day in Mon/Wed/Fri schedule; cannot complete a non-existent session")
+	}
+	if futureWorkoutDays == 0 {
+		t.Skip("no scheduled workout strictly after today this week; cannot prove loop ran past today")
+	}
+
+	// Fully complete today's session — CompleteSession auto-starts if needed
+	// (see Test_CompleteSession_UnstartedSession_AutoStartsAndCompletes) and
+	// sets CompletedAt, which is what flips Status() to SessionCompleted.
+	if err = svc.CompleteSession(ctx, today); err != nil {
+		t.Fatalf("CompleteSession: %v", err)
+	}
+
+	if err = svc.StartDeloadNow(ctx); err != nil {
+		t.Fatalf("StartDeloadNow: %v", err)
+	}
+
+	sessions, err = svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after StartDeloadNow: %v", err)
+	}
+
+	// Today must remain non-deload — the closure's Status() re-check saw
+	// SessionCompleted and returned nil without calling SwitchToDeload.
+	if sessions[todayIdx].IsDeload {
+		t.Errorf("today's session (%s) IsDeload = true; closure must skip completed sessions",
+			sessions[todayIdx].Date.Weekday())
+	}
+
+	// At least one future scheduled session must have flipped — proves the
+	// loop kept iterating past the completed today rather than aborting.
+	flippedFuture := 0
+	for _, s := range sessions {
+		if s.Date.After(today) && len(s.ExerciseSets) > 0 && s.IsDeload {
+			flippedFuture++
+		}
+	}
+	if flippedFuture == 0 {
+		t.Errorf("no future scheduled session flipped to deload; loop must continue past completed today")
+	}
+}
