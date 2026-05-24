@@ -959,7 +959,7 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	// would be meaningless for them.
 	exerciseID := 0
 	for _, es := range todaySess.ExerciseSets {
-		if es.Exercise.HasWeight() {
+		if es.Exercise.ExerciseType == domain.ExerciseTypeWeighted {
 			exerciseID = es.Exercise.ID
 			break
 		}
