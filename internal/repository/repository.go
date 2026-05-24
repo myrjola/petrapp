@@ -103,6 +103,11 @@ type WeekPlanRepository interface {
 	// errors from domain (e.g. ErrAlreadyStarted) propagate so callers can
 	// detect no-op cases via errors.Is.
 	Update(ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error) error
+
+	// Create persists a freshly-planned WeekPlan. Returns domain.ErrAlreadyExists
+	// (wrapped) when any session row already exists for the week, so callers can
+	// recover from concurrent first-time generation races.
+	Create(ctx context.Context, plan domain.WeekPlan) error
 }
 
 // ExerciseRepository persists exercise definitions and their muscle-group

@@ -8,6 +8,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
@@ -152,5 +153,76 @@ func TestWeekPlanRepository_Update_PreservesSlotIDs(t *testing.T) {
 			"slot ID changed: got %d, want %d",
 			reloaded.Sessions[0].ExerciseSets[0].ID, originalSlotID,
 		)
+	}
+}
+
+// buildPlanWithOneSlot constructs a minimal in-memory WeekPlan with one
+// scheduled session on monday containing the Deadlift exercise + one set.
+func buildPlanWithOneSlot(
+	ctx context.Context, t *testing.T, repos *repository.Repositories, monday time.Time,
+) domain.WeekPlan {
+	t.Helper()
+	exs, err := repos.Exercises.List(ctx)
+	if err != nil {
+		t.Fatalf("list exercises: %v", err)
+	}
+	var deadlift domain.Exercise
+	for _, e := range exs {
+		if e.Name == "Deadlift" {
+			deadlift = e
+			break
+		}
+	}
+	if deadlift.ID == 0 {
+		t.Fatalf("Deadlift seed exercise not found")
+	}
+	w := 60.0
+	plan := domain.WeekPlan{Monday: monday} //nolint:exhaustruct // Sessions filled below.
+	for i := range 7 {
+		plan.Sessions[i] = domain.Session{Date: monday.AddDate(0, 0, i)} //nolint:exhaustruct // rest-day placeholder.
+	}
+	plan.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
+		Date:              monday,
+		PeriodizationType: domain.PeriodizationStrength,
+		ExerciseSets: []domain.ExerciseSet{
+			{ //nolint:exhaustruct // ID assigned by repo; warmup nil.
+				Exercise: deadlift,
+				Sets: []domain.Set{
+					{TargetValue: 5, WeightKg: &w},
+				}, //nolint:exhaustruct // CompletedValue/At/Signal start nil.
+			},
+		},
+	}
+	return plan
+}
+
+func TestWeekPlanRepository_Create_PersistsWeek(t *testing.T) {
+	t.Parallel()
+	ctx, repos := setupTestRepos(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	plan := buildPlanWithOneSlot(ctx, t, repos, monday)
+	if err := repos.WeekPlans.Create(ctx, plan); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	got, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(got.Sessions[0].ExerciseSets) == 0 {
+		t.Error("session not persisted")
+	}
+}
+
+func TestWeekPlanRepository_Create_ReturnsErrAlreadyExistsOnConflict(t *testing.T) {
+	t.Parallel()
+	ctx, repos := setupTestRepos(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	plan := buildPlanWithOneSlot(ctx, t, repos, monday)
+	if err := repos.WeekPlans.Create(ctx, plan); err != nil {
+		t.Fatalf("Create first: %v", err)
+	}
+	err := repos.WeekPlans.Create(ctx, plan)
+	if !errors.Is(err, domain.ErrAlreadyExists) {
+		t.Fatalf("Create second: got %v, want ErrAlreadyExists", err)
 	}
 }

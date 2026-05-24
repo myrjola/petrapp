@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -72,6 +73,42 @@ func (r *sqliteWeekPlanRepository) Update(
 
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit week: %w", err)
+	}
+	return nil
+}
+
+// Create persists a freshly-planned WeekPlan in a single transaction. Returns
+// domain.ErrAlreadyExists (wrapped) when any session row already exists for the
+// week — callers use errors.Is to fall through to a re-read recovery path.
+// Rest-day placeholders (no slots, no lifecycle state) are skipped.
+func (r *sqliteWeekPlanRepository) Create(ctx context.Context, plan domain.WeekPlan) (err error) {
+	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
+		}
+	}()
+	for i := range plan.Sessions {
+		sess := plan.Sessions[i]
+		if isRestDayPlaceholder(sess) {
+			continue
+		}
+		if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
+			// Only the workout_sessions PK conflict (duplicate date for this user) maps to
+			// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
+			// those are programming errors, not concurrent-insert races.
+			var sqliteErr sqlite3.Error
+			if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
+				return fmt.Errorf("create week starting %s: %w", formatDate(plan.Monday), domain.ErrAlreadyExists)
+			}
+			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit create week: %w", err)
 	}
 	return nil
 }
