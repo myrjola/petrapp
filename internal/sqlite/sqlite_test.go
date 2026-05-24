@@ -2,8 +2,10 @@ package sqlite_test
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -95,5 +97,72 @@ func TestNewDatabase_CloseWaitsForBackgroundOptimizer(t *testing.T) {
 
 	if active := w.active.Load(); active > 0 {
 		t.Fatalf("Close returned while optimizer still writing (active=%d)", active)
+	}
+}
+
+// TestNewDatabase_ConcurrentReadsAndWritesDoNotLock pins the shared-cache
+// concurrency contract: in-memory databases (mode=memory&cache=shared) fall
+// back to journal_mode=memory, which uses table-level locks. Without
+// read_uncommitted on the read-only handle, concurrent reads on RO and writes
+// on RW race with SQLITE_LOCKED errors that _busy_timeout does not retry.
+func TestNewDatabase_ConcurrentReadsAndWritesDoNotLock(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("NewDatabase: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	var userID int
+	if err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("lock-test"), "Lock Test").Scan(&userID); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+
+	const iterations = 200
+	var wg sync.WaitGroup
+	errs := make(chan error, 2*iterations)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := range iterations {
+			if _, err := db.ReadWrite.ExecContext(ctx,
+				"UPDATE users SET display_name = ? WHERE id = ?",
+				"updated", userID); err != nil {
+				errs <- err
+				return
+			}
+			_ = i
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range iterations {
+			var name string
+			if err := db.ReadOnly.QueryRowContext(ctx,
+				"SELECT display_name FROM users WHERE id = ?", userID).Scan(&name); err != nil {
+				errs <- err
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil && strings.Contains(err.Error(), "database table is locked") {
+			t.Fatalf("SQLITE_LOCKED leaked to caller: %v", err)
+		}
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Errorf("unexpected concurrent r/w error: %v", err)
+		}
 	}
 }

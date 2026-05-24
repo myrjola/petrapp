@@ -75,22 +75,43 @@ func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Databas
 //nolint:gochecknoglobals // once is used to ensure that the SQLite driver is registered only once.
 var once sync.Once
 
-const optimizedDriver = "sqlite3optimized"
+const (
+	optimizedDriver         = "sqlite3optimized"
+	optimizedReadOnlyDriver = "sqlite3optimizedReadOnly"
+)
 
 // registerOptimizedDriver that executes performance-enhancing pragmas on connection.
 func registerOptimizedDriver() {
+	// Performance enhancement by storing temporary tables indices in memory instead of files.
+	// Performance enhancement for reducing syscalls by having the pages in memory-mapped I/O.
+	// Litestream handles checkpoints; see https://litestream.io/tips/#disable-autocheckpoints-for-high-write-load-servers.
+	const sharedPragmas = "PRAGMA temp_store = memory;" +
+		"PRAGMA mmap_size = 30000000000;" +
+		"PRAGMA wal_autocheckpoint = 0;"
+
 	sql.Register(optimizedDriver,
 		&sqlite3.SQLiteDriver{
 			Extensions: nil,
 			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
-				if _, err := conn.Exec(
-					// Performance enhancement by storing temporary tables indices in memory instead of files.
-					"PRAGMA temp_store = memory;"+
-						// Performance enhancement for reducing syscalls by having the pages in memory-mapped I/O.
-						"PRAGMA mmap_size = 30000000000;"+
-						// Litestream handles checkpoints.
-						// See https://litestream.io/tips/#disable-autocheckpoints-for-high-write-load-servers
-						"PRAGMA wal_autocheckpoint = 0;", nil); err != nil {
+				if _, err := conn.Exec(sharedPragmas, nil); err != nil {
+					return fmt.Errorf("exec optimization pragmas: %w", err)
+				}
+				return nil
+			},
+		})
+
+	// The read-only driver also enables read-uncommitted isolation. The pragma only takes
+	// effect when shared-cache mode is on. Production DSNs use mode=ro on a real file
+	// without cache=shared, so the pragma is a documented no-op there. In-memory test
+	// databases use cache=shared and fall back to journal_mode=memory (WAL is unavailable
+	// on :memory:); without read_uncommitted, shared-cache table-level read locks held by
+	// readers block concurrent writers with SQLITE_LOCKED, which _busy_timeout does not
+	// retry. See https://www.sqlite.org/sharedcache.html#read_uncommitted_isolation_mode.
+	sql.Register(optimizedReadOnlyDriver,
+		&sqlite3.SQLiteDriver{
+			Extensions: nil,
+			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+				if _, err := conn.Exec(sharedPragmas+"PRAGMA read_uncommitted = true;", nil); err != nil {
 					return fmt.Errorf("exec optimization pragmas: %w", err)
 				}
 				return nil
@@ -165,7 +186,7 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 		return nil, fmt.Errorf("ping read-write database: %w", err)
 	}
 
-	if readDB, err = sql.Open(optimizedDriver, readConfig); err != nil {
+	if readDB, err = sql.Open(optimizedReadOnlyDriver, readConfig); err != nil {
 		return nil, fmt.Errorf("open read database: %w", err)
 	}
 
