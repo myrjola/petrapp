@@ -6,14 +6,39 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
+// stackNavHeaderValue is the X-Requested-With value the JS shim
+// (ui/static/main.js) sends on form POSTs it has intercepted. Server-side
+// helpers branch on it to negotiate the stack-navigator wire protocol.
+const stackNavHeaderValue = "stacknav"
+
 func (app *application) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	app.logger.LogAttrs(r.Context(), slog.LevelError, "server error", slog.Any("error", err))
+
+	if r.Header.Get("X-Requested-With") == stackNavHeaderValue {
+		// Drive the shim's "200 + X-Location ⇒ navigate" path so the user
+		// sees the error page instead of a silent reload on the form page.
+		// Referer is a UX hint only — sanitised same-origin path becomes a
+		// "← Back" link on the error page, cross-origin / missing is fine.
+		target := "/error"
+		if from := r.Referer(); from != "" {
+			if u, parseErr := url.Parse(from); parseErr == nil && u.Host == r.Host {
+				target = "/error?from=" + url.QueryEscape(u.Path)
+			}
+		}
+		w.Header().Set("X-Location", target)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Non-shim path: render the error page inline with a 500. This is the
+	// path for GET handlers, curl, and no-JS browsers.
 	app.render(w, r, http.StatusInternalServerError, "error", errorTemplateData{
 		BaseTemplateData: newBaseTemplateData(r),
 		From:             "",
