@@ -300,10 +300,9 @@ func Test_AddExercise(t *testing.T) {
 		// Add exercise 2 to the workout. AddExercise returns the
 		// workout_exercise.id of the new slot so handlers can redirect
 		// straight to the new exercise's detail page.
-		var newSlotID int
-		newSlotID, err = svc.AddExercise(ctx, today, exercise2ID)
-		if err != nil {
-			t.Fatalf("Failed to add exercise to workout: %v", err)
+		newSlotID, errAdd := svc.AddExercise(ctx, today, exercise2ID)
+		if errAdd != nil {
+			t.Fatalf("Failed to add exercise to workout: %v", errAdd)
 		}
 		if newSlotID == 0 {
 			t.Errorf("expected non-zero new slot ID, got 0")
@@ -359,8 +358,8 @@ func Test_AddExercise(t *testing.T) {
 		t.Parallel()
 
 		// Try to add exercise 1 which is already in the workout
-		_, err = svc.AddExercise(ctx, today, exercise1ID)
-		if err == nil {
+		_, errAdd := svc.AddExercise(ctx, today, exercise1ID)
+		if errAdd == nil {
 			t.Error("Expected error when adding duplicate exercise, but got nil")
 		}
 	})
@@ -386,13 +385,13 @@ func Test_AddExercise(t *testing.T) {
 
 		// Add exercise to the non-existent workout - should fail with a
 		// ValidationError carrying a user-facing message.
-		_, err = svc.AddExercise(ctx, futureDate, exercise1ID)
-		if err == nil {
+		_, errAdd := svc.AddExercise(ctx, futureDate, exercise1ID)
+		if errAdd == nil {
 			t.Fatal("Expected error when adding exercise to non-existent workout, but got nil")
 		}
 		var ve domain.ValidationError
-		if !errors.As(err, &ve) {
-			t.Fatalf("Expected ValidationError, got %T: %v", err, err)
+		if !errors.As(errAdd, &ve) {
+			t.Fatalf("Expected ValidationError, got %T: %v", errAdd, errAdd)
 		}
 		wantMsg := "This day has no planned workout. Schedule one from the home page first."
 		if ve.Message != wantMsg {
