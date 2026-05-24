@@ -18,6 +18,7 @@ import (
 // the SQLite implementation.
 type Repositories struct {
 	Sessions          SessionRepository
+	WeekPlans         WeekPlanRepository
 	Exercises         ExerciseRepository
 	Preferences       PreferencesRepository
 	FeatureFlags      FeatureFlagRepository
@@ -35,6 +36,7 @@ func New(db *sqlite.Database) *Repositories {
 	featureFlags := newSQLiteFeatureFlagRepository(db)
 	exercises := newSQLiteExerciseRepository(db)
 	sessions := newSQLiteSessionRepository(db)
+	weekPlans := newSQLiteWeekPlanRepository(db)
 	pushSubs := newSQLitePushSubscriptionRepository(db)
 	scheduledPushes := newSQLiteScheduledPushRepository(db)
 	return &Repositories{
@@ -43,6 +45,7 @@ func New(db *sqlite.Database) *Repositories {
 		FeatureFlags:      featureFlags,
 		Exercises:         exercises,
 		Sessions:          sessions,
+		WeekPlans:         weekPlans,
 		PushSubscriptions: pushSubs,
 		ScheduledPushes:   scheduledPushes,
 	}
@@ -79,6 +82,17 @@ type SessionRepository interface {
 		ctx context.Context, exerciseID int, beforeDate time.Time,
 	) (int, error)
 	CountCompleted(ctx context.Context) (int, error)
+}
+
+// WeekPlanRepository persists the full week aggregate. The Update closure
+// pattern mirrors SessionRepository.Update but at week scope: load the seven
+// days into a domain.WeekPlan, run fn under a single transaction, persist the
+// diff on nil.
+type WeekPlanRepository interface {
+	// Get returns the lazily-materialised week. Sessions is always length 7;
+	// non-scheduled dates carry an empty Session{Date: ...}. Returns
+	// domain.ErrNotFound when no workout_sessions row exists for the week.
+	Get(ctx context.Context, monday time.Time) (domain.WeekPlan, error)
 }
 
 // ExerciseRepository persists exercise definitions and their muscle-group

@@ -567,7 +567,7 @@ func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, erro
 // listSessionRows scans the workout_sessions scalar rows for a user on or
 // after sinceDate, newest first. ExerciseSets is left nil — List hydrates it
 // in a single batched follow-up query.
-func (r *sqliteSessionRepository) listSessionRows(
+func (r baseRepository) listSessionRows(
 	ctx context.Context,
 	userID int,
 	sinceDate time.Time,
@@ -613,6 +613,58 @@ func (r *sqliteSessionRepository) listSessionRows(
 	}
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
+	}
+	return sessions, nil
+}
+
+// listSessionRowsBetween returns sessions whose workout_date is in [from, to]
+// inclusive, oldest first. ExerciseSets is left nil — caller hydrates.
+func (r baseRepository) listSessionRowsBetween(
+	ctx context.Context,
+	userID int,
+	from, to time.Time,
+) (_ []domain.Session, err error) {
+	rows, err := r.db.ReadOnly.QueryContext(ctx, `
+		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+		FROM workout_sessions
+		WHERE user_id = ? AND workout_date BETWEEN ? AND ?
+		ORDER BY workout_date ASC`,
+		userID, formatDate(from), formatDate(to))
+	if err != nil {
+		return nil, fmt.Errorf("query workout_sessions between: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
+
+	var sessions []domain.Session
+	for rows.Next() {
+		var (
+			workoutDateStr    string
+			difficultyRating  sql.NullInt32
+			startedAtStr      sql.NullString
+			completedAtStr    sql.NullString
+			periodizationType domain.PeriodizationType
+			isDeload          bool
+		)
+		if err = rows.Scan(
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload,
+		); err != nil {
+			return nil, fmt.Errorf("scan workout_sessions row: %w", err)
+		}
+		var session domain.Session
+		session, err = parseSessionRow(
+			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
+		)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workout_sessions rows: %w", err)
 	}
 	return sessions, nil
 }
@@ -738,7 +790,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 // query across all slots. This is the batched equivalent of loadExerciseSets
 // used by List: the whole date range costs this one query plus one muscle-
 // group query, replacing the prior per-session 1 + 2N N+1.
-func (r *sqliteSessionRepository) loadExerciseSetsSince(
+func (r baseRepository) loadExerciseSetsSince(
 	ctx context.Context,
 	q queryer,
 	userID int,
