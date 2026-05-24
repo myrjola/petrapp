@@ -188,8 +188,8 @@ func buildPlanWithOneSlot(
 			{ //nolint:exhaustruct // ID assigned by repo; warmup nil.
 				Exercise: deadlift,
 				Sets: []domain.Set{
-					{TargetValue: 5, WeightKg: &w},
-				}, //nolint:exhaustruct // CompletedValue/At/Signal start nil.
+					{TargetValue: 5, WeightKg: &w}, //nolint:exhaustruct // CompletedValue/At/Signal start nil.
+				},
 			},
 		},
 	}
