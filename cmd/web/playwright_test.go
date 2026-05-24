@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,19 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"github.com/playwright-community/playwright-go"
 )
+
+// installPlaywrightOnce guards playwright.Install against concurrent calls
+// from parallel tests. Two parallel installs race on the driver's node
+// binary (one writes/holds it open while another tries to exec it),
+// producing "text file busy" (ETXTBSY) in CI.
+//
+//nolint:gochecknoglobals // sync.OnceValue must be package-scoped to share across tests.
+var installPlaywrightOnce = sync.OnceValue(func() error {
+	return playwright.Install(&playwright.RunOptions{
+		Browsers: []string{"chromium"},
+		Verbose:  false,
+	})
+})
 
 // setupPlaywrightPage installs Playwright, starts the app server, launches
 // Chromium, opens a page at "/", and wires a virtual WebAuthn authenticator
@@ -21,10 +35,7 @@ import (
 func setupPlaywrightPage(t *testing.T) (playwright.Page, string) {
 	t.Helper()
 
-	if err := playwright.Install(&playwright.RunOptions{
-		Browsers: []string{"chromium"},
-		Verbose:  false,
-	}); err != nil {
+	if err := installPlaywrightOnce(); err != nil {
 		t.Fatalf("install playwright browsers: %v", err)
 	}
 
