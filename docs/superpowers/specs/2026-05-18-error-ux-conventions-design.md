@@ -2,6 +2,12 @@
 
 **Date:** 2026-05-18
 **Status:** Approved (design phase)
+
+**Class-C update:** the "silent failure when handlers stay on `serverError`"
+note in this design has been superseded by
+[2026-05-24 Shim-Aware `serverError`](2026-05-24-servererror-shim-aware-design.md).
+Class C now navigates to `/error` instead of producing a silent reload.
+
 **Scope:** Server-side and JavaScript error surfacing across the MPA, with WCAG 2.2 AA accessibility.
 
 ## Problem

@@ -140,41 +140,51 @@ Every POST handler ends in exactly one of:
 | Call | When | Effect |
 |---|---|---|
 | `redirect(w, r, url)` | Success | 200 + `X-Location` (stacknav) or 303 (plain); client navigates |
-| `app.userError(w, r, err, safeURL)` | Any failure on an in-flight POST | Routes by error type, calls `putFlashError`, then `redirect(w, r, safeURL)` |
-| `app.serverError(w, r, err)` | GET failures, or the POST escape hatch when the safe URL itself is broken | Logs and renders `error.gohtml` 500 |
+| `app.userError(w, r, err, safeURL)` | Any failure on an in-flight POST | `ValidationError` → `putFlashError(ve.Message)` + `redirect(safeURL)`; anything else → delegates to `serverError` |
+| `app.serverError(w, r, err)` | Catastrophic failures: panics, template render errors, escape hatch when no safe URL fits | Logs. On a shim POST navigates to `/error?from=<sanitised>`; on GET / non-shim renders `error.gohtml` with 500 |
 
-#### Why `serverError` on POST is silent failure
+#### `serverError` on POST navigates to `/error`
 
 The stack-navigator JS shim (`ui/static/main.js`) intercepts every form
 POST, replays it via `fetch`, and on any non-200 response calls
 `location.reload()` — CSP / Trusted Types block injecting the response
-body in place. The reload lands on the page the form lived on, and
-`serverError` does not write to the flash, so there is no banner. The
-user sees "button did nothing."
+body in place. Historically that meant `serverError` on a POST produced
+a silent failure: reload landed on the form page with no flash, no
+banner.
 
-This means `serverError` on a POST is only the right call when the safe
-URL itself is also broken (template render of the form page is what
-failed). In that case the reload's GET also 500s and `error.gohtml`
-renders directly. Every other POST failure belongs in `userError` so
-the flash → banner → safe URL flow produces visible state — even when
-no plausible per-flow safe URL exists, fall back to `/` rather than
-`serverError`.
+Today `serverError` detects the `X-Requested-With: stacknav` header and,
+on the shim path, replies `200 + X-Location: /error[?from=…]` instead
+of a 500 body. The shim navigates to `/error`, which renders a
+catastrophic-failure page with a "← Back" link (when the originating
+path was same-origin) and Go Home. On a curl / no-JS request the same
+helper falls through to the inline 500 + `error.gohtml` body — the
+browser renders it directly.
 
-On GET handlers `serverError` remains the right floor: the browser
-renders the 500 body directly, no shim is involved.
+Use `serverError` when there is no safe URL to flash + redirect to:
+panics caught by `recoverPanic`, template render failures, and the
+escape hatches inside helpers like `parseForm`. Use `userError` for
+in-flight POST failures where validation needs a banner on a known-good
+GET handler — it routes the validation case to the banner and
+delegates everything else back to `serverError`.
 
 #### `userError` semantics
 
-`userError` is the single helper for *both* `domain.ValidationError` and unexpected
-system errors on inline actions. It dispatches on the error type:
+`userError` routes by error type:
 
-- `var ve domain.ValidationError; errors.As(err, &ve)` → flash with `ve.Message` verbatim.
-- Otherwise → log the underlying error at ERROR and flash a generic message.
+- `errors.As(err, &ve)` matching `domain.ValidationError` → flash with
+  `ve.Message` verbatim and `redirect(safeURL)`. The form's GET handler
+  pops the flash with `app.popFlashError(...)` and renders the
+  `banner` component.
+- Anything else → delegate to `serverError`. The non-validation case
+  produces the catastrophic-failure UX (shim navigation to `/error`,
+  or inline 500 for non-shim clients). `userError` does not
+  flash a generic "Couldn't complete that action" message any more —
+  banner UX is reserved for failures the user can act on by adjusting
+  their input.
 
-Then it writes the flash and redirects to `safeURL`. The form's GET handler
-pops the flash with `app.popFlashError(...)` and renders the `banner`
-component as today — see the worked example in `workoutGET` /
-`workoutAddExercisePOST`.
+`safeURL` is only consulted on the validation branch. It must point at
+a GET handler known to render successfully AND that pops + renders the
+flash banner. See the `safeURL` requirements below.
 
 #### `safeURL` is mandatory, must pop + render the flash
 
@@ -193,15 +203,15 @@ produce a redirect loop.
 
 #### Existing handlers may still use inline `errors.As(&ve)` boilerplate
 
-> Go-forward convention for new and migrating handlers. Existing handlers
-> predate `userError` and may still use the inline `errors.As(&ve) {
-> putFlashError(ve.Message); redirect(formURL) }` pattern — that's fine,
-> functionally equivalent, and they migrate opportunistically when next
-> touched. Don't expect every form handler to call `userError` today.
->
-> Handlers that fall through to `app.serverError(w, r, err)` on the
-> non-`ValidationError` branch (e.g. `workoutCompletePOST` today) are
-> the migration priority — they are the silent-failure cases above.
+> Go-forward convention for new and migrating handlers. Existing
+> handlers predate `userError` and may still use the inline
+> `errors.As(&ve) { putFlashError(ve.Message); redirect(formURL) }`
+> + trailing `app.serverError(w, r, err)` pattern. Under the
+> shim-aware `serverError`, that inline pattern is now
+> *functionally equivalent* to calling `userError` — both route
+> `ValidationError` to the banner and non-validation to the
+> catastrophic-failure page. Migrate opportunistically when next
+> touching the handler; there is no UX gap remaining.
 
 #### Other patterns
 
