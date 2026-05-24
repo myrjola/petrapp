@@ -511,3 +511,62 @@ func verifySelected(t *testing.T, doc *goquery.Document, weekdays map[string]int
 		}
 	}
 }
+
+func Test_application_preferencesStartDeloadNow(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// 1) Visit /preferences with deload OFF: button must be disabled.
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences: %v", err)
+	}
+	startBtn := doc.Find("button:contains('Start deload this week')")
+	if startBtn.Length() == 0 {
+		t.Fatal("Start deload button not found on /preferences")
+	}
+	if _, ok := startBtn.Attr("disabled"); !ok {
+		t.Error("Start deload button should be disabled when DeloadEnabled is false")
+	}
+
+	// 2) Enable deload + at least one workout day so the prefs form validates.
+	if _, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+		"monday_minutes":   "60",
+		"deload_enabled":   "on",
+		"mesocycle_length": "5",
+	}); err != nil {
+		t.Fatalf("SubmitForm enable deload: %v", err)
+	}
+
+	// 3) Re-fetch /preferences and confirm the button is now enabled.
+	doc, err = client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences (after enable): %v", err)
+	}
+	startBtn = doc.Find("button:contains('Start deload this week')")
+	if startBtn.Length() == 0 {
+		t.Fatal("Start deload button missing after enabling deload")
+	}
+	if _, ok := startBtn.Attr("disabled"); ok {
+		t.Error("Start deload button should be enabled when DeloadEnabled is true")
+	}
+
+	// 4) Submit the form; expect a redirect back to /preferences that renders.
+	doc, err = client.SubmitForm(ctx, doc, "/preferences/mesocycle/start-deload-now", nil)
+	if err != nil {
+		t.Fatalf("SubmitForm start-deload-now: %v", err)
+	}
+	if got := doc.Find("h2#deload-title").Text(); got != "Deload cycles" {
+		t.Errorf("expected Recovery panel heading after redirect, got %q", got)
+	}
+}

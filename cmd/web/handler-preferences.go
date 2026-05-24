@@ -269,3 +269,14 @@ func (app *application) preferencesRestNotificationsTogglePOST(w http.ResponseWr
 	}
 	redirect(w, r, "/preferences")
 }
+
+func (app *application) preferencesStartDeloadNowPOST(w http.ResponseWriter, r *http.Request) {
+	if !app.parseForm(w, r, defaultMaxFormSize) {
+		return
+	}
+	if err := app.service.StartDeloadNow(r.Context()); err != nil {
+		app.serverError(w, r, fmt.Errorf("start deload now: %w", err))
+		return
+	}
+	redirect(w, r, "/preferences")
+}

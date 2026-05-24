@@ -43,6 +43,8 @@ func (app *application) routes() (*http.ServeMux, error) {
 		app.mustSessionStack(http.HandlerFunc(app.preferencesRestNotificationsTogglePOST)))
 	mux.Handle("POST /preferences/mesocycle/restart",
 		app.mustSessionStack(http.HandlerFunc(app.preferencesRestartMesocyclePOST)))
+	mux.Handle("POST /preferences/mesocycle/start-deload-now",
+		app.mustSessionStack(http.HandlerFunc(app.preferencesStartDeloadNowPOST)))
 
 	mux.Handle("POST /api/push/subscribe",
 		app.mustSessionStack(http.HandlerFunc(app.pushSubscribePOST)))

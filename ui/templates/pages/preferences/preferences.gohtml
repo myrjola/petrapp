@@ -622,6 +622,13 @@
                 <p class="anchor-note">Current cycle started {{ .MesocycleAnchor.Format "Mon 2 Jan 2006" }}.</p>
             {{ end }}
 
+            <form method="post" action="/preferences/mesocycle/start-deload-now" class="panel-actions">
+                <button type="submit" class="btn btn--ghost btn--block"
+                        {{ if not .DeloadEnabled }}disabled{{ end }}>
+                    Start deload this week
+                </button>
+            </form>
+
             <form method="post" action="/preferences/mesocycle/restart" class="panel-actions">
                 <button type="submit" class="btn btn--ghost btn--block" {{ if not .DeloadEnabled }}disabled{{ end }}>
                     Restart cycle next Monday
