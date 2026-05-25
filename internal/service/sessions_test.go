@@ -90,12 +90,17 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 	}
 }
 
-func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T) {
+// Regenerate is a no-op against an unpersisted week: WeekPlans.Update returns
+// ErrNotFound, which the service treats as "nothing started, nothing to
+// regenerate". The subsequent ResolveWeeklySchedule then lazy-creates the
+// week. This test pins both halves: the regenerate succeeds (returns nil) and
+// the lazy-create chain delivers Mon/Wed/Fri exercises on first read.
+func Test_RegenerateWeeklyPlanIfUnstarted_NoOpOnEmptyWeekThenLazyCreate(t *testing.T) {
 	t.Parallel()
 
-	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet.
 
-	// Call directly without seeding via ResolveWeeklySchedule first.
+	// Regenerate on an empty week is a no-op; should not error.
 	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
 		t.Fatalf("RegenerateWeeklyPlanIfUnstarted on empty week: %v", err)
 	}
@@ -105,7 +110,7 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T)
 		t.Fatalf("ResolveWeeklySchedule after empty-week regenerate: %v", err)
 	}
 	sessions := plan.Sessions[:]
-	// Mon=0, Wed=2, Fri=4 must have exercises.
+	// Mon=0, Wed=2, Fri=4 must have exercises — populated by ResolveWeeklySchedule's lazy create.
 	for _, i := range []int{0, 2, 4} {
 		if len(sessions[i].ExerciseSets) == 0 {
 			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
