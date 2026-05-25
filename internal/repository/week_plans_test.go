@@ -213,6 +213,59 @@ func TestWeekPlanRepository_Create_PersistsWeek(t *testing.T) {
 	}
 }
 
+func TestWeekPlanRepository_Update_HandlesMixedExplicitAndNewSlotIDs(t *testing.T) {
+	t.Parallel()
+	ctx, db, repos := setupTestReposWithDB(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	tuesday := monday.AddDate(0, 0, 1)
+	// Seed Tuesday only — gives that session a workout_exercise row with id=1.
+	seedScheduledSession(ctx, t, db, tuesday)
+
+	// Inside Update: add a brand-new Monday session that will need a new
+	// workout_exercise.id. The reinsert loop must claim Tuesday's preserved
+	// id=1 before SQLite auto-assigns id=1 to Monday's new slot.
+	err := repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		// Find an exercise to use for the new Monday slot.
+		// Easiest: copy the Tuesday slot's Exercise (any seed exercise works).
+		var newSlotExercise domain.Exercise
+		for _, slot := range wp.Sessions[1].ExerciseSets {
+			newSlotExercise = slot.Exercise
+			break
+		}
+		if newSlotExercise.ID == 0 {
+			t.Fatal("Tuesday seed should have a slot")
+		}
+		// Add a new (ID=0) slot to Monday.
+		wp.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
+			Date:              monday,
+			PeriodizationType: domain.PeriodizationStrength,
+			ExerciseSets: []domain.ExerciseSet{{ //nolint:exhaustruct // ID=0 means repo assigns.
+				ID:       0,
+				Exercise: newSlotExercise,
+				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // CompletedValue etc. nil.
+			}},
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Update should succeed despite mixed IDs: %v", err)
+	}
+	reloaded, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if len(reloaded.Sessions[0].ExerciseSets) != 1 {
+		t.Errorf("Monday should have 1 slot, got %d", len(reloaded.Sessions[0].ExerciseSets))
+	}
+	if len(reloaded.Sessions[1].ExerciseSets) != 1 {
+		t.Errorf("Tuesday should still have 1 slot, got %d", len(reloaded.Sessions[1].ExerciseSets))
+	}
+	// Tuesday's slot ID must still be 1 (preserved through the rewrite).
+	if reloaded.Sessions[1].ExerciseSets[0].ID != 1 {
+		t.Errorf("Tuesday slot ID should still be 1, got %d", reloaded.Sessions[1].ExerciseSets[0].ID)
+	}
+}
+
 func TestWeekPlanRepository_Create_ReturnsErrAlreadyExistsOnConflict(t *testing.T) {
 	t.Parallel()
 	ctx, repos := setupTestRepos(t)
