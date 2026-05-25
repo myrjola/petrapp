@@ -34,7 +34,7 @@ func TestSessionRepository_GetMissingReturnsErrNotFound(t *testing.T) {
 	}
 }
 
-func TestSessionRepository_CreateBatchThenGetHydratesExercise(t *testing.T) {
+func TestSessionRepository_GetHydratesExercise(t *testing.T) {
 	t.Parallel()
 
 	ctx, repos := setupTestRepos(t)
@@ -44,9 +44,9 @@ func TestSessionRepository_CreateBatchThenGetHydratesExercise(t *testing.T) {
 		t.Fatalf("Create exercise: %v", err)
 	}
 
-	date := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	monday := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero by design.
-		Date:              date,
+		Date:              monday,
 		PeriodizationType: domain.PeriodizationStrength,
 		ExerciseSets: []domain.ExerciseSet{
 			{ //nolint:exhaustruct // ID assigned by DB; WarmupCompletedAt nil.
@@ -55,11 +55,17 @@ func TestSessionRepository_CreateBatchThenGetHydratesExercise(t *testing.T) {
 			},
 		},
 	}
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
+	wp := domain.WeekPlan{Monday: monday} //nolint:exhaustruct // Sessions initialised below.
+	for i := range 7 {
+		//nolint:exhaustruct // rest-day placeholder; only Date is meaningful.
+		wp.Sessions[i] = domain.Session{Date: monday.AddDate(0, 0, i)}
+	}
+	wp.Sessions[0] = sess
+	if err = repos.WeekPlans.Create(ctx, wp); err != nil {
+		t.Fatalf("WeekPlans.Create: %v", err)
 	}
 
-	got, err := repos.Sessions.Get(ctx, date)
+	got, err := repos.Sessions.Get(ctx, monday)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -87,8 +93,9 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create exercise: %v", err)
 	}
-	earlier := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
-	later := time.Date(2026, 5, 13, 0, 0, 0, 0, time.UTC)
+	monday := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
+	earlier := monday                // Monday.
+	later := monday.AddDate(0, 0, 2) // Wednesday — same week so a single WeekPlans.Create suffices.
 	mkSession := func(day time.Time) domain.Session {
 		return domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
 			Date:              day,
@@ -101,10 +108,15 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 			},
 		}
 	}
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{
-		mkSession(earlier), mkSession(later),
-	}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
+	wp := domain.WeekPlan{Monday: monday} //nolint:exhaustruct // Sessions initialised below.
+	for i := range 7 {
+		//nolint:exhaustruct // rest-day placeholder; only Date is meaningful.
+		wp.Sessions[i] = domain.Session{Date: monday.AddDate(0, 0, i)}
+	}
+	wp.Sessions[0] = mkSession(earlier)
+	wp.Sessions[2] = mkSession(later)
+	if err = repos.WeekPlans.Create(ctx, wp); err != nil {
+		t.Fatalf("WeekPlans.Create: %v", err)
 	}
 
 	got, err := repos.Sessions.List(ctx, earlier)
@@ -139,151 +151,27 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 	}
 }
 
-func TestSessionRepository_UpdatePreservesSlotID(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("Create exercise: %v", err)
-	}
-	date := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
-		Date:              date,
-		PeriodizationType: domain.PeriodizationStrength,
-		ExerciseSets: []domain.ExerciseSet{
-			{ //nolint:exhaustruct // ID assigned by DB.
-				Exercise: exercise,
-				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
-			},
-		},
-	}
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
-
-	fetched, err := repos.Sessions.Get(ctx, date)
-	if err != nil {
-		t.Fatalf("Get after create: %v", err)
-	}
-	originalSlotID := fetched.ExerciseSets[0].ID
-	if originalSlotID == 0 {
-		t.Fatalf("expected non-zero slot ID after insert")
-	}
-
-	if err = repos.Sessions.Update(ctx, date, func(s *domain.Session) error {
-		s.StartedAt = time.Now().UTC()
-		return nil
-	}); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	after, err := repos.Sessions.Get(ctx, date)
-	if err != nil {
-		t.Fatalf("Get after Update: %v", err)
-	}
-	if len(after.ExerciseSets) != 1 {
-		t.Fatalf("want 1 slot after Update, got %d", len(after.ExerciseSets))
-	}
-	if after.ExerciseSets[0].ID != originalSlotID {
-		t.Errorf("slot ID changed across Update: %d → %d", originalSlotID, after.ExerciseSets[0].ID)
-	}
-	if after.StartedAt.IsZero() {
-		t.Errorf("expected StartedAt to be set after Update closure")
-	}
-}
-
-func TestSessionRepository_UpdateRollsBackOnError(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("Create exercise: %v", err)
-	}
-	date := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
-		Date:              date,
-		PeriodizationType: domain.PeriodizationStrength,
-		ExerciseSets: []domain.ExerciseSet{
-			{ //nolint:exhaustruct // ID assigned by DB.
-				Exercise: exercise,
-				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
-			},
-		},
-	}
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
-
-	wantErr := errors.New("user-injected failure")
-	if err = repos.Sessions.Update(ctx, date, func(s *domain.Session) error {
-		s.StartedAt = time.Now().UTC()
-		return wantErr
-	}); !errors.Is(err, wantErr) {
-		t.Fatalf("Update: want injected error, got %v", err)
-	}
-
-	after, err := repos.Sessions.Get(ctx, date)
-	if err != nil {
-		t.Fatalf("Get: %v", err)
-	}
-	if !after.StartedAt.IsZero() {
-		t.Errorf("expected rollback to leave StartedAt zero, got %v", after.StartedAt)
-	}
-}
-
-func TestSessionRepository_UpdatePropagatesDomainSentinel(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("Create exercise: %v", err)
-	}
-	date := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
-	now := time.Now().UTC()
-	sess := domain.Session{ //nolint:exhaustruct // CompletedAt zero.
-		Date:              date,
-		PeriodizationType: domain.PeriodizationStrength,
-		StartedAt:         now,
-		ExerciseSets: []domain.ExerciseSet{
-			{ //nolint:exhaustruct // ID assigned by DB.
-				Exercise: exercise,
-				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
-			},
-		},
-	}
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
-
-	err = repos.Sessions.Update(ctx, date, func(s *domain.Session) error {
-		return s.Start(time.Now().UTC()) // already started: returns ErrAlreadyStarted
-	})
-	if !errors.Is(err, domain.ErrAlreadyStarted) {
-		t.Errorf("want domain.ErrAlreadyStarted to propagate, got %v", err)
-	}
-}
-
 func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
 	t.Parallel()
 
 	ctx, repos := setupTestRepos(t)
 
-	date := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	monday := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // only IsDeload round-trip is exercised
-		Date:              date,
+		Date:              monday,
 		PeriodizationType: domain.PeriodizationHypertrophy,
 		IsDeload:          true,
 	}
-	if err := repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
+	wp := domain.WeekPlan{Monday: monday} //nolint:exhaustruct // Sessions initialised below.
+	for i := range 7 {
+		//nolint:exhaustruct // rest-day placeholder; only Date is meaningful.
+		wp.Sessions[i] = domain.Session{Date: monday.AddDate(0, 0, i)}
 	}
-	got, err := repos.Sessions.Get(ctx, date)
+	wp.Sessions[0] = sess
+	if err := repos.WeekPlans.Create(ctx, wp); err != nil {
+		t.Fatalf("WeekPlans.Create: %v", err)
+	}
+	got, err := repos.Sessions.Get(ctx, monday)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -349,8 +237,20 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 		},
 	}
 
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{normal, deload}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
+	// Two distinct weeks → two Create calls.
+	for _, wkSess := range []struct {
+		monday time.Time
+		sess   domain.Session
+	}{{mondayNormal, normal}, {mondayDeload, deload}} {
+		wp := domain.WeekPlan{Monday: wkSess.monday} //nolint:exhaustruct // Sessions initialised below.
+		for i := range 7 {
+			//nolint:exhaustruct // rest-day placeholder; only Date is meaningful.
+			wp.Sessions[i] = domain.Session{Date: wkSess.monday.AddDate(0, 0, i)}
+		}
+		wp.Sessions[0] = wkSess.sess
+		if err = repos.WeekPlans.Create(ctx, wp); err != nil {
+			t.Fatalf("WeekPlans.Create %s: %v", wkSess.monday.Format(time.DateOnly), err)
+		}
 	}
 
 	got, err := repos.Sessions.GetLatestStartingWeightBefore(ctx, exercise.ID, mondayDeload.AddDate(0, 0, 7))
@@ -359,152 +259,6 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 	}
 	if got.WeightKg != 100.0 {
 		t.Errorf("WeightKg = %v, want 100.0 (deload session must be excluded)", got.WeightKg)
-	}
-}
-
-func TestSessionRepository_Create_InsertsSingleSession(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("create exercise: %v", err)
-	}
-
-	date := time.Date(2026, 1, 7, 0, 0, 0, 0, time.UTC) // a Wednesday
-	sess := domain.Session{                             //nolint:exhaustruct // StartedAt/CompletedAt zero on insert.
-		Date:              date,
-		PeriodizationType: domain.PeriodizationStrength,
-		IsDeload:          false,
-		ExerciseSets: []domain.ExerciseSet{
-			{ //nolint:exhaustruct // ID assigned on insert, WarmupCompletedAt nil.
-				Exercise: ex,
-				Sets: []domain.Set{
-					{TargetValue: 5}, //nolint:exhaustruct // all completion fields nil.
-				},
-			},
-		},
-	}
-
-	if err = repos.Sessions.Create(ctx, sess); err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-
-	got, err := repos.Sessions.Get(ctx, date)
-	if err != nil {
-		t.Fatalf("Get after Create: %v", err)
-	}
-	if len(got.ExerciseSets) != 1 || got.ExerciseSets[0].Exercise.ID != ex.ID {
-		t.Errorf("round-trip mismatch: %+v", got)
-	}
-	if got.PeriodizationType != domain.PeriodizationStrength {
-		t.Errorf("PeriodizationType = %s, want strength", got.PeriodizationType)
-	}
-}
-
-func TestSessionRepository_Create_ConflictReturnsErrAlreadyExists(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("create exercise: %v", err)
-	}
-
-	date := time.Date(2026, 1, 8, 0, 0, 0, 0, time.UTC) // a Thursday — distinct from the round-trip test
-	sess := domain.Session{                             //nolint:exhaustruct // StartedAt/CompletedAt zero on insert.
-		Date:              date,
-		PeriodizationType: domain.PeriodizationStrength,
-		ExerciseSets: []domain.ExerciseSet{
-			{ //nolint:exhaustruct // ID assigned on insert, WarmupCompletedAt nil.
-				Exercise: ex,
-				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // completion fields nil.
-			},
-		},
-	}
-	if err = repos.Sessions.Create(ctx, sess); err != nil {
-		t.Fatalf("first Create: %v", err)
-	}
-
-	err = repos.Sessions.Create(ctx, sess)
-	if !errors.Is(err, domain.ErrAlreadyExists) {
-		t.Errorf("second Create err = %v, want wraps domain.ErrAlreadyExists", err)
-	}
-}
-
-func TestSessionRepository_CreateBatch_ConflictReturnsErrAlreadyExists(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	ex, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("create exercise: %v", err)
-	}
-
-	date := time.Date(2026, 1, 9, 0, 0, 0, 0, time.UTC) // a Friday, distinct from other Create tests
-	sess := domain.Session{                             //nolint:exhaustruct // completion fields nil on insert.
-		Date:              date,
-		PeriodizationType: domain.PeriodizationStrength,
-		ExerciseSets: []domain.ExerciseSet{
-			{ //nolint:exhaustruct // ID assigned on insert, WarmupCompletedAt nil.
-				Exercise: ex,
-				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // completion fields nil.
-			},
-		},
-	}
-
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess}); err != nil {
-		t.Fatalf("first CreateBatch: %v", err)
-	}
-
-	err = repos.Sessions.CreateBatch(ctx, []domain.Session{sess})
-	if !errors.Is(err, domain.ErrAlreadyExists) {
-		t.Errorf("second CreateBatch err = %v, want wraps domain.ErrAlreadyExists", err)
-	}
-}
-
-func TestSessionRepository_DeleteWeek(t *testing.T) {
-	t.Parallel()
-
-	ctx, repos := setupTestRepos(t)
-
-	monday := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
-	exercise, err := repos.Exercises.Create(ctx, newTestExerciseFor(t))
-	if err != nil {
-		t.Fatalf("Create exercise: %v", err)
-	}
-	mkSession := func(day time.Time) domain.Session {
-		return domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
-			Date:              day,
-			PeriodizationType: domain.PeriodizationStrength,
-			ExerciseSets: []domain.ExerciseSet{
-				{ //nolint:exhaustruct // ID assigned by DB.
-					Exercise: exercise,
-					Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
-				},
-			},
-		}
-	}
-	if err = repos.Sessions.CreateBatch(ctx, []domain.Session{
-		mkSession(monday),
-		mkSession(monday.AddDate(0, 0, 2)),
-		mkSession(monday.AddDate(0, 0, 4)),
-	}); err != nil {
-		t.Fatalf("CreateBatch: %v", err)
-	}
-
-	if err = repos.Sessions.DeleteWeek(ctx, monday); err != nil {
-		t.Fatalf("DeleteWeek: %v", err)
-	}
-
-	for _, day := range []time.Time{monday, monday.AddDate(0, 0, 2), monday.AddDate(0, 0, 4)} {
-		_, err = repos.Sessions.Get(ctx, day)
-		if !errors.Is(err, domain.ErrNotFound) {
-			t.Errorf("Get %s after DeleteWeek: want ErrNotFound, got %v", day.Format(time.DateOnly), err)
-		}
 	}
 }
 

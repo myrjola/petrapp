@@ -50,11 +50,17 @@ and `internal/contexthelpers`. It does NOT depend on `cmd/web` or
 ## Update-closure pattern
 
 Every method that mutates a `domain.Session` does so through
-`s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error
+`s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error
 { ... })`. The closure body should be a single call to a domain aggregate
-method (e.g. `return sess.RecordSet(...)`); domain sentinels propagate
-unchanged. The service layer wraps the outer error with `fmt.Errorf` to
-satisfy `wrapcheck` and to add the date for diagnostic context.
+method on the week plan (e.g. `return wp.RecordSet(...)`) or — when the
+mutation is naturally scoped to a single day — to a `Session` aggregate
+method via `wp.SessionOn(date)`. Domain sentinels propagate unchanged.
+The service layer wraps the outer error with `fmt.Errorf` to satisfy
+`wrapcheck` and to add the date for diagnostic context.
+
+`SessionRepository` is read-only — its write surface was subsumed by
+`WeekPlanRepository`, which owns the transactional boundary for any
+mutation that touches workout data.
 
 ## Where to add new code
 

@@ -51,27 +51,14 @@ func New(db *sqlite.Database) *Repositories {
 	}
 }
 
-// SessionRepository persists workout sessions and their exercise slots.
+// SessionRepository is the read-only view of workout sessions. Writes are
+// owned by WeekPlanRepository — see internal/repository/week_plans.go. The
+// reads here serve reporting and per-day handler queries.
 type SessionRepository interface {
 	Get(ctx context.Context, date time.Time) (domain.Session, error)
 	List(ctx context.Context, sinceDate time.Time) ([]domain.Session, error)
-	CreateBatch(ctx context.Context, sessions []domain.Session) error
 
-	// Create inserts a single session and its exercise slots. Returns
-	// domain.ErrAlreadyExists (wrapped) if a session already exists for the
-	// date — callers use errors.Is to recover from concurrent insert races.
-	Create(ctx context.Context, sess domain.Session) error
-
-	// Update loads the session inside a single transaction, runs fn against
-	// the hydrated *domain.Session, and persists the result. Returning nil
-	// from fn commits; returning an error rolls back. Sentinel errors from
-	// domain (e.g. ErrAlreadyStarted) propagate so callers can detect no-op
-	// cases via errors.Is.
-	Update(ctx context.Context, date time.Time, fn func(*domain.Session) error) error
-
-	DeleteWeek(ctx context.Context, monday time.Time) error
-
-	// Read-only specialised queries.
+	// Read-only specialised queries used by reporting.
 	ListSetsForExerciseSince(
 		ctx context.Context, exerciseID int, sinceDate time.Time,
 	) ([]domain.ExerciseSetHistory, error)

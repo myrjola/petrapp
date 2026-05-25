@@ -144,46 +144,68 @@ func usedExerciseIDs(plan domain.WeekPlan) map[int]bool {
 	return used
 }
 
-// createAdHocSession plans and persists a single session for date. Used by
-// StartSession when the user starts an unscheduled day (extra workout) or a
-// day added to the schedule mid-week after another in-week session was
-// already started. used is the set of exercise IDs already used in other
-// in-week sessions, passed through to PlanDay's no-repeat selection.
-//
-// Still calls Sessions.Create rather than WeekPlans.Update because the
-// week-wide delete-and-reinsert in WeekPlans.Update orders new-ID inserts
-// before existing-ID inserts, which collides on the workout_exercise PK
-// when this method's new slots are interleaved with another session's
-// preserved IDs. Retiring this path requires a two-pass insertion fix in
-// WeekPlanRepository (out of scope for Task 8 — tracked alongside Task 9's
-// SwapExercise/AddExercise migration which faces the same shape).
-func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used map[int]bool) error {
+// planSingleDay builds a Session for date via the Planner, seeding deload
+// weights if needed. Pure in-memory; no DB writes. Returns the session ready
+// to be placed into a WeekPlan at the right offset.
+func (s *Service) planSingleDay(
+	ctx context.Context, date time.Time, used map[int]bool,
+) (domain.Session, error) {
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
-		return fmt.Errorf("get preferences: %w", err)
+		return domain.Session{}, fmt.Errorf("get preferences: %w", err)
 	}
 	exercises, err := s.repos.Exercises.List(ctx)
 	if err != nil {
-		return fmt.Errorf("get exercises: %w", err)
+		return domain.Session{}, fmt.Errorf("get exercises: %w", err)
 	}
 	targets, err := s.repos.MuscleTargets.List(ctx)
 	if err != nil {
-		return fmt.Errorf("get muscle group targets: %w", err)
+		return domain.Session{}, fmt.Errorf("get muscle group targets: %w", err)
 	}
-
 	planner := domain.NewPlanner(prefs, exercises, targets)
 	sess, err := planner.PlanDay(date, used)
 	if err != nil {
-		return fmt.Errorf("plan day %s: %w", date.Format(time.DateOnly), err)
+		return domain.Session{}, fmt.Errorf("plan day %s: %w", date.Format(time.DateOnly), err)
 	}
-
 	if sess.IsDeload {
 		if err = s.seedDeloadWeights(ctx, &sess); err != nil {
-			return err
+			return domain.Session{}, err
 		}
 	}
-	if err = s.repos.Sessions.Create(ctx, sess); err != nil {
-		return fmt.Errorf("create session %s: %w", date.Format(time.DateOnly), err)
+	return sess, nil
+}
+
+// createAdHocSession plans and persists a single session for date via the
+// WeekPlanRepository.Update closure. Used by StartSession when the user
+// starts an unscheduled day (extra workout) or a day added to the schedule
+// mid-week after another in-week session was already started. used is the
+// set of exercise IDs already used in other in-week sessions, passed
+// through to PlanDay's no-repeat selection.
+//
+// The closure overwrites the rest-day placeholder at the right offset; the
+// three-pass reinsert in WeekPlanRepository.Update preserves other
+// sessions' slot IDs without colliding on the workout_exercise PK.
+// Callers must ensure the week row exists first (StartSession does so via
+// WeekPlans.Create) — Update returns domain.ErrNotFound otherwise.
+func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used map[int]bool) error {
+	sess, err := s.planSingleDay(ctx, date, used)
+	if err != nil {
+		return err
+	}
+	monday := domain.MondayOf(date)
+	err = s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		offset := int(date.Sub(wp.Monday).Hours() / 24)
+		if offset < 0 || offset > 6 {
+			return fmt.Errorf(
+				"date %s outside week %s",
+				date.Format(time.DateOnly), monday.Format(time.DateOnly),
+			)
+		}
+		wp.Sessions[offset] = sess
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("create ad-hoc session %s: %w", date.Format(time.DateOnly), err)
 	}
 	return nil
 }

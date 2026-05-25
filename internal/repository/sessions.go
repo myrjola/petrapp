@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -50,108 +49,6 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 
 func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (domain.Session, error) {
 	return r.get(ctx, r.db.ReadOnly, date)
-}
-
-// Update modifies an existing session within a single transaction. The read
-// happens inside the same BEGIN IMMEDIATE transaction as the write so concurrent
-// updates cannot interleave a read-modify-write race. fn returning an error
-// rolls back without writing; nil commits the diff. Sentinel errors from
-// domain (e.g. ErrAlreadyStarted) propagate through unchanged.
-func (r *sqliteSessionRepository) Update(
-	ctx context.Context,
-	date time.Time,
-	fn func(*domain.Session) error,
-) (err error) {
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-
-	session, err := r.get(ctx, tx, date)
-	if err != nil {
-		return fmt.Errorf("get session for update: %w", err)
-	}
-
-	if err = fn(&session); err != nil {
-		return err
-	}
-
-	if err = r.deleteSession(ctx, tx, date); err != nil {
-		return err
-	}
-	if err = r.insertSessionInTx(ctx, tx, session); err != nil {
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
-	return nil
-}
-
-// CreateBatch inserts a slice of sessions and their exercise slots in one transaction.
-// Returns domain.ErrAlreadyExists (wrapped) if any session in the batch conflicts with an
-// existing row, so callers can recover from concurrent weekly-plan-generation races.
-func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []domain.Session) (err error) {
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-	for _, sess := range sessions {
-		if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
-			// Only the workout_sessions PK conflict (duplicate date for this user) maps to
-			// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
-			// those are programming errors, not concurrent-insert races.
-			var sqliteErr sqlite3.Error
-			if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
-				return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)
-			}
-			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
-		}
-	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit batch sessions: %w", err)
-	}
-	return nil
-}
-
-// Create inserts a single session and its exercise slots in one transaction.
-// Translates the workout_sessions PRIMARY KEY conflict to domain.ErrAlreadyExists
-// so callers can detect concurrent-insert races.
-func (r *sqliteSessionRepository) Create(ctx context.Context, sess domain.Session) (err error) {
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-	if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
-		// Only the workout_sessions PK conflict (duplicate date for this user) maps to
-		// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
-		// those are programming errors, not concurrent-insert races.
-		var sqliteErr sqlite3.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
-			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)
-		}
-		return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
-	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit create session: %w", err)
-	}
-	return nil
 }
 
 // parseSessionRow converts the workout_sessions row scalars into a partial
@@ -539,26 +436,6 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 	return seconds, nil
 }
 
-func (r *sqliteSessionRepository) DeleteWeek(ctx context.Context, monday time.Time) (err error) {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-	if err = r.deleteWeekInTx(ctx, tx, userID, monday); err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit delete week: %w", err)
-	}
-	return nil
-}
-
 func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	var count int
@@ -718,18 +595,6 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 	session.ExerciseSets = exerciseSets
 
 	return session, nil
-}
-
-func (r *sqliteSessionRepository) deleteSession(ctx context.Context, tx *sql.Tx, date time.Time) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	dateStr := formatDate(date)
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM workout_sessions
-		WHERE user_id = ? AND workout_date = ?`,
-		userID, dateStr); err != nil {
-		return fmt.Errorf("delete session: %w", err)
-	}
-	return nil
 }
 
 // loadExerciseSets fetches all exercise slots for a single session, including
