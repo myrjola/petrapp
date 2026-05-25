@@ -661,6 +661,153 @@ func TestPreferencesDeloadSave_RedirectsToDeloadAnchorWithSuccessFlash(t *testin
 	}
 }
 
+func TestPreferencesRestNotificationsToggle_FlashAndAnchor(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("StartServer: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// Toggle OFF (defaults to true). Empty form => rest_notifications_enabled missing => false.
+	resp := postShimForm(t, server, client, "/preferences/rest-notifications-toggle", neturl.Values{})
+	resp.Body.Close()
+	if got := resp.Header.Get("X-Location"); got != "/preferences#notif-title" {
+		t.Errorf("X-Location = %q, want %q", got, "/preferences#notif-title")
+	}
+
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc: %v", err)
+	}
+	panel := doc.Find("section[aria-labelledby='notif-title']")
+	if panel.Length() == 0 {
+		t.Fatal("notif-title panel not found")
+	}
+	banner := panel.Find(".banner--success")
+	if banner.Length() == 0 {
+		t.Fatal("success banner missing in notifications panel")
+	}
+	if got := strings.TrimSpace(banner.Text()); got != "Rest pings disabled." {
+		t.Errorf("banner text = %q, want %q", got, "Rest pings disabled.")
+	}
+
+	// Toggle back ON.
+	resp = postShimForm(t, server, client, "/preferences/rest-notifications-toggle", neturl.Values{
+		"rest_notifications_enabled": []string{"on"},
+	})
+	resp.Body.Close()
+	doc, err = client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc: %v", err)
+	}
+	if got := strings.TrimSpace(
+		doc.Find("section[aria-labelledby='notif-title'] .banner--success").Text(),
+	); got != "Rest pings enabled." {
+		t.Errorf("banner text = %q, want %q", got, "Rest pings enabled.")
+	}
+}
+
+func TestPreferencesStartDeloadNow_FlashAndAnchor(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("StartServer: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// Enable deload (requires a non-empty schedule first).
+	prefsDoc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences/schedule",
+		map[string]string{"monday_minutes": "60"}); err != nil {
+		t.Fatalf("seed schedule: %v", err)
+	}
+	prefsDoc, err = client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("re-fetch /preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences/deload",
+		map[string]string{"deload_enabled": "on", "mesocycle_length": "5"}); err != nil {
+		t.Fatalf("enable deload: %v", err)
+	}
+
+	resp := postShimForm(t, server, client, "/preferences/mesocycle/start-deload-now", neturl.Values{})
+	resp.Body.Close()
+	if got := resp.Header.Get("X-Location"); got != "/preferences#deload-title" {
+		t.Errorf("X-Location = %q, want %q", got, "/preferences#deload-title")
+	}
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc: %v", err)
+	}
+	banner := doc.Find("section[aria-labelledby='deload-title'] .banner--success")
+	if banner.Length() == 0 {
+		t.Fatal("success banner missing in deload panel")
+	}
+	if got := strings.TrimSpace(banner.Text()); got != "Deload started for this week." {
+		t.Errorf("banner text = %q, want %q", got, "Deload started for this week.")
+	}
+}
+
+func TestPreferencesRestartMesocycle_FlashAndAnchor(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("StartServer: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// Same enable-deload setup as TestPreferencesStartDeloadNow_FlashAndAnchor.
+	prefsDoc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences/schedule",
+		map[string]string{"monday_minutes": "60"}); err != nil {
+		t.Fatalf("seed schedule: %v", err)
+	}
+	prefsDoc, err = client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("re-fetch /preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences/deload",
+		map[string]string{"deload_enabled": "on", "mesocycle_length": "5"}); err != nil {
+		t.Fatalf("enable deload: %v", err)
+	}
+
+	resp := postShimForm(t, server, client, "/preferences/mesocycle/restart", neturl.Values{})
+	resp.Body.Close()
+	if got := resp.Header.Get("X-Location"); got != "/preferences#deload-title" {
+		t.Errorf("X-Location = %q, want %q", got, "/preferences#deload-title")
+	}
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc: %v", err)
+	}
+	banner := doc.Find("section[aria-labelledby='deload-title'] .banner--success")
+	if banner.Length() == 0 {
+		t.Fatal("success banner missing in deload panel")
+	}
+	if got := strings.TrimSpace(banner.Text()); got != "Cycle will restart next Monday." {
+		t.Errorf("banner text = %q, want %q", got, "Cycle will restart next Monday.")
+	}
+}
+
 // postShimForm makes a raw POST with the stacknav shim header and a manual
 // CheckRedirect so the X-Location header on the 200 response is observable.
 // Returns the response; caller must close the body.

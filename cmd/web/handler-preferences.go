@@ -29,6 +29,7 @@ const (
 const (
 	scheduleAnchor = "schedule-title"
 	deloadAnchor   = "deload-title"
+	notifAnchor    = "notif-title"
 )
 
 type weekdayPreference struct {
@@ -306,7 +307,8 @@ func (app *application) preferencesRestartMesocyclePOST(w http.ResponseWriter, r
 		app.serverError(w, r, fmt.Errorf("restart mesocycle: %w", err))
 		return
 	}
-	redirect(w, r, "/preferences")
+	app.putFlashSuccess(r.Context(), "Cycle will restart next Monday.", deloadAnchor)
+	redirect(w, r, "/preferences#"+deloadAnchor)
 }
 
 func (app *application) preferencesRestNotificationsTogglePOST(w http.ResponseWriter, r *http.Request) {
@@ -323,7 +325,12 @@ func (app *application) preferencesRestNotificationsTogglePOST(w http.ResponseWr
 		app.serverError(w, r, fmt.Errorf("save preferences: %w", err))
 		return
 	}
-	redirect(w, r, "/preferences")
+	msg := "Rest pings disabled."
+	if prefs.RestNotificationsEnabled {
+		msg = "Rest pings enabled."
+	}
+	app.putFlashSuccess(r.Context(), msg, notifAnchor)
+	redirect(w, r, "/preferences#"+notifAnchor)
 }
 
 func (app *application) preferencesStartDeloadNowPOST(w http.ResponseWriter, r *http.Request) {
@@ -334,5 +341,6 @@ func (app *application) preferencesStartDeloadNowPOST(w http.ResponseWriter, r *
 		app.serverError(w, r, fmt.Errorf("start deload now: %w", err))
 		return
 	}
-	redirect(w, r, "/preferences")
+	app.putFlashSuccess(r.Context(), "Deload started for this week.", deloadAnchor)
+	redirect(w, r, "/preferences#"+deloadAnchor)
 }
