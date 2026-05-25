@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"os"
 	"strings"
 	"sync"
@@ -41,6 +42,7 @@ const (
 	percentageMultiplier       = 100
 	historyTimeout             = 5 * time.Minute
 	defaultUsers               = 10
+	defaultThinkTime           = 2 * time.Second
 )
 
 // setupUsers registers and authenticates the specified number of users concurrently.
@@ -198,16 +200,26 @@ type loadResult struct {
 	Failures  int64
 }
 
-// runLoadTestSustained keeps every user in a tight scenario loop for the full
-// wall-clock window. Scenario successes/failures are counted but a "low success
-// rate" no longer fails the run on its own — the goal of a sustained run is to
-// produce load for the latency report, not gate CI.
+// runLoadTestSustained drives every user through a realistic per-set loop for
+// the full wall-clock window. Each iteration completes one set (see
+// loadtest.SustainedSetStep) and sleeps a jittered think time, modelling a
+// user resting between sets. Scenario successes/failures are counted but a
+// "low success rate" no longer fails the run on its own — the goal of a
+// sustained run is to produce load for the latency report, not gate CI.
+//
+// thinkTime is the mean inter-set delay; the actual sleep jitters uniformly
+// between thinkTime/2 and thinkTime*3/2 so users don't synchronise on the
+// same cadence. Pass 0 to disable think time (load-amplified mode).
 func runLoadTestSustained(
-	ctx context.Context, users []*loadtest.AuthenticatedUser, duration time.Duration, logger *slog.Logger,
+	ctx context.Context,
+	users []*loadtest.AuthenticatedUser,
+	duration, thinkTime time.Duration,
+	logger *slog.Logger,
 ) loadResult {
 	logger.LogAttrs(ctx, slog.LevelInfo, "Starting load test (sustained)",
 		slog.Int("num_users", len(users)),
-		slog.Duration("duration", duration))
+		slog.Duration("duration", duration),
+		slog.Duration("think_time", thinkTime))
 
 	loadCtx, cancel := context.WithTimeout(ctx, duration)
 	defer cancel()
@@ -218,25 +230,54 @@ func runLoadTestSustained(
 		wg.Add(1)
 		go func(u *loadtest.AuthenticatedUser) {
 			defer wg.Done()
-			for {
-				if loadCtx.Err() != nil {
-					return
-				}
-				scenarioCtx, scenarioCancel := context.WithTimeout(loadCtx, scenarioTimeout)
-				if err := loadtest.WorkoutScenario(scenarioCtx, u, logger); err != nil {
-					atomic.AddInt64(&result.Failures, 1)
-					logger.LogAttrs(scenarioCtx, slog.LevelDebug, "Scenario failed",
-						slog.String("user_id", u.UserID),
-						slog.Any("error", err))
-				} else {
-					atomic.AddInt64(&result.Successes, 1)
-				}
-				scenarioCancel()
-			}
+			runSustainedUser(loadCtx, u, thinkTime, &result, logger)
 		}(user)
 	}
 	wg.Wait()
 	return result
+}
+
+// runSustainedUser loops SustainedSetStep + think time for one virtual user
+// until loadCtx is cancelled. Counts success/failure into result atomically.
+func runSustainedUser(
+	loadCtx context.Context,
+	u *loadtest.AuthenticatedUser,
+	thinkTime time.Duration,
+	result *loadResult,
+	logger *slog.Logger,
+) {
+	for {
+		if loadCtx.Err() != nil {
+			return
+		}
+		scenarioCtx, scenarioCancel := context.WithTimeout(loadCtx, scenarioTimeout)
+		if err := loadtest.SustainedSetStep(scenarioCtx, u, logger); err != nil {
+			atomic.AddInt64(&result.Failures, 1)
+			logger.LogAttrs(scenarioCtx, slog.LevelDebug, "Scenario failed",
+				slog.String("user_id", u.UserID),
+				slog.Any("error", err))
+		} else {
+			atomic.AddInt64(&result.Successes, 1)
+		}
+		scenarioCancel()
+		if thinkTime <= 0 {
+			continue
+		}
+		select {
+		case <-loadCtx.Done():
+			return
+		case <-time.After(jitterThinkTime(thinkTime)):
+		}
+	}
+}
+
+// jitterThinkTime returns a duration uniformly distributed in [mean/2, mean*3/2).
+// Used for load-test pacing; math/rand/v2 is intentional — no crypto strength needed.
+func jitterThinkTime(mean time.Duration) time.Duration {
+	if mean <= 0 {
+		return 0
+	}
+	return mean/2 + time.Duration(rand.Int64N(int64(mean))) //nolint:gosec // load-test jitter, not security-sensitive.
 }
 
 const tabwriterPadding = 2
@@ -322,6 +363,9 @@ func main() {
 	users := flag.Int("users", defaultUsers, "number of concurrent virtual users")
 	duration := flag.Duration("duration", 0,
 		"sustained-load window (e.g. 2m). 0 = single-shot legacy mode.")
+	thinkTime := flag.Duration("think", defaultThinkTime,
+		"mean inter-set think time during sustained load (jittered ±50%). "+
+			"0 disables think time. Default matches an aggressive but realistic user resting between sets.")
 	pprofURL := flag.String("pprof-url", "",
 		"base URL where the target exposes pprof (e.g. http://localhost:6060). "+
 			"If set, CPU + heap profiles + JSON report are saved to --out during the load run.")
@@ -360,7 +404,7 @@ func main() {
 
 	var result loadResult
 	if *duration > 0 {
-		result = runLoadTestSustained(ctx, authedUsers, *duration, logger)
+		result = runLoadTestSustained(ctx, authedUsers, *duration, *thinkTime, logger)
 	} else {
 		if err = runLoadTestSingleShot(ctx, authedUsers, logger); err != nil {
 			logger.LogAttrs(ctx, slog.LevelError, "load test failed", slog.Any("error", err))

@@ -140,6 +140,55 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	return nil
 }
 
+// SustainedSetStep performs the per-iteration work of a realistic sustained
+// load: open today's workout, complete one set (after warmup if shown), and
+// return. It does NOT re-submit /preferences/schedule, does NOT re-POST
+// /workouts/{date}/start once the workout exists, and does NOT fetch the
+// progress chart on every iteration. Together those keep the request mix
+// closer to a real user mid-workout: one write (set completion) plus 1–2
+// reads per iteration. Caller is responsible for inter-iteration think time.
+//
+// On a workout that has no remaining active sets the function returns nil
+// without erroring: the user "finished" their workout for the day. Callers
+// running in a tight loop should treat that as a signal to either rotate
+// users, advance the date, or back off.
+func SustainedSetStep(ctx context.Context, user *AuthenticatedUser, logger *slog.Logger) error {
+	client := user.Client
+	today := time.Now().Format("2006-01-02")
+
+	doc, err := getOrCreateWorkout(ctx, client, today)
+	if err != nil {
+		return fmt.Errorf("get workout: %w", err)
+	}
+
+	exerciseID := firstExerciseID(doc, today)
+	if exerciseID == "" {
+		return nil
+	}
+
+	doc, err = client.GetDoc(ctx, "/workouts/"+today+"/exercises/"+exerciseID)
+	if err != nil {
+		return fmt.Errorf("get exercise page: %w", err)
+	}
+
+	if doc, err = completeWarmup(ctx, client, doc, today, exerciseID); err != nil {
+		return err
+	}
+
+	form := activeSetForm(doc)
+	if form.Length() == 0 {
+		return nil
+	}
+	if err = completeOneSet(ctx, client, doc); err != nil {
+		return err
+	}
+
+	logger.LogAttrs(ctx, slog.LevelDebug, "Sustained set completed",
+		slog.String("user_id", user.UserID),
+		slog.String("exercise_id", exerciseID))
+	return nil
+}
+
 // GenerateWorkoutHistory backfills weekly workouts for the user as far as
 // lazy-create allows. Only the current week succeeds; older weeks 404 (logged
 // at DEBUG). Use it to add some load weight, not to seed a realistic DB.
