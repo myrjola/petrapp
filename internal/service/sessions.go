@@ -47,98 +47,79 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 	if err = s.repos.Sessions.DeleteWeek(ctx, monday); err != nil {
 		return fmt.Errorf("delete current week: %w", err)
 	}
-	if err = s.generateWeeklyPlan(ctx, monday); err != nil {
-		return fmt.Errorf("generate weekly plan: %w", err)
-	}
-	return nil
-}
-
-// ResolveWeeklySchedule retrieves the workout schedule for the current week.
-// If no sessions exist for the week, it generates all scheduled days at once using
-// the weekly planner and persists them in a single transaction.
-func (s *Service) ResolveWeeklySchedule(ctx context.Context) ([]domain.Session, error) {
-	monday := domain.MondayOf(time.Now())
-	sunday := monday.AddDate(0, 0, 6)
-
-	existing, err := s.repos.Sessions.List(ctx, monday)
+	newPlan, err := s.planWeek(ctx, monday)
 	if err != nil {
-		return nil, fmt.Errorf("list sessions for week: %w", err)
+		return err
 	}
-	thisWeekCount := 0
-	for _, sess := range existing {
-		if !sess.Date.After(sunday) {
-			thisWeekCount++
-		}
-	}
-
-	if thisWeekCount == 0 {
-		if err = s.generateWeeklyPlan(ctx, monday); err != nil {
-			return nil, fmt.Errorf("generate weekly plan: %w", err)
-		}
-	}
-
-	workouts := make([]domain.Session, 7)
-	for i := range 7 {
-		day := monday.AddDate(0, 0, i)
-		sess, getErr := s.repos.Sessions.Get(ctx, day)
-		if getErr != nil && !errors.Is(getErr, domain.ErrNotFound) {
-			return nil, fmt.Errorf("get session %s: %w", day.Format(time.DateOnly), getErr)
-		}
-		if errors.Is(getErr, domain.ErrNotFound) {
-			workouts[i] = domain.Session{ //nolint:exhaustruct // Rest days have no exercise data.
-				Date: day,
-			}
-			continue
-		}
-		workouts[i] = sess
-	}
-	return workouts, nil
-}
-
-// generateWeeklyPlan uses the domain planner to create all sessions for the week starting
-// on monday and persists them in a single DB transaction.
-func (s *Service) generateWeeklyPlan(ctx context.Context, monday time.Time) error {
-	prefs, err := s.repos.Preferences.Get(ctx)
-	if err != nil {
-		return fmt.Errorf("get preferences: %w", err)
-	}
-	exercises, err := s.repos.Exercises.List(ctx)
-	if err != nil {
-		return fmt.Errorf("get exercises: %w", err)
-	}
-	targets, err := s.repos.MuscleTargets.List(ctx)
-	if err != nil {
-		return fmt.Errorf("get muscle group targets: %w", err)
-	}
-
-	planner := domain.NewPlanner(prefs, exercises, targets)
-	plan, err := planner.Plan(monday)
-	if err != nil {
-		return fmt.Errorf("plan week: %w", err)
-	}
-	// Temporary adapter: flatten the WeekPlan to the legacy []Session shape so
-	// CreateBatch keeps working. The next refactor step rewrites this helper to
-	// persist the WeekPlan directly.
 	plannedSessions := make([]domain.Session, 0, 7)
-	for i := range plan.Sessions {
-		if len(plan.Sessions[i].ExerciseSets) > 0 {
-			plannedSessions = append(plannedSessions, plan.Sessions[i])
+	for i := range newPlan.Sessions {
+		if len(newPlan.Sessions[i].ExerciseSets) > 0 {
+			plannedSessions = append(plannedSessions, newPlan.Sessions[i])
 		}
 	}
-
-	for i := range plannedSessions {
-		if !plannedSessions[i].IsDeload {
-			continue
-		}
-		if err = s.seedDeloadWeights(ctx, &plannedSessions[i]); err != nil {
-			return err
-		}
-	}
-
 	if err = s.repos.Sessions.CreateBatch(ctx, plannedSessions); err != nil {
 		return fmt.Errorf("create batch sessions: %w", err)
 	}
 	return nil
+}
+
+// ResolveWeeklySchedule returns the WeekPlan for the current week. If no plan
+// exists yet, generates one via the Planner and persists it; tolerates a
+// concurrent create race by re-reading on ErrAlreadyExists.
+func (s *Service) ResolveWeeklySchedule(ctx context.Context) (domain.WeekPlan, error) {
+	monday := domain.MondayOf(time.Now())
+
+	plan, err := s.repos.WeekPlans.Get(ctx, monday)
+	if err == nil {
+		return plan, nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return domain.WeekPlan{}, fmt.Errorf("get week %s: %w", monday.Format(time.DateOnly), err)
+	}
+
+	newPlan, err := s.planWeek(ctx, monday)
+	if err != nil {
+		return domain.WeekPlan{}, err
+	}
+	if err = s.repos.WeekPlans.Create(ctx, newPlan); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
+		return domain.WeekPlan{}, fmt.Errorf("create week %s: %w", monday.Format(time.DateOnly), err)
+	}
+	plan, err = s.repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		return domain.WeekPlan{}, fmt.Errorf("re-get week after create: %w", err)
+	}
+	return plan, nil
+}
+
+// planWeek builds an in-memory WeekPlan using the Planner and seeds deload
+// weights. Replaces the old generateWeeklyPlan helper.
+func (s *Service) planWeek(ctx context.Context, monday time.Time) (domain.WeekPlan, error) {
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return domain.WeekPlan{}, fmt.Errorf("get preferences: %w", err)
+	}
+	exercises, err := s.repos.Exercises.List(ctx)
+	if err != nil {
+		return domain.WeekPlan{}, fmt.Errorf("get exercises: %w", err)
+	}
+	targets, err := s.repos.MuscleTargets.List(ctx)
+	if err != nil {
+		return domain.WeekPlan{}, fmt.Errorf("get muscle group targets: %w", err)
+	}
+	planner := domain.NewPlanner(prefs, exercises, targets)
+	plan, err := planner.Plan(monday)
+	if err != nil {
+		return domain.WeekPlan{}, fmt.Errorf("plan week: %w", err)
+	}
+	for i := range plan.Sessions {
+		if !plan.Sessions[i].IsDeload || len(plan.Sessions[i].ExerciseSets) == 0 {
+			continue
+		}
+		if err = s.seedDeloadWeights(ctx, &plan.Sessions[i]); err != nil {
+			return domain.WeekPlan{}, err
+		}
+	}
+	return plan, nil
 }
 
 // seedDeloadWeights sets the per-set weight for every weighted exercise in a
@@ -239,7 +220,7 @@ func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used m
 // because date is a newly-scheduled day that was added mid-week after the
 // weekly plan was generated — a single-day session is planned via PlanDay
 // and inserted before the start mutation. If the whole week is missing the
-// existing generateWeeklyPlan path runs first; only then is the per-date
+// existing weekly-plan generation path runs first; only then is the per-date
 // check applied.
 func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	monday := domain.MondayOf(date)
@@ -251,18 +232,29 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	weekCount, hasDate, used := summarizeWeek(existing, date, monday)
 
 	if weekCount == 0 {
-		// generateWeeklyPlan may race against another caller who already inserted
-		// the week's sessions. Treat ErrAlreadyExists as success — the row we
-		// need is now present, so we just re-list below.
-		if err = s.generateWeeklyPlan(ctx, monday); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
-			return fmt.Errorf("generate weekly plan for %s: %w", date.Format(time.DateOnly), err)
+		// planWeek + CreateBatch may race against another caller who already
+		// inserted the week's sessions. Treat ErrAlreadyExists as success —
+		// the row we need is now present, so we just re-list below.
+		newPlan, planErr := s.planWeek(ctx, monday)
+		if planErr != nil {
+			return fmt.Errorf("generate weekly plan for %s: %w", date.Format(time.DateOnly), planErr)
+		}
+		plannedSessions := make([]domain.Session, 0, 7)
+		for i := range newPlan.Sessions {
+			if len(newPlan.Sessions[i].ExerciseSets) > 0 {
+				plannedSessions = append(plannedSessions, newPlan.Sessions[i])
+			}
+		}
+		if err = s.repos.Sessions.CreateBatch(ctx, plannedSessions); err != nil &&
+			!errors.Is(err, domain.ErrAlreadyExists) {
+			return fmt.Errorf("create batch sessions for %s: %w", date.Format(time.DateOnly), err)
 		}
 		existing, err = s.repos.Sessions.List(ctx, monday)
 		if err != nil {
 			return fmt.Errorf("re-list sessions for week of %s: %w", date.Format(time.DateOnly), err)
 		}
-		// weekCount is irrelevant on the second call — generateWeeklyPlan (or a
-		// concurrent caller) just ensured the week is populated.
+		// weekCount is irrelevant on the second call — planWeek + CreateBatch
+		// (or a concurrent caller) just ensured the week is populated.
 		_, hasDate, used = summarizeWeek(existing, date, monday)
 	}
 
