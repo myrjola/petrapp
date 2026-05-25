@@ -155,12 +155,12 @@ func (s *Service) userMutex(userID int) *sync.Mutex {
 	return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
 }
 
-// nextMonday returns the upcoming Monday at 00:00 UTC. If now is already a
-// Monday, it returns that Monday. Callers pass a UTC instant.
+// nextMonday returns the upcoming Monday at 00:00 UTC, strictly after now's
+// calendar day. If now is already a Monday, the *following* Monday is
+// returned. Callers (StartDeloadNow, RestartMesocycleAnchor,
+// SaveUserPreferences) use this to snap the mesocycle anchor to the start of
+// a fresh week, so today must never be the answer. Callers pass a UTC instant.
 func nextMonday(now time.Time) time.Time {
 	monday := domain.MondayOf(now)
-	if now.Weekday() == time.Monday {
-		return monday
-	}
 	return monday.AddDate(0, 0, 7)
 }
