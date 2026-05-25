@@ -332,9 +332,9 @@
                        dominates). The page-local script below sets and clears
                        body[data-vt="state-refresh"] around the replace navigation. */
                     {{ range .Exercises }}
-                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .ID }}"] { view-transition-name: ex-card-{{ .ID }}; }
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .Position }}"] { view-transition-name: ex-card-{{ .Position }}; }
                     {{ if eq .State "completed" }}
-                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .ID }}"] .exercise-name::after { view-transition-name: ex-strike-{{ .ID }}; }
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ .Position }}"] .exercise-name::after { view-transition-name: ex-strike-{{ .Position }}; }
                     {{ end }}
                     {{ end }}
 
@@ -347,7 +347,7 @@
                         /* Strike draw on newly-completed cards (asymmetric: line exists in
                            new snapshot but not old). */
                         {{ range .Exercises }}{{ if eq .State "completed" }}
-                        &::view-transition-new(ex-strike-{{ .ID }}) {
+                        &::view-transition-new(ex-strike-{{ .Position }}) {
                             animation: strike-draw 320ms cubic-bezier(.2, .7, .3, 1) both;
                             transform-origin: left center;
                         }
@@ -362,7 +362,7 @@
                     @media (prefers-reduced-motion: reduce) {
                         html:active-view-transition-type(state-refresh) {
                             {{ range .Exercises }}{{ if eq .State "completed" }}
-                            &::view-transition-new(ex-strike-{{ .ID }}) {
+                            &::view-transition-new(ex-strike-{{ .Position }}) {
                                 animation-duration: 0.001ms;
                             }
                             {{ end }}{{ end }}
@@ -371,9 +371,9 @@
                 </style>
 
                 {{ range .Exercises }}
-                    <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .ID }}"
+                    <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Position }}"
                        class="exercise {{ .State }}"
-                       data-workout-exercise-id="{{ .ID }}">
+                       data-workout-exercise-id="{{ .Position }}">
                         <span class="exercise-num">{{ printf "%02d" .Index }}</span>
                         <div>
                             <span class="exercise-name">{{ .Name }}</span>

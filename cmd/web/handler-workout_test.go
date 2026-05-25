@@ -86,6 +86,73 @@ func Test_application_addWorkout(t *testing.T) {
 	}
 }
 
+// Test_application_workoutExerciseLinksOpenClickedExercise verifies that
+// clicking an exercise on the workout overview lands on that exercise's
+// detail page — not the neighbouring slot. Regression test for an
+// off-by-one bug where the overview emitted 1-based slot indices in the
+// /exercises/{position} URL while the handler parsed it as 0-based.
+func Test_application_workoutExerciseLinksOpenClickedExercise(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("Failed to get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
+		time.Now().Weekday().String(): "60",
+	}); err != nil {
+		t.Fatalf("Failed to submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("Failed to start workout: %v", err)
+	}
+
+	links := doc.Find("a.exercise")
+	if links.Length() < 2 {
+		t.Fatalf("Expected at least 2 exercises on the workout page, got %d", links.Length())
+	}
+
+	links.Each(func(i int, s *goquery.Selection) {
+		href, ok := s.Attr("href")
+		if !ok {
+			t.Errorf("exercise link %d has no href", i)
+			return
+		}
+		expected := strings.TrimSpace(s.Find(".exercise-name").Text())
+		if expected == "" {
+			t.Errorf("exercise link %d has no name", i)
+			return
+		}
+
+		exerciseDoc, getErr := client.GetDoc(ctx, href)
+		if getErr != nil {
+			t.Errorf("follow link %d (%s): %v", i, href, getErr)
+			return
+		}
+		actual := strings.TrimSpace(exerciseDoc.Find("h1.exercise-title").Text())
+		if actual != expected {
+			t.Errorf("href %s: expected exercise %q, got %q", href, expected, actual)
+		}
+	})
+}
+
 func Test_application_workoutNotFound(t *testing.T) {
 	t.Parallel()
 

@@ -30,7 +30,7 @@ type workoutTemplateData struct {
 // workoutExerciseView is the per-exercise row rendered on the workout overview.
 // Pre-shaped in the handler so the template can range without arithmetic.
 type workoutExerciseView struct {
-	ID                int
+	Position          int // 0-based slot index in Session.ExerciseSets — used in /exercises/{position} URLs and the view-transition name.
 	Index             int // 1-based position label ("01", "02", …)
 	Name              string
 	State             domain.ExerciseSetState
@@ -228,7 +228,7 @@ func newWorkoutTemplateData(
 
 	exerciseViews := make([]workoutExerciseView, 0, total)
 	for i, es := range session.ExerciseSets {
-		exerciseViews = append(exerciseViews, newWorkoutExerciseView(i+1, es))
+		exerciseViews = append(exerciseViews, newWorkoutExerciseView(i, es))
 	}
 
 	base := newBaseTemplateData(r)
@@ -266,8 +266,9 @@ func finishNoteFor(incomplete int) string {
 }
 
 // newWorkoutExerciseView shapes one ExerciseSet into a workoutExerciseView,
-// including the sub-line copy and the per-set dot indicator.
-func newWorkoutExerciseView(index int, es domain.ExerciseSet) workoutExerciseView {
+// including the sub-line copy and the per-set dot indicator. pos is the
+// 0-based slot index in Session.ExerciseSets.
+func newWorkoutExerciseView(pos int, es domain.ExerciseSet) workoutExerciseView {
 	dots := make([]workoutExerciseDot, len(es.Sets))
 	for j, s := range es.Sets {
 		dots[j] = workoutExerciseDot{Done: s.CompletedAt != nil}
@@ -286,8 +287,8 @@ func newWorkoutExerciseView(index int, es domain.ExerciseSet) workoutExerciseVie
 		subLine = fmt.Sprintf("%d / %d sets done", completedSets, len(es.Sets))
 	}
 	return workoutExerciseView{
-		ID:                index,
-		Index:             index,
+		Position:          pos,
+		Index:             pos + 1,
 		Name:              es.Exercise.Name,
 		State:             es.CompletionState(),
 		SetCount:          len(es.Sets),
