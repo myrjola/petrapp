@@ -85,12 +85,11 @@ type WeekPlanRepository interface {
 	// Update loads the WeekPlan for monday inside a single transaction, runs fn
 	// against the hydrated *domain.WeekPlan, and persists the result via
 	// delete-then-reinsert across the week's date range. Returning nil from fn
-	// commits; returning an error rolls back. Slot IDs are preserved via
-	// INSERT ... RETURNING id, with a two-pass reinsert (explicit-ID slots
-	// first, auto-ID slots second) so SQLite's rowid assignment never collides
-	// with a preserved workout_exercise.id. Sentinel errors from domain (e.g.
-	// ErrAlreadyStarted) propagate so callers can detect no-op cases via
-	// errors.Is.
+	// commits; returning an error rolls back. Slot identity is the array index
+	// in Session.ExerciseSets, persisted as the workout_exercises.position
+	// column, so the reinsert is a single pass and no autoincrement collisions
+	// are possible. Sentinel errors from domain (e.g. ErrAlreadyStarted)
+	// propagate so callers can detect no-op cases via errors.Is.
 	Update(ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error) error
 
 	// Create persists a freshly-planned WeekPlan. Returns domain.ErrAlreadyExists
@@ -146,13 +145,13 @@ type PushSubscriptionRepository interface {
 }
 
 // ScheduledPushRepository persists pending push fires so they survive
-// process restarts. One row per workout_exercise_id (enforced by UNIQUE
-// index).
+// process restarts. One row per slot (enforced by a UNIQUE index on
+// (workout_user_id, workout_date, position)).
 type ScheduledPushRepository interface {
 	Replace(ctx context.Context, push domain.ScheduledPush) (domain.ScheduledPush, error)
 	Delete(ctx context.Context, id int) error
-	DeleteByWorkoutExercise(ctx context.Context, workoutExerciseID int) error
+	DeleteBySlot(ctx context.Context, userID int, date time.Time, pos int) error
 	DeleteByWorkoutSession(ctx context.Context, userID int, date time.Time) error
-	Get(ctx context.Context, workoutExerciseID int) (domain.ScheduledPush, error)
+	GetBySlot(ctx context.Context, userID int, date time.Time, pos int) (domain.ScheduledPush, error)
 	ListAll(ctx context.Context) ([]domain.ScheduledPush, error)
 }

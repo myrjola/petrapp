@@ -55,7 +55,7 @@
                     letter-spacing: -0.025em;
                     color: var(--color-text-primary);
                     margin: 0;
-                    view-transition-name: exercise-title-{{ .ExerciseSet.ID }};
+                    view-transition-name: exercise-title-{{ .Position }};
                 }
 
                 .brief-nav {
@@ -99,16 +99,16 @@
         </div>
 
         <h1 class="exercise-title"
-            data-workout-exercise-id="{{ .ExerciseSet.ID }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+            data-workout-exercise-id="{{ .Position }}">{{ .ExerciseSet.Exercise.Name }}</h1>
 
         <div class="brief-nav">
             {{ template "back-link" (backLink (printf "/workouts/%s" (.Date.Format "2006-01-02")) $.Nonce) }}
             <div class="brief-actions">
                 <a class="brief-action"
-                   href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/info"
+                   href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Position }}/info"
                    aria-label="View exercise information">Info</a>
                 <a class="brief-action"
-                   href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/swap"
+                   href="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Position }}/swap"
                    aria-label="Swap exercise">Swap</a>
             </div>
         </div>

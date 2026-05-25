@@ -15,12 +15,12 @@ import (
 func (s *Service) UpdateSetWeight(
 	ctx context.Context,
 	date time.Time,
-	workoutExerciseID int,
+	pos int,
 	setIndex int,
 	newWeight float64,
 ) error {
 	if err := s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
-		return wp.UpdateSetWeight(date, workoutExerciseID, setIndex, newWeight)
+		return wp.UpdateSetWeight(date, pos, setIndex, newWeight)
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
@@ -31,12 +31,12 @@ func (s *Service) UpdateSetWeight(
 func (s *Service) UpdateCompletedValue(
 	ctx context.Context,
 	date time.Time,
-	workoutExerciseID int,
+	pos int,
 	setIndex int,
 	completedValue int,
 ) error {
 	if err := s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
-		return wp.UpdateCompletedValue(date, workoutExerciseID, setIndex, completedValue, time.Now().UTC())
+		return wp.UpdateCompletedValue(date, pos, setIndex, completedValue, time.Now().UTC())
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
@@ -49,7 +49,7 @@ func (s *Service) UpdateCompletedValue(
 func (s *Service) RecordSet(
 	ctx context.Context,
 	date time.Time,
-	workoutExerciseID int,
+	pos int,
 	setIndex int,
 	signal *domain.Signal,
 	weightKg *float64,
@@ -69,18 +69,24 @@ func (s *Service) RecordSet(
 		if sess == nil {
 			return domain.ErrNotFound
 		}
-		if slot, ok := sess.Slot(workoutExerciseID); ok && setIndex >= 0 && setIndex < len(slot.Sets) {
-			wasComplete = slot.Sets[setIndex].CompletedAt != nil
+		if pos >= 0 && pos < len(sess.ExerciseSets) {
+			slot := sess.ExerciseSets[pos]
+			if setIndex >= 0 && setIndex < len(slot.Sets) {
+				wasComplete = slot.Sets[setIndex].CompletedAt != nil
+			}
 		}
 		periodization = sess.PeriodizationType
 		sessionDeload = sess.IsDeload
 
-		if recErr := sess.RecordSet(workoutExerciseID, setIndex, signal, weightKg, completedValue, now); recErr != nil {
+		if recErr := sess.RecordSet(pos, setIndex, signal, weightKg, completedValue, now); recErr != nil {
 			// Domain sentinels propagate unchanged so callers can errors.Is at the call site;
 			// the outer `if err != nil` wraps for diagnostic context.
 			return recErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
 		}
-		postSlot, postSlotOK = sess.Slot(workoutExerciseID)
+		if pos >= 0 && pos < len(sess.ExerciseSets) {
+			postSlot = sess.ExerciseSets[pos]
+			postSlotOK = true
+		}
 		return nil
 	})
 	if err != nil {
@@ -89,7 +95,7 @@ func (s *Service) RecordSet(
 
 	if !wasComplete && postSlotOK {
 		userID := contexthelpers.AuthenticatedUserID(ctx)
-		s.applyRestPushDecision(ctx, userID, workoutExerciseID, postSlot, periodization, sessionDeload, now)
+		s.applyRestPushDecision(ctx, userID, date, pos, postSlot, periodization, sessionDeload, now)
 	}
 	return nil
 }
@@ -97,11 +103,13 @@ func (s *Service) RecordSet(
 // applyRestPushDecision runs the rest-push policy against the post-mutation
 // slot and acts on the result. The completion itself is already persisted,
 // so failures here just mean the user won't get a notification — never
-// propagate. Every log line carries user_id + workout_exercise_id so
-// triage can filter by either.
+// propagate. Every log line carries user_id, workout_date, and position so
+// triage can filter by any of them.
 func (s *Service) applyRestPushDecision(
 	ctx context.Context,
-	userID, workoutExerciseID int,
+	userID int,
+	date time.Time,
+	pos int,
 	slot domain.ExerciseSet,
 	periodization domain.PeriodizationType,
 	isDeload bool,
@@ -116,10 +124,11 @@ func (s *Service) applyRestPushDecision(
 	case domain.RestPushActionNoOp:
 		return
 	case domain.RestPushActionCancel:
-		if err := s.scheduler.Cancel(ctx, workoutExerciseID); err != nil {
+		if err := s.scheduler.Cancel(ctx, userID, date, pos); err != nil {
 			s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: cancel failed",
 				slog.Int("user_id", userID),
-				slog.Int("workout_exercise_id", workoutExerciseID),
+				slog.String("workout_date", date.Format(time.DateOnly)),
+				slog.Int("position", pos),
 				slog.Any("error", err))
 		}
 		return
@@ -131,7 +140,8 @@ func (s *Service) applyRestPushDecision(
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: get preferences failed",
 			slog.Int("user_id", userID),
-			slog.Int("workout_exercise_id", workoutExerciseID),
+			slog.String("workout_date", date.Format(time.DateOnly)),
+			slog.Int("position", pos),
 			slog.Any("error", err))
 		return
 	}
@@ -142,7 +152,8 @@ func (s *Service) applyRestPushDecision(
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: count subscriptions failed",
 			slog.Int("user_id", userID),
-			slog.Int("workout_exercise_id", workoutExerciseID),
+			slog.String("workout_date", date.Format(time.DateOnly)),
+			slog.Int("position", pos),
 			slog.Any("error", err))
 		return
 	}
@@ -168,21 +179,24 @@ func (s *Service) applyRestPushDecision(
 	if err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: marshal payload",
 			slog.Int("user_id", userID),
-			slog.Int("workout_exercise_id", workoutExerciseID),
+			slog.String("workout_date", date.Format(time.DateOnly)),
+			slog.Int("position", pos),
 			slog.Any("error", err))
 		return
 	}
 
 	push := domain.ScheduledPush{ //nolint:exhaustruct // ID and CreatedAt assigned by the repository at insert time.
-		UserID:            userID,
-		WorkoutExerciseID: workoutExerciseID,
-		FireAt:            decision.FireAt,
-		Payload:           string(payloadBytes),
+		UserID:      userID,
+		WorkoutDate: date,
+		Position:    pos,
+		FireAt:      decision.FireAt,
+		Payload:     string(payloadBytes),
 	}
 	if err = s.scheduler.Schedule(ctx, push); err != nil {
 		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: schedule failed",
 			slog.Int("user_id", userID),
-			slog.Int("workout_exercise_id", workoutExerciseID),
+			slog.String("workout_date", date.Format(time.DateOnly)),
+			slog.Int("position", pos),
 			slog.Any("error", err))
 	}
 }

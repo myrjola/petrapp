@@ -31,11 +31,10 @@ func (r *sqliteWeekPlanRepository) Get(ctx context.Context, monday time.Time) (d
 
 // Update loads the WeekPlan for monday inside a single transaction, runs fn,
 // then persists the result via delete-then-reinsert across the week's date
-// range. Slot IDs are preserved via INSERT ... RETURNING id, with a two-pass
-// reinsert (explicit-ID slots before auto-ID slots) so SQLite's rowid
-// assignment never collides with a preserved workout_exercise.id. Domain
-// sentinels returned by fn propagate unchanged so callers can errors.Is
-// against them.
+// range. The reinsert is a single pass — slot identity is the array index in
+// Session.ExerciseSets, written into the row's position column, so SQLite
+// never auto-assigns a rowid. Domain sentinels returned by fn propagate
+// unchanged so callers can errors.Is against them.
 func (r *sqliteWeekPlanRepository) Update(
 	ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error,
 ) (err error) {
@@ -152,13 +151,9 @@ func (r *sqliteWeekPlanRepository) getInTx(
 	return wp, nil
 }
 
-// reinsertWeekInTx persists wp's sessions in three passes so SQLite's
-// INTEGER PRIMARY KEY auto-assignment never collides with a preserved slot ID.
-// Pass 1 inserts every workout_sessions row. Pass 2 inserts all explicit-ID
-// slots across the week, claiming their workout_exercise.id values. Pass 3
-// inserts NULL-ID slots, which SQLite assigns rowids around the now-claimed
-// IDs. Mixing pre-existing-ID and new (ID==0) slots across sessions would
-// otherwise hit "UNIQUE constraint failed: workout_exercise.id".
+// reinsertWeekInTx persists wp's sessions in a single pass. Slot positions
+// come from the in-memory array index; the row's position column captures
+// it, so SQLite never auto-assigns a rowid and there is nothing to collide.
 func (r *sqliteWeekPlanRepository) reinsertWeekInTx(
 	ctx context.Context, tx *sql.Tx, wp domain.WeekPlan,
 ) error {
@@ -170,36 +165,9 @@ func (r *sqliteWeekPlanRepository) reinsertWeekInTx(
 		if err := r.insertSessionRowInTx(ctx, tx, sess); err != nil {
 			return fmt.Errorf("insert session row %s: %w", formatDate(sess.Date), err)
 		}
-	}
-	if err := r.reinsertSlotsForWeek(ctx, tx, wp, true); err != nil {
-		return err
-	}
-	return r.reinsertSlotsForWeek(ctx, tx, wp, false)
-}
-
-// reinsertSlotsForWeek inserts one ID class of slots across every scheduled
-// session in wp. When explicitOnly is true, only slots with a pre-existing
-// ID (>0) are inserted; when false, only auto-assign slots (ID==0). Splitting
-// into two single-class passes is what avoids the workout_exercise.id rowid
-// collision described on reinsertWeekInTx.
-func (r *sqliteWeekPlanRepository) reinsertSlotsForWeek(
-	ctx context.Context, tx *sql.Tx, wp domain.WeekPlan, explicitOnly bool,
-) error {
-	label := "new-id"
-	if explicitOnly {
-		label = "explicit-id"
-	}
-	for i := range wp.Sessions {
-		sess := wp.Sessions[i]
-		if isRestDayPlaceholder(sess) {
-			continue
-		}
-		for _, slot := range sess.ExerciseSets {
-			if explicitOnly == (slot.ID == 0) {
-				continue
-			}
-			if err := r.saveOneSlotInTx(ctx, tx, sess.Date, slot); err != nil {
-				return fmt.Errorf("save %s slot for %s: %w", label, formatDate(sess.Date), err)
+		for pos, slot := range sess.ExerciseSets {
+			if err := r.saveOneSlotInTx(ctx, tx, sess.Date, pos, slot); err != nil {
+				return fmt.Errorf("save slot %d for %s: %w", pos, formatDate(sess.Date), err)
 			}
 		}
 	}

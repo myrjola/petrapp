@@ -182,8 +182,9 @@ func (s *Service) planSingleDay(
 // through to PlanDay's no-repeat selection.
 //
 // The closure overwrites the rest-day placeholder at the right offset; the
-// three-pass reinsert in WeekPlanRepository.Update preserves other
-// sessions' slot IDs without colliding on the workout_exercise PK.
+// single-pass reinsert in WeekPlanRepository.Update writes each slot's
+// array index into the workout_exercises.position column, so other
+// sessions' slot positions survive untouched.
 // Callers must ensure the week row exists first (StartSession does so via
 // WeekPlans.Create) — Update returns domain.ErrNotFound otherwise.
 func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used map[int]bool) error {
@@ -298,7 +299,7 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
 	return nil
 }
 
-// MarkWarmupComplete marks the warmup as complete for a specific workout exercise slot.
+// MarkWarmupComplete marks the warmup as complete for the slot at pos on date.
 // Schedules a rest push announcing set 1 when the warmup transitions from
 // not-done to done, the user has push enabled, and at least one subscription
 // exists. Re-clicking when the warmup is already done is a no-op on the
@@ -307,7 +308,7 @@ func (s *Service) SaveFeedback(ctx context.Context, date time.Time, difficulty i
 func (s *Service) MarkWarmupComplete(
 	ctx context.Context,
 	date time.Time,
-	workoutExerciseID int,
+	pos int,
 ) error {
 	var (
 		wasComplete   bool
@@ -323,16 +324,19 @@ func (s *Service) MarkWarmupComplete(
 		if sess == nil {
 			return domain.ErrNotFound
 		}
-		if slot, ok := sess.Slot(workoutExerciseID); ok {
-			wasComplete = slot.WarmupCompletedAt != nil
+		if pos >= 0 && pos < len(sess.ExerciseSets) {
+			wasComplete = sess.ExerciseSets[pos].WarmupCompletedAt != nil
 		}
 		periodization = sess.PeriodizationType
 		sessionDeload = sess.IsDeload
 
-		if mErr := sess.MarkWarmupComplete(workoutExerciseID, now); mErr != nil {
+		if mErr := sess.MarkWarmupComplete(pos, now); mErr != nil {
 			return mErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
 		}
-		postSlot, postSlotOK = sess.Slot(workoutExerciseID)
+		if pos >= 0 && pos < len(sess.ExerciseSets) {
+			postSlot = sess.ExerciseSets[pos]
+			postSlotOK = true
+		}
 		return nil
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
@@ -340,7 +344,7 @@ func (s *Service) MarkWarmupComplete(
 
 	if !wasComplete && postSlotOK {
 		userID := contexthelpers.AuthenticatedUserID(ctx)
-		s.applyRestPushDecision(ctx, userID, workoutExerciseID, postSlot, periodization, sessionDeload, now)
+		s.applyRestPushDecision(ctx, userID, date, pos, postSlot, periodization, sessionDeload, now)
 	}
 	return nil
 }

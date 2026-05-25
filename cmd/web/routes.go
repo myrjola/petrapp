@@ -13,17 +13,17 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("POST /workouts/{date}/complete", app.mustSessionStack(http.HandlerFunc(app.workoutCompletePOST)))
 	mux.Handle("GET /workouts/{date}/complete", app.mustSessionStack(http.HandlerFunc(app.workoutCompletionGET)))
 
-	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}",
+	mux.Handle("GET /workouts/{date}/exercises/{position}",
 		app.mustSessionStack(http.HandlerFunc(app.exerciseSetGET)))
-	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/sets/{setIndex}/update",
+	mux.Handle("POST /workouts/{date}/exercises/{position}/sets/{setIndex}/update",
 		app.mustSessionStack(http.HandlerFunc(app.exerciseSetUpdatePOST)))
-	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/warmup/complete",
+	mux.Handle("POST /workouts/{date}/exercises/{position}/warmup/complete",
 		app.mustSessionStack(http.HandlerFunc(app.exerciseSetWarmupCompletePOST)))
-	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}/info",
+	mux.Handle("GET /workouts/{date}/exercises/{position}/info",
 		app.mustSessionStack(http.HandlerFunc(app.exerciseInfoGET)))
-	mux.Handle("GET /workouts/{date}/exercises/{workoutExerciseID}/swap",
+	mux.Handle("GET /workouts/{date}/exercises/{position}/swap",
 		app.mustSessionStack(http.HandlerFunc(app.workoutSwapExerciseGET)))
-	mux.Handle("POST /workouts/{date}/exercises/{workoutExerciseID}/swap",
+	mux.Handle("POST /workouts/{date}/exercises/{position}/swap",
 		app.mustSessionStack(http.HandlerFunc(app.workoutSwapExercisePOST)))
 	mux.Handle("GET /workouts/{date}/add-exercise",
 		app.mustSessionStack(http.HandlerFunc(app.workoutAddExerciseGET)))

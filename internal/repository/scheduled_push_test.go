@@ -9,19 +9,20 @@ import (
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
-func TestScheduledPushes_ReplaceUpsertsByWorkoutExercise(t *testing.T) {
+func TestScheduledPushes_ReplaceUpsertsBySlot(t *testing.T) {
 	t.Parallel()
 	ctx, db, repos := setupTestReposWithDB(t)
 
 	userID := contexthelpers.AuthenticatedUserID(ctx)
-	weID := seedWorkoutExercise(ctx, t, db)
+	date, pos := seedWorkoutExerciseSlot(ctx, t, db)
 
 	fireAt1 := time.Now().Add(90 * time.Second).UTC().Truncate(time.Millisecond)
 	first := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt populated by Replace.
-		UserID:            userID,
-		WorkoutExerciseID: weID,
-		FireAt:            fireAt1,
-		Payload:           `{"title":"Rest over","body":"Set 1"}`,
+		UserID:      userID,
+		WorkoutDate: date,
+		Position:    pos,
+		FireAt:      fireAt1,
+		Payload:     `{"title":"Rest over","body":"Set 1"}`,
 	}
 	got, err := repos.ScheduledPushes.Replace(ctx, first)
 	if err != nil {
@@ -55,12 +56,14 @@ func TestScheduledPushes_ReplaceUpsertsByWorkoutExercise(t *testing.T) {
 	}
 }
 
-func TestScheduledPushes_GetReturnsErrNotFoundWhenMissing(t *testing.T) {
+func TestScheduledPushes_GetBySlotReturnsErrNotFoundWhenMissing(t *testing.T) {
 	t.Parallel()
 	ctx, _, repos := setupTestReposWithDB(t)
+	userID := contexthelpers.AuthenticatedUserID(ctx)
+	missingDate := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	_, err := repos.ScheduledPushes.Get(ctx, 999999)
+	_, err := repos.ScheduledPushes.GetBySlot(ctx, userID, missingDate, 0)
 	if !errors.Is(err, domain.ErrNotFound) {
-		t.Errorf("Get(missing) error = %v, want ErrNotFound", err)
+		t.Errorf("GetBySlot(missing) error = %v, want ErrNotFound", err)
 	}
 }

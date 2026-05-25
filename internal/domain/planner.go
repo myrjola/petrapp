@@ -479,7 +479,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 // buildPlannedExerciseSet creates an ExerciseSet for one exercise using
 // BuildPlannedSets as the single source of truth for set prescription.
 func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType, isDeload bool) ExerciseSet {
-	return ExerciseSet{ //nolint:exhaustruct // ID auto-assigned at insert; WarmupCompletedAt nil.
+	return ExerciseSet{ //nolint:exhaustruct // WarmupCompletedAt nil.
 		Exercise: ex,
 		Sets:     BuildPlannedSets(ex, pt, isDeload),
 	}

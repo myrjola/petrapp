@@ -35,13 +35,13 @@ func markdownToHTML(ctx context.Context, logger *slog.Logger, md string) templat
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
 
-	Date              time.Time
-	Header            PageHeaderData
-	WorkoutExerciseID int
-	Exercise          domain.Exercise
-	IsAdmin           bool
-	ProgressPoints    []ExerciseProgressDataPoint
-	DescriptionHTML   template.HTML
+	Date            time.Time
+	Header          PageHeaderData
+	Position        int
+	Exercise        domain.Exercise
+	IsAdmin         bool
+	ProgressPoints  []ExerciseProgressDataPoint
+	DescriptionHTML template.HTML
 }
 
 // exerciseInfoGET handles GET requests to view exercise information.
@@ -53,9 +53,8 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	workoutExerciseIDStr := r.PathValue("workoutExerciseID")
-	workoutExerciseID, err := strconv.Atoi(workoutExerciseIDStr)
-	if err != nil {
+	pos, err := strconv.Atoi(r.PathValue("position"))
+	if err != nil || pos < 0 {
 		app.notFound(w, r)
 		return
 	}
@@ -70,12 +69,11 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		app.serverError(w, r, err)
 		return
 	}
-	exerciseSet, found := findExerciseSetInSession(&session, workoutExerciseID)
-	if !found {
+	if pos >= len(session.ExerciseSets) {
 		app.notFound(w, r)
 		return
 	}
-	exercise := exerciseSet.Exercise
+	exercise := session.ExerciseSets[pos].Exercise
 
 	// Fetch the progress data.
 	progressData, err := app.generateExerciseProgressData(r.Context(), date, exercise)
@@ -96,11 +94,11 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 			Subtitle: "",
 			Nonce:    base.Nonce,
 		},
-		WorkoutExerciseID: workoutExerciseID,
-		Exercise:          exercise,
-		IsAdmin:           isAdmin,
-		ProgressPoints:    progressData,
-		DescriptionHTML:   markdownToHTML(r.Context(), app.logger, exercise.DescriptionMarkdown),
+		Position:        pos,
+		Exercise:        exercise,
+		IsAdmin:         isAdmin,
+		ProgressPoints:  progressData,
+		DescriptionHTML: markdownToHTML(r.Context(), app.logger, exercise.DescriptionMarkdown),
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-info", data)

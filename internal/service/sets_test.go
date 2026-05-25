@@ -56,18 +56,18 @@ func Test_RecordSetCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
-	var weID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		"INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id",
-		userID, today, exerciseID).Scan(&weID)
+	const pos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
+		userID, today, pos, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercise: %v", err)
+		t.Fatalf("insert workout_exercises: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
 		 weight_kg, target_value)
-		 VALUES (?, 1, 100.0, 5)`,
-		weID)
+		 VALUES (?, ?, ?, 1, 100.0, 5)`,
+		userID, today, pos)
 	if err != nil {
 		t.Fatalf("insert set: %v", err)
 	}
@@ -77,7 +77,7 @@ func Test_RecordSetCompletion(t *testing.T) {
 
 	weight := 102.5
 	sig := domain.SignalOnTarget
-	if err = svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err = svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -116,8 +116,14 @@ func Test_RecordSetCompletion(t *testing.T) {
 type fakeScheduler struct {
 	mu        sync.Mutex
 	scheduled []domain.ScheduledPush
-	cancels   []int
+	cancels   []fakeSlotCancel
 	workout   []fakeWorkoutCancel
+}
+
+type fakeSlotCancel struct {
+	userID int
+	date   time.Time
+	pos    int
 }
 
 type fakeWorkoutCancel struct {
@@ -132,9 +138,9 @@ func (f *fakeScheduler) Schedule(_ context.Context, push domain.ScheduledPush) e
 	return nil
 }
 
-func (f *fakeScheduler) Cancel(_ context.Context, weID int) error {
+func (f *fakeScheduler) Cancel(_ context.Context, userID int, date time.Time, pos int) error {
 	f.mu.Lock()
-	f.cancels = append(f.cancels, weID)
+	f.cancels = append(f.cancels, fakeSlotCancel{userID: userID, date: date, pos: pos})
 	f.mu.Unlock()
 	return nil
 }
@@ -156,7 +162,7 @@ type erroringScheduler struct {
 func (e *erroringScheduler) Schedule(_ context.Context, _ domain.ScheduledPush) error {
 	return e.scheduleErr
 }
-func (e *erroringScheduler) Cancel(_ context.Context, _ int) error { return nil }
+func (e *erroringScheduler) Cancel(_ context.Context, _ int, _ time.Time, _ int) error { return nil }
 func (e *erroringScheduler) CancelForWorkout(_ context.Context, _ int, _ time.Time) error {
 	return nil
 }
@@ -164,11 +170,12 @@ func (e *erroringScheduler) CancelForWorkout(_ context.Context, _ int, _ time.Ti
 func Test_RecordSet_SchedulesRestPush(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
+	today := time.Now().Format("2006-01-02")
 	// Seed a second incomplete set so the just-completed one isn't the last.
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-		 VALUES (?, 2, 100.0, 5)`, weID,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 2, 100.0, 5)`, userID, today, pos,
 	); err != nil {
 		t.Fatalf("seed second set: %v", err)
 	}
@@ -194,7 +201,7 @@ func Test_RecordSet_SchedulesRestPush(t *testing.T) {
 	weight := 100.0
 	date := time.Now().UTC().Truncate(24 * time.Hour)
 	sig := domain.SignalOnTarget
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -203,15 +210,18 @@ func Test_RecordSet_SchedulesRestPush(t *testing.T) {
 	if len(fake.scheduled) != 1 {
 		t.Fatalf("Schedule calls = %d, want 1", len(fake.scheduled))
 	}
-	if fake.scheduled[0].WorkoutExerciseID != weID {
-		t.Errorf("WorkoutExerciseID = %d, want %d", fake.scheduled[0].WorkoutExerciseID, weID)
+	if fake.scheduled[0].Position != pos {
+		t.Errorf("Position = %d, want %d", fake.scheduled[0].Position, pos)
+	}
+	if !fake.scheduled[0].WorkoutDate.Equal(date) {
+		t.Errorf("WorkoutDate = %s, want %s", fake.scheduled[0].WorkoutDate, date)
 	}
 }
 
 func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
 		 VALUES (?, 'https://example.test/wp/last', 'p', 'a')`, userID,
@@ -225,7 +235,7 @@ func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 	weight := 100.0
 	date := time.Now().UTC().Truncate(24 * time.Hour)
 	sig2 := domain.SignalOnTarget
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig2, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig2, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -244,7 +254,7 @@ func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	// Seed a SECOND exercise slot with one incomplete set so the session
 	// still has work after finishing the first slot's only set.
 	var otherExerciseID int
@@ -254,17 +264,17 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 		t.Fatalf("get bench press id: %v", err)
 	}
 	today := time.Now().Format("2006-01-02")
-	var otherWEID int
-	if err := db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
-		 VALUES (?, ?, ?) RETURNING id`,
-		userID, today, otherExerciseID,
-	).Scan(&otherWEID); err != nil {
-		t.Fatalf("insert second workout_exercise: %v", err)
+	const otherPos = 1
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		 VALUES (?, ?, ?, ?)`,
+		userID, today, otherPos, otherExerciseID,
+	); err != nil {
+		t.Fatalf("insert second workout_exercises: %v", err)
 	}
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-		 VALUES (?, 1, 60.0, 5)`, otherWEID,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 1, 60.0, 5)`, userID, today, otherPos,
 	); err != nil {
 		t.Fatalf("insert other slot set: %v", err)
 	}
@@ -285,11 +295,11 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
 		WithScheduler(fake)
 
-	// Complete the only set in the first slot (weID).
+	// Complete the only set in the first slot (pos).
 	weight := 100.0
 	date := time.Now().UTC().Truncate(24 * time.Hour)
 	sig := domain.SignalOnTarget
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
@@ -301,8 +311,11 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 	if len(fake.cancels) != 1 {
 		t.Fatalf("Cancel calls = %d, want 1", len(fake.cancels))
 	}
-	if fake.cancels[0] != weID {
-		t.Errorf("Cancel target = %d, want %d", fake.cancels[0], weID)
+	if fake.cancels[0].pos != pos {
+		t.Errorf("Cancel target pos = %d, want %d", fake.cancels[0].pos, pos)
+	}
+	if !fake.cancels[0].date.Equal(date) {
+		t.Errorf("Cancel target date = %s, want %s", fake.cancels[0].date, date)
 	}
 }
 
@@ -312,7 +325,7 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
 		 VALUES (?, 'https://example.test/wp/edit', 'p', 'a')`, userID,
@@ -333,7 +346,7 @@ func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
 	date := time.Now().UTC().Truncate(24 * time.Hour)
 	weight := 100.0
 	sig := domain.SignalOnTarget
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet (seed completion): %v", err)
 	}
 
@@ -342,7 +355,7 @@ func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
 	cancelsBefore := len(fake.cancels)
 	fake.mu.Unlock()
 
-	if err := svc.UpdateCompletedValue(ctx, date, weID, 0, 6); err != nil {
+	if err := svc.UpdateCompletedValue(ctx, date, pos, 0, 6); err != nil {
 		t.Fatalf("UpdateCompletedValue: %v", err)
 	}
 
@@ -361,7 +374,7 @@ func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
 func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
 		 VALUES (?, 'https://example.test/wp/weight-edit', 'p', 'a')`, userID,
@@ -380,7 +393,7 @@ func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.UpdateSetWeight(ctx, date, weID, 0, 105.0); err != nil {
+	if err := svc.UpdateSetWeight(ctx, date, pos, 0, 105.0); err != nil {
 		t.Fatalf("UpdateSetWeight: %v", err)
 	}
 
@@ -400,11 +413,12 @@ func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
 func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
+	today := time.Now().Format("2006-01-02")
 	// Seed a second set so the first completion schedules a push.
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-		 VALUES (?, 2, 100.0, 5)`, weID,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 2, 100.0, 5)`, userID, today, pos,
 	); err != nil {
 		t.Fatalf("seed second set: %v", err)
 	}
@@ -428,7 +442,7 @@ func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 	date := time.Now().UTC().Truncate(24 * time.Hour)
 	weight := 100.0
 	sig := domain.SignalOnTarget
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet (first): %v", err)
 	}
 
@@ -441,7 +455,7 @@ func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 
 	// Re-record the same set with a different value. wasComplete is true now,
 	// so the policy must not be re-invoked.
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 6); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 6); err != nil {
 		t.Fatalf("RecordSet (re-record): %v", err)
 	}
 
@@ -456,7 +470,8 @@ func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 }
 
 // setupSessionForRecordSet builds a workout session with one weighted exercise
-// and one planned set, returning everything the scheduling tests need.
+// and one planned set, returning everything the scheduling tests need. The
+// returned int is the slot's position (always 0 here — single-slot setup).
 func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, int, int) {
 	t.Helper()
 	ctx := t.Context()
@@ -492,32 +507,33 @@ func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, 
 	); err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
-	var weID int
-	if err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
-		 VALUES (?, ?, ?) RETURNING id`,
-		userID, today, exerciseID,
-	).Scan(&weID); err != nil {
-		t.Fatalf("insert workout_exercise: %v", err)
+	const pos = 0
+	if _, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		 VALUES (?, ?, ?, ?)`,
+		userID, today, pos, exerciseID,
+	); err != nil {
+		t.Fatalf("insert workout_exercises: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-		 VALUES (?, 1, 100.0, 5)`, weID,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 1, 100.0, 5)`, userID, today, pos,
 	); err != nil {
 		t.Fatalf("insert set: %v", err)
 	}
-	return ctx, db, userID, weID
+	return ctx, db, userID, pos
 }
 
-func Test_RecordSet_FailedSchedule_LogsUserAndExerciseID(t *testing.T) {
+func Test_RecordSet_FailedSchedule_LogsUserAndPosition(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
+	today := time.Now().Format("2006-01-02")
 	// Seed an incomplete second set so the just-completed one isn't the last,
 	// which means PlanRestPush returns Schedule (not Cancel).
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-		 VALUES (?, 2, 100.0, 5)`, weID,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 2, 100.0, 5)`, userID, today, pos,
 	); err != nil {
 		t.Fatalf("seed second set: %v", err)
 	}
@@ -544,18 +560,18 @@ func Test_RecordSet_FailedSchedule_LogsUserAndExerciseID(t *testing.T) {
 	weight := 100.0
 	sig := domain.SignalOnTarget
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
 	out := logBuf.String()
 	wantUser := fmt.Sprintf("user_id=%d", userID)
-	wantWE := fmt.Sprintf("workout_exercise_id=%d", weID)
+	wantPos := fmt.Sprintf("position=%d", pos)
 	if !strings.Contains(out, wantUser) {
 		t.Errorf("log missing %q; got:\n%s", wantUser, out)
 	}
-	if !strings.Contains(out, wantWE) {
-		t.Errorf("log missing %q; got:\n%s", wantWE, out)
+	if !strings.Contains(out, wantPos) {
+		t.Errorf("log missing %q; got:\n%s", wantPos, out)
 	}
 	if !strings.Contains(out, "rest push: schedule failed") {
 		t.Errorf("log missing expected message; got:\n%s", out)

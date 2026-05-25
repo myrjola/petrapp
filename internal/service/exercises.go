@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
@@ -53,9 +54,9 @@ func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
 	return groups, nil
 }
 
-// SwapExercise replaces the exercise occupying a workout slot (identified by
-// workoutExerciseID) with newExerciseID. The workout slot's stable ID is
-// preserved so URLs targeting the slot keep working.
+// SwapExercise replaces the exercise occupying the slot at pos on date with
+// newExerciseID. The slot's position is preserved so URLs targeting the slot
+// keep working.
 //
 // Sets recorded against the old exercise are dropped — replaced with historical
 // data for the new exercise when available, otherwise empty placeholders matching
@@ -63,7 +64,7 @@ func (s *Service) ListMuscleGroups(ctx context.Context) ([]string, error) {
 func (s *Service) SwapExercise(
 	ctx context.Context,
 	date time.Time,
-	workoutExerciseID int,
+	pos int,
 	newExerciseID int,
 ) error {
 	newExercise, err := s.repos.Exercises.Get(ctx, newExerciseID)
@@ -82,16 +83,18 @@ func (s *Service) SwapExercise(
 			return domain.ErrNotFound
 		}
 		newSets := domain.BuildSetsForAdd(newExercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
-		return sess.SwapExerciseInSlot(workoutExerciseID, newExercise, newSets)
+		return sess.SwapExerciseInSlot(pos, newExercise, newSets)
 	})
 	if err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
 
+	userID := contexthelpers.AuthenticatedUserID(ctx)
 	if s.scheduler != nil {
-		if err = s.scheduler.Cancel(ctx, workoutExerciseID); err != nil {
+		if err = s.scheduler.Cancel(ctx, userID, date, pos); err != nil {
 			s.logger.LogAttrs(ctx, slog.LevelWarn, "cancel pending push on swap",
-				slog.Int("workout_exercise_id", workoutExerciseID),
+				slog.String("workout_date", date.Format(time.DateOnly)),
+				slog.Int("position", pos),
 				slog.Any("error", err))
 		}
 	}
@@ -122,19 +125,18 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 	return nil, nil
 }
 
-// ListSwapCandidates returns the exercises eligible to replace the given
-// slot in the given session, filtered by an optional case-insensitive query
+// ListSwapCandidates returns the exercises eligible to replace the slot at
+// pos in the session on date, filtered by an optional case-insensitive query
 // substring and sorted by similarity to the current exercise (descending),
 // then by name (ascending). Excludes the current exercise and any exercise
 // already used in the same session — those would collide with the UNIQUE
-// constraint on workout_exercise.
+// constraint on workout_exercises.
 //
-// Returns domain.ErrSlotNotFound when workoutExerciseID does not match a
-// slot in the session for the given date.
+// Returns domain.ErrSlotNotFound when pos is out of range for the session.
 func (s *Service) ListSwapCandidates(
 	ctx context.Context,
 	date time.Time,
-	workoutExerciseID int,
+	pos int,
 	query string,
 ) (domain.Exercise, []domain.Exercise, error) {
 	session, err := s.GetSession(ctx, date)
@@ -142,18 +144,13 @@ func (s *Service) ListSwapCandidates(
 		return domain.Exercise{}, nil, fmt.Errorf("get session: %w", err)
 	}
 
-	var current domain.Exercise
-	currentFound := false
+	if pos < 0 || pos >= len(session.ExerciseSets) {
+		return domain.Exercise{}, nil, fmt.Errorf("slot %d: %w", pos, domain.ErrSlotNotFound)
+	}
+	current := session.ExerciseSets[pos].Exercise
 	existing := make(map[int]bool, len(session.ExerciseSets))
 	for _, es := range session.ExerciseSets {
 		existing[es.Exercise.ID] = true
-		if es.ID == workoutExerciseID {
-			current = es.Exercise
-			currentFound = true
-		}
-	}
-	if !currentFound {
-		return domain.Exercise{}, nil, fmt.Errorf("slot %d: %w", workoutExerciseID, domain.ErrSlotNotFound)
 	}
 
 	all, err := s.ListExercises(ctx)
@@ -204,8 +201,8 @@ func (s *Service) FindCompatibleExercises(ctx context.Context, exerciseID int) (
 
 // AddExercise adds a new exercise to an existing workout session.
 // It will retrieve historical weight data if available. Returns the
-// workout_exercise.id assigned to the new slot, so callers can build URLs
-// that point at the new exercise's detail page.
+// position (0-based array index) of the new slot in the session, so callers
+// can build URLs that point at the new exercise's detail page.
 func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID int) (int, error) {
 	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
@@ -257,9 +254,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	if updatedSess == nil {
 		return 0, fmt.Errorf("re-fetch session %s after add: %w", date.Format(time.DateOnly), domain.ErrNotFound)
 	}
-	for _, es := range updatedSess.ExerciseSets {
+	for pos, es := range updatedSess.ExerciseSets {
 		if es.Exercise.ID == exerciseID {
-			return es.ID, nil
+			return pos, nil
 		}
 	}
 	return 0, fmt.Errorf("added exercise %d not found in session %s", exerciseID, date.Format(time.DateOnly))

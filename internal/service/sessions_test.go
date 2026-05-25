@@ -448,7 +448,7 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
 		 VALUES (?, 'https://example.test/wp/warmup', 'p', 'a')`, userID,
@@ -467,7 +467,7 @@ func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+	if err := svc.MarkWarmupComplete(ctx, date, pos); err != nil {
 		t.Fatalf("MarkWarmupComplete: %v", err)
 	}
 
@@ -476,8 +476,11 @@ func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
 	if len(fake.scheduled) != 1 {
 		t.Fatalf("Schedule calls = %d, want 1", len(fake.scheduled))
 	}
-	if fake.scheduled[0].WorkoutExerciseID != weID {
-		t.Errorf("WorkoutExerciseID = %d, want %d", fake.scheduled[0].WorkoutExerciseID, weID)
+	if fake.scheduled[0].Position != pos {
+		t.Errorf("Position = %d, want %d", fake.scheduled[0].Position, pos)
+	}
+	if !fake.scheduled[0].WorkoutDate.Equal(date) {
+		t.Errorf("WorkoutDate = %s, want %s", fake.scheduled[0].WorkoutDate, date)
 	}
 	if !strings.Contains(fake.scheduled[0].Payload, `"set_number":1`) {
 		t.Errorf("payload = %q, want set_number=1", fake.scheduled[0].Payload)
@@ -487,13 +490,13 @@ func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
 func Test_MarkWarmupComplete_NoSubscriptions_DoesNotSchedule(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, _, weID := setupSessionForRecordSet(t)
+	ctx, db, _, pos := setupSessionForRecordSet(t)
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
 	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+	if err := svc.MarkWarmupComplete(ctx, date, pos); err != nil {
 		t.Fatalf("MarkWarmupComplete: %v", err)
 	}
 
@@ -507,11 +510,12 @@ func Test_MarkWarmupComplete_NoSubscriptions_DoesNotSchedule(t *testing.T) {
 func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
+	today := time.Now().Format("2006-01-02")
 	// Seed a second set so set 2 exists for the schedule target.
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-		 VALUES (?, 2, 100.0, 5)`, weID,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 2, 100.0, 5)`, userID, today, pos,
 	); err != nil {
 		t.Fatalf("seed second set: %v", err)
 	}
@@ -536,11 +540,11 @@ func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
 	weight := 100.0
 	sig := domain.SignalOnTarget
 	// Complete set 1 first.
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 	// Now click warmup-complete (out-of-order user behavior, but legal).
-	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+	if err := svc.MarkWarmupComplete(ctx, date, pos); err != nil {
 		t.Fatalf("MarkWarmupComplete: %v", err)
 	}
 
@@ -558,7 +562,7 @@ func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
 func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
 		 VALUES (?, 'https://example.test/wp/warmup-done', 'p', 'a')`, userID,
@@ -580,7 +584,7 @@ func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testin
 	weight := 100.0
 	sig := domain.SignalOnTarget
 	// Complete the only set, then call warmup-complete on an exhausted slot.
-	if err := svc.RecordSet(ctx, date, weID, 0, &sig, &weight, 5); err != nil {
+	if err := svc.RecordSet(ctx, date, pos, 0, &sig, &weight, 5); err != nil {
 		t.Fatalf("RecordSet: %v", err)
 	}
 	fake.mu.Lock()
@@ -588,7 +592,7 @@ func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testin
 	preCancelCount := len(fake.cancels)
 	fake.mu.Unlock()
 
-	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+	if err := svc.MarkWarmupComplete(ctx, date, pos); err != nil {
 		t.Fatalf("MarkWarmupComplete: %v", err)
 	}
 
@@ -607,7 +611,7 @@ func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testin
 func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
 	t.Parallel()
 
-	ctx, db, userID, weID := setupSessionForRecordSet(t)
+	ctx, db, userID, pos := setupSessionForRecordSet(t)
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
 		 VALUES (?, 'https://example.test/wp/warmup-dup', 'p', 'a')`, userID,
@@ -626,10 +630,10 @@ func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
-	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+	if err := svc.MarkWarmupComplete(ctx, date, pos); err != nil {
 		t.Fatalf("first MarkWarmupComplete: %v", err)
 	}
-	if err := svc.MarkWarmupComplete(ctx, date, weID); err != nil {
+	if err := svc.MarkWarmupComplete(ctx, date, pos); err != nil {
 		t.Fatalf("second MarkWarmupComplete: %v", err)
 	}
 
@@ -1081,18 +1085,18 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	if err != nil {
 		t.Fatalf("insert prior hypertrophy session: %v", err)
 	}
-	var weID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
-		userID, priorStr, exerciseID).Scan(&weID)
+	const priorPos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		userID, priorStr, priorPos, exerciseID)
 	if err != nil {
-		t.Fatalf("insert prior workout_exercise: %v", err)
+		t.Fatalf("insert prior workout_exercises: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
 		 weight_kg, target_value, completed_value, completed_at, signal)
-		 VALUES (?, 1, 80.0, 8, 8, ?, 'on_target')`,
-		weID, priorMonday.Format("2006-01-02T15:04:05.000Z"))
+		 VALUES (?, ?, ?, 1, 80.0, 8, 8, ?, 'on_target')`,
+		userID, priorStr, priorPos, priorMonday.Format("2006-01-02T15:04:05.000Z"))
 	if err != nil {
 		t.Fatalf("insert prior exercise_sets: %v", err)
 	}

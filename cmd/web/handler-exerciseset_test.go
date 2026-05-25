@@ -823,29 +823,38 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Fatalf("get Assisted Pull-Up id: %v", err)
 	}
 
-	// Insert a workout_exercise row pointing at Assisted Pull-Up, attached to
+	// Insert a workout_exercises row pointing at Assisted Pull-Up, attached to
 	// the just-started session for the test user. This avoids depending on
-	// the swap UI's offered-alternatives logic.
-	var slotID int
+	// the swap UI's offered-alternatives logic. The slot's identity is its
+	// natural-key tuple (user_id, workout_date, position); we pick the next
+	// free position via MAX(position)+1.
+	var (
+		slotUserID int
+		slotPos    int
+	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
-         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
-         FROM workout_sessions WHERE workout_date = ?
-         RETURNING id`, assistedID, today).Scan(&slotID); err != nil {
+         SELECT user_id, workout_date,
+                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                          WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
+                ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions ws WHERE workout_date = ?
+         RETURNING workout_user_id, position`, assistedID, today,
+	).Scan(&slotUserID, &slotPos); err != nil {
 		t.Fatalf("insert assisted slot: %v", err)
 	}
 	// Seed four placeholder sets so the form has rows to submit against.
 	for setNum := 1; setNum <= 4; setNum++ {
 		if _, err = db.ExecContext(ctx,
-			`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+			`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
                 weight_kg, target_value)
-             VALUES (?, ?, 0.0, 5)`, slotID, setNum); err != nil {
+             VALUES (?, ?, ?, ?, 0.0, 5)`, slotUserID, today, slotPos, setNum); err != nil {
 			t.Fatalf("insert placeholder set %d: %v", setNum, err)
 		}
 	}
 
-	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotPos)
 	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
 		t.Fatalf("get exercise set: %v", err)
 	}
@@ -871,8 +880,8 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 	var weight1 float64
 	if err = db.QueryRowContext(ctx,
 		`SELECT weight_kg FROM exercise_sets
-         WHERE workout_exercise_id = ? AND set_number = 1`,
-		slotID).Scan(&weight1); err != nil {
+         WHERE workout_user_id = ? AND workout_date = ? AND position = ? AND set_number = 1`,
+		slotUserID, today, slotPos).Scan(&weight1); err != nil {
 		t.Fatalf("query set 1 weight: %v", err)
 	}
 	if weight1 != -20.0 {
@@ -899,8 +908,8 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 	var weight2 float64
 	if err = db.QueryRowContext(ctx,
 		`SELECT weight_kg FROM exercise_sets
-         WHERE workout_exercise_id = ? AND set_number = 2`,
-		slotID).Scan(&weight2); err != nil {
+         WHERE workout_user_id = ? AND workout_date = ? AND position = ? AND set_number = 2`,
+		slotUserID, today, slotPos).Scan(&weight2); err != nil {
 		t.Fatalf("query set 2 weight: %v", err)
 	}
 	if weight2 != 5.0 {
@@ -928,8 +937,8 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 	var weight3 float64
 	if err = db.QueryRowContext(ctx,
 		`SELECT weight_kg FROM exercise_sets
-         WHERE workout_exercise_id = ? AND set_number = 3`,
-		slotID).Scan(&weight3); err != nil {
+         WHERE workout_user_id = ? AND workout_date = ? AND position = ? AND set_number = 3`,
+		slotUserID, today, slotPos).Scan(&weight3); err != nil {
 		t.Fatalf("query set 3 weight: %v", err)
 	}
 	if weight3 != -15.0 {
@@ -1368,7 +1377,7 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 	}
 
 	// Look up the seeded "Plank" id (set to ExerciseTypeTime by fixtures.sql)
-	// and attach a workout_exercise slot for it on today's session with the
+	// and attach a workout_exercises slot for it on today's session with the
 	// warmup already complete, so the active oversized row renders.
 	db := server.DB()
 	var plankID int
@@ -1377,26 +1386,33 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 		t.Fatalf("get Plank id: %v", err)
 	}
 
-	var slotID int
+	var (
+		slotUserID int
+		slotPos    int
+	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
-         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
-         FROM workout_sessions WHERE workout_date = ?
-         RETURNING id`, plankID, today).Scan(&slotID); err != nil {
+         SELECT user_id, workout_date,
+                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                          WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
+                ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions ws WHERE workout_date = ?
+         RETURNING workout_user_id, position`, plankID, today,
+	).Scan(&slotUserID, &slotPos); err != nil {
 		t.Fatalf("insert plank slot: %v", err)
 	}
 
 	// Seed a single placeholder set (target_value = 30 seconds) so the form has
 	// a row to render. weight_kg is unused for time-based but the column is NOT NULL.
 	if _, err = db.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
             weight_kg, target_value)
-         VALUES (?, 1, 0.0, 30)`, slotID); err != nil {
+         VALUES (?, ?, ?, 1, 0.0, 30)`, slotUserID, today, slotPos); err != nil {
 		t.Fatalf("insert plank set: %v", err)
 	}
 
-	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotPos)
 	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
 		t.Fatalf("get exercise set page: %v", err)
 	}
@@ -1482,24 +1498,31 @@ func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
 		t.Fatalf("get Plank id: %v", err)
 	}
 
-	var slotID int
+	var (
+		slotUserID int
+		slotPos    int
+	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
-         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
-         FROM workout_sessions WHERE workout_date = ?
-         RETURNING id`, plankID, today).Scan(&slotID); err != nil {
+         SELECT user_id, workout_date,
+                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                          WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
+                ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions ws WHERE workout_date = ?
+         RETURNING workout_user_id, position`, plankID, today,
+	).Scan(&slotUserID, &slotPos); err != nil {
 		t.Fatalf("insert plank slot: %v", err)
 	}
 
 	if _, err = db.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
             weight_kg, target_value)
-         VALUES (?, 1, 0.0, 30)`, slotID); err != nil {
+         VALUES (?, ?, ?, 1, 0.0, 30)`, slotUserID, today, slotPos); err != nil {
 		t.Fatalf("insert plank set: %v", err)
 	}
 
-	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotPos)
 	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
 		t.Fatalf("get exercise set page: %v", err)
 	}
@@ -1576,26 +1599,34 @@ func Test_application_exerciseSet_overline_clamps_when_all_sets_complete(t *test
 		t.Fatalf("get Plank id: %v", err)
 	}
 
-	var slotID int
+	var (
+		slotUserID int
+		slotPos    int
+	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
-         SELECT user_id, workout_date, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
-         FROM workout_sessions WHERE workout_date = ?
-         RETURNING id`, plankID, today).Scan(&slotID); err != nil {
+         SELECT user_id, workout_date,
+                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                          WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
+                ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions ws WHERE workout_date = ?
+         RETURNING workout_user_id, position`, plankID, today,
+	).Scan(&slotUserID, &slotPos); err != nil {
 		t.Fatalf("insert plank slot: %v", err)
 	}
 
 	// Seed a single set already completed so the page renders the "all sets
 	// done" state.
 	if _, err = db.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
             weight_kg, target_value, completed_value, completed_at)
-         VALUES (?, 1, 0.0, 30, 30, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))`, slotID); err != nil {
+         VALUES (?, ?, ?, 1, 0.0, 30, 30, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))`,
+		slotUserID, today, slotPos); err != nil {
 		t.Fatalf("insert completed plank set: %v", err)
 	}
 
-	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotID)
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotPos)
 	if doc, err = client.GetDoc(ctx, slotPath); err != nil {
 		t.Fatalf("get exercise set page: %v", err)
 	}

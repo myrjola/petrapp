@@ -31,6 +31,7 @@ type exerciseSetTemplateData struct {
 	BaseTemplateData
 
 	Date                  time.Time
+	Position              int // Slot's 0-based index in Session.ExerciseSets, used for URL building and view-transition names.
 	ExerciseSet           domain.ExerciseSet
 	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex  int
@@ -145,7 +146,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workoutExerciseID, ok := app.parseWorkoutExerciseIDParam(w, r)
+	pos, ok := app.parsePositionParam(w, r)
 	if !ok {
 		return
 	}
@@ -170,11 +171,11 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exerciseSet, found := findExerciseSetInSession(&session, workoutExerciseID)
-	if !found {
+	if pos >= len(session.ExerciseSets) {
 		app.notFound(w, r)
 		return
 	}
+	exerciseSet := session.ExerciseSets[pos]
 
 	currentSetTarget, currentSetTimedTarget, err := app.buildProgressionTargets(r, date, exerciseSet.Exercise)
 	if err != nil {
@@ -204,6 +205,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	data := exerciseSetTemplateData{
 		BaseTemplateData:      newBaseTemplateData(r),
 		Date:                  date,
+		Position:              pos,
 		ExerciseSet:           exerciseSet,
 		SetsDisplay:           prepareSetsDisplay(exerciseSet.Exercise, exerciseSet.Sets),
 		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSet.Sets),
@@ -233,11 +235,12 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 }
 
 // exerciseSetParams bundles the URL params for exercise set operations.
-// WorkoutExerciseID is the stable slot identifier (workout_exercise.id) in the URL.
+// Position is the slot's 0-based index in Session.ExerciseSets, taken from
+// the URL.
 type exerciseSetParams struct {
-	Date              time.Time
-	WorkoutExerciseID int
-	SetIndex          int
+	Date     time.Time
+	Position int
+	SetIndex int
 }
 
 // parseExerciseSetURLParams extracts and validates URL parameters for exercise set operations.
@@ -247,9 +250,12 @@ func (app *application) parseExerciseSetURLParams(r *http.Request) (exerciseSetP
 		return exerciseSetParams{}, fmt.Errorf("parse date: %w", err)
 	}
 
-	workoutExerciseID, err := strconv.Atoi(r.PathValue("workoutExerciseID"))
+	pos, err := strconv.Atoi(r.PathValue("position"))
 	if err != nil {
-		return exerciseSetParams{}, fmt.Errorf("parse workout exercise ID: %w", err)
+		return exerciseSetParams{}, fmt.Errorf("parse position: %w", err)
+	}
+	if pos < 0 {
+		return exerciseSetParams{}, fmt.Errorf("position %d: must be >= 0", pos)
 	}
 
 	setIndex, err := strconv.Atoi(r.PathValue("setIndex"))
@@ -258,20 +264,10 @@ func (app *application) parseExerciseSetURLParams(r *http.Request) (exerciseSetP
 	}
 
 	return exerciseSetParams{
-		Date:              date,
-		WorkoutExerciseID: workoutExerciseID,
-		SetIndex:          setIndex,
+		Date:     date,
+		Position: pos,
+		SetIndex: setIndex,
 	}, nil
-}
-
-// findExerciseSetInSession returns the workout slot identified by its stable ID.
-func findExerciseSetInSession(session *domain.Session, workoutExerciseID int) (domain.ExerciseSet, bool) {
-	for _, es := range session.ExerciseSets {
-		if es.ID == workoutExerciseID {
-			return es, true
-		}
-	}
-	return domain.ExerciseSet{}, false
 }
 
 // recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
@@ -302,7 +298,7 @@ func (app *application) recordSetCompletionWithWeight(
 	}
 
 	err = app.service.RecordSet(
-		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, signal, &weight, reps)
+		r.Context(), params.Date, params.Position, params.SetIndex, signal, &weight, reps)
 	if err != nil {
 		app.serverError(w, r, fmt.Errorf("record set completion: %w", err))
 		return false
@@ -314,7 +310,7 @@ func (app *application) recordSetCompletionWithWeight(
 	}
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded set completion",
 		slog.String("date", params.Date.Format("2006-01-02")),
-		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
+		slog.Int("position", params.Position),
 		slog.Int("set_index", params.SetIndex),
 		slog.String(signalFormField, signalStr),
 		slog.Float64("weight", weight),
@@ -339,7 +335,7 @@ func (app *application) recordBodyweightSetCompletion(
 		return false
 	}
 	if err = app.service.UpdateCompletedValue(
-		r.Context(), params.Date, params.WorkoutExerciseID, params.SetIndex, completedValue); err != nil {
+		r.Context(), params.Date, params.Position, params.SetIndex, completedValue); err != nil {
 		app.serverError(w, r, fmt.Errorf("update completed value: %w", err))
 		return false
 	}
@@ -372,7 +368,7 @@ func (app *application) recordTimedSetCompletion(
 	if err = app.service.RecordSet(
 		r.Context(),
 		params.Date,
-		params.WorkoutExerciseID,
+		params.Position,
 		params.SetIndex,
 		signal,
 		nil,
@@ -388,7 +384,7 @@ func (app *application) recordTimedSetCompletion(
 	}
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "recorded timed set completion",
 		slog.String("date", params.Date.Format("2006-01-02")),
-		slog.Int("workout_exercise_id", params.WorkoutExerciseID),
+		slog.Int("position", params.Position),
 		slog.Int("set_index", params.SetIndex),
 		slog.String(signalFormField, signalStr),
 		slog.Int("completed_seconds", completedSeconds))
@@ -412,11 +408,11 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	exerciseSet, found := findExerciseSetInSession(&session, params.WorkoutExerciseID)
-	if !found {
+	if params.Position >= len(session.ExerciseSets) {
 		app.notFound(w, r)
 		return
 	}
+	exerciseSet := session.ExerciseSets[params.Position]
 	exercise := exerciseSet.Exercise
 
 	switch exercise.ExerciseType {
@@ -435,7 +431,7 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	}
 
 	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d",
-		params.Date.Format("2006-01-02"), params.WorkoutExerciseID))
+		params.Date.Format("2006-01-02"), params.Position))
 }
 
 func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *http.Request) {
@@ -444,19 +440,19 @@ func (app *application) exerciseSetWarmupCompletePOST(w http.ResponseWriter, r *
 		return
 	}
 
-	workoutExerciseID, ok := app.parseWorkoutExerciseIDParam(w, r)
+	pos, ok := app.parsePositionParam(w, r)
 	if !ok {
 		return
 	}
 
-	if err := app.service.MarkWarmupComplete(r.Context(), date, workoutExerciseID); err != nil {
+	if err := app.service.MarkWarmupComplete(r.Context(), date, pos); err != nil {
 		app.serverError(w, r, fmt.Errorf("mark warmup complete: %w", err))
 		return
 	}
 
 	app.logger.LogAttrs(r.Context(), slog.LevelInfo, "warmup completed",
 		slog.String("date", date.Format("2006-01-02")),
-		slog.Int("workout_exercise_id", workoutExerciseID))
+		slog.Int("position", pos))
 
-	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), workoutExerciseID))
+	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), pos))
 }

@@ -16,7 +16,13 @@ import (
 	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
-// fakeDispatch records every Dispatch call and closes done after target fires.
+// testDate is a fixed date all scheduler tests use for their slot keys.
+//
+//nolint:gochecknoglobals // package-scoped fixture shared by every test in this file.
+var testDate = time.Date(2026, 5, 4, 0, 0, 0, 0, time.UTC)
+
+// fakeDispatch records every Dispatch call (by Position) and closes done after
+// target fires.
 type fakeDispatch struct {
 	mu     sync.Mutex
 	fires  []int
@@ -31,7 +37,7 @@ func newFakeDispatch(target int) *fakeDispatch {
 
 func (f *fakeDispatch) Dispatch(_ context.Context, push domain.ScheduledPush) error {
 	f.mu.Lock()
-	f.fires = append(f.fires, push.WorkoutExerciseID)
+	f.fires = append(f.fires, push.Position)
 	if f.target > 0 && len(f.fires) == f.target {
 		close(f.done)
 	}
@@ -58,10 +64,11 @@ func TestScheduler_ScheduleFires(t *testing.T) {
 	})
 
 	push := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
-		UserID:            1,
-		WorkoutExerciseID: 42,
-		FireAt:            time.Now().Add(50 * time.Millisecond),
-		Payload:           `{}`,
+		UserID:      1,
+		WorkoutDate: testDate,
+		Position:    42,
+		FireAt:      time.Now().Add(50 * time.Millisecond),
+		Payload:     `{}`,
 	}
 	if err := scheduler.Schedule(context.Background(), push); err != nil {
 		t.Fatalf("Schedule: %v", err)
@@ -97,13 +104,15 @@ func TestScheduler_CancelStopsTimer(t *testing.T) {
 	})
 
 	push := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt/Payload unused here.
-		UserID: 1, WorkoutExerciseID: 99,
-		FireAt: time.Now().Add(100 * time.Millisecond),
+		UserID:      1,
+		WorkoutDate: testDate,
+		Position:    99,
+		FireAt:      time.Now().Add(100 * time.Millisecond),
 	}
 	if err := scheduler.Schedule(context.Background(), push); err != nil {
 		t.Fatalf("Schedule: %v", err)
 	}
-	if err := scheduler.Cancel(context.Background(), 99); err != nil {
+	if err := scheduler.Cancel(context.Background(), 1, testDate, 99); err != nil {
 		t.Fatalf("Cancel: %v", err)
 	}
 	time.Sleep(200 * time.Millisecond)
@@ -129,14 +138,18 @@ func TestScheduler_ReplaceOnlyFiresLatest(t *testing.T) {
 	// Schedule far-future, then immediately reschedule near-future. Far-future is tight enough
 	// that we'd catch a missed Stop() within the test window — see post-fire sleep below.
 	farFuture := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
-		UserID: 1, WorkoutExerciseID: 7,
-		FireAt:  time.Now().Add(300 * time.Millisecond),
-		Payload: `"original"`,
+		UserID:      1,
+		WorkoutDate: testDate,
+		Position:    7,
+		FireAt:      time.Now().Add(300 * time.Millisecond),
+		Payload:     `"original"`,
 	}
 	nearFuture := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
-		UserID: 1, WorkoutExerciseID: 7,
-		FireAt:  time.Now().Add(50 * time.Millisecond),
-		Payload: `"replacement"`,
+		UserID:      1,
+		WorkoutDate: testDate,
+		Position:    7,
+		FireAt:      time.Now().Add(50 * time.Millisecond),
+		Payload:     `"replacement"`,
 	}
 	if err := scheduler.Schedule(context.Background(), farFuture); err != nil {
 		t.Fatalf("first Schedule: %v", err)
@@ -164,9 +177,11 @@ func TestScheduler_ReloadReconstitutesFutureTimers(t *testing.T) {
 	// Pre-seed the repo with a future fire.
 	//nolint:exhaustruct // ID/CreatedAt assigned by the repo.
 	seed := domain.ScheduledPush{
-		UserID: 1, WorkoutExerciseID: 11,
-		FireAt:  time.Now().Add(50 * time.Millisecond),
-		Payload: "{}",
+		UserID:      1,
+		WorkoutDate: testDate,
+		Position:    11,
+		FireAt:      time.Now().Add(50 * time.Millisecond),
+		Payload:     "{}",
 	}
 	if _, err := repo.Replace(context.Background(), seed); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -197,9 +212,11 @@ func TestScheduler_ReloadFiresPastDueImmediately(t *testing.T) {
 	repo := newInMemoryScheduledPushRepo()
 	//nolint:exhaustruct // ID/CreatedAt assigned by the repo.
 	seed := domain.ScheduledPush{
-		UserID: 1, WorkoutExerciseID: 22,
-		FireAt:  time.Now().Add(-time.Minute),
-		Payload: "{}",
+		UserID:      1,
+		WorkoutDate: testDate,
+		Position:    22,
+		FireAt:      time.Now().Add(-time.Minute),
+		Payload:     "{}",
 	}
 	if _, err := repo.Replace(context.Background(), seed); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -226,16 +243,32 @@ func TestScheduler_ReloadFiresPastDueImmediately(t *testing.T) {
 	}
 }
 
+// slotKey mirrors the production slotKey: (user_id, workout_date, position)
+// keyed by the date's YYYY-MM-DD string so map equality works cleanly.
+type slotKey struct {
+	userID int
+	date   string
+	pos    int
+}
+
+func keyForPush(p domain.ScheduledPush) slotKey {
+	return slotKey{
+		userID: p.UserID,
+		date:   p.WorkoutDate.Format(time.DateOnly),
+		pos:    p.Position,
+	}
+}
+
 // newInMemoryScheduledPushRepo returns an in-memory implementation of the
 // scheduler's ScheduledPushRepo interface for tests.
 func newInMemoryScheduledPushRepo() *inMemScheduledPushRepo {
 	//nolint:exhaustruct // mu/nextID zero values intentional.
-	return &inMemScheduledPushRepo{rows: map[int]domain.ScheduledPush{}}
+	return &inMemScheduledPushRepo{rows: map[slotKey]domain.ScheduledPush{}}
 }
 
 type inMemScheduledPushRepo struct {
 	mu     sync.Mutex
-	rows   map[int]domain.ScheduledPush
+	rows   map[slotKey]domain.ScheduledPush
 	nextID int
 }
 
@@ -245,7 +278,7 @@ func (m *inMemScheduledPushRepo) Replace(_ context.Context, push domain.Schedule
 	m.nextID++
 	push.ID = m.nextID
 	push.CreatedAt = time.Now()
-	m.rows[push.WorkoutExerciseID] = push
+	m.rows[keyForPush(push)] = push
 	return push, nil
 }
 
@@ -261,10 +294,10 @@ func (m *inMemScheduledPushRepo) Delete(_ context.Context, id int) error {
 	return nil
 }
 
-func (m *inMemScheduledPushRepo) DeleteByWorkoutExercise(_ context.Context, weID int) error {
+func (m *inMemScheduledPushRepo) DeleteBySlot(_ context.Context, userID int, date time.Time, pos int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.rows, weID)
+	delete(m.rows, slotKey{userID: userID, date: date.Format(time.DateOnly), pos: pos})
 	return nil
 }
 
@@ -303,10 +336,11 @@ func TestScheduler_DispatchFailure_LogsUserID(t *testing.T) {
 	})
 
 	push := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt assigned by the repo.
-		UserID:            7,
-		WorkoutExerciseID: 314,
-		FireAt:            time.Now().Add(30 * time.Millisecond),
-		Payload:           `{}`,
+		UserID:      7,
+		WorkoutDate: testDate,
+		Position:    314,
+		FireAt:      time.Now().Add(30 * time.Millisecond),
+		Payload:     `{}`,
 	}
 	if err := scheduler.Schedule(context.Background(), push); err != nil {
 		t.Fatalf("Schedule: %v", err)
@@ -331,8 +365,8 @@ func TestScheduler_DispatchFailure_LogsUserID(t *testing.T) {
 	if !strings.Contains(out, "user_id=7") {
 		t.Errorf("log missing user_id=7; got:\n%s", out)
 	}
-	if !strings.Contains(out, "workout_exercise_id=314") {
-		t.Errorf("log missing workout_exercise_id=314; got:\n%s", out)
+	if !strings.Contains(out, "position=314") {
+		t.Errorf("log missing position=314; got:\n%s", out)
 	}
 	if !strings.Contains(out, "push dispatch failed") {
 		t.Errorf("log missing dispatch failure message; got:\n%s", out)

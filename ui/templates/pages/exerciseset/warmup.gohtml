@@ -38,7 +38,7 @@
             <span class="warmup-label">Warm up</span>
             <span class="warmup-hint">a few easy reps to prime</span>
             <form method="post"
-                  action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .ExerciseSet.ID }}/warmup/complete">
+                  action="/workouts/{{ .Date.Format "2006-01-02" }}/exercises/{{ .Position }}/warmup/complete">
                 <button type="submit" class="btn btn--quiet btn--sm">Mark done</button>
             </form>
         </div>

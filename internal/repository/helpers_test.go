@@ -43,16 +43,21 @@ func setupTestReposWithDB(t *testing.T) (context.Context, *sqlite.Database, *rep
 	return ctx, db, repository.New(db)
 }
 
-// seedWorkoutExercise inserts a workout_session and workout_exercise row for the
-// authenticated user and returns the workout_exercise.id.
-func seedWorkoutExercise(ctx context.Context, t *testing.T, db *sqlite.Database) int {
+// seedWorkoutExerciseSlot inserts a workout_session and workout_exercises row at
+// position 0 for the authenticated user and returns the workout date and the
+// slot position (always 0). Callers that need additional slots can insert
+// further rows at incrementing positions.
+func seedWorkoutExerciseSlot(
+	ctx context.Context, t *testing.T, db *sqlite.Database,
+) (time.Time, int) {
 	t.Helper()
 	userID := contexthelpers.AuthenticatedUserID(ctx)
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	todayStr := today.Format("2006-01-02")
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)
 		 ON CONFLICT DO NOTHING`,
-		userID, today,
+		userID, todayStr,
 	); err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
@@ -62,13 +67,12 @@ func seedWorkoutExercise(ctx context.Context, t *testing.T, db *sqlite.Database)
 	).Scan(&exerciseID); err != nil {
 		t.Fatalf("fetch deadlift: %v", err)
 	}
-	var weID int
-	if err := db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
-		 VALUES (?, ?, ?) RETURNING id`,
-		userID, today, exerciseID,
-	).Scan(&weID); err != nil {
-		t.Fatalf("insert workout_exercise: %v", err)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		 VALUES (?, ?, 0, ?)`,
+		userID, todayStr, exerciseID,
+	); err != nil {
+		t.Fatalf("insert workout_exercises: %v", err)
 	}
-	return weID
+	return today, 0
 }

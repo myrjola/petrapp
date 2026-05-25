@@ -22,7 +22,7 @@ type DispatchFunc func(ctx context.Context, push domain.ScheduledPush) error
 type ScheduledPushRepo interface {
 	Replace(ctx context.Context, push domain.ScheduledPush) (domain.ScheduledPush, error)
 	Delete(ctx context.Context, id int) error
-	DeleteByWorkoutExercise(ctx context.Context, workoutExerciseID int) error
+	DeleteBySlot(ctx context.Context, userID int, date time.Time, pos int) error
 	DeleteByWorkoutSession(ctx context.Context, userID int, date time.Time) error
 	ListAll(ctx context.Context) ([]domain.ScheduledPush, error)
 }
@@ -35,12 +35,20 @@ type SchedulerConfig struct {
 	Now      func() time.Time // injectable for tests; defaults to time.Now when nil.
 }
 
-// Scheduler holds an in-process map of workout_exercise_id → *time.Timer,
-// persisted to SQLite so pending pushes survive restarts. Goroutine-safe.
+// slotKey identifies a slot for timer bookkeeping. Mirrors the composite
+// natural key on scheduled_pushes (workout_user_id, workout_date, position).
+type slotKey struct {
+	userID int
+	date   string // YYYY-MM-DD, formatted via time.DateOnly so map keys compare cleanly.
+	pos    int
+}
+
+// Scheduler holds an in-process map of slot → *time.Timer, persisted to
+// SQLite so pending pushes survive restarts. Goroutine-safe.
 type Scheduler struct {
 	cfg    SchedulerConfig
 	mu     sync.Mutex
-	timers map[int]*time.Timer // keyed by workout_exercise_id
+	timers map[slotKey]*time.Timer
 }
 
 // NewScheduler constructs a Scheduler. Call Reload once at process start.
@@ -51,13 +59,13 @@ func NewScheduler(cfg SchedulerConfig) *Scheduler {
 	return &Scheduler{
 		cfg:    cfg,
 		mu:     sync.Mutex{},
-		timers: map[int]*time.Timer{},
+		timers: map[slotKey]*time.Timer{},
 	}
 }
 
 // Schedule persists the push and starts an in-process timer. If a timer for
-// the same workout_exercise_id already exists, it is stopped and replaced
-// (the repo's UNIQUE index handles the row-level replace).
+// the same slot already exists, it is stopped and replaced (the repo's UNIQUE
+// index handles the row-level replace).
 func (s *Scheduler) Schedule(ctx context.Context, push domain.ScheduledPush) error {
 	stored, err := s.cfg.Repo.Replace(ctx, push)
 	if err != nil {
@@ -67,16 +75,17 @@ func (s *Scheduler) Schedule(ctx context.Context, push domain.ScheduledPush) err
 	return nil
 }
 
-// Cancel stops the in-process timer for the given workout_exercise_id and
-// deletes its row from the repo. No-op if neither exists.
-func (s *Scheduler) Cancel(ctx context.Context, workoutExerciseID int) error {
+// Cancel stops the in-process timer for the given slot and deletes its row
+// from the repo. No-op if neither exists.
+func (s *Scheduler) Cancel(ctx context.Context, userID int, date time.Time, pos int) error {
+	key := slotKey{userID: userID, date: date.Format(time.DateOnly), pos: pos}
 	s.mu.Lock()
-	if t, ok := s.timers[workoutExerciseID]; ok {
+	if t, ok := s.timers[key]; ok {
 		t.Stop()
-		delete(s.timers, workoutExerciseID)
+		delete(s.timers, key)
 	}
 	s.mu.Unlock()
-	if err := s.cfg.Repo.DeleteByWorkoutExercise(ctx, workoutExerciseID); err != nil {
+	if err := s.cfg.Repo.DeleteBySlot(ctx, userID, date, pos); err != nil {
 		return fmt.Errorf("delete scheduled push row: %w", err)
 	}
 	return nil
@@ -90,14 +99,16 @@ func (s *Scheduler) CancelForWorkout(ctx context.Context, userID int, date time.
 	if err != nil {
 		return fmt.Errorf("list scheduled pushes for cancel: %w", err)
 	}
+	dateStr := date.Format(time.DateOnly)
 	s.mu.Lock()
 	for _, p := range all {
-		if p.UserID != userID {
+		if p.UserID != userID || p.WorkoutDate.Format(time.DateOnly) != dateStr {
 			continue
 		}
-		if t, ok := s.timers[p.WorkoutExerciseID]; ok {
+		key := slotKey{userID: p.UserID, date: dateStr, pos: p.Position}
+		if t, ok := s.timers[key]; ok {
 			t.Stop()
-			delete(s.timers, p.WorkoutExerciseID)
+			delete(s.timers, key)
 		}
 	}
 	s.mu.Unlock()
@@ -131,7 +142,11 @@ func (s *Scheduler) PendingCount() int {
 
 func (s *Scheduler) startTimer(push domain.ScheduledPush) {
 	delay := max(push.FireAt.Sub(s.cfg.Now()), 0)
-	weID := push.WorkoutExerciseID
+	key := slotKey{
+		userID: push.UserID,
+		date:   push.WorkoutDate.Format(time.DateOnly),
+		pos:    push.Position,
+	}
 
 	// Hold the mutex across AfterFunc creation and map install. AfterFunc's callback runs on its
 	// own goroutine and will block on s.mu inside fire() until we release here, so the map entry
@@ -139,7 +154,7 @@ func (s *Scheduler) startTimer(push domain.ScheduledPush) {
 	// where a zero-delay timer could fire before the map install completed, leaking the entry.
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if existing, ok := s.timers[weID]; ok {
+	if existing, ok := s.timers[key]; ok {
 		existing.Stop()
 	}
 	// Heap-allocate the timer-pointer holder so the AfterFunc closure can read it after we've
@@ -147,19 +162,19 @@ func (s *Scheduler) startTimer(push domain.ScheduledPush) {
 	// before dereferencing the holder, so the write below happens-before any read in fire().
 	selfBox := new(*time.Timer)
 	*selfBox = time.AfterFunc(delay, func() {
-		s.fire(selfBox, push)
+		s.fire(selfBox, key, push)
 	})
-	s.timers[weID] = *selfBox
+	s.timers[key] = *selfBox
 }
 
-func (s *Scheduler) fire(selfBox **time.Timer, push domain.ScheduledPush) {
+func (s *Scheduler) fire(selfBox **time.Timer, key slotKey, push domain.ScheduledPush) {
 	s.mu.Lock()
 	// Identity check: only clear the map entry if it still points at *this* timer. A concurrent
 	// Schedule may have installed a replacement between our timer firing and us acquiring the
 	// lock; in that case the replacement is the rightful map owner and must not be evicted.
 	self := *selfBox
-	if current, ok := s.timers[push.WorkoutExerciseID]; ok && current == self {
-		delete(s.timers, push.WorkoutExerciseID)
+	if current, ok := s.timers[key]; ok && current == self {
+		delete(s.timers, key)
 	}
 	s.mu.Unlock()
 
@@ -171,13 +186,15 @@ func (s *Scheduler) fire(selfBox **time.Timer, push domain.ScheduledPush) {
 	if err := s.cfg.Dispatch(ctx, push); err != nil {
 		s.cfg.Logger.LogAttrs(ctx, slog.LevelWarn, "push dispatch failed",
 			slog.Int("user_id", push.UserID),
-			slog.Int("workout_exercise_id", push.WorkoutExerciseID),
+			slog.String("workout_date", key.date),
+			slog.Int("position", key.pos),
 			slog.Any("error", err))
 	}
 	if err := s.cfg.Repo.Delete(ctx, push.ID); err != nil {
 		s.cfg.Logger.LogAttrs(ctx, slog.LevelWarn, "delete scheduled push row after fire",
 			slog.Int("user_id", push.UserID),
-			slog.Int("workout_exercise_id", push.WorkoutExerciseID),
+			slog.String("workout_date", key.date),
+			slog.Int("position", key.pos),
 			slog.Int("id", push.ID),
 			slog.Any("error", err))
 	}

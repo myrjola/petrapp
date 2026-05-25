@@ -12,9 +12,10 @@ import (
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
-// seedScheduledSession inserts a workout_sessions row + one workout_exercise
-// (the Deadlift seed exercise) for the authenticated user on date, plus one
-// exercise_sets row. Used by WeekPlan tests to populate a scheduled day.
+// seedScheduledSession inserts a workout_sessions row + one workout_exercises
+// row at position 0 (the Deadlift seed exercise) for the authenticated user
+// on date, plus one exercise_sets row. Used by WeekPlan tests to populate a
+// scheduled day.
 func seedScheduledSession(ctx context.Context, t *testing.T, db *sqlite.Database, date time.Time) {
 	t.Helper()
 	userID := contexthelpers.AuthenticatedUserID(ctx)
@@ -30,16 +31,15 @@ func seedScheduledSession(ctx context.Context, t *testing.T, db *sqlite.Database
 		`SELECT id FROM exercises WHERE name = 'Deadlift'`).Scan(&exerciseID); err != nil {
 		t.Fatalf("fetch Deadlift: %v", err)
 	}
-	var weID int
-	if err := db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
-		 VALUES (?, ?, ?) RETURNING id`,
-		userID, dateStr, exerciseID).Scan(&weID); err != nil {
-		t.Fatalf("insert workout_exercise: %v", err)
+	if _, err := db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		 VALUES (?, ?, 0, ?)`,
+		userID, dateStr, exerciseID); err != nil {
+		t.Fatalf("insert workout_exercises: %v", err)
 	}
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO exercise_sets (workout_exercise_id, set_number, target_value, weight_kg)
-		 VALUES (?, 1, 5, 60.0)`, weID); err != nil {
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, target_value, weight_kg)
+		 VALUES (?, ?, 0, 1, 5, 60.0)`, userID, dateStr); err != nil {
 		t.Fatalf("insert exercise_set: %v", err)
 	}
 }
@@ -123,7 +123,7 @@ func TestWeekPlanRepository_Update_RollsBackOnError(t *testing.T) {
 	}
 }
 
-func TestWeekPlanRepository_Update_PreservesSlotIDs(t *testing.T) {
+func TestWeekPlanRepository_Update_PreservesSlotPositions(t *testing.T) {
 	t.Parallel()
 	ctx, db, repos := setupTestReposWithDB(t)
 	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
@@ -136,7 +136,7 @@ func TestWeekPlanRepository_Update_PreservesSlotIDs(t *testing.T) {
 	if len(wp.Sessions[0].ExerciseSets) == 0 {
 		t.Fatalf("seed should have produced a slot")
 	}
-	originalSlotID := wp.Sessions[0].ExerciseSets[0].ID
+	originalExerciseID := wp.Sessions[0].ExerciseSets[0].Exercise.ID
 
 	err = repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
 		return wp.Start(monday, time.Now().UTC())
@@ -148,10 +148,18 @@ func TestWeekPlanRepository_Update_PreservesSlotIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get after update: %v", err)
 	}
-	if reloaded.Sessions[0].ExerciseSets[0].ID != originalSlotID {
+	if len(reloaded.Sessions[0].ExerciseSets) != 1 {
+		t.Fatalf(
+			"slot count changed: got %d, want 1",
+			len(reloaded.Sessions[0].ExerciseSets),
+		)
+	}
+	// The slot's identity is its position (array index 0) and Exercise.ID.
+	// Update with a no-op closure must preserve both.
+	if reloaded.Sessions[0].ExerciseSets[0].Exercise.ID != originalExerciseID {
 		t.Errorf(
-			"slot ID changed: got %d, want %d",
-			reloaded.Sessions[0].ExerciseSets[0].ID, originalSlotID,
+			"slot 0 exercise changed: got %d, want %d",
+			reloaded.Sessions[0].ExerciseSets[0].Exercise.ID, originalExerciseID,
 		)
 	}
 }
@@ -213,20 +221,19 @@ func TestWeekPlanRepository_Create_PersistsWeek(t *testing.T) {
 	}
 }
 
-func TestWeekPlanRepository_Update_HandlesMixedExplicitAndNewSlotIDs(t *testing.T) {
+func TestWeekPlanRepository_Update_AddsNewSessionAlongsideExisting(t *testing.T) {
 	t.Parallel()
 	ctx, db, repos := setupTestReposWithDB(t)
 	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
 	tuesday := monday.AddDate(0, 0, 1)
-	// Seed Tuesday only — gives that session a workout_exercise row with id=1.
+	// Seed Tuesday only — gives that session a slot at position 0.
 	seedScheduledSession(ctx, t, db, tuesday)
 
-	// Inside Update: add a brand-new Monday session that will need a new
-	// workout_exercise.id. The reinsert loop must claim Tuesday's preserved
-	// id=1 before SQLite auto-assigns id=1 to Monday's new slot.
+	// Inside Update: add a brand-new Monday session. Each slot is keyed by
+	// (workout_user_id, workout_date, position), so Monday's new position-0
+	// slot can never collide with Tuesday's existing position-0 slot.
 	err := repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
-		// Find an exercise to use for the new Monday slot.
-		// Easiest: copy the Tuesday slot's Exercise (any seed exercise works).
+		// Find an exercise to use for the new Monday slot — copy Tuesday's.
 		var newSlotExercise domain.Exercise
 		for _, slot := range wp.Sessions[1].ExerciseSets {
 			newSlotExercise = slot.Exercise
@@ -235,12 +242,10 @@ func TestWeekPlanRepository_Update_HandlesMixedExplicitAndNewSlotIDs(t *testing.
 		if newSlotExercise.ID == 0 {
 			t.Fatal("Tuesday seed should have a slot")
 		}
-		// Add a new (ID=0) slot to Monday.
 		wp.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
 			Date:              monday,
 			PeriodizationType: domain.PeriodizationStrength,
-			ExerciseSets: []domain.ExerciseSet{{ //nolint:exhaustruct // ID=0 means repo assigns.
-				ID:       0,
+			ExerciseSets: []domain.ExerciseSet{{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: newSlotExercise,
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // CompletedValue etc. nil.
 			}},
@@ -248,7 +253,7 @@ func TestWeekPlanRepository_Update_HandlesMixedExplicitAndNewSlotIDs(t *testing.
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("Update should succeed despite mixed IDs: %v", err)
+		t.Fatalf("Update should succeed adding new session: %v", err)
 	}
 	reloaded, err := repos.WeekPlans.Get(ctx, monday)
 	if err != nil {
@@ -259,10 +264,6 @@ func TestWeekPlanRepository_Update_HandlesMixedExplicitAndNewSlotIDs(t *testing.
 	}
 	if len(reloaded.Sessions[1].ExerciseSets) != 1 {
 		t.Errorf("Tuesday should still have 1 slot, got %d", len(reloaded.Sessions[1].ExerciseSets))
-	}
-	// Tuesday's slot ID must still be 1 (preserved through the rewrite).
-	if reloaded.Sessions[1].ExerciseSets[0].ID != 1 {
-		t.Errorf("Tuesday slot ID should still be 1, got %d", reloaded.Sessions[1].ExerciseSets[0].ID)
 	}
 }
 

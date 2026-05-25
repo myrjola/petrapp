@@ -79,8 +79,9 @@ When you need a premigration:
    the legacy-schema fixture in the same commit**. There is no version table — the only signal
    that a premigration is no longer needed is that production has booted past it.
 
-See git history for `internal/sqlite/premigrate.go` (workout_exercise stable-id migration,
-PR #75) for a worked example.
+See git history for `internal/sqlite/premigrate.go` (workout_exercise natural-key
+migration; see spec at `docs/superpowers/specs/2026-05-25-natural-key-slots-design.md`)
+for the most recent worked example.
 
 ### Fixtures and conflict handling
 

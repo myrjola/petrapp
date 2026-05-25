@@ -70,7 +70,10 @@ func countExerciseSets(t *testing.T, db *sqlite.Database, exerciseID int) (int, 
 	var count int
 	err := db.ReadOnly.QueryRow(
 		`SELECT COUNT(*) FROM exercise_sets es
-		 JOIN workout_exercise we ON we.id = es.workout_exercise_id
+		 JOIN workout_exercises we
+		    ON we.workout_user_id = es.workout_user_id
+		   AND we.workout_date    = es.workout_date
+		   AND we.position        = es.position
 		 WHERE we.exercise_id = ?`,
 		exerciseID,
 	).Scan(&count)
