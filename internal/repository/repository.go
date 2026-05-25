@@ -18,6 +18,7 @@ import (
 // the SQLite implementation.
 type Repositories struct {
 	Sessions          SessionRepository
+	WeekPlans         WeekPlanRepository
 	Exercises         ExerciseRepository
 	Preferences       PreferencesRepository
 	FeatureFlags      FeatureFlagRepository
@@ -35,6 +36,7 @@ func New(db *sqlite.Database) *Repositories {
 	featureFlags := newSQLiteFeatureFlagRepository(db)
 	exercises := newSQLiteExerciseRepository(db)
 	sessions := newSQLiteSessionRepository(db)
+	weekPlans := newSQLiteWeekPlanRepository(db)
 	pushSubs := newSQLitePushSubscriptionRepository(db)
 	scheduledPushes := newSQLiteScheduledPushRepository(db)
 	return &Repositories{
@@ -43,32 +45,20 @@ func New(db *sqlite.Database) *Repositories {
 		FeatureFlags:      featureFlags,
 		Exercises:         exercises,
 		Sessions:          sessions,
+		WeekPlans:         weekPlans,
 		PushSubscriptions: pushSubs,
 		ScheduledPushes:   scheduledPushes,
 	}
 }
 
-// SessionRepository persists workout sessions and their exercise slots.
+// SessionRepository is the read-only view of workout sessions. Writes are
+// owned by WeekPlanRepository — see internal/repository/week_plans.go. The
+// reads here serve reporting and per-day handler queries.
 type SessionRepository interface {
 	Get(ctx context.Context, date time.Time) (domain.Session, error)
 	List(ctx context.Context, sinceDate time.Time) ([]domain.Session, error)
-	CreateBatch(ctx context.Context, sessions []domain.Session) error
 
-	// Create inserts a single session and its exercise slots. Returns
-	// domain.ErrAlreadyExists (wrapped) if a session already exists for the
-	// date — callers use errors.Is to recover from concurrent insert races.
-	Create(ctx context.Context, sess domain.Session) error
-
-	// Update loads the session inside a single transaction, runs fn against
-	// the hydrated *domain.Session, and persists the result. Returning nil
-	// from fn commits; returning an error rolls back. Sentinel errors from
-	// domain (e.g. ErrAlreadyStarted) propagate so callers can detect no-op
-	// cases via errors.Is.
-	Update(ctx context.Context, date time.Time, fn func(*domain.Session) error) error
-
-	DeleteWeek(ctx context.Context, monday time.Time) error
-
-	// Read-only specialised queries.
+	// Read-only specialised queries used by reporting.
 	ListSetsForExerciseSince(
 		ctx context.Context, exerciseID int, sinceDate time.Time,
 	) ([]domain.ExerciseSetHistory, error)
@@ -79,6 +69,34 @@ type SessionRepository interface {
 		ctx context.Context, exerciseID int, beforeDate time.Time,
 	) (int, error)
 	CountCompleted(ctx context.Context) (int, error)
+}
+
+// WeekPlanRepository persists the full week aggregate. The Update closure
+// pattern loads the seven days into a domain.WeekPlan, runs fn under a single
+// transaction, and persists the diff on nil via delete-then-reinsert across
+// the week's date range. Domain sentinels returned by fn propagate unchanged
+// so callers can errors.Is them.
+type WeekPlanRepository interface {
+	// Get returns the lazily-materialised week. Sessions is always length 7;
+	// non-scheduled dates carry an empty Session{Date: ...}. Returns
+	// domain.ErrNotFound when no workout_sessions row exists for the week.
+	Get(ctx context.Context, monday time.Time) (domain.WeekPlan, error)
+
+	// Update loads the WeekPlan for monday inside a single transaction, runs fn
+	// against the hydrated *domain.WeekPlan, and persists the result via
+	// delete-then-reinsert across the week's date range. Returning nil from fn
+	// commits; returning an error rolls back. Slot IDs are preserved via
+	// INSERT ... RETURNING id, with a two-pass reinsert (explicit-ID slots
+	// first, auto-ID slots second) so SQLite's rowid assignment never collides
+	// with a preserved workout_exercise.id. Sentinel errors from domain (e.g.
+	// ErrAlreadyStarted) propagate so callers can detect no-op cases via
+	// errors.Is.
+	Update(ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error) error
+
+	// Create persists a freshly-planned WeekPlan. Returns domain.ErrAlreadyExists
+	// (wrapped) when any session row already exists for the week, so callers can
+	// recover from concurrent first-time generation races.
+	Create(ctx context.Context, plan domain.WeekPlan) error
 }
 
 // ExerciseRepository persists exercise definitions and their muscle-group

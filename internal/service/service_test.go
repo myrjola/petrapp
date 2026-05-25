@@ -94,10 +94,11 @@ func Test_RestartMesocycleAnchor_ClearsCurrentWeekDeloadAfterStartDeloadNow(t *t
 		t.Fatalf("RestartMesocycleAnchor: %v", err)
 	}
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after restart: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	today := domain.StartOfDay(time.Now())
 	// Precondition: the assertion loop only checks sessions dated today or
@@ -158,10 +159,11 @@ func Test_RestartMesocycleAnchor_LeavesCompletedSessionsAlone(t *testing.T) {
 		t.Fatalf("SaveUserPreferences: %v", err)
 	}
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	today := domain.StartOfDay(time.Now())
 	todayIdx := -1
@@ -194,10 +196,11 @@ func Test_RestartMesocycleAnchor_LeavesCompletedSessionsAlone(t *testing.T) {
 		t.Fatalf("RestartMesocycleAnchor: %v", err)
 	}
 
-	sessions, err = svc.ResolveWeeklySchedule(ctx)
+	plan, err = svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after RestartMesocycleAnchor: %v", err)
 	}
+	sessions = plan.Sessions[:]
 
 	// Today must remain IsDeload == true — the closure's Status() re-check
 	// saw SessionCompleted and returned nil without calling ClearDeload.

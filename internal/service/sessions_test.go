@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -21,10 +22,11 @@ func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
 
 	ctx, svc := setupTestService(t)
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 	if len(sessions) != 7 {
 		t.Fatalf("want 7 sessions (one per day), got %d", len(sessions))
 	}
@@ -49,15 +51,17 @@ func Test_ResolveWeeklySchedule_DoesNotRegenerateExistingSessions(t *testing.T) 
 
 	ctx, svc := setupTestService(t)
 
-	sessions1, err := svc.ResolveWeeklySchedule(ctx)
+	plan1, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("first ResolveWeeklySchedule: %v", err)
 	}
+	sessions1 := plan1.Sessions[:]
 
-	sessions2, err := svc.ResolveWeeklySchedule(ctx)
+	plan2, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("second ResolveWeeklySchedule: %v", err)
 	}
+	sessions2 := plan2.Sessions[:]
 
 	// Same scheduled days must have the same exercise IDs on both calls.
 	for _, i := range []int{0, 2, 4} {
@@ -87,21 +91,27 @@ func Test_GetSession_ReturnsErrNotFoundForUnplannedDate(t *testing.T) {
 	}
 }
 
-func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesFromEmptyWeek(t *testing.T) {
+// Regenerate is a no-op against an unpersisted week: WeekPlans.Update returns
+// ErrNotFound, which the service treats as "nothing started, nothing to
+// regenerate". The subsequent ResolveWeeklySchedule then lazy-creates the
+// week. This test pins both halves: the regenerate succeeds (returns nil) and
+// the lazy-create chain delivers Mon/Wed/Fri exercises on first read.
+func Test_RegenerateWeeklyPlanIfUnstarted_NoOpOnEmptyWeekThenLazyCreate(t *testing.T) {
 	t.Parallel()
 
-	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet
+	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min — no sessions created yet.
 
-	// Call directly without seeding via ResolveWeeklySchedule first.
+	// Regenerate on an empty week is a no-op; should not error.
 	if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
 		t.Fatalf("RegenerateWeeklyPlanIfUnstarted on empty week: %v", err)
 	}
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after empty-week regenerate: %v", err)
 	}
-	// Mon=0, Wed=2, Fri=4 must have exercises.
+	sessions := plan.Sessions[:]
+	// Mon=0, Wed=2, Fri=4 must have exercises — populated by ResolveWeeklySchedule's lazy create.
 	for _, i := range []int{0, 2, 4} {
 		if len(sessions[i].ExerciseSets) == 0 {
 			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
@@ -132,10 +142,11 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *tes
 		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
 	}
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after regenerate: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	// Tue=1, Thu=3, Sat=5 must have exercises; Mon=0, Wed=2, Fri=4, Sun=6 must be rest.
 	for _, i := range []int{1, 3, 5} {
@@ -155,10 +166,11 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 
 	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	// Start the first scheduled workout (Monday, index 0).
 	if err = svc.StartSession(ctx, sessions[0].Date); err != nil {
@@ -178,10 +190,11 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 		t.Fatalf("RegenerateWeeklyPlanIfUnstarted: %v", err)
 	}
 
-	sessions2, err := svc.ResolveWeeklySchedule(ctx)
+	plan2, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after skip: %v", err)
 	}
+	sessions2 := plan2.Sessions[:]
 
 	// Monday (index 0) must still have exercises — the original plan was kept.
 	if len(sessions2[0].ExerciseSets) == 0 {
@@ -233,10 +246,11 @@ func Test_CompleteSession_UnstartedSession_AutoStartsAndCompletes(t *testing.T) 
 
 	ctx, svc := setupTestService(t) // Mon, Wed, Fri at 60 min
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	// Pick a scheduled workout (Monday, index 0) and complete it WITHOUT
 	// calling StartSession first — the production "session not started" path.
@@ -270,10 +284,11 @@ func Test_StartSession_CreatesAdHocSessionForUnscheduledToday(t *testing.T) {
 	ctx, svc := setupTestService(t)
 
 	// Ensure the week is generated first so usedExerciseIDs is populated.
-	weekSessions, err := svc.ResolveWeeklySchedule(ctx)
+	weekPlan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	weekSessions := weekPlan.Sessions[:]
 	monday := weekSessions[0].Date
 	tue := monday.AddDate(0, 0, 1)
 
@@ -301,10 +316,11 @@ func Test_StartSession_CreatesNewlyScheduledMidWeekDay(t *testing.T) {
 	// StartSession on Tuesday must still succeed by creating the session.
 	ctx, svc := setupTestService(t)
 
-	weekSessions, err := svc.ResolveWeeklySchedule(ctx)
+	weekPlan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	weekSessions := weekPlan.Sessions[:]
 	monday := weekSessions[0].Date
 	tue := monday.AddDate(0, 0, 1)
 
@@ -350,10 +366,11 @@ func Test_StartSession_DoubleStartIsIdempotent(t *testing.T) {
 	// the Update is idempotent via ErrAlreadyStarted).
 	ctx, svc := setupTestService(t)
 
-	weekSessions, err := svc.ResolveWeeklySchedule(ctx)
+	weekPlan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	weekSessions := weekPlan.Sessions[:]
 	tue := weekSessions[0].Date.AddDate(0, 0, 1)
 
 	if err = svc.StartSession(ctx, tue); err != nil {
@@ -406,10 +423,11 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 	}
 
 	// Generate this week's plan and collect periodization types for all 3 workout days.
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	// Collect periodization types for scheduled days (Mon=0, Wed=2, Fri=4).
 	scheduledIndices := []int{0, 2, 4}
@@ -627,6 +645,13 @@ func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T
 
 	ctx, svc := setupTestService(t)
 
+	// Seed the week so Regenerate has something to operate on. Without a
+	// persisted week, Regenerate is a no-op (ErrNotFound is tolerated by
+	// design — a missing week has nothing started by definition).
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule (seed): %v", err)
+	}
+
 	const goroutines = 8
 	var (
 		wg   sync.WaitGroup
@@ -671,6 +696,74 @@ func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T
 	}
 }
 
+// Test_RegenerateAndStart_AreSerializedByTheDatabase pins the spec's central
+// correctness claim: with the per-user mutex deleted (Task 11), concurrent
+// RegenerateWeeklyPlanIfUnstarted and StartSession calls do not race. SQLite's
+// BEGIN IMMEDIATE locking inside WeekPlanRepository.Update is what serializes
+// them now — there is no in-process mutex left.
+//
+// Setup: pre-generate the week via ResolveWeeklySchedule so both methods
+// operate on existing rows. setupTestService configures Mon/Wed/Fri at 60 min;
+// today's Monday is a scheduled workout day in that schedule.
+func Test_RegenerateAndStart_AreSerializedByTheDatabase(t *testing.T) {
+	t.Parallel()
+	ctx, svc := setupTestService(t)
+
+	monday := domain.MondayOf(time.Now())
+	today := monday // Test runs against the current ISO week's Monday.
+
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	const iterations = 50
+	var wg sync.WaitGroup
+	wg.Add(2)
+	errCh := make(chan error, 2*iterations)
+
+	go func() {
+		defer wg.Done()
+		for range iterations {
+			if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+				errCh <- fmt.Errorf("regenerate: %w", err)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range iterations {
+			err := svc.StartSession(ctx, today)
+			if err != nil && !errors.Is(err, domain.ErrAlreadyStarted) {
+				errCh <- fmt.Errorf("start: %w", err)
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Errorf("unexpected concurrent error: %v", err)
+	}
+
+	// Invariant: today's session is started AND has slots. If Regenerate
+	// had clobbered an already-started week or StartSession had observed
+	// a half-deleted week, one of these would fail.
+	plan, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after race: %v", err)
+	}
+	sess := plan.SessionOn(today)
+	if sess == nil {
+		t.Fatalf("today's session missing after race")
+	}
+	if sess.StartedAt.IsZero() {
+		t.Error("today's session should be started after the race")
+	}
+	if len(sess.ExerciseSets) == 0 {
+		t.Error("today's session should have slots after the race")
+	}
+}
+
 func Test_StartDeloadNow_FlipsTodayAndFutureNonCompletedSessions(t *testing.T) {
 	t.Parallel()
 
@@ -697,10 +790,11 @@ func Test_StartDeloadNow_FlipsTodayAndFutureNonCompletedSessions(t *testing.T) {
 	}
 
 	// Sanity: no session should be a natural-cadence deload yet.
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule (re-list): %v", err)
 	}
+	sessions := plan.Sessions[:]
 	for i, s := range sessions {
 		if s.IsDeload {
 			t.Fatalf("session[%d] (%s) unexpectedly already deload", i, s.Date.Weekday())
@@ -711,10 +805,11 @@ func Test_StartDeloadNow_FlipsTodayAndFutureNonCompletedSessions(t *testing.T) {
 		t.Fatalf("StartDeloadNow: %v", err)
 	}
 
-	sessions, err = svc.ResolveWeeklySchedule(ctx)
+	plan, err = svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after StartDeloadNow: %v", err)
 	}
+	sessions = plan.Sessions[:]
 
 	today := domain.StartOfDay(time.Now())
 	for i, s := range sessions {
@@ -797,18 +892,20 @@ func Test_StartDeloadNow_Idempotent(t *testing.T) {
 	if err = svc.StartDeloadNow(ctx); err != nil {
 		t.Fatalf("StartDeloadNow first call: %v", err)
 	}
-	first, err := svc.ResolveWeeklySchedule(ctx)
+	firstPlan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after first: %v", err)
 	}
+	first := firstPlan.Sessions[:]
 
 	if err = svc.StartDeloadNow(ctx); err != nil {
 		t.Fatalf("StartDeloadNow second call: %v", err)
 	}
-	second, err := svc.ResolveWeeklySchedule(ctx)
+	secondPlan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after second: %v", err)
 	}
+	second := secondPlan.Sessions[:]
 
 	for i := range first {
 		if first[i].IsDeload != second[i].IsDeload {
@@ -845,10 +942,11 @@ func Test_StartDeloadNow_SkipsCompletedToday(t *testing.T) {
 		t.Fatalf("SaveUserPreferences: %v", err)
 	}
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	today := domain.StartOfDay(time.Now())
 	todayIdx := -1
@@ -879,10 +977,11 @@ func Test_StartDeloadNow_SkipsCompletedToday(t *testing.T) {
 		t.Fatalf("StartDeloadNow: %v", err)
 	}
 
-	sessions, err = svc.ResolveWeeklySchedule(ctx)
+	plan, err = svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule after StartDeloadNow: %v", err)
 	}
+	sessions = plan.Sessions[:]
 
 	// Today must remain non-deload — the closure's Status() re-check saw
 	// SessionCompleted and returned nil without calling SwitchToDeload.
@@ -933,10 +1032,11 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 		t.Fatalf("SaveUserPreferences: %v", err)
 	}
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 
 	// Pick today's session if it's a workout day with a weighted exercise.
 	today := domain.StartOfDay(time.Now())

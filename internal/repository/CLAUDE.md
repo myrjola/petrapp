@@ -36,28 +36,36 @@ template logic, no business orchestration.
 
 ## Update closure contract
 
-`SessionRepository.Update` and `ExerciseRepository.Update` accept a
+`WeekPlanRepository.Update` and `ExerciseRepository.Update` accept a
 closure `func(*domain.X) error` that runs inside an open transaction:
 
 - The repo loads the aggregate (hydrating exercise data for sessions),
   runs the closure, persists the result on `nil`, rolls back on error.
 - The closure expresses business invariants by calling aggregate methods
-  on `domain.Session` (e.g. `sess.Start(now)`); domain sentinels
-  (`ErrAlreadyStarted`, `ErrSlotNotFound`, etc.) propagate to the caller
-  unchanged so service-layer code can `errors.Is` against them.
+  on `domain.WeekPlan` / `domain.Session` (e.g. `wp.Start(date, now)`);
+  domain sentinels (`ErrAlreadyStarted`, `ErrSlotNotFound`, etc.)
+  propagate to the caller unchanged so service-layer code can
+  `errors.Is` against them.
 - Returning a non-domain error rolls back too — the repo doesn't try to
   classify; service code decides whether the error is fatal.
 
+`SessionRepository` is read-only — every write that touches workout
+data goes through `WeekPlanRepository.Update`, which holds the
+transactional boundary at week scope.
+
 ## Diff strategy: delete-and-reinsert
 
-`SessionRepository.Update` persists by deleting the
-`workout_sessions` row inside the tx (CASCADE clears
-`workout_exercise` and `exercise_sets`) and re-inserting the entire
-session. Pre-existing `ExerciseSet.ID` values are passed back into
-`INSERT ... RETURNING id` so URL-stable slot IDs survive the cycle. New
-slots (ID == 0) get auto-assigned IDs. For PetrApp's data sizes (a
-handful of exercises × a handful of sets per session) the cost is
-negligible and the simplicity is worth the trade.
+`WeekPlanRepository.Update` persists by deleting every
+`workout_sessions` row in `[monday, monday+6]` inside the tx (CASCADE
+clears `workout_exercise` and `exercise_sets`) and re-inserting the
+sessions across three passes — session rows, explicit-ID slots, then
+auto-assign slots — so SQLite's rowid auto-assignment never collides
+with a preserved `workout_exercise.id`. Pre-existing `ExerciseSet.ID`
+values are passed back into `INSERT ... RETURNING id` so URL-stable
+slot IDs survive the cycle. New slots (ID == 0) get auto-assigned IDs.
+For PetrApp's data sizes (a handful of exercises × a handful of sets
+per session) the cost is negligible and the simplicity is worth the
+trade.
 
 ## Hydration policy
 
@@ -109,7 +117,7 @@ SQL-shaped contract, not the business rule.
     persists; on a returned error the transaction rolls back and the
     on-disk state is unchanged.
   - Slot-ID stability — pre-existing `ExerciseSet.ID` values survive the
-    delete-and-reinsert cycle inside `SessionRepository.Update`.
+    delete-and-reinsert cycle inside `WeekPlanRepository.Update`.
 - **What NOT to test here:** business rules and aggregate invariants
   (those live in `internal/domain/`), and end-to-end orchestration
   across multiple aggregates (that lives in `internal/service/`).

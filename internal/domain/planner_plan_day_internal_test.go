@@ -96,7 +96,11 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *te
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
-	for _, want := range weekly {
+	for i := range weekly.Sessions {
+		want := weekly.Sessions[i]
+		if len(want.ExerciseSets) == 0 {
+			continue
+		}
 		var got Session
 		got, err = wp.PlanDay(want.Date, nil)
 		if err != nil {
@@ -187,7 +191,8 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *t
 		t.Fatalf("Plan: %v", err)
 	}
 	var planSunPT PeriodizationType
-	for _, s := range weekly {
+	for i := range weekly.Sessions {
+		s := weekly.Sessions[i]
 		if s.Date.Equal(sun) {
 			planSunPT = s.PeriodizationType
 		}

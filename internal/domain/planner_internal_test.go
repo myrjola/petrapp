@@ -507,9 +507,15 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(42, 0))
 
-		sessions, err := wp.Plan(monday)
+		plan, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan failed: %v", err)
+		}
+		var sessions []Session
+		for i := range plan.Sessions {
+			if len(plan.Sessions[i].ExerciseSets) > 0 {
+				sessions = append(sessions, plan.Sessions[i])
+			}
 		}
 
 		// Collect all exercise IDs across all sessions.
@@ -687,9 +693,15 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 		{MuscleGroupName: "quads", WeeklySetTarget: 6},
 	}
 	wp := NewPlanner(prefs, exercises, targets)
-	sessions, err := wp.Plan(planMonday)
+	plan, err := wp.Plan(planMonday)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
+	}
+	var sessions []Session
+	for i := range plan.Sessions {
+		if len(plan.Sessions[i].ExerciseSets) > 0 {
+			sessions = append(sessions, plan.Sessions[i])
+		}
 	}
 	if len(sessions) == 0 {
 		t.Fatal("expected at least one session")
@@ -743,9 +755,15 @@ func TestPlanner_NonDeloadWeekUnchanged(t *testing.T) {
 	}
 	targets := []MuscleGroupTarget{{MuscleGroupName: "chest", WeeklySetTarget: 3}}
 	wp := NewPlanner(p, exercises, targets)
-	sessions, err := wp.Plan(planMonday)
+	plan, err := wp.Plan(planMonday)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
+	}
+	var sessions []Session
+	for i := range plan.Sessions {
+		if len(plan.Sessions[i].ExerciseSets) > 0 {
+			sessions = append(sessions, plan.Sessions[i])
+		}
 	}
 	for _, s := range sessions {
 		if s.IsDeload {
@@ -786,9 +804,15 @@ func TestPlan(t *testing.T) {
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
 
-		sessions, err := wp.Plan(monday)
+		plan, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
+		}
+		var sessions []Session
+		for i := range plan.Sessions {
+			if len(plan.Sessions[i].ExerciseSets) > 0 {
+				sessions = append(sessions, plan.Sessions[i])
+			}
 		}
 		if len(sessions) != 3 {
 			t.Fatalf("want 3 sessions, got %d", len(sessions))
@@ -801,9 +825,15 @@ func TestPlan(t *testing.T) {
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(1, 0))
 
-		sessions, err := wp.Plan(monday)
+		plan, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
+		}
+		var sessions []Session
+		for i := range plan.Sessions {
+			if len(plan.Sessions[i].ExerciseSets) > 0 {
+				sessions = append(sessions, plan.Sessions[i])
+			}
 		}
 		expected := []time.Weekday{time.Monday, time.Wednesday, time.Friday}
 		for i, sess := range sessions {
@@ -820,9 +850,15 @@ func TestPlan(t *testing.T) {
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(2, 0))
 
-		sessions, err := wp.Plan(monday)
+		plan, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
+		}
+		var sessions []Session
+		for i := range plan.Sessions {
+			if len(plan.Sessions[i].ExerciseSets) > 0 {
+				sessions = append(sessions, plan.Sessions[i])
+			}
 		}
 		for _, sess := range sessions {
 			want := exercisesMedium
@@ -842,9 +878,15 @@ func TestPlan(t *testing.T) {
 		wp := NewPlanner(p, exercises, targets)
 		wp.rng = rand.New(rand.NewPCG(3, 0))
 
-		sessions, err := wp.Plan(monday)
+		plan, err := wp.Plan(monday)
 		if err != nil {
 			t.Fatalf("Plan returned error: %v", err)
+		}
+		var sessions []Session
+		for i := range plan.Sessions {
+			if len(plan.Sessions[i].ExerciseSets) > 0 {
+				sessions = append(sessions, plan.Sessions[i])
+			}
 		}
 		if len(sessions) < 2 {
 			t.Fatal("need at least 2 sessions to test alternation")
@@ -1026,9 +1068,15 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	wp := NewPlanner(p, minimalExercises(), minimalTargets())
 	wp.rng = rand.New(rand.NewPCG(7, 0))
 
-	sessions, err := wp.Plan(monday)
+	plan, err := wp.Plan(monday)
 	if err != nil {
 		t.Fatalf("Plan returned error: %v", err)
+	}
+	var sessions []Session
+	for i := range plan.Sessions {
+		if len(plan.Sessions[i].ExerciseSets) > 0 {
+			sessions = append(sessions, plan.Sessions[i])
+		}
 	}
 	if len(sessions) != 2 {
 		t.Fatalf("want 2 sessions, got %d", len(sessions))

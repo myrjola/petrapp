@@ -6,9 +6,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -36,11 +36,6 @@ type Service struct {
 	openaiAPIKey     string
 	scheduler        PushScheduler // nil-safe; methods no-op when nil.
 	maintenanceCache *maintenanceCache
-	// userLocks serializes operations that must not race per-user (today:
-	// RegenerateWeeklyPlanIfUnstarted). Keyed by user ID; entries are never
-	// evicted — the working set is the active-user count, which is small.
-	// Stored as *sync.Map (not value) so With* shallow copies share state.
-	userLocks *sync.Map // map[int]*sync.Mutex
 }
 
 // NewService creates a new workout service.
@@ -52,7 +47,6 @@ func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *
 		openaiAPIKey:     openaiAPIKey,
 		scheduler:        nil,
 		maintenanceCache: newMaintenanceCache(),
-		userLocks:        &sync.Map{},
 	}
 }
 
@@ -116,23 +110,11 @@ func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
 	monday := domain.MondayOf(time.Now())
 	today := domain.StartOfDay(time.Now())
 
-	sessions, err := s.repos.Sessions.List(ctx, monday)
-	if err != nil {
-		return fmt.Errorf("list sessions for current week: %w", err)
-	}
-	for _, sess := range sessions {
-		if sess.Date.Before(today) {
-			continue
-		}
-		err = s.repos.Sessions.Update(ctx, sess.Date, func(latest *domain.Session) error {
-			if latest.Status() == domain.SessionCompleted {
-				return nil
-			}
-			return latest.ClearDeload()
-		})
-		if err != nil {
-			return fmt.Errorf("clear deload for %s: %w", sess.Date.Format(time.DateOnly), err)
-		}
+	err := s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		return wp.ClearDeloadFromToday(today)
+	})
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("clear deload for week %s: %w", monday.Format(time.DateOnly), err)
 	}
 
 	prefs, err := s.repos.Preferences.Get(ctx)
@@ -146,21 +128,12 @@ func (s *Service) RestartMesocycleAnchor(ctx context.Context) error {
 	return nil
 }
 
-// userMutex returns the per-user mutex, creating it on first access.
-func (s *Service) userMutex(userID int) *sync.Mutex {
-	if m, ok := s.userLocks.Load(userID); ok {
-		return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
-	}
-	m, _ := s.userLocks.LoadOrStore(userID, &sync.Mutex{})
-	return m.(*sync.Mutex) //nolint:forcetypeassert,errcheck // value is always *sync.Mutex.
-}
-
-// nextMonday returns the upcoming Monday at 00:00 UTC. If now is already a
-// Monday, it returns that Monday. Callers pass a UTC instant.
+// nextMonday returns the upcoming Monday at 00:00 UTC, strictly after now's
+// calendar day. If now is already a Monday, the *following* Monday is
+// returned. Callers (StartDeloadNow, RestartMesocycleAnchor,
+// SaveUserPreferences) use this to snap the mesocycle anchor to the start of
+// a fresh week, so today must never be the answer. Callers pass a UTC instant.
 func nextMonday(now time.Time) time.Time {
 	monday := domain.MondayOf(now)
-	if now.Weekday() == time.Monday {
-		return monday
-	}
 	return monday.AddDate(0, 0, 7)
 }

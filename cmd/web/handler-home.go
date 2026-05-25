@@ -462,11 +462,12 @@ func (app *application) homePopulateAuthenticated(w http.ResponseWriter, r *http
 		return false
 	}
 
-	sessions, err := app.service.ResolveWeeklySchedule(r.Context())
+	plan, err := app.service.ResolveWeeklySchedule(r.Context())
 	if err != nil {
 		app.serverError(w, r, err)
 		return false
 	}
+	sessions := plan.Sessions[:]
 
 	volumes, err := app.service.WeeklyMuscleGroupVolume(r.Context(), sessions)
 	if err != nil {

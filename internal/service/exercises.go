@@ -76,7 +76,11 @@ func (s *Service) SwapExercise(
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
-	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+	err = s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
+		sess := wp.SessionOn(date)
+		if sess == nil {
+			return domain.ErrNotFound
+		}
 		newSets := domain.BuildSetsForAdd(newExercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
 		return sess.SwapExerciseInSlot(workoutExerciseID, newExercise, newSets)
 	})
@@ -213,15 +217,31 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 		return 0, fmt.Errorf("find historical sets: %w", err)
 	}
 
-	if _, err = s.repos.Sessions.Get(ctx, date); errors.Is(err, domain.ErrNotFound) {
+	monday := domain.MondayOf(date)
+	plan, getErr := s.repos.WeekPlans.Get(ctx, monday)
+	if getErr != nil && !errors.Is(getErr, domain.ErrNotFound) {
+		return 0, fmt.Errorf("check session existence: %w", getErr)
+	}
+	// PeriodizationType defaults to a non-empty value in the DB schema, so a
+	// zero-value field on the session pointer signals a rest-day placeholder
+	// produced by WeekPlanRepository.Get for days with no workout_sessions row.
+	// This preserves the original Sessions.Get-based existence check, which
+	// passed for any row regardless of whether exercises had been added yet.
+	var preSess *domain.Session
+	if getErr == nil {
+		preSess = plan.SessionOn(date)
+	}
+	if preSess == nil || preSess.PeriodizationType == "" {
 		return 0, domain.ValidationError{
 			Message: "This day has no planned workout. Schedule one from the home page first.",
 		}
-	} else if err != nil {
-		return 0, fmt.Errorf("check session existence: %w", err)
 	}
 
-	err = s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+	err = s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		sess := wp.SessionOn(date)
+		if sess == nil {
+			return domain.ErrNotFound
+		}
 		newSets := domain.BuildSetsForAdd(exercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
 		return sess.AddExercise(exercise, newSets)
 	})
@@ -229,11 +249,15 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 		return 0, fmt.Errorf("update session with new exercise: %w", err)
 	}
 
-	updated, err := s.repos.Sessions.Get(ctx, date)
+	updated, err := s.repos.WeekPlans.Get(ctx, monday)
 	if err != nil {
 		return 0, fmt.Errorf("re-fetch session after add: %w", err)
 	}
-	for _, es := range updated.ExerciseSets {
+	updatedSess := updated.SessionOn(date)
+	if updatedSess == nil {
+		return 0, fmt.Errorf("re-fetch session %s after add: %w", date.Format(time.DateOnly), domain.ErrNotFound)
+	}
+	for _, es := range updatedSess.ExerciseSets {
 		if es.Exercise.ID == exerciseID {
 			return es.ID, nil
 		}

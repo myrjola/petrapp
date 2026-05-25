@@ -967,10 +967,11 @@ func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
 
 	ctx, svc := setupTestService(t)
 
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 	var (
 		session     domain.Session
 		workoutDate time.Time
@@ -1022,10 +1023,11 @@ func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
 	t.Parallel()
 
 	ctx, svc := setupTestService(t)
-	sessions, err := svc.ResolveWeeklySchedule(ctx)
+	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
+	sessions := plan.Sessions[:]
 	var (
 		session     domain.Session
 		workoutDate time.Time

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/sqlite"
@@ -50,108 +49,6 @@ func (r *sqliteSessionRepository) List(ctx context.Context, sinceDate time.Time)
 
 func (r *sqliteSessionRepository) Get(ctx context.Context, date time.Time) (domain.Session, error) {
 	return r.get(ctx, r.db.ReadOnly, date)
-}
-
-// Update modifies an existing session within a single transaction. The read
-// happens inside the same BEGIN IMMEDIATE transaction as the write so concurrent
-// updates cannot interleave a read-modify-write race. fn returning an error
-// rolls back without writing; nil commits the diff. Sentinel errors from
-// domain (e.g. ErrAlreadyStarted) propagate through unchanged.
-func (r *sqliteSessionRepository) Update(
-	ctx context.Context,
-	date time.Time,
-	fn func(*domain.Session) error,
-) (err error) {
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-
-	session, err := r.get(ctx, tx, date)
-	if err != nil {
-		return fmt.Errorf("get session for update: %w", err)
-	}
-
-	if err = fn(&session); err != nil {
-		return err
-	}
-
-	if err = r.deleteSession(ctx, tx, date); err != nil {
-		return err
-	}
-	if err = r.insertSession(ctx, tx, session); err != nil {
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
-	return nil
-}
-
-// CreateBatch inserts a slice of sessions and their exercise slots in one transaction.
-// Returns domain.ErrAlreadyExists (wrapped) if any session in the batch conflicts with an
-// existing row, so callers can recover from concurrent weekly-plan-generation races.
-func (r *sqliteSessionRepository) CreateBatch(ctx context.Context, sessions []domain.Session) (err error) {
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-	for _, sess := range sessions {
-		if err = r.insertSession(ctx, tx, sess); err != nil {
-			// Only the workout_sessions PK conflict (duplicate date for this user) maps to
-			// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
-			// those are programming errors, not concurrent-insert races.
-			var sqliteErr sqlite3.Error
-			if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
-				return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)
-			}
-			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
-		}
-	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit batch sessions: %w", err)
-	}
-	return nil
-}
-
-// Create inserts a single session and its exercise slots in one transaction.
-// Translates the workout_sessions PRIMARY KEY conflict to domain.ErrAlreadyExists
-// so callers can detect concurrent-insert races.
-func (r *sqliteSessionRepository) Create(ctx context.Context, sess domain.Session) (err error) {
-	tx, err := r.db.ReadWrite.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			err = errors.Join(err, fmt.Errorf("rollback transaction: %w", rollbackErr))
-		}
-	}()
-	if err = r.insertSession(ctx, tx, sess); err != nil {
-		// Only the workout_sessions PK conflict (duplicate date for this user) maps to
-		// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
-		// those are programming errors, not concurrent-insert races.
-		var sqliteErr sqlite3.Error
-		if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
-			return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), domain.ErrAlreadyExists)
-		}
-		return fmt.Errorf("insert session %s: %w", formatDate(sess.Date), err)
-	}
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("commit create session: %w", err)
-	}
-	return nil
 }
 
 // parseSessionRow converts the workout_sessions row scalars into a partial
@@ -539,18 +436,6 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 	return seconds, nil
 }
 
-func (r *sqliteSessionRepository) DeleteWeek(ctx context.Context, monday time.Time) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	sunday := monday.AddDate(0, 0, 6)
-	if _, err := r.db.ReadWrite.ExecContext(ctx, `
-		DELETE FROM workout_sessions
-		WHERE user_id = ? AND workout_date >= ? AND workout_date <= ?`,
-		userID, formatDate(monday), formatDate(sunday)); err != nil {
-		return fmt.Errorf("delete week sessions: %w", err)
-	}
-	return nil
-}
-
 func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	var count int
@@ -567,7 +452,7 @@ func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, erro
 // listSessionRows scans the workout_sessions scalar rows for a user on or
 // after sinceDate, newest first. ExerciseSets is left nil — List hydrates it
 // in a single batched follow-up query.
-func (r *sqliteSessionRepository) listSessionRows(
+func (r baseRepository) listSessionRows(
 	ctx context.Context,
 	userID int,
 	sinceDate time.Time,
@@ -617,6 +502,60 @@ func (r *sqliteSessionRepository) listSessionRows(
 	return sessions, nil
 }
 
+// listSessionRowsBetween returns sessions whose workout_date is in [from, to]
+// inclusive, oldest first. ExerciseSets is left nil — caller hydrates. Takes a
+// queryer so WeekPlanRepository.Update can read inside its open transaction.
+func (r baseRepository) listSessionRowsBetween(
+	ctx context.Context,
+	q queryer,
+	userID int,
+	from, to time.Time,
+) (_ []domain.Session, err error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+		FROM workout_sessions
+		WHERE user_id = ? AND workout_date BETWEEN ? AND ?
+		ORDER BY workout_date ASC`,
+		userID, formatDate(from), formatDate(to))
+	if err != nil {
+		return nil, fmt.Errorf("query workout_sessions between: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close rows: %w", closeErr))
+		}
+	}()
+
+	var sessions []domain.Session
+	for rows.Next() {
+		var (
+			workoutDateStr    string
+			difficultyRating  sql.NullInt32
+			startedAtStr      sql.NullString
+			completedAtStr    sql.NullString
+			periodizationType domain.PeriodizationType
+			isDeload          bool
+		)
+		if err = rows.Scan(
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload,
+		); err != nil {
+			return nil, fmt.Errorf("scan workout_sessions row: %w", err)
+		}
+		var session domain.Session
+		session, err = parseSessionRow(
+			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
+		)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, session)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate workout_sessions rows: %w", err)
+	}
+	return sessions, nil
+}
+
 func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.Time) (domain.Session, error) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	dateStr := formatDate(date)
@@ -656,37 +595,6 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 	session.ExerciseSets = exerciseSets
 
 	return session, nil
-}
-
-func (r *sqliteSessionRepository) insertSession(ctx context.Context, tx *sql.Tx, sess domain.Session) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	dateStr := formatDate(sess.Date)
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO workout_sessions (
-			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		userID, dateStr, sess.DifficultyRating,
-		formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
-		sess.PeriodizationType, sess.IsDeload); err != nil {
-		return fmt.Errorf("insert session: %w", err)
-	}
-	if err := r.saveExerciseSets(ctx, tx, sess.Date, sess.ExerciseSets); err != nil {
-		return fmt.Errorf("save exercise sets: %w", err)
-	}
-	return nil
-}
-
-func (r *sqliteSessionRepository) deleteSession(ctx context.Context, tx *sql.Tx, date time.Time) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	dateStr := formatDate(date)
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM workout_sessions
-		WHERE user_id = ? AND workout_date = ?`,
-		userID, dateStr); err != nil {
-		return fmt.Errorf("delete session: %w", err)
-	}
-	return nil
 }
 
 // loadExerciseSets fetches all exercise slots for a single session, including
@@ -738,7 +646,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 // query across all slots. This is the batched equivalent of loadExerciseSets
 // used by List: the whole date range costs this one query plus one muscle-
 // group query, replacing the prior per-session 1 + 2N N+1.
-func (r *sqliteSessionRepository) loadExerciseSetsSince(
+func (r baseRepository) loadExerciseSetsSince(
 	ctx context.Context,
 	q queryer,
 	userID int,
@@ -778,58 +686,4 @@ func (r *sqliteSessionRepository) loadExerciseSetsSince(
 		byDate[dates[i]] = append(byDate[dates[i]], slots[i])
 	}
 	return byDate, nil
-}
-
-// saveExerciseSets writes the workout_exercise rows and their child
-// exercise_sets for a session. Pre-existing IDs are preserved so URL-stable
-// slot IDs survive delete-and-reinsert cycles in Update; new aggregates
-// (ID == 0) get an auto-assigned id.
-func (r *sqliteSessionRepository) saveExerciseSets(
-	ctx context.Context,
-	tx *sql.Tx,
-	date time.Time,
-	exerciseSets []domain.ExerciseSet,
-) error {
-	dateStr := formatDate(date)
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-
-	for _, exerciseSet := range exerciseSets {
-		var idArg any
-		if exerciseSet.ID > 0 {
-			idArg = exerciseSet.ID
-		}
-		var warmupArg any
-		if exerciseSet.WarmupCompletedAt != nil {
-			warmupArg = formatTimestamp(*exerciseSet.WarmupCompletedAt)
-		}
-		var weID int
-		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO workout_exercise (
-				id, workout_user_id, workout_date, exercise_id, warmup_completed_at
-			) VALUES (?, ?, ?, ?, ?)
-			RETURNING id`,
-			idArg, userID, dateStr, exerciseSet.Exercise.ID, warmupArg).Scan(&weID); err != nil {
-			return fmt.Errorf("insert workout exercise: %w", err)
-		}
-		for i, set := range exerciseSet.Sets {
-			var completedAtStr any
-			if set.CompletedAt != nil {
-				completedAtStr = formatTimestamp(*set.CompletedAt)
-			}
-			var signalValue any
-			if set.Signal != nil {
-				signalValue = string(*set.Signal)
-			}
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO exercise_sets (
-					workout_exercise_id, set_number,
-					weight_kg, target_value, completed_value, completed_at, signal
-				) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-				weID, i+1,
-				set.WeightKg, set.TargetValue, set.CompletedValue, completedAtStr, signalValue); err != nil {
-				return fmt.Errorf("insert exercise set: %w", err)
-			}
-		}
-	}
-	return nil
 }

@@ -20,6 +20,8 @@ const (
 
 	maxMuscleGroupDaysPerWeek = 2
 	numPeriodizationTypes     = 2
+
+	hoursPerDay = 24
 )
 
 // errNoExercisesForCategory is returned by PlanDay (and wrapped by Plan) when
@@ -46,12 +48,28 @@ func NewPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTa
 	}
 }
 
-// Plan generates one Session per scheduled workout day for the week beginning on
-// startingDate. Returns an error if startingDate is not a Monday, if no workout days are
-// scheduled, or if a scheduled day has no compatible exercises.
-func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
+// Plan generates a WeekPlan for the week beginning on startingDate. The returned
+// plan always has 7 Session slots indexed by day-offset from startingDate
+// (slot i corresponds to startingDate.AddDate(0, 0, i)). Scheduled workout days
+// are populated with full content; rest days carry an empty Session{Date: ...}
+// with no ExerciseSets. Returns an error if startingDate is not a Monday, if no
+// workout days are scheduled, or if a scheduled day has no compatible exercises.
+func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 	if startingDate.Weekday() != time.Monday {
-		return nil, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
+		return WeekPlan{}, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
+	}
+
+	// Pre-fill all 7 slots with rest-day placeholders. Scheduled days
+	// overwrite their slot below; the rest carry only their Date so
+	// WeekPlan.SessionOn returns a valid pointer for every day of the week.
+	result := WeekPlan{
+		Monday:   startingDate,
+		Sessions: [7]Session{},
+	}
+	for i := range 7 {
+		result.Sessions[i] = Session{ //nolint:exhaustruct // Rest-day placeholder; no slots or periodization.
+			Date: startingDate.AddDate(0, 0, i),
+		}
 	}
 
 	// Collect scheduled workout days Mon–Sun.
@@ -63,7 +81,7 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 		}
 	}
 	if len(workoutDays) == 0 {
-		return nil, errors.New("no workout days scheduled in preferences")
+		return WeekPlan{}, errors.New("no workout days scheduled in preferences")
 	}
 
 	// Phase 1: determine category for each scheduled day.
@@ -71,7 +89,7 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 	for _, day := range workoutDays {
 		cat := wp.determineCategory(day)
 		if !wp.hasExercisesForCategory(cat) {
-			return nil, fmt.Errorf("%w: %s day (%s)", errNoExercisesForCategory, cat, day.Weekday())
+			return WeekPlan{}, fmt.Errorf("%w: %s day (%s)", errNoExercisesForCategory, cat, day.Weekday())
 		}
 		categories[day] = cat
 	}
@@ -83,9 +101,8 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 	firstPT := wp.firstSessionPeriodizationType(startingDate)
 	isDeload := IsDeloadWeek(startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
 
-	// Phase 3: select exercises and build sessions.
+	// Phase 3: select exercises and write into the day-indexed slot.
 	weekUsedExercises := make(map[int]bool)
-	sessions := make([]Session, len(workoutDays))
 	for i, day := range workoutDays {
 		pt := nextPeriodizationType(firstPT, i)
 		if isDeload {
@@ -106,7 +123,8 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 			weekUsedExercises[es.Exercise.ID] = true
 		}
 
-		sessions[i] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+		dayOffset := int(day.Sub(startingDate).Hours() / hoursPerDay)
+		result.Sessions[dayOffset] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
 			Date:              day,
 			PeriodizationType: pt,
 			IsDeload:          isDeload,
@@ -114,7 +132,7 @@ func (wp *Planner) Plan(startingDate time.Time) ([]Session, error) {
 		}
 	}
 
-	return sessions, nil
+	return result, nil
 }
 
 // PlanDay generates one Session for date, suitable for ad-hoc workouts on

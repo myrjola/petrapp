@@ -19,8 +19,8 @@ func (s *Service) UpdateSetWeight(
 	setIndex int,
 	newWeight float64,
 ) error {
-	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		return sess.UpdateSetWeight(workoutExerciseID, setIndex, newWeight)
+	if err := s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
+		return wp.UpdateSetWeight(date, workoutExerciseID, setIndex, newWeight)
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
@@ -35,8 +35,8 @@ func (s *Service) UpdateCompletedValue(
 	setIndex int,
 	completedValue int,
 ) error {
-	if err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
-		return sess.UpdateCompletedValue(workoutExerciseID, setIndex, completedValue, time.Now().UTC())
+	if err := s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
+		return wp.UpdateCompletedValue(date, workoutExerciseID, setIndex, completedValue, time.Now().UTC())
 	}); err != nil {
 		return fmt.Errorf("update session %s: %w", date.Format(time.DateOnly), err)
 	}
@@ -64,7 +64,11 @@ func (s *Service) RecordSet(
 	)
 	now := time.Now().UTC()
 
-	err := s.repos.Sessions.Update(ctx, date, func(sess *domain.Session) error {
+	err := s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
+		sess := wp.SessionOn(date)
+		if sess == nil {
+			return domain.ErrNotFound
+		}
 		if slot, ok := sess.Slot(workoutExerciseID); ok && setIndex >= 0 && setIndex < len(slot.Sets) {
 			wasComplete = slot.Sets[setIndex].CompletedAt != nil
 		}
