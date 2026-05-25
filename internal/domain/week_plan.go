@@ -74,14 +74,17 @@ func (wp *WeekPlan) Replace(newPlan WeekPlan) {
 	wp.Sessions = newPlan.Sessions
 }
 
-// FlipDeloadFromToday sets IsDeload=true on every non-completed session whose
-// Date is on or after today. Past sessions and completed sessions are left
-// untouched. Idempotent.
+// FlipDeloadFromToday sets IsDeload=true on every non-completed scheduled
+// session whose Date is on or after today. Past sessions, completed sessions,
+// and rest-day placeholders (no slots) are left untouched. Idempotent.
 func (wp *WeekPlan) FlipDeloadFromToday(today time.Time) error {
 	t := StartOfDay(today)
 	for i := range wp.Sessions {
 		s := &wp.Sessions[i]
 		if s.Date.Before(t) {
+			continue
+		}
+		if len(s.ExerciseSets) == 0 {
 			continue
 		}
 		if s.Status() == SessionCompleted {
@@ -94,13 +97,17 @@ func (wp *WeekPlan) FlipDeloadFromToday(today time.Time) error {
 	return nil
 }
 
-// ClearDeloadFromToday sets IsDeload=false on every non-completed session whose
-// Date is on or after today. Counterpart to FlipDeloadFromToday. Idempotent.
+// ClearDeloadFromToday sets IsDeload=false on every non-completed scheduled
+// session whose Date is on or after today. Counterpart to FlipDeloadFromToday;
+// rest-day placeholders (no slots) are left untouched. Idempotent.
 func (wp *WeekPlan) ClearDeloadFromToday(today time.Time) error {
 	t := StartOfDay(today)
 	for i := range wp.Sessions {
 		s := &wp.Sessions[i]
 		if s.Date.Before(t) {
+			continue
+		}
+		if len(s.ExerciseSets) == 0 {
 			continue
 		}
 		if s.Status() == SessionCompleted {

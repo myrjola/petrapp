@@ -14,19 +14,13 @@ import (
 // RegenerateWeeklyPlanIfUnstarted replaces the current week's plan when no
 // session has been started yet. Atomic via WeekPlanRepository.Update — the
 // AnyStarted check and the replacement happen in one transaction, closing the
-// race window the old userMutex existed to mitigate. The mutex remains for
-// one more commit (it is removed in Task 11 along with the userLocks field).
+// race window the old userMutex existed to mitigate.
 //
 // Treats ErrNotFound as a no-op: a missing week has by definition no started
 // session, so there is nothing to regenerate. This keeps callers
 // (e.g. handler-preferences.go) from erroring on a brand-new user's first
 // regenerate before any week has been persisted.
 func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	mu := s.userMutex(userID)
-	mu.Lock()
-	defer mu.Unlock()
-
 	monday := domain.MondayOf(time.Now())
 	newPlan, err := s.planWeek(ctx, monday)
 	if err != nil {
@@ -336,33 +330,21 @@ func (s *Service) MarkWarmupComplete(
 // recovery off-schedule (e.g. returning from sickness). Undone by
 // RestartMesocycleAnchor, which clears the same set of flips.
 //
-// No mutex: each per-session Update is its own transaction, the closure
-// re-checks Status() != SessionCompleted before mutating, and a
-// double-press is idempotent.
+// Atomic within the week via WeekPlans.Update — the for-each-session
+// flip happens in one transaction. The mesocycle-anchor write is a
+// separate tx; only the flip needs week-level atomicity. Treats
+// ErrNotFound as a no-op (no week persisted yet → nothing to flip).
 //
 //nolint:dupl // mirror of RestartMesocycleAnchor; kept separate intentionally (SwitchToDeload vs ClearDeload, distinct intent).
 func (s *Service) StartDeloadNow(ctx context.Context) error {
 	monday := domain.MondayOf(time.Now())
 	today := domain.StartOfDay(time.Now())
 
-	sessions, err := s.repos.Sessions.List(ctx, monday)
-	if err != nil {
-		return fmt.Errorf("list sessions for current week: %w", err)
-	}
-
-	for _, sess := range sessions {
-		if sess.Date.Before(today) {
-			continue
-		}
-		err = s.repos.Sessions.Update(ctx, sess.Date, func(latest *domain.Session) error {
-			if latest.Status() == domain.SessionCompleted {
-				return nil
-			}
-			return latest.SwitchToDeload()
-		})
-		if err != nil {
-			return fmt.Errorf("flip deload for %s: %w", sess.Date.Format(time.DateOnly), err)
-		}
+	err := s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		return wp.FlipDeloadFromToday(today)
+	})
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return fmt.Errorf("flip deload for week %s: %w", monday.Format(time.DateOnly), err)
 	}
 
 	prefs, err := s.repos.Preferences.Get(ctx)
