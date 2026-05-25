@@ -72,10 +72,10 @@ type SessionRepository interface {
 }
 
 // WeekPlanRepository persists the full week aggregate. The Update closure
-// pattern mirrors SessionRepository.Update but at week scope: load the seven
-// days into a domain.WeekPlan, run fn under a single transaction, persist the
-// diff on nil via delete-then-reinsert across the week's date range. Domain
-// sentinels returned by fn propagate unchanged so callers can errors.Is them.
+// pattern loads the seven days into a domain.WeekPlan, runs fn under a single
+// transaction, and persists the diff on nil via delete-then-reinsert across
+// the week's date range. Domain sentinels returned by fn propagate unchanged
+// so callers can errors.Is them.
 type WeekPlanRepository interface {
 	// Get returns the lazily-materialised week. Sessions is always length 7;
 	// non-scheduled dates carry an empty Session{Date: ...}. Returns
@@ -86,9 +86,11 @@ type WeekPlanRepository interface {
 	// against the hydrated *domain.WeekPlan, and persists the result via
 	// delete-then-reinsert across the week's date range. Returning nil from fn
 	// commits; returning an error rolls back. Slot IDs are preserved via
-	// INSERT ... RETURNING id (same trick as SessionRepository.Update). Sentinel
-	// errors from domain (e.g. ErrAlreadyStarted) propagate so callers can
-	// detect no-op cases via errors.Is.
+	// INSERT ... RETURNING id, with a two-pass reinsert (explicit-ID slots
+	// first, auto-ID slots second) so SQLite's rowid assignment never collides
+	// with a preserved workout_exercise.id. Sentinel errors from domain (e.g.
+	// ErrAlreadyStarted) propagate so callers can detect no-op cases via
+	// errors.Is.
 	Update(ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error) error
 
 	// Create persists a freshly-planned WeekPlan. Returns domain.ErrAlreadyExists
