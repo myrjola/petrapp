@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -692,6 +693,74 @@ func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T
 	}
 	if withExercises != 3 {
 		t.Errorf("after concurrent regenerate: got %d sessions with exercises, want 3 (Mon/Wed/Fri)", withExercises)
+	}
+}
+
+// Test_RegenerateAndStart_AreSerializedByTheDatabase pins the spec's central
+// correctness claim: with the per-user mutex deleted (Task 11), concurrent
+// RegenerateWeeklyPlanIfUnstarted and StartSession calls do not race. SQLite's
+// BEGIN IMMEDIATE locking inside WeekPlanRepository.Update is what serializes
+// them now — there is no in-process mutex left.
+//
+// Setup: pre-generate the week via ResolveWeeklySchedule so both methods
+// operate on existing rows. setupTestService configures Mon/Wed/Fri at 60 min;
+// today's Monday is a scheduled workout day in that schedule.
+func Test_RegenerateAndStart_AreSerializedByTheDatabase(t *testing.T) {
+	t.Parallel()
+	ctx, svc := setupTestService(t)
+
+	monday := domain.MondayOf(time.Now())
+	today := monday // Test runs against the current ISO week's Monday.
+
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule: %v", err)
+	}
+
+	const iterations = 50
+	var wg sync.WaitGroup
+	wg.Add(2)
+	errCh := make(chan error, 2*iterations)
+
+	go func() {
+		defer wg.Done()
+		for range iterations {
+			if err := svc.RegenerateWeeklyPlanIfUnstarted(ctx); err != nil {
+				errCh <- fmt.Errorf("regenerate: %w", err)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range iterations {
+			err := svc.StartSession(ctx, today)
+			if err != nil && !errors.Is(err, domain.ErrAlreadyStarted) {
+				errCh <- fmt.Errorf("start: %w", err)
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Errorf("unexpected concurrent error: %v", err)
+	}
+
+	// Invariant: today's session is started AND has slots. If Regenerate
+	// had clobbered an already-started week or StartSession had observed
+	// a half-deleted week, one of these would fail.
+	plan, err := svc.ResolveWeeklySchedule(ctx)
+	if err != nil {
+		t.Fatalf("ResolveWeeklySchedule after race: %v", err)
+	}
+	sess := plan.SessionOn(today)
+	if sess == nil {
+		t.Fatalf("today's session missing after race")
+	}
+	if sess.StartedAt.IsZero() {
+		t.Error("today's session should be started after the race")
+	}
+	if len(sess.ExerciseSets) == 0 {
+		t.Error("today's session should have slots after the race")
 	}
 }
 
