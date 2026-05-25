@@ -17,7 +17,7 @@ and `internal/contexthelpers`. It does NOT depend on `cmd/web` or
 - **Session orchestration** (`sessions.go`): start/complete/feedback,
   weekly plan generation, schedule resolution. Week-start arithmetic
   uses `domain.MondayOf`.
-- **Set mutations** (`sets.go`): all `Session.Update`-via-aggregate
+- **Set mutations** (`sets.go`): all `WeekPlans.Update`-via-aggregate
   calls that change recorded set data.
 - **Exercise CRUD + slot ops** (`exercises.go`): list/get/update,
   `AddExercise`, `SwapExercise`, plus the historical-set lookup

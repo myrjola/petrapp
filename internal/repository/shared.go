@@ -238,7 +238,7 @@ func (r baseRepository) saveOneSlotInTx(
 
 // deleteWeekInTx removes all workout_sessions for the user between [monday,
 // monday+6] inside tx. CASCADE clears child workout_exercise and exercise_sets
-// rows. Shared by SessionRepository.DeleteWeek and WeekPlanRepository.Update.
+// rows. Called from WeekPlanRepository.Update before the three-pass reinsert.
 func (r baseRepository) deleteWeekInTx(
 	ctx context.Context, tx *sql.Tx, userID int, monday time.Time,
 ) error {

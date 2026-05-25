@@ -31,9 +31,11 @@ func (r *sqliteWeekPlanRepository) Get(ctx context.Context, monday time.Time) (d
 
 // Update loads the WeekPlan for monday inside a single transaction, runs fn,
 // then persists the result via delete-then-reinsert across the week's date
-// range. Slot IDs are preserved via INSERT ... RETURNING id (same trick as
-// SessionRepository.Update). Domain sentinels returned by fn propagate
-// unchanged so callers can errors.Is against them.
+// range. Slot IDs are preserved via INSERT ... RETURNING id, with a two-pass
+// reinsert (explicit-ID slots before auto-ID slots) so SQLite's rowid
+// assignment never collides with a preserved workout_exercise.id. Domain
+// sentinels returned by fn propagate unchanged so callers can errors.Is
+// against them.
 func (r *sqliteWeekPlanRepository) Update(
 	ctx context.Context, monday time.Time, fn func(*domain.WeekPlan) error,
 ) (err error) {
