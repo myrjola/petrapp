@@ -175,8 +175,8 @@ delegates everything else back to `serverError`.
 
 - `errors.As(err, &ve)` matching `domain.ValidationError` → flash with
   `ve.Message` verbatim and `redirect(safeURL)`. The form's GET handler
-  pops the flash with `app.popFlashError(...)` and renders the
-  `banner` component.
+  pops the flash with `app.popFlash(...)`, reads the `.Message` field,
+  and renders the `banner` component.
 - Anything else → delegate to `serverError`. The non-validation case
   produces the catastrophic-failure UX (shim navigation to `/error`,
   or inline 500 for non-shim clients). `userError` does not
@@ -195,7 +195,8 @@ handler pops + renders the flash banner. Today that means: `/workouts/{date}`
 (both success and not-found branches), `/schedule`, `/admin/exercises`,
 `/admin/exercises/{id}`. If you need a new target, plumb a `Flash BannerData`
 field through its template data struct, render `{{ template "banner" .Flash }}`
-in the template, and pop with `app.popFlashError(r.Context())` in the handler.
+in the template, and pop with `app.popFlash(r.Context())` (reading the
+`.Message` field) in the handler.
 
 **Do not** default `safeURL` to `r.Referer()` (unreliable on direct POSTs,
 easily forged) or to the request URL (wrong for action endpoints like

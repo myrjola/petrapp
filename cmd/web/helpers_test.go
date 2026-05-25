@@ -20,6 +20,7 @@ import (
 // each test gets a fresh empty store.
 func newTestSessionManager(t *testing.T) *scs.SessionManager {
 	t.Helper()
+	// gob.Register is idempotent, so calling it per newTestSessionManager is safe.
 	gob.Register(flashEntry{}) //nolint:exhaustruct // gob.Register only needs the type, value fields are unused.
 	sm := scs.New()
 	sm.Store = memstore.New()
