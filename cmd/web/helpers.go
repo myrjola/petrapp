@@ -140,8 +140,6 @@ func (app *application) putFlashError(ctx context.Context, message string) {
 }
 
 // putFlashErrorWithAnchor sets an error flash bound to a specific panel id.
-//
-//nolint:unused // wired up in later tasks of the preferences-scroll-and-flash plan.
 func (app *application) putFlashErrorWithAnchor(ctx context.Context, message, anchor string) {
 	app.putFlash(ctx, BannerVariantError, message, anchor)
 }

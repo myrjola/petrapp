@@ -39,7 +39,7 @@ func Test_application_exerciseInfo(t *testing.T) {
 		if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 			t.Fatalf("Failed to get preferences: %v", err)
 		}
-		if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+		if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 			t.Fatalf("Failed to submit form: %v", err)
 		}
 

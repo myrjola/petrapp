@@ -83,7 +83,7 @@ func Test_application_home(t *testing.T) {
 		if err != nil {
 			t.Fatalf("get preferences page: %v", err)
 		}
-		if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+		if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 			"Monday":    "60",
 			"Wednesday": "60",
 			"Friday":    "60",

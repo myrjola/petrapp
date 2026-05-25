@@ -98,7 +98,7 @@ func WorkoutScenario(ctx context.Context, user *AuthenticatedUser, logger *slog.
 	}
 
 	// Label-based match resolves to the underlying name="{weekday}_minutes" select.
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 		time.Now().Weekday().String(): "60",
 	}); err != nil {
 		return fmt.Errorf("submit preferences: %w", err)
@@ -152,7 +152,7 @@ func GenerateWorkoutHistory(ctx context.Context, user *AuthenticatedUser, logger
 	if err != nil {
 		return fmt.Errorf("get preferences: %w", err)
 	}
-	if _, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+	if _, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 		time.Now().Weekday().String(): "60",
 	}); err != nil {
 		return fmt.Errorf("submit preferences: %w", err)

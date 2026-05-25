@@ -40,7 +40,7 @@ func Test_application_addWorkout(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Failed to submit preferences form: %v", err)
 	}
 
@@ -171,7 +171,7 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
@@ -300,7 +300,7 @@ func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
@@ -403,7 +403,7 @@ func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 		nonToday.String(): "60",
 	}); err != nil {
 		t.Fatalf("Failed to submit preferences: %v", err)
@@ -484,7 +484,7 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 		today.String(): "60",
 	}); err != nil {
 		t.Fatalf("Failed to submit preferences: %v", err)
@@ -504,7 +504,7 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences (2nd): %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 		today.String():    "60",
 		addedDay.String(): "60",
 	}); err != nil {
@@ -561,7 +561,7 @@ func Test_application_workoutCompletePOST_unstartedSession_shimHeader_redirectsT
 	if err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences", formData); err != nil {
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
@@ -622,7 +622,7 @@ func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_redirect
 	if err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences", formData); err != nil {
+	if _, err = client.SubmitForm(ctx, prefsDoc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 

@@ -349,7 +349,7 @@
         {{ template "page-header" .Header }}
         {{ template "banner" .Flash }}
 
-        <form method="post" action="/preferences" class="panel" aria-labelledby="schedule-title">
+        <form method="post" action="/preferences/schedule" class="panel" aria-labelledby="schedule-title">
             <header class="panel-head">
                 <span class="panel-eyebrow"><span class="panel-eyebrow-num">01</span> Training week</span>
                 <h2 class="panel-title" id="schedule-title">When are you in the gym?</h2>
@@ -596,7 +596,7 @@
 
             {{ template "banner" (index $.FlashByPanel "deload-title") }}
 
-            <form method="post" action="/preferences" class="stack">
+            <form method="post" action="/preferences/deload" class="stack">
                 <label class="toggle-card">
                     <input type="checkbox" name="deload_enabled" {{ if .DeloadEnabled }}checked{{ end }}>
                     <span class="toggle-card-text">
@@ -615,10 +615,6 @@
                         {{ end }}
                     </select>
                 </label>
-
-                {{ range .Weekdays }}
-                    <input type="hidden" name="{{ .ID }}_minutes" value="{{ .Minutes }}">
-                {{ end }}
 
                 <div class="panel-actions">
                     <button type="submit" class="btn btn--block">Save recovery settings</button>

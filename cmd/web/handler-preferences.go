@@ -146,7 +146,57 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "preferences", data)
 }
 
-func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) {
+const scheduleAnchor = "schedule-title"
+
+// preferencesScheduleSavePOST persists the weekday-minutes selection. On
+// success, the user is redirected to home so they see the regenerated week.
+func (app *application) preferencesScheduleSavePOST(w http.ResponseWriter, r *http.Request) {
+	if !app.parseForm(w, r, defaultMaxFormSize) {
+		return
+	}
+
+	prefs, err := app.service.GetUserPreferences(r.Context())
+	if err != nil {
+		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
+		return
+	}
+	prefs.MondayMinutes = parseMinutes(r.Form.Get("monday_minutes"))
+	prefs.TuesdayMinutes = parseMinutes(r.Form.Get("tuesday_minutes"))
+	prefs.WednesdayMinutes = parseMinutes(r.Form.Get("wednesday_minutes"))
+	prefs.ThursdayMinutes = parseMinutes(r.Form.Get("thursday_minutes"))
+	prefs.FridayMinutes = parseMinutes(r.Form.Get("friday_minutes"))
+	prefs.SaturdayMinutes = parseMinutes(r.Form.Get("saturday_minutes"))
+	prefs.SundayMinutes = parseMinutes(r.Form.Get("sunday_minutes"))
+
+	if prefs.IsEmpty() {
+		app.putFlashErrorWithAnchor(r.Context(),
+			"Please schedule at least one workout day.", scheduleAnchor)
+		redirect(w, r, "/preferences#"+scheduleAnchor)
+		return
+	}
+
+	if err = app.service.SaveUserPreferences(r.Context(), prefs); err != nil {
+		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))
+		app.logger.LogAttrs(r.Context(), slog.LevelDebug, "preferences details", slog.Any("preferences", prefs))
+		return
+	}
+
+	if err = app.service.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
+		// Preferences are saved; regeneration failure is not fatal because
+		// ResolveWeeklySchedule on the home page will regenerate the plan automatically.
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "regenerate weekly plan after schedule save",
+			slog.Any("error", err))
+	}
+
+	redirect(w, r, "/")
+}
+
+const deloadAnchor = "deload-title"
+
+// preferencesDeloadSavePOST persists the deload-enable toggle and mesocycle
+// length. On success, the user lands at the recovery panel with a success
+// banner inside it.
+func (app *application) preferencesDeloadSavePOST(w http.ResponseWriter, r *http.Request) {
 	if !app.parseForm(w, r, defaultMaxFormSize) {
 		return
 	}
@@ -158,19 +208,6 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 	}
 	prefs.DeloadEnabled = r.Form.Get("deload_enabled") == "on"
 	prefs.MesocycleLength = parseMesocycleLength(r.Form.Get("mesocycle_length"))
-	prefs.MondayMinutes = parseMinutes(r.Form.Get("monday_minutes"))
-	prefs.TuesdayMinutes = parseMinutes(r.Form.Get("tuesday_minutes"))
-	prefs.WednesdayMinutes = parseMinutes(r.Form.Get("wednesday_minutes"))
-	prefs.ThursdayMinutes = parseMinutes(r.Form.Get("thursday_minutes"))
-	prefs.FridayMinutes = parseMinutes(r.Form.Get("friday_minutes"))
-	prefs.SaturdayMinutes = parseMinutes(r.Form.Get("saturday_minutes"))
-	prefs.SundayMinutes = parseMinutes(r.Form.Get("sunday_minutes"))
-
-	if prefs.IsEmpty() {
-		app.putFlashError(r.Context(), "Please schedule at least one workout day.")
-		redirect(w, r, "/preferences")
-		return
-	}
 
 	if err = app.service.SaveUserPreferences(r.Context(), prefs); err != nil {
 		app.serverError(w, r, fmt.Errorf("save user preferences: %w", err))
@@ -179,13 +216,12 @@ func (app *application) preferencesPOST(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err = app.service.RegenerateWeeklyPlanIfUnstarted(r.Context()); err != nil {
-		// Preferences are already saved; regeneration failure is not fatal because
-		// ResolveWeeklySchedule on the home page will regenerate the plan automatically.
-		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "regenerate weekly plan after preference save",
+		app.logger.LogAttrs(r.Context(), slog.LevelWarn, "regenerate weekly plan after deload save",
 			slog.Any("error", err))
 	}
 
-	redirect(w, r, "/")
+	app.putFlashSuccess(r.Context(), "Recovery settings saved.", deloadAnchor)
+	redirect(w, r, "/preferences#"+deloadAnchor)
 }
 
 func (app *application) deleteUserPOST(w http.ResponseWriter, r *http.Request) {

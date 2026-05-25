@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -79,7 +80,7 @@ func Test_application_preferences(t *testing.T) {
 		"Monday":    "60",
 		"Wednesday": "45",
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Failed to submit form: %v", err)
 	}
 
@@ -166,7 +167,7 @@ func Test_application_preferencesPOST_preservesRestNotificationsEnabled(t *testi
 	}
 
 	// Submit the weekday-schedule form. Pre-fix this clobbered the column.
-	if _, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
+	if _, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
 		"Monday": "60",
 	}); err != nil {
 		t.Fatalf("Failed to submit weekday form: %v", err)
@@ -453,20 +454,25 @@ func TestPreferencesPOST_RejectsEmptySchedule(t *testing.T) {
 		"saturday_minutes":  "0",
 		"sunday_minutes":    "0",
 	}
-	doc, err = client.SubmitForm(ctx, doc, "/preferences", formData)
+	doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData)
 	if err != nil {
 		t.Fatalf("Failed to submit preferences form: %v", err)
 	}
 
-	// Should stay on /preferences (redirected back after flash).
+	// Should land at /preferences (the fragment is dropped by goquery's URL parse;
+	// the path is what matters for the assertion).
 	if doc.Url.Path != "/preferences" {
 		t.Errorf("Expected to stay on /preferences, got %q", doc.Url.Path)
 	}
 
-	// Should render an error banner containing "at least one workout day".
-	banner := doc.Find(".banner--error")
+	// Error banner now lives inside the schedule panel, not at page top.
+	schedulePanel := doc.Find("form[aria-labelledby='schedule-title']")
+	if schedulePanel.Length() == 0 {
+		t.Fatal("schedule-title panel not found")
+	}
+	banner := schedulePanel.Find(".banner--error")
 	if banner.Length() == 0 {
-		t.Fatal("Expected error banner to be rendered")
+		t.Fatal("Expected error banner to be rendered inside schedule panel")
 	}
 	if !strings.Contains(banner.Text(), "at least one workout day") {
 		t.Errorf("Expected banner to contain 'at least one workout day', got %q", banner.Text())
@@ -475,7 +481,7 @@ func TestPreferencesPOST_RejectsEmptySchedule(t *testing.T) {
 
 func verifySelected(t *testing.T, doc *goquery.Document, weekdays map[string]int) {
 	t.Helper()
-	form, err := e2etest.FindForm(doc, "/preferences")
+	form, err := e2etest.FindForm(doc, "/preferences/schedule")
 	if err != nil {
 		t.Fatalf("Failed to find form: %v", err)
 	}
@@ -540,8 +546,16 @@ func Test_application_preferencesStartDeloadNow(t *testing.T) {
 	}
 
 	// 2) Enable deload + at least one workout day so the prefs form validates.
-	if _, err = client.SubmitForm(ctx, doc, "/preferences", map[string]string{
-		"monday_minutes":   "60",
+	if _, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
+		"monday_minutes": "60",
+	}); err != nil {
+		t.Fatalf("SubmitForm save schedule: %v", err)
+	}
+	doc, err = client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences after schedule save: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, doc, "/preferences/deload", map[string]string{
 		"deload_enabled":   "on",
 		"mesocycle_length": "5",
 	}); err != nil {
@@ -569,4 +583,110 @@ func Test_application_preferencesStartDeloadNow(t *testing.T) {
 	if got := doc.Find("h2#deload-title").Text(); got != "Deload cycles" {
 		t.Errorf("expected Recovery panel heading after redirect, got %q", got)
 	}
+}
+
+func TestPreferencesScheduleSave_RedirectsHomeWithoutFlash(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("StartServer: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	resp := postShimForm(t, server, client, "/preferences/schedule", neturl.Values{
+		"monday_minutes": []string{"60"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+	if got := resp.Header.Get("X-Location"); got != "/" {
+		t.Errorf("X-Location = %q, want %q", got, "/")
+	}
+}
+
+func TestPreferencesDeloadSave_RedirectsToDeloadAnchorWithSuccessFlash(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("StartServer: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	// Seed a valid schedule so prefs is non-empty before saving deload.
+	prefsDoc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences: %v", err)
+	}
+	if _, err = client.SubmitForm(ctx, prefsDoc,
+		"/preferences/schedule", map[string]string{"monday_minutes": "60"}); err != nil {
+		t.Fatalf("seed schedule: %v", err)
+	}
+
+	resp := postShimForm(t, server, client, "/preferences/deload", neturl.Values{
+		"deload_enabled":   []string{"on"},
+		"mesocycle_length": []string{"5"},
+	})
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+	if got := resp.Header.Get("X-Location"); got != "/preferences#deload-title" {
+		t.Errorf("X-Location = %q, want %q", got, "/preferences#deload-title")
+	}
+
+	// Follow with a GET and assert the banner lands inside the deload panel.
+	doc, err := client.GetDoc(ctx, "/preferences")
+	if err != nil {
+		t.Fatalf("GetDoc /preferences: %v", err)
+	}
+	panel := doc.Find("section[aria-labelledby='deload-title']")
+	if panel.Length() == 0 {
+		t.Fatal("deload-title panel not found")
+	}
+	banner := panel.Find(".banner--success")
+	if banner.Length() == 0 {
+		t.Fatal("success banner not rendered inside deload panel")
+	}
+	if got := strings.TrimSpace(banner.Text()); got != "Recovery settings saved." {
+		t.Errorf("banner text = %q, want %q", got, "Recovery settings saved.")
+	}
+}
+
+// postShimForm makes a raw POST with the stacknav shim header and a manual
+// CheckRedirect so the X-Location header on the 200 response is observable.
+// Returns the response; caller must close the body.
+func postShimForm(
+	t *testing.T,
+	server *e2etest.Server,
+	client *e2etest.Client,
+	path string,
+	fields neturl.Values,
+) *http.Response {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		server.URL()+path, strings.NewReader(fields.Encode()))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Requested-With", "stacknav")
+
+	httpClient := *client.HTTPClient() // shallow copy preserves the cookie jar.
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", path, err)
+	}
+	return resp
 }

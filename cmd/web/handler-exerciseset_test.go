@@ -44,7 +44,7 @@ func Test_application_exerciseSet(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Failed to submit form: %v", err)
 	}
 
@@ -294,7 +294,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
@@ -418,7 +418,7 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
@@ -558,7 +558,7 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Failed to get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Failed to submit form: %v", err)
 	}
 
@@ -643,7 +643,7 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("Get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("Submit preferences: %v", err)
 	}
 
@@ -806,7 +806,7 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 	today := time.Now().Format("2006-01-02")
@@ -971,7 +971,7 @@ func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 
@@ -1076,7 +1076,7 @@ func Test_ExerciseSet_RestChipAfterWarmupComplete(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 
@@ -1159,7 +1159,7 @@ func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 
@@ -1368,7 +1368,7 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 	today := time.Now().Format("2006-01-02")
@@ -1483,7 +1483,7 @@ func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 	today := time.Now().Format("2006-01-02")
@@ -1584,7 +1584,7 @@ func Test_application_exerciseSet_overline_clamps_when_all_sets_complete(t *test
 	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
 		t.Fatalf("get preferences: %v", err)
 	}
-	if doc, err = client.SubmitForm(ctx, doc, "/preferences", formData); err != nil {
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
 		t.Fatalf("submit preferences: %v", err)
 	}
 	today := time.Now().Format("2006-01-02")
