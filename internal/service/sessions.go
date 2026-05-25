@@ -11,19 +11,16 @@ import (
 	"github.com/myrjola/petrapp/internal/domain"
 )
 
-// RegenerateWeeklyPlanIfUnstarted replaces the current week's generated plan with one
-// that reflects the latest preferences, but only when no session has been started yet.
-// If any workout this week has a non-zero StartedAt the existing plan is left intact.
+// RegenerateWeeklyPlanIfUnstarted replaces the current week's plan when no
+// session has been started yet. Atomic via WeekPlanRepository.Update — the
+// AnyStarted check and the replacement happen in one transaction, closing the
+// race window the old userMutex existed to mitigate. The mutex remains for
+// one more commit (it is removed in Task 11 along with the userLocks field).
 //
-// The delete and generate steps are NOT wrapped in a single transaction. To
-// prevent two concurrent callers from both passing the no-started-session
-// check and racing on delete+generate, we serialize per-user via an
-// in-process mutex. Multi-process deployments would need a different
-// scheme (advisory lock or single-row sentinel); today's deployment is
-// single-machine (see fly.toml min_machines_running = 0, no horizontal
-// scaling configured).
-//
-// The self-heal via ResolveWeeklySchedule remains as defense-in-depth.
+// Treats ErrNotFound as a no-op: a missing week has by definition no started
+// session, so there is nothing to regenerate. This keeps callers
+// (e.g. handler-preferences.go) from erroring on a brand-new user's first
+// regenerate before any week has been persisted.
 func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	mu := s.userMutex(userID)
@@ -31,34 +28,22 @@ func (s *Service) RegenerateWeeklyPlanIfUnstarted(ctx context.Context) error {
 	defer mu.Unlock()
 
 	monday := domain.MondayOf(time.Now())
-	sunday := monday.AddDate(0, 0, 6)
-
-	existing, err := s.repos.Sessions.List(ctx, monday)
-	if err != nil {
-		return fmt.Errorf("list sessions for week: %w", err)
-	}
-
-	for _, sess := range existing {
-		if !sess.Date.After(sunday) && !sess.StartedAt.IsZero() {
-			return nil
-		}
-	}
-
-	if err = s.repos.Sessions.DeleteWeek(ctx, monday); err != nil {
-		return fmt.Errorf("delete current week: %w", err)
-	}
 	newPlan, err := s.planWeek(ctx, monday)
 	if err != nil {
 		return err
 	}
-	plannedSessions := make([]domain.Session, 0, 7)
-	for i := range newPlan.Sessions {
-		if len(newPlan.Sessions[i].ExerciseSets) > 0 {
-			plannedSessions = append(plannedSessions, newPlan.Sessions[i])
+	err = s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		if wp.AnyStarted() {
+			return nil
 		}
+		wp.Replace(newPlan)
+		return nil
+	})
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
 	}
-	if err = s.repos.Sessions.CreateBatch(ctx, plannedSessions); err != nil {
-		return fmt.Errorf("create batch sessions: %w", err)
+	if err != nil {
+		return fmt.Errorf("regenerate week %s: %w", monday.Format(time.DateOnly), err)
 	}
 	return nil
 }

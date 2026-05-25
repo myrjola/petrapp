@@ -639,6 +639,13 @@ func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T
 
 	ctx, svc := setupTestService(t)
 
+	// Seed the week so Regenerate has something to operate on. Without a
+	// persisted week, Regenerate is a no-op (ErrNotFound is tolerated by
+	// design — a missing week has nothing started by definition).
+	if _, err := svc.ResolveWeeklySchedule(ctx); err != nil {
+		t.Fatalf("ResolveWeeklySchedule (seed): %v", err)
+	}
+
 	const goroutines = 8
 	var (
 		wg   sync.WaitGroup
