@@ -125,6 +125,35 @@ func TestWeekPlan_ClearDeloadFromToday(t *testing.T) {
 	}
 }
 
+// Rest-day placeholders (no slots) must NOT be touched by the deload
+// mutators: a placeholder with IsDeload=true would no longer satisfy the
+// repository's rest-day-placeholder predicate, and the reinsert pass would
+// try to write a workout_sessions row with empty PeriodizationType — failing
+// the schema's CHECK constraint. This test pins the protection.
+func TestWeekPlan_FlipAndClearDeloadFromToday_SkipRestDayPlaceholders(t *testing.T) {
+	t.Parallel()
+	wp := newWeekPlan()
+	// Tuesday: pure rest-day placeholder, no slots, no lifecycle.
+	wp.Sessions[1] = domain.Session{Date: monday().AddDate(0, 0, 1)} //nolint:exhaustruct // placeholder.
+
+	if err := wp.FlipDeloadFromToday(monday()); err != nil {
+		t.Fatalf("FlipDeloadFromToday: %v", err)
+	}
+	if wp.Sessions[1].IsDeload {
+		t.Error("rest-day placeholder must not flip to IsDeload=true")
+	}
+
+	// Even with IsDeload pre-set (shouldn't happen in practice), Clear must
+	// leave a slot-less session untouched too — it has no exercises to deload.
+	wp.Sessions[1].IsDeload = true
+	if err := wp.ClearDeloadFromToday(monday()); err != nil {
+		t.Fatalf("ClearDeloadFromToday: %v", err)
+	}
+	if !wp.Sessions[1].IsDeload {
+		t.Error("rest-day placeholder must not be touched by Clear (no slots = no-op)")
+	}
+}
+
 func TestWeekPlan_Dispatchers_NotFound(t *testing.T) {
 	t.Parallel()
 	wp := newWeekPlan()
