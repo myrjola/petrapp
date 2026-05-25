@@ -23,6 +23,14 @@ const (
 	defaultMesocycleLength = 5
 )
 
+// Anchor IDs match the panel <h2 id="..."> values. Handlers use these to
+// anchor flash entries and to build redirect fragments so the user lands
+// inside the panel they were editing.
+const (
+	scheduleAnchor = "schedule-title"
+	deloadAnchor   = "deload-title"
+)
+
 type weekdayPreference struct {
 	ID      string // lowercase ID for form field name
 	Name    string // Display name
@@ -146,8 +154,6 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "preferences", data)
 }
 
-const scheduleAnchor = "schedule-title"
-
 // preferencesScheduleSavePOST persists the weekday-minutes selection. On
 // success, the user is redirected to home so they see the regenerated week.
 func (app *application) preferencesScheduleSavePOST(w http.ResponseWriter, r *http.Request) {
@@ -190,8 +196,6 @@ func (app *application) preferencesScheduleSavePOST(w http.ResponseWriter, r *ht
 
 	redirect(w, r, "/")
 }
-
-const deloadAnchor = "deload-title"
 
 // preferencesDeloadSavePOST persists the deload-enable toggle and mesocycle
 // length. On success, the user lands at the recovery panel with a success
