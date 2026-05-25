@@ -58,6 +58,7 @@
                     line-height: 1.15;
                     color: var(--color-text-primary);
                     letter-spacing: -0.005em;
+                    scroll-margin-top: var(--size-5);
                 }
 
                 .panel-blurb {
@@ -355,6 +356,8 @@
                 <p class="panel-blurb">Pick a session length for each day. Rest days are honored — no plan, no nag.</p>
             </header>
 
+            {{ template "banner" (index $.FlashByPanel "schedule-title") }}
+
             <ul class="day-list">
                 {{ range .Weekdays }}
                     <li class="day-row {{ if eq .Minutes 0 }}day-row--rest{{ end }}">
@@ -385,6 +388,8 @@
                 <h2 class="panel-title" id="notif-title">Rest timer pings</h2>
                 <p class="panel-blurb">Get a push when each set's rest period ends, so you can stay off your screen between sets.</p>
             </header>
+
+            {{ template "banner" (index $.FlashByPanel "notif-title") }}
 
             <div data-rest-notifications data-vapid-key="{{ .VAPIDPublicKey }}"
                  data-sub-count="{{ .PushSubscriptionCount }}">
@@ -588,6 +593,8 @@
                 <h2 class="panel-title" id="deload-title">Deload cycles</h2>
                 <p class="panel-blurb">Planned recovery weeks back off intensity and volume so the next block starts fresh — the goal is recovery, not progress.</p>
             </header>
+
+            {{ template "banner" (index $.FlashByPanel "deload-title") }}
 
             <form method="post" action="/preferences" class="stack">
                 <label class="toggle-card">

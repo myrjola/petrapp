@@ -48,6 +48,7 @@ type preferencesTemplateData struct {
 	MesocycleLengthOptions   []int
 	MesocycleAnchor          time.Time
 	Flash                    BannerData
+	FlashByPanel             map[string]BannerData
 }
 
 func getWorkoutDurationOptions() []workoutDurationOption {
@@ -111,6 +112,17 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 
 	base := newBaseTemplateData(r)
 	flash := app.popFlash(ctx)
+	pageTopFlash := BannerData{Variant: "", Message: "", Nonce: base.Nonce}
+	flashByPanel := map[string]BannerData{}
+	if flash.Message != "" {
+		bd := BannerData{Variant: flash.Variant, Message: flash.Message, Nonce: base.Nonce}
+		if flash.Anchor == "" {
+			pageTopFlash = bd
+		} else {
+			flashByPanel[flash.Anchor] = bd
+		}
+	}
+
 	data := preferencesTemplateData{
 		BaseTemplateData: base,
 		Header: PageHeaderData{
@@ -127,11 +139,8 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		MesocycleLength:          prefs.MesocycleLength,
 		MesocycleLengthOptions:   []int{4, 5, 6, 7},
 		MesocycleAnchor:          prefs.MesocycleAnchor,
-		Flash: BannerData{
-			Variant: flash.Variant,
-			Message: flash.Message,
-			Nonce:   base.Nonce,
-		},
+		Flash:                    pageTopFlash,
+		FlashByPanel:             flashByPanel,
 	}
 
 	app.render(w, r, http.StatusOK, "preferences", data)
