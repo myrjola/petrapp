@@ -13,8 +13,7 @@ import (
 
 // RegenerateWeeklyPlanIfUnstarted replaces the current week's plan when no
 // session has been started yet. Atomic via WeekPlanRepository.Update — the
-// AnyStarted check and the replacement happen in one transaction, closing the
-// race window the old userMutex existed to mitigate.
+// AnyStarted check and the replacement happen in one transaction.
 //
 // Treats ErrNotFound as a no-op: a missing week has by definition no started
 // session, so there is nothing to regenerate. This keeps callers

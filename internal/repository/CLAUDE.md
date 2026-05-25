@@ -7,19 +7,33 @@ template logic, no business orchestration.
 
 ## What lives here
 
-- **SQLite implementations** of the seven repository contracts:
-  `SessionRepository`, `ExerciseRepository`, `PreferencesRepository`,
-  `FeatureFlagRepository`, `MuscleGroupTargetRepository`,
-  `PushSubscriptionRepository`, `ScheduledPushRepository`. Implementations
-  are unexported (`sqliteSessionRepository`, etc.).
+- **SQLite implementations** of the eight repository contracts:
+  `WeekPlanRepository`, `SessionRepository`, `ExerciseRepository`,
+  `PreferencesRepository`, `FeatureFlagRepository`,
+  `MuscleGroupTargetRepository`, `PushSubscriptionRepository`,
+  `ScheduledPushRepository`. Implementations are unexported
+  (`sqliteWeekPlanRepository`, `sqliteSessionRepository`, etc.).
+  `WeekPlanRepository` owns workout writes at week scope; `SessionRepository`
+  is read-only (see "Update closure contract" below).
 - **The `Repositories` composite struct** plus the single public
   constructor `New(db *sqlite.Database) *Repositories` that wires every
   repository together.
-- **Shared helpers** in `shared.go`: `parseTimestamp`, `formatTimestamp`,
-  `formatDate`, the `queryer` interface, `fetchMuscleGroupsByExerciseID`
-  (batched muscle-group hydration shared by the exercise and session
-  repositories), the `baseRepository` mixin, and the timestamp/date
-  format constants.
+- **Shared helpers** in `shared.go`:
+  - Format primitives — `parseTimestamp`, `formatTimestamp`, `formatDate`,
+    the `queryer` interface, the `baseRepository` mixin, and the
+    timestamp/date format constants.
+  - `fetchMuscleGroupsByExerciseID` — batched muscle-group hydration
+    shared by the exercise and session reads.
+  - Session-shaped persistence on `baseRepository` (write helpers in
+    `shared.go`, read helpers in `sessions.go`): `insertSessionRowInTx`,
+    `saveOneSlotInTx`, `saveExerciseSetsInTx` (per-session two-pass:
+    explicit-ID slots before auto-ID slots), `insertSessionInTx` (the
+    composite of row + sets), `deleteWeekInTx`, plus read-side
+    `listSessionRows`, `listSessionRowsBetween`, and
+    `loadExerciseSetsSince`. Shared by `WeekPlanRepository.Update`'s
+    three-pass reinsert and the `SessionRepository` reads. If a third
+    repository starts using them, consider splitting into a dedicated
+    `session_persistence.go`.
 
 ## What does NOT live here
 
