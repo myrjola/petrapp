@@ -112,16 +112,58 @@ func redirectReplace(w http.ResponseWriter, r *http.Request, path string) {
 	http.Redirect(w, r, path, http.StatusSeeOther) //nolint:gosec // G710: path is handler-chosen, never user input.
 }
 
-const flashErrorKey = "flash_error"
+const flashKey = "flash"
 
-// putFlashError stores a flash error message in the session to be displayed on the next page load.
-func (app *application) putFlashError(ctx context.Context, message string) {
-	app.sessionManager.Put(ctx, flashErrorKey, message)
+// flashEntry is the session-backed flash payload. Variant is one of
+// BannerVariantError, BannerVariantSuccess, BannerVariantInfo. Anchor is the
+// id of the panel that should render the banner; empty Anchor means the page-
+// top slot.
+type flashEntry struct {
+	Variant string
+	Message string
+	Anchor  string
 }
 
-// popFlashError retrieves and removes the flash error message from the session.
-func (app *application) popFlashError(ctx context.Context) string {
-	return app.sessionManager.PopString(ctx, flashErrorKey)
+// putFlash stores a typed flash entry in the session for the next page load.
+func (app *application) putFlash(ctx context.Context, variant, message, anchor string) {
+	app.sessionManager.Put(ctx, flashKey, flashEntry{
+		Variant: variant,
+		Message: message,
+		Anchor:  anchor,
+	})
+}
+
+// putFlashError is the legacy shim for the page-top error banner. Prefer
+// putFlashErrorWithAnchor or putFlashSuccess for new code.
+func (app *application) putFlashError(ctx context.Context, message string) {
+	app.putFlash(ctx, BannerVariantError, message, "")
+}
+
+// putFlashErrorWithAnchor sets an error flash bound to a specific panel id.
+//
+//nolint:unused // wired up in later tasks of the preferences-scroll-and-flash plan.
+func (app *application) putFlashErrorWithAnchor(ctx context.Context, message, anchor string) {
+	app.putFlash(ctx, BannerVariantError, message, anchor)
+}
+
+// putFlashSuccess sets a success flash bound to a specific panel id.
+// Pass an empty anchor for the page-top slot.
+func (app *application) putFlashSuccess(ctx context.Context, message, anchor string) {
+	app.putFlash(ctx, BannerVariantSuccess, message, anchor)
+}
+
+// popFlash retrieves and removes the flash entry from the session. Returns a
+// zero-value flashEntry when nothing is stored.
+func (app *application) popFlash(ctx context.Context) flashEntry {
+	raw := app.sessionManager.Pop(ctx, flashKey)
+	if raw == nil {
+		return flashEntry{}
+	}
+	entry, ok := raw.(flashEntry)
+	if !ok {
+		return flashEntry{}
+	}
+	return entry
 }
 
 // parseDateParam parses the "date" path parameter from the request URL.

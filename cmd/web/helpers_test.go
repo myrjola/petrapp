@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/gob"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 // each test gets a fresh empty store.
 func newTestSessionManager(t *testing.T) *scs.SessionManager {
 	t.Helper()
+	gob.Register(flashEntry{}) //nolint:exhaustruct // gob.Register only needs the type, value fields are unused.
 	sm := scs.New()
 	sm.Store = memstore.New()
 	return sm
@@ -235,7 +237,7 @@ func Test_userError_ValidationError_FlashesAndRedirects(t *testing.T) {
 		t.Errorf("Location = %q, want /safe", got)
 	}
 	// The flash must be populated for the safe URL's GET to surface the banner.
-	if got := app.popFlashError(r.Context()); got != "Name must be 1–50 characters." {
+	if got := app.popFlash(r.Context()).Message; got != "Name must be 1–50 characters." {
 		t.Errorf("flash = %q, want validation message", got)
 	}
 }
@@ -271,8 +273,60 @@ func Test_userError_NonValidation_StackNav_DelegatesToServerError(t *testing.T) 
 	}
 	// Flash must NOT be populated — the banner-on-safe-URL UX is intentionally
 	// abandoned for non-validation errors.
-	if got := app.popFlashError(r.Context()); got != "" {
+	if got := app.popFlash(r.Context()).Message; got != "" {
 		t.Errorf("flash = %q, want empty (non-validation must not flash)", got)
+	}
+}
+
+func TestPutFlashSuccess_PopFlashRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	app := &application{ //nolint:exhaustruct // only sessionManager is touched.
+		logger:         slog.New(slog.DiscardHandler),
+		sessionManager: newTestSessionManager(t),
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx, err := app.sessionManager.Load(r.Context(), "")
+	if err != nil {
+		t.Fatalf("session load: %v", err)
+	}
+
+	app.putFlashSuccess(ctx, "Saved.", "deload-title")
+
+	entry := app.popFlash(ctx)
+	if entry.Variant != BannerVariantSuccess {
+		t.Errorf("Variant = %q, want %q", entry.Variant, BannerVariantSuccess)
+	}
+	if entry.Message != "Saved." {
+		t.Errorf("Message = %q, want %q", entry.Message, "Saved.")
+	}
+	if entry.Anchor != "deload-title" {
+		t.Errorf("Anchor = %q, want %q", entry.Anchor, "deload-title")
+	}
+	if got := app.popFlash(ctx); got != (flashEntry{}) { //nolint:exhaustruct // zero-value comparison.
+		t.Errorf("second pop should be empty, got %+v", got)
+	}
+}
+
+func TestPutFlashError_LegacySignatureStillWorks(t *testing.T) {
+	t.Parallel()
+
+	app := &application{ //nolint:exhaustruct // only sessionManager is touched.
+		logger:         slog.New(slog.DiscardHandler),
+		sessionManager: newTestSessionManager(t),
+	}
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx, err := app.sessionManager.Load(r.Context(), "")
+	if err != nil {
+		t.Fatalf("session load: %v", err)
+	}
+
+	app.putFlashError(ctx, "Boom.")
+	entry := app.popFlash(ctx)
+	if entry.Variant != BannerVariantError || entry.Message != "Boom." || entry.Anchor != "" {
+		t.Errorf("entry = %+v, want {error, Boom., \"\"}", entry)
 	}
 }
 

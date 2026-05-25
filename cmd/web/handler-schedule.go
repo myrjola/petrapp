@@ -23,6 +23,7 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := newBaseTemplateData(r)
+	flash := app.popFlash(ctx)
 	data := scheduleTemplateData{
 		BaseTemplateData: base,
 		Header: PageHeaderData{
@@ -33,8 +34,8 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 		Weekdays:        preferencesToWeekdays(prefs),
 		DurationOptions: getWorkoutDurationOptions(),
 		Flash: BannerData{
-			Variant: BannerVariantError,
-			Message: app.popFlashError(ctx),
+			Variant: flash.Variant,
+			Message: flash.Message,
 			Nonce:   base.Nonce,
 		},
 	}

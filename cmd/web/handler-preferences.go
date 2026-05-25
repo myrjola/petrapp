@@ -110,6 +110,7 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := newBaseTemplateData(r)
+	flash := app.popFlash(ctx)
 	data := preferencesTemplateData{
 		BaseTemplateData: base,
 		Header: PageHeaderData{
@@ -127,8 +128,8 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 		MesocycleLengthOptions:   []int{4, 5, 6, 7},
 		MesocycleAnchor:          prefs.MesocycleAnchor,
 		Flash: BannerData{
-			Variant: BannerVariantError,
-			Message: app.popFlashError(ctx),
+			Variant: flash.Variant,
+			Message: flash.Message,
 			Nonce:   base.Nonce,
 		},
 	}

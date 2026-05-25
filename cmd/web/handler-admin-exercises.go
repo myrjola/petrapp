@@ -83,6 +83,7 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 	}
 
 	base := newBaseTemplateData(r)
+	flash := app.popFlash(r.Context())
 	data := exerciseAdminTemplateData{
 		BaseTemplateData: base,
 		Header: PageHeaderData{
@@ -91,8 +92,8 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 			Nonce:    base.Nonce,
 		},
 		Flash: BannerData{
-			Variant: BannerVariantError,
-			Message: app.popFlashError(r.Context()),
+			Variant: flash.Variant,
+			Message: flash.Message,
 			Nonce:   base.Nonce,
 		},
 		Exercises: rows,
@@ -144,6 +145,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 	}
 
 	base := newBaseTemplateData(r)
+	flash := app.popFlash(r.Context())
 	data := exerciseEditTemplateData{
 		BaseTemplateData: base,
 		Header: PageHeaderData{
@@ -152,8 +154,8 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 			Nonce:    base.Nonce,
 		},
 		Flash: BannerData{
-			Variant: BannerVariantError,
-			Message: app.popFlashError(r.Context()),
+			Variant: flash.Variant,
+			Message: flash.Message,
 			Nonce:   base.Nonce,
 		},
 		Exercise: exercise,

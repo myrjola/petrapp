@@ -27,9 +27,10 @@ func (app *application) devErrorUXGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := newBaseTemplateData(r)
+	popped := app.popFlash(r.Context())
 	flash := BannerData{
-		Variant: BannerVariantError,
-		Message: app.popFlashError(r.Context()),
+		Variant: popped.Variant,
+		Message: popped.Message,
 		Nonce:   base.Nonce,
 	}
 	data := errorUXTemplateData{

@@ -150,7 +150,8 @@ func (app *application) workoutStartPOST(w http.ResponseWriter, r *http.Request)
 	// Start the workout session
 	if err := app.service.StartSession(r.Context(), date); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			data := newWorkoutNotFoundTemplateData(r, date, app.popFlashError(r.Context()))
+			flash := app.popFlash(r.Context())
+			data := newWorkoutNotFoundTemplateData(r, date, flash.Message)
 			app.render(w, r, http.StatusNotFound, "workout-not-found", data)
 			return
 		}
@@ -174,7 +175,8 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Check if the workout doesn't exist
 		if errors.Is(err, domain.ErrNotFound) {
-			data := newWorkoutNotFoundTemplateData(r, date, app.popFlashError(r.Context()))
+			flash := app.popFlash(r.Context())
+			data := newWorkoutNotFoundTemplateData(r, date, flash.Message)
 			app.render(w, r, http.StatusNotFound, "workout-not-found", data)
 			return
 		}
@@ -182,7 +184,8 @@ func (app *application) workoutGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := newWorkoutTemplateData(r, date, session, app.popFlashError(r.Context()))
+	flash := app.popFlash(r.Context())
+	data := newWorkoutTemplateData(r, date, session, flash.Message)
 
 	app.render(w, r, http.StatusOK, "workout", data)
 }
