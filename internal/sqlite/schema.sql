@@ -113,36 +113,41 @@ CREATE TABLE workout_sessions
     PRIMARY KEY (user_id, workout_date)
 ) WITHOUT ROWID, STRICT;
 
-CREATE TABLE workout_exercise
+CREATE TABLE workout_exercises
 (
-    id                  INTEGER PRIMARY KEY,
     workout_user_id     INTEGER NOT NULL,
     workout_date        TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
+    position            INTEGER NOT NULL CHECK (position >= 0),
     exercise_id         INTEGER NOT NULL,
     warmup_completed_at TEXT CHECK (warmup_completed_at IS NULL OR
                                     STRFTIME('%Y-%m-%dT%H:%M:%fZ', warmup_completed_at) = warmup_completed_at),
 
+    PRIMARY KEY (workout_user_id, workout_date, position),
     UNIQUE (workout_user_id, workout_date, exercise_id),
     FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
-) STRICT;
+) WITHOUT ROWID, STRICT;
 
 -- Supports lookups of an exercise's history across workouts, e.g. latest starting weight.
-CREATE INDEX workout_exercise_user_exercise_date_idx
-    ON workout_exercise (workout_user_id, exercise_id, workout_date);
+CREATE INDEX workout_exercises_user_exercise_date_idx
+    ON workout_exercises (workout_user_id, exercise_id, workout_date);
 
 CREATE TABLE exercise_sets
 (
-    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercise (id) ON DELETE CASCADE,
-    set_number          INTEGER NOT NULL CHECK (set_number > 0),
-    weight_kg           REAL,
-    target_value        INTEGER NOT NULL CHECK (target_value > 0),
-    completed_value     INTEGER CHECK (completed_value IS NULL OR completed_value >= 0),
-    completed_at        TEXT CHECK (completed_at IS NULL OR
-                                    STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
-    signal              TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
+    workout_user_id INTEGER NOT NULL,
+    workout_date    TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
+    position        INTEGER NOT NULL,
+    set_number      INTEGER NOT NULL CHECK (set_number > 0),
+    weight_kg       REAL,
+    target_value    INTEGER NOT NULL CHECK (target_value > 0),
+    completed_value INTEGER CHECK (completed_value IS NULL OR completed_value >= 0),
+    completed_at    TEXT CHECK (completed_at IS NULL OR
+                                STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
+    signal          TEXT CHECK (signal IS NULL OR signal IN ('too_heavy', 'on_target', 'too_light')),
 
-    PRIMARY KEY (workout_exercise_id, set_number)
+    PRIMARY KEY (workout_user_id, workout_date, position, set_number),
+    FOREIGN KEY (workout_user_id, workout_date, position)
+        REFERENCES workout_exercises (workout_user_id, workout_date, position) ON DELETE CASCADE
 ) WITHOUT ROWID, STRICT;
 
 CREATE TABLE muscle_groups
@@ -194,15 +199,19 @@ CREATE INDEX push_subscriptions_user_id ON push_subscriptions (user_id);
 
 CREATE TABLE scheduled_pushes
 (
-    id                  INTEGER PRIMARY KEY,
-    user_id             INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercise (id) ON DELETE CASCADE,
-    fire_at             TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', fire_at) = fire_at),
-    payload             TEXT    NOT NULL CHECK (LENGTH(payload) < 2048),
-    created_at          TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
-        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at)
+    id              INTEGER PRIMARY KEY,
+    workout_user_id INTEGER NOT NULL,
+    workout_date    TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
+    position        INTEGER NOT NULL,
+    fire_at         TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', fire_at) = fire_at),
+    payload         TEXT    NOT NULL CHECK (LENGTH(payload) < 2048),
+    created_at      TEXT    NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at),
+
+    FOREIGN KEY (workout_user_id, workout_date, position)
+        REFERENCES workout_exercises (workout_user_id, workout_date, position) ON DELETE CASCADE
 ) STRICT;
 
-CREATE UNIQUE INDEX scheduled_pushes_workout_exercise_id
-    ON scheduled_pushes (workout_exercise_id);
+CREATE UNIQUE INDEX scheduled_pushes_slot_uidx
+    ON scheduled_pushes (workout_user_id, workout_date, position);
 CREATE INDEX scheduled_pushes_fire_at ON scheduled_pushes (fire_at);

@@ -149,15 +149,15 @@ func (app *application) parseForm(w http.ResponseWriter, r *http.Request, maxByt
 	return true
 }
 
-// parseWorkoutExerciseIDParam parses the "workoutExerciseID" path parameter from
-// the request URL. Returns the parsed ID and true on success, or zero and false
-// on failure (sending HTTP 404 automatically).
-func (app *application) parseWorkoutExerciseIDParam(w http.ResponseWriter, r *http.Request) (int, bool) {
-	idStr := r.PathValue("workoutExerciseID")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
+// parsePositionParam parses the "position" path parameter from the request
+// URL. Returns the parsed position and true on success, or zero and false on
+// failure (sending HTTP 404 automatically). Negative values are rejected.
+func (app *application) parsePositionParam(w http.ResponseWriter, r *http.Request) (int, bool) {
+	posStr := r.PathValue("position")
+	pos, err := strconv.Atoi(posStr)
+	if err != nil || pos < 0 {
 		app.notFound(w, r)
 		return 0, false
 	}
-	return id, true
+	return pos, true
 }

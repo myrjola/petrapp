@@ -317,8 +317,33 @@ func TestDatabase_preMigrateWorkoutPositions(t *testing.T) {
 		t.Fatalf("idempotent re-run: %v", err)
 	}
 
-	// The migrateTo no-op assertion is enabled in Task 14, once schema.sql is updated
-	// to the post-premigration shape. Until then, the declarative migrator sees a
-	// shape mismatch (workout_exercises exists but schema.sql still has workout_exercise).
-	_ = schemaDefinition
+	// Clear data from the trimmed-down legacy tables (users, exercises,
+	// workout_sessions) so the declarative migrator can reshape them to match
+	// the live schema without tripping on NOT NULL columns that the legacy
+	// rows don't carry. CASCADE clears the workout_exercises/exercise_sets
+	// rows we just migrated, but they have been asserted above. The migrateTo
+	// call below confirms the post-premigration workout-table shape matches
+	// the live schema (it would surface as a "migrating table" log if not).
+	if _, err = db.ReadWrite.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		t.Fatalf("disable foreign keys: %v", err)
+	}
+	for _, stmt := range []string{
+		`DELETE FROM scheduled_pushes`,
+		`DELETE FROM exercise_sets`,
+		`DELETE FROM workout_exercises`,
+		`DELETE FROM workout_sessions`,
+		`DELETE FROM exercises`,
+		`DELETE FROM users`,
+	} {
+		if _, execErr := db.ReadWrite.ExecContext(ctx, stmt); execErr != nil {
+			t.Fatalf("clear legacy rows %q: %v", stmt, execErr)
+		}
+	}
+
+	// migrateTo against the live schema reshapes the trimmed legacy tables
+	// (users, exercises, workout_sessions) to their full shape but must not
+	// touch the workout-related tables — they already match.
+	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
+		t.Fatalf("migrateTo: %v", err)
+	}
 }

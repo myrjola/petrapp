@@ -22,7 +22,7 @@ import (
 // it, keeping the dependency graph clean.
 type PushScheduler interface {
 	Schedule(ctx context.Context, push domain.ScheduledPush) error
-	Cancel(ctx context.Context, workoutExerciseID int) error
+	Cancel(ctx context.Context, userID int, date time.Time, pos int) error
 	CancelForWorkout(ctx context.Context, userID int, date time.Time) error
 }
 

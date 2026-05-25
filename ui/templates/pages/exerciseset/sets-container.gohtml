@@ -421,7 +421,7 @@
                             <span>{{ $.CurrentSetTarget.TargetReps }}<span class="unit">reps</span></span>
                         </div>
                         <form method="post"
-                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.Position }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
                               class="set-form"
                               aria-label="Complete current set">
@@ -547,7 +547,7 @@
                             }
                         </style>
                         <form method="post"
-                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.Position }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
                               class="set-form timed-form"
                               aria-label="Complete current hold">
@@ -742,7 +742,7 @@
                             <span>{{ $setDisplay.TargetStr }}<span class="unit">{{ $setDisplay.Unit }}</span></span>
                         </div>
                         <form method="post"
-                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.ExerciseSet.ID }}/sets/{{ $index }}/update"
+                              action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.Position }}/sets/{{ $index }}/update"
                               id="form-{{ $index }}"
                               class="set-form bodyweight-form"
                               aria-label="Complete current set">

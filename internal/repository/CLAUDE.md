@@ -26,12 +26,13 @@ template logic, no business orchestration.
     shared by the exercise and session reads.
   - Session-shaped persistence on `baseRepository` (write helpers in
     `shared.go`, read helpers in `sessions.go`): `insertSessionRowInTx`,
-    `saveOneSlotInTx`, `saveExerciseSetsInTx` (per-session two-pass:
-    explicit-ID slots before auto-ID slots), `insertSessionInTx` (the
-    composite of row + sets), `deleteWeekInTx`, plus read-side
+    `saveOneSlotInTx` (writes one slot at a caller-supplied position),
+    `saveExerciseSetsInTx` (single pass over `Session.ExerciseSets`,
+    passing each slot's array index as `position`), `insertSessionInTx`
+    (the composite of row + sets), `deleteWeekInTx`, plus read-side
     `listSessionRows`, `listSessionRowsBetween`, and
     `loadExerciseSetsSince`. Shared by `WeekPlanRepository.Update`'s
-    three-pass reinsert and the `SessionRepository` reads. If a third
+    single-pass reinsert and the `SessionRepository` reads. If a third
     repository starts using them, consider splitting into a dedicated
     `session_persistence.go`.
 
@@ -46,7 +47,7 @@ template logic, no business orchestration.
 - Tests of business behaviour — those belong in `internal/domain` (pure
   unit) or `internal/service` (orchestration/e2e). Repository tests
   cover repository-shape contracts: round-trip persistence, error
-  translation, slot-ID stability across `Update`.
+  translation, slot-position stability across `Update`.
 
 ## Update closure contract
 
@@ -71,21 +72,19 @@ transactional boundary at week scope.
 
 `WeekPlanRepository.Update` persists by deleting every
 `workout_sessions` row in `[monday, monday+6]` inside the tx (CASCADE
-clears `workout_exercise` and `exercise_sets`) and re-inserting the
-sessions across three passes — session rows, explicit-ID slots, then
-auto-assign slots — so SQLite's rowid auto-assignment never collides
-with a preserved `workout_exercise.id`. Pre-existing `ExerciseSet.ID`
-values are passed back into `INSERT ... RETURNING id` so URL-stable
-slot IDs survive the cycle. New slots (ID == 0) get auto-assigned IDs.
-For PetrApp's data sizes (a handful of exercises × a handful of sets
-per session) the cost is negligible and the simplicity is worth the
-trade.
+clears `workout_exercises` and `exercise_sets`) and re-inserting the
+sessions in a single pass. Slot identity is the array index in
+`Session.ExerciseSets`, written into the row's `position` column —
+there is no autoincrement, so the order in which slots are inserted
+does not matter and there is nothing for SQLite to collide on. For
+PetrApp's data sizes (a handful of exercises × a handful of sets per
+session) the cost is negligible and the simplicity is worth the trade.
 
 ## Hydration policy
 
 `SessionRepository.Get` and `List` always populate `ExerciseSet.Exercise`
 inline: the base exercise columns are joined in via
-`workout_exercise.exercise_id → exercises.id`, and primary/secondary
+`workout_exercises.exercise_id → exercises.id`, and primary/secondary
 muscle groups are fetched in a single follow-up query keyed by the
 deduped exercise IDs. `Get` costs two read queries on top of the session
 row (the sets+exercise join plus the batched muscle-group fetch).
@@ -130,8 +129,9 @@ SQL-shaped contract, not the business rule.
   - Update-closure semantics — on `nil` from the closure the change
     persists; on a returned error the transaction rolls back and the
     on-disk state is unchanged.
-  - Slot-ID stability — pre-existing `ExerciseSet.ID` values survive the
-    delete-and-reinsert cycle inside `WeekPlanRepository.Update`.
+  - Slot-position stability — each slot's array index in
+    `Session.ExerciseSets` survives the delete-and-reinsert cycle inside
+    `WeekPlanRepository.Update`, including across `SwapExerciseInSlot`.
 - **What NOT to test here:** business rules and aggregate invariants
   (those live in `internal/domain/`), and end-to-end orchestration
   across multiple aggregates (that lives in `internal/service/`).

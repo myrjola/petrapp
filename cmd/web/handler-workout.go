@@ -283,7 +283,7 @@ func newWorkoutExerciseView(index int, es domain.ExerciseSet) workoutExerciseVie
 		subLine = fmt.Sprintf("%d / %d sets done", completedSets, len(es.Sets))
 	}
 	return workoutExerciseView{
-		ID:                es.ID,
+		ID:                index,
 		Index:             index,
 		Name:              es.Exercise.Name,
 		State:             es.CompletionState(),
@@ -332,14 +332,14 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	workoutExerciseID, ok := app.parseWorkoutExerciseIDParam(w, r)
+	pos, ok := app.parsePositionParam(w, r)
 	if !ok {
 		return
 	}
 
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
-	current, candidates, err := app.service.ListSwapCandidates(r.Context(), date, workoutExerciseID, query)
+	current, candidates, err := app.service.ListSwapCandidates(r.Context(), date, pos, query)
 	if err != nil {
 		if errors.Is(err, domain.ErrSlotNotFound) {
 			app.notFound(w, r)
@@ -355,7 +355,7 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	for _, ex := range candidates {
 		cards = append(cards, ExerciseResultCardData{
 			Exercise:        ex,
-			FormAction:      fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, workoutExerciseID),
+			FormAction:      fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, pos),
 			FieldName:       "new_exercise_id",
 			ButtonLabel:     "Swap to this exercise",
 			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
@@ -364,13 +364,13 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	}
 
 	data := exerciseSwapTemplateData{
-		BaseTemplateData:  base,
-		Date:              date,
-		Header:            PageHeaderData{Title: "Swap Exercise", Subtitle: "", Nonce: base.Nonce},
-		WorkoutExerciseID: workoutExerciseID,
-		CurrentExercise:   current,
-		Cards:             cards,
-		Query:             query,
+		BaseTemplateData: base,
+		Date:             date,
+		Header:           PageHeaderData{Title: "Swap Exercise", Subtitle: "", Nonce: base.Nonce},
+		Position:         pos,
+		CurrentExercise:  current,
+		Cards:            cards,
+		Query:            query,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-swap", data)
@@ -383,7 +383,7 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	workoutExerciseID, ok := app.parseWorkoutExerciseIDParam(w, r)
+	pos, ok := app.parsePositionParam(w, r)
 	if !ok {
 		return
 	}
@@ -404,25 +404,24 @@ func (app *application) workoutSwapExercisePOST(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err = app.service.SwapExercise(r.Context(), date, workoutExerciseID, newExerciseID); err != nil {
+	if err = app.service.SwapExercise(r.Context(), date, pos, newExerciseID); err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// URL keeps the same workoutExerciseID so any back-navigation still hits this slot.
-	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), workoutExerciseID))
+	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d", date.Format("2006-01-02"), pos))
 }
 
 // exerciseSwapTemplateData contains data for the exercise swap template.
 type exerciseSwapTemplateData struct {
 	BaseTemplateData
 
-	Date              time.Time
-	Header            PageHeaderData
-	WorkoutExerciseID int
-	CurrentExercise   domain.Exercise
-	Cards             []ExerciseResultCardData
-	Query             string
+	Date            time.Time
+	Header          PageHeaderData
+	Position        int
+	CurrentExercise domain.Exercise
+	Cards           []ExerciseResultCardData
+	Query           string
 }
 
 // exerciseAddTemplateData contains data for the exercise add template.
@@ -532,9 +531,9 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Add exercise to the workout and capture the new slot ID so we can
-	// land the user straight on the new exercise's detail page.
-	newWorkoutExerciseID, err := app.service.AddExercise(r.Context(), date, exerciseID)
+	// Add exercise to the workout and capture the new slot's position so we
+	// can land the user straight on the new exercise's detail page.
+	newPos, err := app.service.AddExercise(r.Context(), date, exerciseID)
 	if err != nil {
 		workoutURL := fmt.Sprintf("/workouts/%s", date.Format("2006-01-02"))
 		app.userError(w, r, err, workoutURL)
@@ -544,5 +543,5 @@ func (app *application) workoutAddExercisePOST(w http.ResponseWriter, r *http.Re
 	// Replace /add-exercise with the new exercise's detail page so back
 	// goes to the workout overview rather than the picker.
 	redirectReplace(w, r, fmt.Sprintf("/workouts/%s/exercises/%d",
-		date.Format("2006-01-02"), newWorkoutExerciseID))
+		date.Format("2006-01-02"), newPos))
 }

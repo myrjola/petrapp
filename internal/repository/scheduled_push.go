@@ -19,21 +19,22 @@ func newSQLiteScheduledPushRepository(db *sqlite.Database) *sqliteScheduledPushR
 	return &sqliteScheduledPushRepository{baseRepository: newBaseRepository(db)}
 }
 
-// Replace upserts the row for the given workout_exercise_id. The UNIQUE index
-// on workout_exercise_id enforces the one-pending-push-per-slot invariant.
+// Replace upserts the row for the given slot. The UNIQUE index on
+// (workout_user_id, workout_date, position) enforces the
+// one-pending-push-per-slot invariant.
 func (r *sqliteScheduledPushRepository) Replace(
 	ctx context.Context, push domain.ScheduledPush,
 ) (domain.ScheduledPush, error) {
 	var createdAt sql.NullString
 	err := r.db.ReadWrite.QueryRowContext(ctx, `
-		INSERT INTO scheduled_pushes (user_id, workout_exercise_id, fire_at, payload)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT (workout_exercise_id) DO UPDATE SET
-		    user_id = excluded.user_id,
+		INSERT INTO scheduled_pushes (workout_user_id, workout_date, position, fire_at, payload)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (workout_user_id, workout_date, position) DO UPDATE SET
 		    fire_at = excluded.fire_at,
 		    payload = excluded.payload
 		RETURNING id, created_at`,
-		push.UserID, push.WorkoutExerciseID, formatTimestamp(push.FireAt), push.Payload,
+		push.UserID, formatDate(push.WorkoutDate), push.Position,
+		formatTimestamp(push.FireAt), push.Payload,
 	).Scan(&push.ID, &createdAt)
 	if err != nil {
 		return domain.ScheduledPush{}, fmt.Errorf("upsert scheduled push: %w", err)
@@ -53,11 +54,15 @@ func (r *sqliteScheduledPushRepository) Delete(ctx context.Context, id int) erro
 	return nil
 }
 
-func (r *sqliteScheduledPushRepository) DeleteByWorkoutExercise(ctx context.Context, workoutExerciseID int) error {
-	if _, err := r.db.ReadWrite.ExecContext(ctx,
-		`DELETE FROM scheduled_pushes WHERE workout_exercise_id = ?`, workoutExerciseID,
+func (r *sqliteScheduledPushRepository) DeleteBySlot(
+	ctx context.Context, userID int, date time.Time, pos int,
+) error {
+	if _, err := r.db.ReadWrite.ExecContext(ctx, `
+		DELETE FROM scheduled_pushes
+		WHERE workout_user_id = ? AND workout_date = ? AND position = ?`,
+		userID, formatDate(date), pos,
 	); err != nil {
-		return fmt.Errorf("delete scheduled push by workout_exercise: %w", err)
+		return fmt.Errorf("delete scheduled push by slot: %w", err)
 	}
 	return nil
 }
@@ -67,34 +72,37 @@ func (r *sqliteScheduledPushRepository) DeleteByWorkoutSession(
 ) error {
 	if _, err := r.db.ReadWrite.ExecContext(ctx, `
 		DELETE FROM scheduled_pushes
-		WHERE workout_exercise_id IN (
-		    SELECT id FROM workout_exercise
-		    WHERE workout_user_id = ? AND workout_date = ?
-		)`, userID, formatDate(date),
+		WHERE workout_user_id = ? AND workout_date = ?`,
+		userID, formatDate(date),
 	); err != nil {
 		return fmt.Errorf("delete scheduled pushes by session: %w", err)
 	}
 	return nil
 }
 
-func (r *sqliteScheduledPushRepository) Get(
-	ctx context.Context, workoutExerciseID int,
+func (r *sqliteScheduledPushRepository) GetBySlot(
+	ctx context.Context, userID int, date time.Time, pos int,
 ) (domain.ScheduledPush, error) {
 	var (
 		push      domain.ScheduledPush
+		workDate  string
 		fireAt    sql.NullString
 		createdAt sql.NullString
 	)
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT id, user_id, workout_exercise_id, fire_at, payload, created_at
+		SELECT id, workout_user_id, workout_date, position, fire_at, payload, created_at
 		FROM scheduled_pushes
-		WHERE workout_exercise_id = ?`, workoutExerciseID,
-	).Scan(&push.ID, &push.UserID, &push.WorkoutExerciseID, &fireAt, &push.Payload, &createdAt)
+		WHERE workout_user_id = ? AND workout_date = ? AND position = ?`,
+		userID, formatDate(date), pos,
+	).Scan(&push.ID, &push.UserID, &workDate, &push.Position, &fireAt, &push.Payload, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.ScheduledPush{}, domain.ErrNotFound
 	}
 	if err != nil {
 		return domain.ScheduledPush{}, fmt.Errorf("query scheduled push: %w", err)
+	}
+	if push.WorkoutDate, err = time.Parse(dateFormat, workDate); err != nil {
+		return domain.ScheduledPush{}, fmt.Errorf("parse workout_date: %w", err)
 	}
 	if push.FireAt, err = parseTimestamp(fireAt); err != nil {
 		return domain.ScheduledPush{}, fmt.Errorf("parse fire_at: %w", err)
@@ -107,7 +115,7 @@ func (r *sqliteScheduledPushRepository) Get(
 
 func (r *sqliteScheduledPushRepository) ListAll(ctx context.Context) (_ []domain.ScheduledPush, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT id, user_id, workout_exercise_id, fire_at, payload, created_at
+		SELECT id, workout_user_id, workout_date, position, fire_at, payload, created_at
 		FROM scheduled_pushes
 		ORDER BY fire_at ASC`)
 	if err != nil {
@@ -123,13 +131,17 @@ func (r *sqliteScheduledPushRepository) ListAll(ctx context.Context) (_ []domain
 	for rows.Next() {
 		var (
 			push      domain.ScheduledPush
+			workDate  string
 			fireAt    sql.NullString
 			createdAt sql.NullString
 		)
 		if err = rows.Scan(
-			&push.ID, &push.UserID, &push.WorkoutExerciseID, &fireAt, &push.Payload, &createdAt,
+			&push.ID, &push.UserID, &workDate, &push.Position, &fireAt, &push.Payload, &createdAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan scheduled push: %w", err)
+		}
+		if push.WorkoutDate, err = time.Parse(dateFormat, workDate); err != nil {
+			return nil, fmt.Errorf("parse workout_date: %w", err)
 		}
 		if push.FireAt, err = parseTimestamp(fireAt); err != nil {
 			return nil, fmt.Errorf("parse fire_at: %w", err)

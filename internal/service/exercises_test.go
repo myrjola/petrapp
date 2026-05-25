@@ -88,19 +88,19 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		t.Fatalf("Failed to insert workout session: %v", err)
 	}
 
-	// Insert workout_exercise slot and one set hanging off it.
-	var weID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
-		userID, dateStr, exerciseID).Scan(&weID)
+	// Insert workout_exercises slot and one set hanging off it.
+	const pos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		userID, dateStr, pos, exerciseID)
 	if err != nil {
-		t.Fatalf("Failed to insert workout_exercise: %v", err)
+		t.Fatalf("Failed to insert workout_exercises: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets
-		(workout_exercise_id, set_number, weight_kg, target_value)
-		VALUES (?, ?, ?, ?)`,
-		weID, 1, 50.0, 12)
+		(workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, dateStr, pos, 1, 50.0, 12)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise set: %v", err)
 	}
@@ -264,19 +264,19 @@ func Test_AddExercise(t *testing.T) {
 		t.Fatalf("Failed to insert workout session: %v", err)
 	}
 
-	// Insert workout_exercise slot for exercise 1 with one set.
-	var weID1 int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
-		userID, dateStr, exercise1ID).Scan(&weID1)
+	// Insert workout_exercises slot for exercise 1 with one set.
+	const pos1 = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		userID, dateStr, pos1, exercise1ID)
 	if err != nil {
-		t.Fatalf("Failed to insert workout_exercise: %v", err)
+		t.Fatalf("Failed to insert workout_exercises: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets
-		(workout_exercise_id, set_number, weight_kg, target_value)
-		VALUES (?, ?, ?, ?)`,
-		weID1, 1, 50.0, 12)
+		(workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, dateStr, pos1, 1, 50.0, 12)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise set: %v", err)
 	}
@@ -298,14 +298,17 @@ func Test_AddExercise(t *testing.T) {
 		}
 
 		// Add exercise 2 to the workout. AddExercise returns the
-		// workout_exercise.id of the new slot so handlers can redirect
+		// 0-based position of the new slot so handlers can redirect
 		// straight to the new exercise's detail page.
-		newSlotID, errAdd := svc.AddExercise(ctx, today, exercise2ID)
+		newSlotPos, errAdd := svc.AddExercise(ctx, today, exercise2ID)
 		if errAdd != nil {
 			t.Fatalf("Failed to add exercise to workout: %v", errAdd)
 		}
-		if newSlotID == 0 {
-			t.Errorf("expected non-zero new slot ID, got 0")
+		// The seed slot occupies position 0; the newly added slot must land at
+		// position 1.
+		const wantPos = 1
+		if newSlotPos != wantPos {
+			t.Errorf("expected new slot position %d, got %d", wantPos, newSlotPos)
 		}
 
 		// Count exercise sets after adding
@@ -332,24 +335,19 @@ func Test_AddExercise(t *testing.T) {
 			t.Error("Exercise was not added to the workout")
 		}
 
-		// Verify the returned slot ID belongs to the slot we just added —
-		// same workout_exercise.id, mapped to exercise 2.
+		// Verify the returned position belongs to the slot we just added —
+		// the position resolves to exercise 2 in the session's slot array.
 		got, errGet := svc.GetSession(ctx, today)
 		if errGet != nil {
 			t.Fatalf("GetSession after add: %v", errGet)
 		}
-		var foundSlot bool
-		for _, es := range got.ExerciseSets {
-			if es.ID == newSlotID {
-				if es.Exercise.ID != exercise2ID {
-					t.Errorf("slot %d has exercise %d, want %d", newSlotID, es.Exercise.ID, exercise2ID)
-				}
-				foundSlot = true
-				break
-			}
+		if newSlotPos < 0 || newSlotPos >= len(got.ExerciseSets) {
+			t.Fatalf("returned slot position %d out of range (session has %d slots)",
+				newSlotPos, len(got.ExerciseSets))
 		}
-		if !foundSlot {
-			t.Errorf("returned slot ID %d not present in session", newSlotID)
+		if got.ExerciseSets[newSlotPos].Exercise.ID != exercise2ID {
+			t.Errorf("slot %d has exercise %d, want %d",
+				newSlotPos, got.ExerciseSets[newSlotPos].Exercise.ID, exercise2ID)
 		}
 	})
 
@@ -453,17 +451,17 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 			userID, dateStr); err != nil {
 			t.Fatalf("insert session %d days ago: %v", daysAgo, err)
 		}
-		var weID int
-		if err = db.ReadWrite.QueryRowContext(ctx,
-			`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
-			 VALUES (?, ?, ?) RETURNING id`,
-			userID, dateStr, exerciseID).Scan(&weID); err != nil {
-			t.Fatalf("insert workout_exercise %d days ago: %v", daysAgo, err)
+		const pos = 0
+		if _, err = db.ReadWrite.ExecContext(ctx,
+			`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+			 VALUES (?, ?, ?, ?)`,
+			userID, dateStr, pos, exerciseID); err != nil {
+			t.Fatalf("insert workout_exercises %d days ago: %v", daysAgo, err)
 		}
 		if _, err = db.ReadWrite.ExecContext(ctx,
-			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-			 VALUES (?, 1, ?, 12)`,
-			weID, weight); err != nil {
+			`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+			 VALUES (?, ?, ?, 1, ?, 12)`,
+			userID, dateStr, pos, weight); err != nil {
 			t.Fatalf("insert exercise_set %d days ago: %v", daysAgo, err)
 		}
 	}
@@ -509,7 +507,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 // the rep-based defaultTargetValue or zero sets.
 //
 // Regression: the time_based premigration in PR #87 dropped historical
-// exercise_sets rows for plank but kept the workout_exercise slots. The
+// exercise_sets rows for plank but kept the workout_exercises slots. The
 // resulting empty (but non-nil) history slice slipped past the
 // `historicalSets != nil` check and persisted zero sets, so the user saw
 // a blank exercise page when adding or swapping to plank.
@@ -553,7 +551,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	today := time.Now()
 	dateStr := today.Format("2006-01-02")
 
-	// Simulate the post-premigration state: a historical workout_exercise slot
+	// Simulate the post-premigration state: a historical workout_exercises slot
 	// for plank exists but its exercise_sets rows were dropped.
 	historicalDate := today.AddDate(0, 0, -7).Format("2006-01-02")
 	if _, err = db.ReadWrite.ExecContext(ctx,
@@ -562,9 +560,9 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 		t.Fatalf("insert historical session: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)`,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, historicalDate, plankID); err != nil {
-		t.Fatalf("insert orphaned workout_exercise: %v", err)
+		t.Fatalf("insert orphaned workout_exercises: %v", err)
 	}
 
 	// Today's empty session.
@@ -663,9 +661,9 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		t.Fatalf("insert historical session: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?)`,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, historicalDate, plankID); err != nil {
-		t.Fatalf("insert orphaned workout_exercise: %v", err)
+		t.Fatalf("insert orphaned workout_exercises: %v", err)
 	}
 
 	// Today's session with squat occupying a slot.
@@ -674,24 +672,24 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		userID, dateStr); err != nil {
 		t.Fatalf("insert today's session: %v", err)
 	}
-	var squatSlotID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id)
-		 VALUES (?, ?, ?) RETURNING id`,
-		userID, dateStr, squatID).Scan(&squatSlotID)
+	const squatPos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		 VALUES (?, ?, ?, ?)`,
+		userID, dateStr, squatPos, squatID)
 	if err != nil {
 		t.Fatalf("insert squat slot: %v", err)
 	}
 	for i := 1; i <= 3; i++ {
 		if _, err = db.ReadWrite.ExecContext(ctx,
-			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-			 VALUES (?, ?, ?, ?)`,
-			squatSlotID, i, 60.0, 5); err != nil {
+			`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			userID, dateStr, squatPos, i, 60.0, 5); err != nil {
 			t.Fatalf("insert squat set: %v", err)
 		}
 	}
 
-	if err = svc.SwapExercise(ctx, today, squatSlotID, plankID); err != nil {
+	if err = svc.SwapExercise(ctx, today, squatPos, plankID); err != nil {
 		t.Fatalf("SwapExercise: %v", err)
 	}
 
@@ -700,16 +698,14 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var plankSets []domain.Set
-	for _, es := range session.ExerciseSets {
-		if es.ID == squatSlotID {
-			if es.Exercise.ID != plankID {
-				t.Fatalf("slot %d still maps to exercise %d, want %d", es.ID, es.Exercise.ID, plankID)
-			}
-			plankSets = es.Sets
-			break
-		}
+	if squatPos < 0 || squatPos >= len(session.ExerciseSets) {
+		t.Fatalf("squat position %d out of range (session has %d slots)", squatPos, len(session.ExerciseSets))
 	}
+	slot := session.ExerciseSets[squatPos]
+	if slot.Exercise.ID != plankID {
+		t.Fatalf("slot %d still maps to exercise %d, want %d", squatPos, slot.Exercise.ID, plankID)
+	}
+	plankSets := slot.Sets
 	if len(plankSets) != 3 {
 		t.Fatalf("expected 3 plank sets, got %d", len(plankSets))
 	}
@@ -882,18 +878,18 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 		userID, histDateStr); err != nil {
 		t.Fatalf("insert hist session: %v", err)
 	}
-	var weHistID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
-		userID, histDateStr, deadliftID).Scan(&weHistID)
+	const histPos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		userID, histDateStr, histPos, deadliftID)
 	if err != nil {
-		t.Fatalf("insert hist workout_exercise: %v", err)
+		t.Fatalf("insert hist workout_exercises: %v", err)
 	}
 	for i := 1; i <= 4; i++ {
 		if _, err = db.ReadWrite.ExecContext(ctx,
-			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-			 VALUES (?, ?, 80.0, 3)`,
-			weHistID, i); err != nil {
+			`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+			 VALUES (?, ?, ?, ?, 80.0, 3)`,
+			userID, histDateStr, histPos, i); err != nil {
 			t.Fatalf("insert hist set %d: %v", i, err)
 		}
 	}
@@ -904,24 +900,24 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 		userID, dateStr); err != nil {
 		t.Fatalf("insert today's session: %v", err)
 	}
-	var squatSlotID int
-	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO workout_exercise (workout_user_id, workout_date, exercise_id) VALUES (?, ?, ?) RETURNING id`,
-		userID, dateStr, squatID).Scan(&squatSlotID)
+	const squatPos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		userID, dateStr, squatPos, squatID)
 	if err != nil {
 		t.Fatalf("insert squat slot: %v", err)
 	}
 	for i := 1; i <= 3; i++ {
 		if _, err = db.ReadWrite.ExecContext(ctx,
-			`INSERT INTO exercise_sets (workout_exercise_id, set_number, weight_kg, target_value)
-			 VALUES (?, ?, 60.0, 10)`,
-			squatSlotID, i); err != nil {
+			`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+			 VALUES (?, ?, ?, ?, 60.0, 10)`,
+			userID, dateStr, squatPos, i); err != nil {
 			t.Fatalf("insert squat set %d: %v", i, err)
 		}
 	}
 
 	// Swap squat → deadlift on the hypertrophy session.
-	if err = svc.SwapExercise(ctx, today, squatSlotID, deadliftID); err != nil {
+	if err = svc.SwapExercise(ctx, today, squatPos, deadliftID); err != nil {
 		t.Fatalf("SwapExercise: %v", err)
 	}
 
@@ -930,16 +926,14 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var sets []domain.Set
-	for _, es := range session.ExerciseSets {
-		if es.ID == squatSlotID {
-			if es.Exercise.ID != deadliftID {
-				t.Fatalf("slot still maps to exercise %d, want deadlift %d", es.Exercise.ID, deadliftID)
-			}
-			sets = es.Sets
-			break
-		}
+	if squatPos < 0 || squatPos >= len(session.ExerciseSets) {
+		t.Fatalf("squat position %d out of range (session has %d slots)", squatPos, len(session.ExerciseSets))
 	}
+	slot := session.ExerciseSets[squatPos]
+	if slot.Exercise.ID != deadliftID {
+		t.Fatalf("slot still maps to exercise %d, want deadlift %d", slot.Exercise.ID, deadliftID)
+	}
+	sets := slot.Sets
 
 	// Hypertrophy: DeriveScheme(3, 6, Hypertrophy) → 6 reps, 3 sets.
 	const wantTargetValue = 6
@@ -986,9 +980,9 @@ func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
 	if !found {
 		t.Fatal("no workout day with exercises found in this week")
 	}
-	weID := session.ExerciseSets[0].ID
+	const slotPos = 0
 
-	current, candidates, err := svc.ListSwapCandidates(ctx, workoutDate, weID, "")
+	current, candidates, err := svc.ListSwapCandidates(ctx, workoutDate, slotPos, "")
 	if err != nil {
 		t.Fatalf("ListSwapCandidates: %v", err)
 	}
@@ -1029,23 +1023,22 @@ func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
 	}
 	sessions := plan.Sessions[:]
 	var (
-		session     domain.Session
 		workoutDate time.Time
 		found       bool
 	)
 	for _, s := range sessions {
 		if len(s.ExerciseSets) > 0 {
-			session, workoutDate, found = s, s.Date, true
+			workoutDate, found = s.Date, true
 			break
 		}
 	}
 	if !found {
 		t.Fatal("no workout day with exercises found")
 	}
-	weID := session.ExerciseSets[0].ID
+	const slotPos = 0
 
 	var candidates []domain.Exercise
-	_, candidates, err = svc.ListSwapCandidates(ctx, workoutDate, weID, "zzzzzzz")
+	_, candidates, err = svc.ListSwapCandidates(ctx, workoutDate, slotPos, "zzzzzzz")
 	if err != nil {
 		t.Fatalf("ListSwapCandidates(no-match): %v", err)
 	}
@@ -1054,12 +1047,12 @@ func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
 	}
 
 	var all []domain.Exercise
-	_, all, err = svc.ListSwapCandidates(ctx, workoutDate, weID, "")
+	_, all, err = svc.ListSwapCandidates(ctx, workoutDate, slotPos, "")
 	if err != nil {
 		t.Fatalf("ListSwapCandidates(unfiltered): %v", err)
 	}
 	var eFiltered []domain.Exercise
-	_, eFiltered, err = svc.ListSwapCandidates(ctx, workoutDate, weID, "e")
+	_, eFiltered, err = svc.ListSwapCandidates(ctx, workoutDate, slotPos, "e")
 	if err != nil {
 		t.Fatalf("ListSwapCandidates('e'): %v", err)
 	}

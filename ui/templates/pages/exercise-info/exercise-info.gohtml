@@ -104,7 +104,7 @@
                     line-height: 0.92;
                     letter-spacing: -0.035em;
                     color: var(--color-text-primary);
-                    view-transition-name: exercise-title-{{ .WorkoutExerciseID }};
+                    view-transition-name: exercise-title-{{ .Position }};
                 }
 
                 .hero-catalog {
@@ -324,7 +324,7 @@
         </style>
 
         <div class="top-row">
-            {{ template "back-link" (backLink (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .WorkoutExerciseID) $.Nonce) }}
+            {{ template "back-link" (backLink (printf "/workouts/%s/exercises/%d" (.Date.Format "2006-01-02") .Position) $.Nonce) }}
             {{ if .IsAdmin }}
                 <a href="/admin/exercises/{{ .Exercise.ID }}" class="admin-edit">Edit Exercise</a>
             {{ end }}

@@ -21,11 +21,11 @@ const (
 	SessionCompleted  SessionStatus = "completed"
 )
 
-// ExerciseSet groups all sets for a specific exercise in a workout.
+// ExerciseSet is one slot in a Session: an exercise plus its sets. Slot
+// identity is the slot's position in Session.ExerciseSets — there is no
+// surrogate ID. Position is stable under SwapExerciseInSlot, so URLs and
+// schedule keys keyed on it survive swaps.
 type ExerciseSet struct {
-	// ID is the stable identifier of this exercise slot within the workout. It survives
-	// swapping the exercise to a different one, which is what keeps URLs stable.
-	ID                int
 	Exercise          Exercise
 	Sets              []Set
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
@@ -153,24 +153,10 @@ func (s *Session) ClearDeload() error {
 	return nil
 }
 
-// Slot returns a copy of the exercise slot identified by slotID; ok is false
-// when no slot matches. It is a read accessor for callers that need to
-// inspect slot state — e.g. the service layer capturing pre-mutation data
-// for rest-push scheduling. Use the mutating aggregate methods to change
-// session state.
-func (s *Session) Slot(slotID int) (ExerciseSet, bool) {
-	slot, err := s.findSlot(slotID)
-	if err != nil {
-		return ExerciseSet{}, false
-	}
-	return *slot, true
-}
-
 // MarkWarmupComplete records the warmup completion timestamp for the
-// exercise slot identified by slotID. Returns ErrSlotNotFound if no slot
-// matches.
-func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
-	slot, err := s.findSlot(slotID)
+// exercise slot at pos. Returns ErrSlotNotFound when pos is out of range.
+func (s *Session) MarkWarmupComplete(pos int, now time.Time) error {
+	slot, err := s.slotAt(pos)
 	if err != nil {
 		return err
 	}
@@ -183,13 +169,13 @@ func (s *Session) MarkWarmupComplete(slotID int, now time.Time) error {
 // the actual value (reps or seconds), and the completion timestamp.
 // Returns ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
 func (s *Session) RecordSet(
-	slotID, setIndex int,
+	pos, setIndex int,
 	signal *Signal,
 	weightKg *float64,
 	completedValue int,
 	now time.Time,
 ) error {
-	slot, err := s.findSlot(slotID)
+	slot, err := s.slotAt(pos)
 	if err != nil {
 		return err
 	}
@@ -217,8 +203,8 @@ func (s *Session) RecordSet(
 // UpdateCompletedValue records the actual reps (or seconds for time-based)
 // achieved on a set, and stamps the completion time. Returns
 // ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
-func (s *Session) UpdateCompletedValue(slotID, setIndex, value int, now time.Time) error {
-	slot, err := s.findSlot(slotID)
+func (s *Session) UpdateCompletedValue(pos, setIndex, value int, now time.Time) error {
+	slot, err := s.slotAt(pos)
 	if err != nil {
 		return err
 	}
@@ -233,36 +219,33 @@ func (s *Session) UpdateCompletedValue(slotID, setIndex, value int, now time.Tim
 	return nil
 }
 
-// AddExercise appends a new exercise slot to the session. The slot's stable
-// ID is left as 0 — the repository assigns the workout_exercise.id at insert
-// time. Returns ErrExerciseAlreadyInSession when an existing slot already
-// references the same Exercise.ID.
-//
-// Service code that needs the assigned ID re-fetches the session after the
-// Update closure commits; the aggregate itself never observes it.
+// AddExercise appends a new exercise slot to the session. The slot's position
+// is len(s.ExerciseSets) at the time of the append, persisted by the
+// repository as the row's position column. Returns
+// ErrExerciseAlreadyInSession when an existing slot already references the
+// same Exercise.ID.
 func (s *Session) AddExercise(ex Exercise, sets []Set) error {
 	for _, existing := range s.ExerciseSets {
 		if existing.Exercise.ID == ex.ID {
 			return ErrExerciseAlreadyInSession
 		}
 	}
-	s.ExerciseSets = append(s.ExerciseSets, ExerciseSet{ //nolint:exhaustruct // ID set by repo; WarmupCompletedAt nil.
-		ID:       0,
+	s.ExerciseSets = append(s.ExerciseSets, ExerciseSet{ //nolint:exhaustruct // WarmupCompletedAt nil.
 		Exercise: ex,
 		Sets:     sets,
 	})
 	return nil
 }
 
-// SwapExerciseInSlot replaces the exercise occupying the slot identified by
-// slotID with newExercise. The slot's stable ID is preserved (so URLs
+// SwapExerciseInSlot replaces the exercise occupying the slot at pos with
+// newExercise. The slot's position is preserved (so URLs and schedule keys
 // continue to resolve). The new sets slice replaces the slot's existing
 // sets entirely; any prior recorded data is dropped. The warmup-completion
 // flag is reset to nil because the warmup performed for the old exercise
-// does not apply to the new one. Returns ErrSlotNotFound when no slot
-// matches.
-func (s *Session) SwapExerciseInSlot(slotID int, newExercise Exercise, sets []Set) error {
-	slot, err := s.findSlot(slotID)
+// does not apply to the new one. Returns ErrSlotNotFound when pos is out of
+// range.
+func (s *Session) SwapExerciseInSlot(pos int, newExercise Exercise, sets []Set) error {
+	slot, err := s.slotAt(pos)
 	if err != nil {
 		return err
 	}
@@ -274,8 +257,8 @@ func (s *Session) SwapExerciseInSlot(slotID int, newExercise Exercise, sets []Se
 
 // UpdateSetWeight overwrites the weight on a single set within a slot.
 // Returns ErrSlotNotFound or ErrSetIndexOutOfBounds when the lookup fails.
-func (s *Session) UpdateSetWeight(slotID, setIndex int, weightKg float64) error {
-	slot, err := s.findSlot(slotID)
+func (s *Session) UpdateSetWeight(pos, setIndex int, weightKg float64) error {
+	slot, err := s.slotAt(pos)
 	if err != nil {
 		return err
 	}
@@ -360,14 +343,12 @@ func (s *Session) HasIncompleteSets() bool {
 	return false
 }
 
-// findSlot returns a pointer to the exercise slot identified by slotID, or
-// ErrSlotNotFound when no slot matches. The pointer aliases into
+// slotAt returns a pointer to the exercise slot at pos within ExerciseSets,
+// or ErrSlotNotFound when pos is out of range. The pointer aliases into
 // ExerciseSets so callers can mutate the slot in place.
-func (s *Session) findSlot(slotID int) (*ExerciseSet, error) {
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].ID == slotID {
-			return &s.ExerciseSets[i], nil
-		}
+func (s *Session) slotAt(pos int) (*ExerciseSet, error) {
+	if pos < 0 || pos >= len(s.ExerciseSets) {
+		return nil, ErrSlotNotFound
 	}
-	return nil, ErrSlotNotFound
+	return &s.ExerciseSets[pos], nil
 }
