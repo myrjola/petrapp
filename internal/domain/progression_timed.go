@@ -37,14 +37,14 @@ type TimedProgression struct {
 	completed []TimedSetResult
 }
 
-// NewTimed creates a TimedProgression for a new exercise execution.
-func NewTimed(c TimedConfig) *TimedProgression {
+// NewTimedProgression creates a TimedProgression for a new exercise execution.
+func NewTimedProgression(c TimedConfig) *TimedProgression {
 	return &TimedProgression{config: c, completed: nil}
 }
 
-// NewTimedFromHistory reconstructs a TimedProgression from sets already completed in this session.
-func NewTimedFromHistory(c TimedConfig, completed []TimedSetResult) *TimedProgression {
-	p := NewTimed(c)
+// NewTimedProgressionFromHistory reconstructs a TimedProgression from sets already completed in this session.
+func NewTimedProgressionFromHistory(c TimedConfig, completed []TimedSetResult) *TimedProgression {
+	p := NewTimedProgression(c)
 	p.completed = make([]TimedSetResult, len(completed))
 	copy(p.completed, completed)
 	return p

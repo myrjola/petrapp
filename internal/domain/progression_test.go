@@ -50,7 +50,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := domain.New(domain.Config{
+			p := domain.NewProgression(domain.Config{
 				Type:           tt.periodization,
 				RepMin:         tt.repMin,
 				RepMax:         tt.repMax,
@@ -98,7 +98,7 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := domain.New(domain.Config{
+			p := domain.NewProgression(domain.Config{
 				Type:           domain.PeriodizationHypertrophy,
 				RepMin:         5,
 				RepMax:         8,
@@ -122,7 +122,7 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 	t.Parallel()
 
 	// 23kg: |w|*0.10 = 2.3, below the 2.5kg minimum step → 23 - 2.5 = 20.5
-	p := domain.New(domain.Config{
+	p := domain.NewProgression(domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
@@ -145,7 +145,7 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 
 	// Recommended set 1 = 100kg. User overrides to 95kg and signals OnTarget.
 	// Set 2 recommendation must be 95kg (from actual), not 100kg.
-	p := domain.New(domain.Config{
+	p := domain.NewProgression(domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
@@ -168,7 +168,7 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 
 	// User overrides set 2 to 90kg and signals TooLight.
 	// Set 3 must be 90 + 2.5 = 92.5kg.
-	p := domain.New(domain.Config{
+	p := domain.NewProgression(domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
@@ -207,13 +207,13 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 	}
 
 	// Build via replay.
-	replay := domain.New(config)
+	replay := domain.NewProgression(config)
 	for _, r := range results {
 		replay.RecordCompletion(r)
 	}
 
 	// Build via NewFromHistory.
-	history := domain.NewFromHistory(config, results)
+	history := domain.NewProgressionFromHistory(config, results)
 
 	replayTarget := replay.CurrentSet()
 	historyTarget := history.CurrentSet()
@@ -236,8 +236,8 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 		StartingWeight: 60.0,
 		IsDeload:       false,
 	}
-	fresh := domain.New(config)
-	fromEmpty := domain.NewFromHistory(config, nil)
+	fresh := domain.NewProgression(config)
+	fromEmpty := domain.NewProgressionFromHistory(config, nil)
 
 	if fresh.CurrentSet() != fromEmpty.CurrentSet() {
 		t.Errorf("CurrentSet mismatch: fresh=%+v history=%+v", fresh.CurrentSet(), fromEmpty.CurrentSet())
@@ -247,7 +247,7 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 func TestSetsCompleted(t *testing.T) {
 	t.Parallel()
 
-	p := domain.New(domain.Config{
+	p := domain.NewProgression(domain.Config{
 		Type:           domain.PeriodizationHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
@@ -376,7 +376,7 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			p := domain.NewFromHistory(
+			p := domain.NewProgressionFromHistory(
 				domain.Config{
 					Type:           domain.PeriodizationStrength,
 					RepMin:         5,
@@ -426,7 +426,7 @@ func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
 		StartingWeight: 67.5,
 		IsDeload:       true,
 	}
-	p := domain.New(cfg)
+	p := domain.NewProgression(cfg)
 
 	target := p.CurrentSet()
 	if target.WeightKg != 67.5 {
@@ -459,7 +459,7 @@ func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
 
 func TestAdjustedWeight_UnknownSignalDoesNotPanic(t *testing.T) {
 	t.Parallel()
-	p := domain.NewFromHistory(
+	p := domain.NewProgressionFromHistory(
 		domain.Config{Type: domain.PeriodizationStrength, RepMin: 5, RepMax: 8, StartingWeight: 50, IsDeload: false},
 		[]domain.SetResult{{ActualReps: 5, Signal: domain.Signal("bogus"), WeightKg: 60}},
 	)
@@ -481,7 +481,7 @@ func TestExhaustiveSignalCoverage(t *testing.T) {
 		domain.SignalTooLight,
 	}
 	for _, s := range valid {
-		p := domain.NewFromHistory(
+		p := domain.NewProgressionFromHistory(
 			domain.Config{
 				Type:           domain.PeriodizationHypertrophy,
 				RepMin:         5,

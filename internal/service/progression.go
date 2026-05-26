@@ -146,7 +146,7 @@ func (s *Service) BuildProgression(
 		break
 	}
 
-	return domain.NewFromHistory(config, completed), nil
+	return domain.NewProgressionFromHistory(config, completed), nil
 }
 
 const (
@@ -216,7 +216,7 @@ func (s *Service) BuildTimedProgression(
 		break
 	}
 
-	return domain.NewTimedFromHistory(
+	return domain.NewTimedProgressionFromHistory(
 		domain.TimedConfig{StartingSeconds: starting},
 		completed,
 	), nil

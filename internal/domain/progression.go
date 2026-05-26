@@ -51,14 +51,14 @@ type Progression struct {
 	completed []SetResult
 }
 
-// New creates a Progression for a new exercise execution.
-func New(config Config) *Progression {
+// NewProgression creates a Progression for a new exercise execution.
+func NewProgression(config Config) *Progression {
 	return &Progression{config: config, completed: nil}
 }
 
-// NewFromHistory reconstructs a Progression from sets already completed in this session.
-func NewFromHistory(config Config, completed []SetResult) *Progression {
-	p := New(config)
+// NewProgressionFromHistory reconstructs a Progression from sets already completed in this session.
+func NewProgressionFromHistory(config Config, completed []SetResult) *Progression {
+	p := NewProgression(config)
 	p.completed = make([]SetResult, len(completed))
 	copy(p.completed, completed)
 	return p

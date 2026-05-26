@@ -103,7 +103,7 @@ func TestTimedProgressionCurrentSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := domain.NewTimedFromHistory(
+			p := domain.NewTimedProgressionFromHistory(
 				domain.TimedConfig{StartingSeconds: tt.in.startingSeconds},
 				tt.in.completed,
 			)
@@ -117,7 +117,7 @@ func TestTimedProgressionCurrentSet(t *testing.T) {
 
 func TestAdjustedSeconds_UnknownSignalDoesNotPanic(t *testing.T) {
 	t.Parallel()
-	p := domain.NewTimedFromHistory(
+	p := domain.NewTimedProgressionFromHistory(
 		domain.TimedConfig{StartingSeconds: 30},
 		[]domain.TimedSetResult{{ActualSeconds: 45, Signal: domain.Signal("bogus")}},
 	)
@@ -130,7 +130,7 @@ func TestAdjustedSeconds_UnknownSignalDoesNotPanic(t *testing.T) {
 func TestTimedProgressionRecordCompletion(t *testing.T) {
 	t.Parallel()
 
-	p := domain.NewTimed(domain.TimedConfig{StartingSeconds: 30})
+	p := domain.NewTimedProgression(domain.TimedConfig{StartingSeconds: 30})
 	if got := p.SetsCompleted(); got != 0 {
 		t.Fatalf("SetsCompleted before any record = %d, want 0", got)
 	}
