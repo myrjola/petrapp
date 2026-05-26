@@ -81,7 +81,7 @@ CREATE TABLE workout_preferences
     mesocycle_length           INTEGER NOT NULL DEFAULT 5 CHECK (mesocycle_length BETWEEN 4 AND 7),
     mesocycle_anchor           TEXT CHECK (mesocycle_anchor IS NULL
                                            OR STRFTIME('%Y-%m-%d', mesocycle_anchor) = mesocycle_anchor)
-) WITHOUT ROWID, STRICT;
+) STRICT;
 
 CREATE TABLE exercises
 (
