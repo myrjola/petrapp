@@ -30,10 +30,10 @@ type workoutTemplateData struct {
 // workoutExerciseView is the per-exercise row rendered on the workout overview.
 // Pre-shaped in the handler so the template can range without arithmetic.
 type workoutExerciseView struct {
-	Position          int // 0-based slot index in Session.ExerciseSets — used in /exercises/{position} URLs and the view-transition name.
+	Position          int // 0-based slot index in Session.Slots — used in /exercises/{position} URLs and the view-transition name.
 	Index             int // 1-based position label ("01", "02", …)
 	Name              string
-	State             domain.ExerciseSetState
+	State             domain.ExerciseSlotState
 	SetCount          int
 	CompletedSetCount int
 	TargetText        string
@@ -213,7 +213,7 @@ func newWorkoutTemplateData(
 	}
 
 	completed := session.CompletedExerciseCount()
-	total := len(session.ExerciseSets)
+	total := len(session.Slots)
 	progressPercent := 0
 	progressState := ""
 	if total > 0 {
@@ -227,7 +227,7 @@ func newWorkoutTemplateData(
 	}
 
 	exerciseViews := make([]workoutExerciseView, 0, total)
-	for i, es := range session.ExerciseSets {
+	for i, es := range session.Slots {
 		exerciseViews = append(exerciseViews, newWorkoutExerciseView(i, es))
 	}
 
@@ -265,10 +265,10 @@ func finishNoteFor(incomplete int) string {
 	}
 }
 
-// newWorkoutExerciseView shapes one ExerciseSet into a workoutExerciseView,
+// newWorkoutExerciseView shapes one ExerciseSlot into a workoutExerciseView,
 // including the sub-line copy and the per-set dot indicator. pos is the
-// 0-based slot index in Session.ExerciseSets.
-func newWorkoutExerciseView(pos int, es domain.ExerciseSet) workoutExerciseView {
+// 0-based slot index in Session.Slots.
+func newWorkoutExerciseView(pos int, es domain.ExerciseSlot) workoutExerciseView {
 	dots := make([]workoutExerciseDot, len(es.Sets))
 	for j, s := range es.Sets {
 		dots[j] = workoutExerciseDot{Done: s.CompletedAt != nil}
@@ -457,8 +457,8 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 
 	// Create a map of exercise IDs that are already in the workout
 	existingExerciseIDs := make(map[int]bool)
-	for _, exerciseSet := range session.ExerciseSets {
-		existingExerciseIDs[exerciseSet.Exercise.ID] = true
+	for _, exerciseSlot := range session.Slots {
+		existingExerciseIDs[exerciseSlot.Exercise.ID] = true
 	}
 
 	// Get all exercises

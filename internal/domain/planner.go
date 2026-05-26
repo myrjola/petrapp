@@ -47,7 +47,7 @@ func NewPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTa
 // plan always has 7 Session slots indexed by day-offset from startingDate
 // (slot i corresponds to startingDate.AddDate(0, 0, i)). Scheduled workout days
 // are populated with full content; rest days carry an empty Session{Date: ...}
-// with no ExerciseSets. Returns an error if startingDate is not a Monday, if no
+// with no Slots. Returns an error if startingDate is not a Monday, if no
 // workout days are scheduled, or if a scheduled day has no compatible exercises.
 func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 	if startingDate.Weekday() != time.Monday {
@@ -104,7 +104,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 			pt = PeriodizationHypertrophy
 		}
 		n := exercisesPerSession(wp.Prefs, day.Weekday(), pt, isDeload)
-		exerciseSets := wp.selectExercisesForDayWithPeriodization(
+		exerciseSlots := wp.selectExercisesForDayWithPeriodization(
 			categories[day],
 			dayMuscleGroups[day],
 			n,
@@ -114,7 +114,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		)
 
 		// Record which exercises were used this week.
-		for _, es := range exerciseSets {
+		for _, es := range exerciseSlots {
 			weekUsedExercises[es.Exercise.ID] = true
 		}
 
@@ -123,7 +123,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 			Date:              day,
 			PeriodizationType: pt,
 			IsDeload:          isDeload,
-			ExerciseSets:      exerciseSets,
+			Slots:             exerciseSlots,
 		}
 	}
 
@@ -188,7 +188,7 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 	if used == nil {
 		used = make(map[int]bool)
 	}
-	exerciseSets := wp.selectExercisesForDayWithPeriodization(
+	exerciseSlots := wp.selectExercisesForDayWithPeriodization(
 		category, nil, n, pt, isDeload, used,
 	)
 
@@ -196,7 +196,7 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 		Date:              date,
 		PeriodizationType: pt,
 		IsDeload:          isDeload,
-		ExerciseSets:      exerciseSets,
+		Slots:             exerciseSlots,
 	}, nil
 }
 
@@ -407,7 +407,7 @@ func (wp *Planner) selectExercisesForDay(
 	category Category,
 	priorityMuscleGroups []string,
 	n int,
-) []ExerciseSet {
+) []ExerciseSlot {
 	return wp.selectExercisesForDayWithPeriodization(
 		category,
 		priorityMuscleGroups,
@@ -425,7 +425,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	pt PeriodizationType,
 	isDeload bool,
 	weekUsedExercises map[int]bool,
-) []ExerciseSet {
+) []ExerciseSlot {
 	// Filter exercise pool by category compatibility.
 	pool := make([]Exercise, 0, len(wp.Exercises))
 	for _, ex := range wp.Exercises {
@@ -461,20 +461,20 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 		selected = append(selected, ex)
 	}
 
-	// Build ExerciseSets. Time-based exercises use their own
+	// Build Slots. Time-based exercises use their own
 	// DefaultStartingSeconds with a fixed set count; rep-based exercises
 	// derive their full prescription from the per-exercise window via DeriveScheme.
-	result := make([]ExerciseSet, len(selected))
+	result := make([]ExerciseSlot, len(selected))
 	for i, ex := range selected {
-		result[i] = buildPlannedExerciseSet(ex, pt, isDeload)
+		result[i] = buildPlannedExerciseSlot(ex, pt, isDeload)
 	}
 	return result
 }
 
-// buildPlannedExerciseSet creates an ExerciseSet for one exercise using
+// buildPlannedExerciseSlot creates an ExerciseSlot for one exercise using
 // BuildPlannedSets as the single source of truth for set prescription.
-func buildPlannedExerciseSet(ex Exercise, pt PeriodizationType, isDeload bool) ExerciseSet {
-	return ExerciseSet{ //nolint:exhaustruct // WarmupCompletedAt nil.
+func buildPlannedExerciseSlot(ex Exercise, pt PeriodizationType, isDeload bool) ExerciseSlot {
+	return ExerciseSlot{ //nolint:exhaustruct // WarmupCompletedAt nil.
 		Exercise: ex,
 		Sets:     BuildPlannedSets(ex, pt, isDeload),
 	}

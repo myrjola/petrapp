@@ -154,14 +154,14 @@ func (r baseRepository) insertSessionRowInTx(ctx context.Context, tx *sql.Tx, se
 
 // saveExerciseSetsInTx writes the workout_exercises rows and their child
 // exercise_sets for sess in a single pass. The slot's position in
-// sess.ExerciseSets is persisted as the row's position column — no
+// sess.Slots is persisted as the row's position column — no
 // autoincrement, no rowid collisions to worry about.
 func (r baseRepository) saveExerciseSetsInTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	sess domain.Session,
 ) error {
-	for pos, slot := range sess.ExerciseSets {
+	for pos, slot := range sess.Slots {
 		if err := r.saveOneSlotInTx(ctx, tx, sess.Date, pos, slot); err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ func (r baseRepository) saveOneSlotInTx(
 	tx *sql.Tx,
 	date time.Time,
 	pos int,
-	slot domain.ExerciseSet,
+	slot domain.ExerciseSlot,
 ) error {
 	dateStr := formatDate(date)
 	userID := contexthelpers.AuthenticatedUserID(ctx)

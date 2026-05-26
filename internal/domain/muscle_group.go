@@ -130,7 +130,7 @@ func aggregateMuscleGroupLoad(
 	planned, completed map[string]float64,
 ) {
 	for _, sess := range sessions {
-		for _, ex := range sess.ExerciseSets {
+		for _, ex := range sess.Slots {
 			for _, set := range ex.Sets {
 				done := set.CompletedAt != nil
 				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetWeight, done, known, planned, completed)

@@ -35,17 +35,17 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 		TargetValue: 12,
 	}
 
-	benchSet := domain.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
+	benchSet := domain.ExerciseSlot{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
 		Exercise: bench,
 		Sets:     []domain.Set{completedSet, completedSet, plannedSet},
 	}
-	dipSet := domain.ExerciseSet{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
+	dipSet := domain.ExerciseSlot{ //nolint:exhaustruct // ID + WarmupCompletedAt are repository-managed.
 		Exercise: dip,
 		Sets:     []domain.Set{plannedSet, plannedSet},
 	}
 	sessions := []domain.Session{
 		{ //nolint:exhaustruct // Date and timestamps are not relevant for the volume aggregator.
-			ExerciseSets: []domain.ExerciseSet{benchSet, dipSet},
+			Slots: []domain.ExerciseSlot{benchSet, dipSet},
 		},
 	}
 

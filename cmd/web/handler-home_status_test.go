@@ -17,7 +17,7 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 			DifficultyRating:  nil,
 			StartedAt:         startedAt,
 			CompletedAt:       completedAt,
-			ExerciseSets:      nil,
+			Slots:             nil,
 			PeriodizationType: "",
 			IsDeload:          false,
 		}

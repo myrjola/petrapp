@@ -173,8 +173,8 @@ func determineWorkoutStatus(session domain.Session, isScheduled bool, completedS
 func calculateProgress(session domain.Session) (int, int, int) {
 	var completedSets, totalSets, progressPercent int
 
-	for _, exerciseSet := range session.ExerciseSets {
-		for _, set := range exerciseSet.Sets {
+	for _, exerciseSlot := range session.Slots {
+		for _, set := range exerciseSlot.Sets {
 			totalSets++
 			if set.CompletedAt != nil {
 				completedSets++

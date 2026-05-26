@@ -57,7 +57,7 @@ func (s *Service) RecordSet(
 ) error {
 	var (
 		wasComplete   bool
-		postSlot      domain.ExerciseSet
+		postSlot      domain.ExerciseSlot
 		postSlotOK    bool
 		periodization domain.PeriodizationType
 		sessionDeload bool
@@ -69,8 +69,8 @@ func (s *Service) RecordSet(
 		if sess == nil {
 			return domain.ErrNotFound
 		}
-		if pos >= 0 && pos < len(sess.ExerciseSets) {
-			slot := sess.ExerciseSets[pos]
+		if pos >= 0 && pos < len(sess.Slots) {
+			slot := sess.Slots[pos]
 			if setIndex >= 0 && setIndex < len(slot.Sets) {
 				wasComplete = slot.Sets[setIndex].CompletedAt != nil
 			}
@@ -83,8 +83,8 @@ func (s *Service) RecordSet(
 			// the outer `if err != nil` wraps for diagnostic context.
 			return recErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
 		}
-		if pos >= 0 && pos < len(sess.ExerciseSets) {
-			postSlot = sess.ExerciseSets[pos]
+		if pos >= 0 && pos < len(sess.Slots) {
+			postSlot = sess.Slots[pos]
 			postSlotOK = true
 		}
 		return nil
@@ -110,7 +110,7 @@ func (s *Service) applyRestPushDecision(
 	userID int,
 	date time.Time,
 	pos int,
-	slot domain.ExerciseSet,
+	slot domain.ExerciseSlot,
 	periodization domain.PeriodizationType,
 	isDeload bool,
 	completedAt time.Time,

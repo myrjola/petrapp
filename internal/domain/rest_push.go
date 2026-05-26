@@ -54,7 +54,7 @@ type RestPushDecision struct {
 // (warmup-complete and set-complete) because both ask the same question:
 // "what is the first incomplete set in this slot?".
 func PlanRestPush(
-	slot ExerciseSet,
+	slot ExerciseSlot,
 	periodization PeriodizationType,
 	isDeload bool,
 	completedAt time.Time,

@@ -67,16 +67,16 @@ func TestWeekPlanRepository_Get_HydratesScheduledDays(t *testing.T) {
 	if !wp.Monday.Equal(monday) {
 		t.Errorf("Monday: got %v, want %v", wp.Monday, monday)
 	}
-	if len(wp.Sessions[0].ExerciseSets) == 0 {
+	if len(wp.Sessions[0].Slots) == 0 {
 		t.Error("Monday should be scheduled")
 	}
-	if len(wp.Sessions[1].ExerciseSets) != 0 {
+	if len(wp.Sessions[1].Slots) != 0 {
 		t.Error("Tuesday should be a rest day (empty)")
 	}
 	if !wp.Sessions[1].Date.Equal(monday.AddDate(0, 0, 1)) {
 		t.Errorf("Tuesday rest day date: got %v", wp.Sessions[1].Date)
 	}
-	if len(wp.Sessions[2].ExerciseSets) == 0 {
+	if len(wp.Sessions[2].Slots) == 0 {
 		t.Error("Wednesday should be scheduled")
 	}
 }
@@ -133,10 +133,10 @@ func TestWeekPlanRepository_Update_PreservesSlotPositions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if len(wp.Sessions[0].ExerciseSets) == 0 {
+	if len(wp.Sessions[0].Slots) == 0 {
 		t.Fatalf("seed should have produced a slot")
 	}
-	originalExerciseID := wp.Sessions[0].ExerciseSets[0].Exercise.ID
+	originalExerciseID := wp.Sessions[0].Slots[0].Exercise.ID
 
 	err = repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
 		return wp.Start(monday, time.Now().UTC())
@@ -148,18 +148,18 @@ func TestWeekPlanRepository_Update_PreservesSlotPositions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get after update: %v", err)
 	}
-	if len(reloaded.Sessions[0].ExerciseSets) != 1 {
+	if len(reloaded.Sessions[0].Slots) != 1 {
 		t.Fatalf(
 			"slot count changed: got %d, want 1",
-			len(reloaded.Sessions[0].ExerciseSets),
+			len(reloaded.Sessions[0].Slots),
 		)
 	}
 	// The slot's identity is its position (array index 0) and Exercise.ID.
 	// Update with a no-op closure must preserve both.
-	if reloaded.Sessions[0].ExerciseSets[0].Exercise.ID != originalExerciseID {
+	if reloaded.Sessions[0].Slots[0].Exercise.ID != originalExerciseID {
 		t.Errorf(
 			"slot 0 exercise changed: got %d, want %d",
-			reloaded.Sessions[0].ExerciseSets[0].Exercise.ID, originalExerciseID,
+			reloaded.Sessions[0].Slots[0].Exercise.ID, originalExerciseID,
 		)
 	}
 }
@@ -192,7 +192,7 @@ func buildPlanWithOneSlot(
 	plan.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
 		Date:              monday,
 		PeriodizationType: domain.PeriodizationStrength,
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID assigned by repo; warmup nil.
 				Exercise: deadlift,
 				Sets: []domain.Set{
@@ -216,7 +216,7 @@ func TestWeekPlanRepository_Create_PersistsWeek(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if len(got.Sessions[0].ExerciseSets) == 0 {
+	if len(got.Sessions[0].Slots) == 0 {
 		t.Error("session not persisted")
 	}
 }
@@ -235,7 +235,7 @@ func TestWeekPlanRepository_Update_AddsNewSessionAlongsideExisting(t *testing.T)
 	err := repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
 		// Find an exercise to use for the new Monday slot — copy Tuesday's.
 		var newSlotExercise domain.Exercise
-		for _, slot := range wp.Sessions[1].ExerciseSets {
+		for _, slot := range wp.Sessions[1].Slots {
 			newSlotExercise = slot.Exercise
 			break
 		}
@@ -245,7 +245,7 @@ func TestWeekPlanRepository_Update_AddsNewSessionAlongsideExisting(t *testing.T)
 		wp.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
 			Date:              monday,
 			PeriodizationType: domain.PeriodizationStrength,
-			ExerciseSets: []domain.ExerciseSet{{ //nolint:exhaustruct // WarmupCompletedAt nil.
+			Slots: []domain.ExerciseSlot{{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: newSlotExercise,
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // CompletedValue etc. nil.
 			}},
@@ -259,11 +259,11 @@ func TestWeekPlanRepository_Update_AddsNewSessionAlongsideExisting(t *testing.T)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if len(reloaded.Sessions[0].ExerciseSets) != 1 {
-		t.Errorf("Monday should have 1 slot, got %d", len(reloaded.Sessions[0].ExerciseSets))
+	if len(reloaded.Sessions[0].Slots) != 1 {
+		t.Errorf("Monday should have 1 slot, got %d", len(reloaded.Sessions[0].Slots))
 	}
-	if len(reloaded.Sessions[1].ExerciseSets) != 1 {
-		t.Errorf("Tuesday should still have 1 slot, got %d", len(reloaded.Sessions[1].ExerciseSets))
+	if len(reloaded.Sessions[1].Slots) != 1 {
+		t.Errorf("Tuesday should still have 1 slot, got %d", len(reloaded.Sessions[1].Slots))
 	}
 }
 

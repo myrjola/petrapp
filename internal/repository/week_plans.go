@@ -32,7 +32,7 @@ func (r *sqliteWeekPlanRepository) Get(ctx context.Context, monday time.Time) (d
 // Update loads the WeekPlan for monday inside a single transaction, runs fn,
 // then persists the result via delete-then-reinsert across the week's date
 // range. The reinsert is a single pass — slot identity is the array index in
-// Session.ExerciseSets, written into the row's position column, so SQLite
+// Session.Slots, written into the row's position column, so SQLite
 // never auto-assigns a rowid. Domain sentinels returned by fn propagate
 // unchanged so callers can errors.Is against them.
 func (r *sqliteWeekPlanRepository) Update(
@@ -93,7 +93,7 @@ func (r *sqliteWeekPlanRepository) Create(ctx context.Context, plan domain.WeekP
 		}
 		if err = r.insertSessionInTx(ctx, tx, sess); err != nil {
 			// Only the workout_sessions PK conflict (duplicate date for this user) maps to
-			// ErrAlreadyExists. UNIQUE violations from saveExerciseSets propagate as-is —
+			// ErrAlreadyExists. UNIQUE violations from saveExerciseSetsInTx propagate as-is —
 			// those are programming errors, not concurrent-insert races.
 			var sqliteErr sqlite3.Error
 			if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
@@ -145,7 +145,7 @@ func (r *sqliteWeekPlanRepository) getInTx(
 		if offset < 0 || offset > 6 {
 			continue
 		}
-		sess.ExerciseSets = setsByDate[formatDate(sess.Date)]
+		sess.Slots = setsByDate[formatDate(sess.Date)]
 		wp.Sessions[offset] = sess
 	}
 	return wp, nil
@@ -165,7 +165,7 @@ func (r *sqliteWeekPlanRepository) reinsertWeekInTx(
 		if err := r.insertSessionRowInTx(ctx, tx, sess); err != nil {
 			return fmt.Errorf("insert session row %s: %w", formatDate(sess.Date), err)
 		}
-		for pos, slot := range sess.ExerciseSets {
+		for pos, slot := range sess.Slots {
 			if err := r.saveOneSlotInTx(ctx, tx, sess.Date, pos, slot); err != nil {
 				return fmt.Errorf("save slot %d for %s: %w", pos, formatDate(sess.Date), err)
 			}
@@ -178,7 +178,7 @@ func (r *sqliteWeekPlanRepository) reinsertWeekInTx(
 // writing (no slots, no lifecycle, no deload flag). Used by Update to skip
 // pure rest-day placeholders during the reinsert pass.
 func isRestDayPlaceholder(sess domain.Session) bool {
-	return len(sess.ExerciseSets) == 0 &&
+	return len(sess.Slots) == 0 &&
 		sess.StartedAt.IsZero() &&
 		sess.CompletedAt.IsZero() &&
 		sess.DifficultyRating == nil &&

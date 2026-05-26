@@ -90,7 +90,7 @@ func (s *Service) planWeek(ctx context.Context, monday time.Time) (domain.WeekPl
 		return domain.WeekPlan{}, fmt.Errorf("plan week: %w", err)
 	}
 	for i := range plan.Sessions {
-		if !plan.Sessions[i].IsDeload || len(plan.Sessions[i].ExerciseSets) == 0 {
+		if !plan.Sessions[i].IsDeload || len(plan.Sessions[i].Slots) == 0 {
 			continue
 		}
 		if err = s.seedDeloadWeights(ctx, &plan.Sessions[i]); err != nil {
@@ -105,8 +105,8 @@ func (s *Service) planWeek(ctx context.Context, monday time.Time) (domain.WeekPl
 // working weight). Called for both weekly-plan generation and ad-hoc session
 // creation when sess.IsDeload is true.
 func (s *Service) seedDeloadWeights(ctx context.Context, sess *domain.Session) error {
-	for j := range sess.ExerciseSets {
-		ex := sess.ExerciseSets[j].Exercise
+	for j := range sess.Slots {
+		ex := sess.Slots[j].Exercise
 		if !ex.HasWeight() {
 			continue
 		}
@@ -115,8 +115,8 @@ func (s *Service) seedDeloadWeights(ctx context.Context, sess *domain.Session) e
 			return fmt.Errorf("seed deload weight for %s: %w", ex.Name, err)
 		}
 		weight := w
-		for k := range sess.ExerciseSets[j].Sets {
-			sess.ExerciseSets[j].Sets[k].WeightKg = &weight
+		for k := range sess.Slots[j].Sets {
+			sess.Slots[j].Sets[k].WeightKg = &weight
 		}
 	}
 	return nil
@@ -136,7 +136,7 @@ func (s *Service) GetSession(ctx context.Context, date time.Time) (domain.Sessio
 func usedExerciseIDs(plan domain.WeekPlan) map[int]bool {
 	used := make(map[int]bool)
 	for i := range plan.Sessions {
-		for _, es := range plan.Sessions[i].ExerciseSets {
+		for _, es := range plan.Sessions[i].Slots {
 			used[es.Exercise.ID] = true
 		}
 	}
@@ -239,7 +239,7 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	}
 
 	sessOnDate := plan.SessionOn(date)
-	hasDate := sessOnDate != nil && len(sessOnDate.ExerciseSets) > 0
+	hasDate := sessOnDate != nil && len(sessOnDate.Slots) > 0
 	if !hasDate {
 		used := usedExerciseIDs(plan)
 		if err = s.createAdHocSession(ctx, date, used); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
@@ -312,7 +312,7 @@ func (s *Service) MarkWarmupComplete(
 ) error {
 	var (
 		wasComplete   bool
-		postSlot      domain.ExerciseSet
+		postSlot      domain.ExerciseSlot
 		postSlotOK    bool
 		periodization domain.PeriodizationType
 		sessionDeload bool
@@ -324,8 +324,8 @@ func (s *Service) MarkWarmupComplete(
 		if sess == nil {
 			return domain.ErrNotFound
 		}
-		if pos >= 0 && pos < len(sess.ExerciseSets) {
-			wasComplete = sess.ExerciseSets[pos].WarmupCompletedAt != nil
+		if pos >= 0 && pos < len(sess.Slots) {
+			wasComplete = sess.Slots[pos].WarmupCompletedAt != nil
 		}
 		periodization = sess.PeriodizationType
 		sessionDeload = sess.IsDeload
@@ -333,8 +333,8 @@ func (s *Service) MarkWarmupComplete(
 		if mErr := sess.MarkWarmupComplete(pos, now); mErr != nil {
 			return mErr //nolint:wrapcheck // outer fmt.Errorf wraps with date context.
 		}
-		if pos >= 0 && pos < len(sess.ExerciseSets) {
-			postSlot = sess.ExerciseSets[pos]
+		if pos >= 0 && pos < len(sess.Slots) {
+			postSlot = sess.Slots[pos]
 			postSlotOK = true
 		}
 		return nil

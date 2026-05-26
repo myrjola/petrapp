@@ -33,14 +33,14 @@ func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
 
 	// Scheduled days (Mon=0, Wed=2, Fri=4) must have exercises.
 	for _, i := range []int{0, 2, 4} {
-		if len(sessions[i].ExerciseSets) == 0 {
+		if len(sessions[i].Slots) == 0 {
 			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
 		}
 	}
 
 	// Rest days must be empty sessions.
 	for _, i := range []int{1, 3, 5, 6} {
-		if len(sessions[i].ExerciseSets) != 0 {
+		if len(sessions[i].Slots) != 0 {
 			t.Errorf("sessions[%d] (%s) must be empty (rest day)", i, sessions[i].Date.Weekday())
 		}
 	}
@@ -113,7 +113,7 @@ func Test_RegenerateWeeklyPlanIfUnstarted_NoOpOnEmptyWeekThenLazyCreate(t *testi
 	sessions := plan.Sessions[:]
 	// Mon=0, Wed=2, Fri=4 must have exercises — populated by ResolveWeeklySchedule's lazy create.
 	for _, i := range []int{0, 2, 4} {
-		if len(sessions[i].ExerciseSets) == 0 {
+		if len(sessions[i].Slots) == 0 {
 			t.Errorf("sessions[%d] (%s) must have exercise sets", i, sessions[i].Date.Weekday())
 		}
 	}
@@ -152,12 +152,12 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *tes
 
 	// Tue=1, Thu=3, Sat=5 must have exercises; Mon=0, Wed=2, Fri=4, Sun=6 must be rest.
 	for _, i := range []int{1, 3, 5} {
-		if len(sessions[i].ExerciseSets) == 0 {
+		if len(sessions[i].Slots) == 0 {
 			t.Errorf("sessions[%d] (%s) must have exercise sets after preference change", i, sessions[i].Date.Weekday())
 		}
 	}
 	for _, i := range []int{0, 2, 4, 6} {
-		if len(sessions[i].ExerciseSets) != 0 {
+		if len(sessions[i].Slots) != 0 {
 			t.Errorf("sessions[%d] (%s) must be a rest day after preference change", i, sessions[i].Date.Weekday())
 		}
 	}
@@ -201,12 +201,12 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 	sessions2 := plan2.Sessions[:]
 
 	// Monday (index 0) must still have exercises — the original plan was kept.
-	if len(sessions2[0].ExerciseSets) == 0 {
+	if len(sessions2[0].Slots) == 0 {
 		t.Error("sessions2[0] (Monday) must still have exercise sets; workout was already started")
 	}
 
 	// Tuesday must still be a rest day — the new preferences were not applied.
-	if len(sessions2[1].ExerciseSets) != 0 {
+	if len(sessions2[1].Slots) != 0 {
 		t.Error("sessions2[1] (Tuesday) must remain a rest day; new preferences must not be applied")
 	}
 }
@@ -307,7 +307,7 @@ func Test_StartSession_CreatesAdHocSessionForUnscheduledToday(t *testing.T) {
 	if sess.StartedAt.IsZero() {
 		t.Error("StartedAt is zero — Start did not mark the session")
 	}
-	if len(sess.ExerciseSets) == 0 {
+	if len(sess.Slots) == 0 {
 		t.Error("ad-hoc session has no exercises — PlanDay or persistence failed")
 	}
 }
@@ -358,7 +358,7 @@ func Test_StartSession_CreatesNewlyScheduledMidWeekDay(t *testing.T) {
 	if sess.StartedAt.IsZero() {
 		t.Error("Tuesday StartedAt is zero")
 	}
-	if len(sess.ExerciseSets) == 0 {
+	if len(sess.Slots) == 0 {
 		t.Error("Tuesday session has no exercises")
 	}
 }
@@ -698,7 +698,7 @@ func Test_RegenerateWeeklyPlanIfUnstarted_ConcurrentCallsSerialized(t *testing.T
 	for _, s := range allSessions {
 		if !s.Date.After(sunday) {
 			thisWeek++
-			if len(s.ExerciseSets) > 0 {
+			if len(s.Slots) > 0 {
 				withExercises++
 			}
 		}
@@ -771,7 +771,7 @@ func Test_RegenerateAndStart_AreSerializedByTheDatabase(t *testing.T) {
 	if sess.StartedAt.IsZero() {
 		t.Error("today's session should be started after the race")
 	}
-	if len(sess.ExerciseSets) == 0 {
+	if len(sess.Slots) == 0 {
 		t.Error("today's session should have slots after the race")
 	}
 }
@@ -825,7 +825,7 @@ func Test_StartDeloadNow_FlipsTodayAndFutureNonCompletedSessions(t *testing.T) {
 
 	today := domain.StartOfDay(time.Now())
 	for i, s := range sessions {
-		if len(s.ExerciseSets) == 0 {
+		if len(s.Slots) == 0 {
 			continue // rest day
 		}
 		isForwardLooking := !s.Date.Before(today)
@@ -964,10 +964,10 @@ func Test_StartDeloadNow_SkipsCompletedToday(t *testing.T) {
 	todayIdx := -1
 	futureWorkoutDays := 0
 	for i, s := range sessions {
-		if s.Date.Equal(today) && len(s.ExerciseSets) > 0 {
+		if s.Date.Equal(today) && len(s.Slots) > 0 {
 			todayIdx = i
 		}
-		if s.Date.After(today) && len(s.ExerciseSets) > 0 {
+		if s.Date.After(today) && len(s.Slots) > 0 {
 			futureWorkoutDays++
 		}
 	}
@@ -1006,7 +1006,7 @@ func Test_StartDeloadNow_SkipsCompletedToday(t *testing.T) {
 	// loop kept iterating past the completed today rather than aborting.
 	flippedFuture := 0
 	for _, s := range sessions {
-		if s.Date.After(today) && len(s.ExerciseSets) > 0 && s.IsDeload {
+		if s.Date.After(today) && len(s.Slots) > 0 && s.IsDeload {
 			flippedFuture++
 		}
 	}
@@ -1054,7 +1054,7 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	today := domain.StartOfDay(time.Now())
 	var todaySess *domain.Session
 	for i, s := range sessions {
-		if s.Date.Equal(today) && len(s.ExerciseSets) > 0 {
+		if s.Date.Equal(today) && len(s.Slots) > 0 {
 			todaySess = &sessions[i]
 			break
 		}
@@ -1070,7 +1070,7 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	// don't carry a per-set weight, so BuildProgression's WeightKg comparison
 	// would be meaningless for them.
 	exerciseID := 0
-	for _, es := range todaySess.ExerciseSets {
+	for _, es := range todaySess.Slots {
 		if es.Exercise.ExerciseType == domain.ExerciseTypeWeighted {
 			exerciseID = es.Exercise.ID
 			break

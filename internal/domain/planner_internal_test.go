@@ -484,7 +484,7 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 		}
 		var sessions []Session
 		for i := range plan.Sessions {
-			if len(plan.Sessions[i].ExerciseSets) > 0 {
+			if len(plan.Sessions[i].Slots) > 0 {
 				sessions = append(sessions, plan.Sessions[i])
 			}
 		}
@@ -492,7 +492,7 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 		// Collect all exercise IDs across all sessions.
 		usedExercises := make(map[int]bool)
 		for _, session := range sessions {
-			for _, es := range session.ExerciseSets {
+			for _, es := range session.Slots {
 				if usedExercises[es.Exercise.ID] {
 					t.Errorf("exercise %d appears in multiple sessions across the week", es.Exercise.ID)
 				}
@@ -589,7 +589,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 	)
 
 	if len(sets) != 1 {
-		t.Fatalf("got %d ExerciseSets, want 1", len(sets))
+		t.Fatalf("got %d Slots, want 1", len(sets))
 	}
 	if sets[0].Exercise.ID != plank.ID {
 		t.Fatalf("got exerciseID %d, want %d", sets[0].Exercise.ID, plank.ID)
@@ -661,7 +661,7 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 	}
 	var sessions []Session
 	for i := range plan.Sessions {
-		if len(plan.Sessions[i].ExerciseSets) > 0 {
+		if len(plan.Sessions[i].Slots) > 0 {
 			sessions = append(sessions, plan.Sessions[i])
 		}
 	}
@@ -679,7 +679,7 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 				s.PeriodizationType,
 			)
 		}
-		for _, es := range s.ExerciseSets {
+		for _, es := range s.Slots {
 			// Normal mid-rep band has 3 sets. Deload halves to 2.
 			if len(es.Sets) != 2 {
 				t.Errorf("session %s, exercise %s: %d sets, want 2 (deload halves)",
@@ -723,7 +723,7 @@ func TestPlanner_NonDeloadWeekUnchanged(t *testing.T) {
 	}
 	var sessions []Session
 	for i := range plan.Sessions {
-		if len(plan.Sessions[i].ExerciseSets) > 0 {
+		if len(plan.Sessions[i].Slots) > 0 {
 			sessions = append(sessions, plan.Sessions[i])
 		}
 	}
@@ -771,7 +771,7 @@ func TestPlan(t *testing.T) {
 		}
 		var sessions []Session
 		for i := range plan.Sessions {
-			if len(plan.Sessions[i].ExerciseSets) > 0 {
+			if len(plan.Sessions[i].Slots) > 0 {
 				sessions = append(sessions, plan.Sessions[i])
 			}
 		}
@@ -791,7 +791,7 @@ func TestPlan(t *testing.T) {
 		}
 		var sessions []Session
 		for i := range plan.Sessions {
-			if len(plan.Sessions[i].ExerciseSets) > 0 {
+			if len(plan.Sessions[i].Slots) > 0 {
 				sessions = append(sessions, plan.Sessions[i])
 			}
 		}
@@ -815,7 +815,7 @@ func TestPlan(t *testing.T) {
 		}
 		var sessions []Session
 		for i := range plan.Sessions {
-			if len(plan.Sessions[i].ExerciseSets) > 0 {
+			if len(plan.Sessions[i].Slots) > 0 {
 				sessions = append(sessions, plan.Sessions[i])
 			}
 		}
@@ -824,9 +824,9 @@ func TestPlan(t *testing.T) {
 			if sess.PeriodizationType == PeriodizationHypertrophy && !sess.IsDeload {
 				want = exercisesMediumHypertrophy
 			}
-			if len(sess.ExerciseSets) != want {
+			if len(sess.Slots) != want {
 				t.Errorf("60-min %s session: want %d exercises, got %d",
-					sess.PeriodizationType, want, len(sess.ExerciseSets))
+					sess.PeriodizationType, want, len(sess.Slots))
 			}
 		}
 	})
@@ -842,7 +842,7 @@ func TestPlan(t *testing.T) {
 		}
 		var sessions []Session
 		for i := range plan.Sessions {
-			if len(plan.Sessions[i].ExerciseSets) > 0 {
+			if len(plan.Sessions[i].Slots) > 0 {
 				sessions = append(sessions, plan.Sessions[i])
 			}
 		}
@@ -1026,7 +1026,7 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	}
 	var sessions []Session
 	for i := range plan.Sessions {
-		if len(plan.Sessions[i].ExerciseSets) > 0 {
+		if len(plan.Sessions[i].Slots) > 0 {
 			sessions = append(sessions, plan.Sessions[i])
 		}
 	}
@@ -1040,7 +1040,7 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 		if sess.PeriodizationType != wantPT[i] {
 			t.Errorf("session %d periodization: want %s, got %s", i, wantPT[i], sess.PeriodizationType)
 		}
-		if got := len(sess.ExerciseSets); got != wantCount[i] {
+		if got := len(sess.Slots); got != wantCount[i] {
 			t.Errorf("session %d (%s) exercise count: want %d, got %d",
 				i, sess.PeriodizationType, wantCount[i], got)
 		}

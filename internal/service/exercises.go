@@ -144,12 +144,12 @@ func (s *Service) ListSwapCandidates(
 		return domain.Exercise{}, nil, fmt.Errorf("get session: %w", err)
 	}
 
-	if pos < 0 || pos >= len(session.ExerciseSets) {
+	if pos < 0 || pos >= len(session.Slots) {
 		return domain.Exercise{}, nil, fmt.Errorf("slot %d: %w", pos, domain.ErrSlotNotFound)
 	}
-	current := session.ExerciseSets[pos].Exercise
-	existing := make(map[int]bool, len(session.ExerciseSets))
-	for _, es := range session.ExerciseSets {
+	current := session.Slots[pos].Exercise
+	existing := make(map[int]bool, len(session.Slots))
+	for _, es := range session.Slots {
 		existing[es.Exercise.ID] = true
 	}
 
@@ -254,7 +254,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	if updatedSess == nil {
 		return 0, fmt.Errorf("re-fetch session %s after add: %w", date.Format(time.DateOnly), domain.ErrNotFound)
 	}
-	for pos, es := range updatedSess.ExerciseSets {
+	for pos, es := range updatedSess.Slots {
 		if es.Exercise.ID == exerciseID {
 			return pos, nil
 		}

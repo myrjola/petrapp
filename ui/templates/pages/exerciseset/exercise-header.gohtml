@@ -99,7 +99,7 @@
         </div>
 
         <h1 class="exercise-title"
-            data-workout-exercise-id="{{ .Position }}">{{ .ExerciseSet.Exercise.Name }}</h1>
+            data-workout-exercise-id="{{ .Position }}">{{ .ExerciseSlot.Exercise.Name }}</h1>
 
         <div class="brief-nav">
             {{ template "back-link" (backLink (printf "/workouts/%s" (.Date.Format "2006-01-02")) $.Nonce) }}

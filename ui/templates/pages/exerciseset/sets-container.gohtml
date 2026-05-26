@@ -1,8 +1,8 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
 
 {{ define "sets-container" }}
-    <div class="sets-container stack{{ if not .ExerciseSet.WarmupCompletedAt }} disabled{{ end }}"
-         aria-label="Exercise sets"{{ if not .ExerciseSet.WarmupCompletedAt }} aria-disabled="true"{{ end }}>
+    <div class="sets-container stack{{ if not .ExerciseSlot.WarmupCompletedAt }} disabled{{ end }}"
+         aria-label="Exercise sets"{{ if not .ExerciseSlot.WarmupCompletedAt }} aria-disabled="true"{{ end }}>
         <style {{ $.Nonce }}>
             @scope (.sets-container) {
                 :scope {
@@ -414,7 +414,7 @@
                         {{ end }}
                     </div>
 
-                    {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
+                    {{ if or (eq $.ExerciseSlot.Exercise.ExerciseType "weighted") (eq $.ExerciseSlot.Exercise.ExerciseType "assisted") }}
                         <div class="active-hero">
                             <span>{{ formatFloat $.CurrentSetTarget.WeightKg }}<span class="unit">kg</span></span>
                             <span class="sep">×</span>
@@ -451,7 +451,7 @@
                                     >
                                 </div>
                             </div>
-                            {{ if eq $.ExerciseSet.Exercise.ExerciseType "assisted" }}
+                            {{ if eq $.ExerciseSlot.Exercise.ExerciseType "assisted" }}
                             <div class="input-field assisted-field">
                                 <label for="assisted-{{ $index }}">
                                     <input type="checkbox" id="assisted-{{ $index }}" name="assisted"
@@ -484,7 +484,7 @@
                                 </fieldset>
                             {{ end }}
                         </form>
-                    {{ else if eq $.ExerciseSet.Exercise.ExerciseType "time_based" }}
+                    {{ else if eq $.ExerciseSlot.Exercise.ExerciseType "time_based" }}
                         <div class="active-hero">
                             <span>{{ $.CurrentSetTimedTarget }}<span class="unit">sec</span></span>
                         </div>
@@ -766,7 +766,7 @@
                     {{/* Planned & Done rows ------------------------------ */}}
                     <span class="set-index">Set {{ $setDisplay.Number }}</span>
                     <span class="set-figures">
-                        {{ if or (eq $.ExerciseSet.Exercise.ExerciseType "weighted") (eq $.ExerciseSet.Exercise.ExerciseType "assisted") }}
+                        {{ if or (eq $.ExerciseSlot.Exercise.ExerciseType "weighted") (eq $.ExerciseSlot.Exercise.ExerciseType "assisted") }}
                             {{ if $set.CompletedValue }}
                                 <span class="set-weight">{{ formatFloat $set.WeightKg }} kg</span>
                                 <span class="sep">·</span>

@@ -31,8 +31,8 @@ type exerciseSetTemplateData struct {
 	BaseTemplateData
 
 	Date                  time.Time
-	Position              int // Slot's 0-based index in Session.ExerciseSets, used for URL building and view-transition names.
-	ExerciseSet           domain.ExerciseSet
+	Position              int // Slot's 0-based index in Session.Slots, used for URL building and view-transition names.
+	ExerciseSlot          domain.ExerciseSlot
 	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
 	FirstIncompleteIndex  int
 	EditingIndex          int              // Index of the set being edited
@@ -43,7 +43,7 @@ type exerciseSetTemplateData struct {
 	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
 	RestEndAtMs           int64            // 0 when no rest chip should be shown.
 	CurrentSetNumber      int              // 1-based number of the first incomplete set, clamped to TotalSetCount when all done.
-	TotalSetCount         int              // len(ExerciseSet.Sets), for the "Set N of M" overline.
+	TotalSetCount         int              // len(ExerciseSlot.Sets), for the "Set N of M" overline.
 }
 
 func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDisplay {
@@ -171,13 +171,13 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if pos >= len(session.ExerciseSets) {
+	if pos >= len(session.Slots) {
 		app.notFound(w, r)
 		return
 	}
-	exerciseSet := session.ExerciseSets[pos]
+	exerciseSlot := session.Slots[pos]
 
-	currentSetTarget, currentSetTimedTarget, err := app.buildProgressionTargets(r, date, exerciseSet.Exercise)
+	currentSetTarget, currentSetTimedTarget, err := app.buildProgressionTargets(r, date, exerciseSlot.Exercise)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -186,14 +186,14 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	// The rest clock zero point is the most recent of WarmupCompletedAt and
 	// the last set completion — mirrors PlanRestPush, which schedules a push
 	// from the same point on either trigger.
-	restClockStart := getLastCompletedAt(exerciseSet.Sets)
+	restClockStart := getLastCompletedAt(exerciseSlot.Sets)
 	if restClockStart == nil {
-		restClockStart = exerciseSet.WarmupCompletedAt
+		restClockStart = exerciseSlot.WarmupCompletedAt
 	}
 
 	var restEndAtMs int64
 	if restClockStart != nil {
-		restSeconds := domain.RestSecondsFor(exerciseSet.Exercise, session.PeriodizationType, false)
+		restSeconds := domain.RestSecondsFor(exerciseSlot.Exercise, session.PeriodizationType, false)
 		if restSeconds > 0 {
 			restEnd := restClockStart.Add(time.Duration(restSeconds) * time.Second)
 			if restEnd.After(time.Now()) {
@@ -206,9 +206,9 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData:      newBaseTemplateData(r),
 		Date:                  date,
 		Position:              pos,
-		ExerciseSet:           exerciseSet,
-		SetsDisplay:           prepareSetsDisplay(exerciseSet.Exercise, exerciseSet.Sets),
-		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSet.Sets),
+		ExerciseSlot:          exerciseSlot,
+		SetsDisplay:           prepareSetsDisplay(exerciseSlot.Exercise, exerciseSlot.Sets),
+		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSlot.Sets),
 		EditingIndex:          editingIndex,
 		IsEditing:             isEditing,
 		IsDeload:              session.IsDeload,
@@ -216,13 +216,13 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		CurrentSetTimedTarget: currentSetTimedTarget,
 		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
 		RestEndAtMs:           restEndAtMs,
-		CurrentSetNumber:      min(getFirstIncompleteIndex(exerciseSet.Sets)+1, len(exerciseSet.Sets)),
-		TotalSetCount:         len(exerciseSet.Sets),
+		CurrentSetNumber:      min(getFirstIncompleteIndex(exerciseSlot.Sets)+1, len(exerciseSlot.Sets)),
+		TotalSetCount:         len(exerciseSlot.Sets),
 	}
 
 	for i := range data.SetsDisplay {
 		data.SetsDisplay[i].IsActive = computeSetActive(
-			exerciseSet.WarmupCompletedAt != nil,
+			exerciseSlot.WarmupCompletedAt != nil,
 			data.SetsDisplay[i].Set.CompletedValue != nil,
 			i,
 			data.FirstIncompleteIndex,
@@ -235,7 +235,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 }
 
 // exerciseSetParams bundles the URL params for exercise set operations.
-// Position is the slot's 0-based index in Session.ExerciseSets, taken from
+// Position is the slot's 0-based index in Session.Slots, taken from
 // the URL.
 type exerciseSetParams struct {
 	Date     time.Time
@@ -408,12 +408,12 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if params.Position >= len(session.ExerciseSets) {
+	if params.Position >= len(session.Slots) {
 		app.notFound(w, r)
 		return
 	}
-	exerciseSet := session.ExerciseSets[params.Position]
-	exercise := exerciseSet.Exercise
+	exerciseSlot := session.Slots[params.Position]
+	exercise := exerciseSlot.Exercise
 
 	switch exercise.ExerciseType {
 	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:

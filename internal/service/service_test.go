@@ -108,7 +108,7 @@ func Test_RestartMesocycleAnchor_ClearsCurrentWeekDeloadAfterStartDeloadNow(t *t
 	// clear message when there are none.
 	forwardLookingCount := 0
 	for _, s := range sessions {
-		if len(s.ExerciseSets) == 0 {
+		if len(s.Slots) == 0 {
 			continue
 		}
 		if !s.Date.Before(today) {
@@ -121,7 +121,7 @@ func Test_RestartMesocycleAnchor_ClearsCurrentWeekDeloadAfterStartDeloadNow(t *t
 	}
 
 	for i, s := range sessions {
-		if len(s.ExerciseSets) == 0 {
+		if len(s.Slots) == 0 {
 			continue
 		}
 		if !s.Date.Before(today) && s.IsDeload {
@@ -177,7 +177,7 @@ func Test_RestartMesocycleAnchor_LeavesCompletedSessionsAlone(t *testing.T) {
 		t.Fatalf("today (%s) not found in weekly schedule", today.Weekday())
 	}
 	todaySess := sessions[todayIdx]
-	if len(todaySess.ExerciseSets) == 0 {
+	if len(todaySess.Slots) == 0 {
 		t.Skip("today is a rest day in Mon/Wed/Fri schedule; cannot complete a non-existent session")
 	}
 	if !todaySess.IsDeload {

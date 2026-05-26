@@ -341,13 +341,13 @@ func Test_AddExercise(t *testing.T) {
 		if errGet != nil {
 			t.Fatalf("GetSession after add: %v", errGet)
 		}
-		if newSlotPos < 0 || newSlotPos >= len(got.ExerciseSets) {
+		if newSlotPos < 0 || newSlotPos >= len(got.Slots) {
 			t.Fatalf("returned slot position %d out of range (session has %d slots)",
-				newSlotPos, len(got.ExerciseSets))
+				newSlotPos, len(got.Slots))
 		}
-		if got.ExerciseSets[newSlotPos].Exercise.ID != exercise2ID {
+		if got.Slots[newSlotPos].Exercise.ID != exercise2ID {
 			t.Errorf("slot %d has exercise %d, want %d",
-				newSlotPos, got.ExerciseSets[newSlotPos].Exercise.ID, exercise2ID)
+				newSlotPos, got.Slots[newSlotPos].Exercise.ID, exercise2ID)
 		}
 	})
 
@@ -487,7 +487,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 	}
 
 	var seededWeight *float64
-	for _, es := range session.ExerciseSets {
+	for _, es := range session.Slots {
 		if es.Exercise.ID == exerciseID && len(es.Sets) > 0 {
 			seededWeight = es.Sets[0].WeightKg
 			break
@@ -582,7 +582,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	}
 
 	var plankSets []domain.Set
-	for _, es := range session.ExerciseSets {
+	for _, es := range session.Slots {
 		if es.Exercise.ID == plankID {
 			plankSets = es.Sets
 			break
@@ -698,10 +698,10 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	if squatPos < 0 || squatPos >= len(session.ExerciseSets) {
-		t.Fatalf("squat position %d out of range (session has %d slots)", squatPos, len(session.ExerciseSets))
+	if squatPos < 0 || squatPos >= len(session.Slots) {
+		t.Fatalf("squat position %d out of range (session has %d slots)", squatPos, len(session.Slots))
 	}
-	slot := session.ExerciseSets[squatPos]
+	slot := session.Slots[squatPos]
 	if slot.Exercise.ID != plankID {
 		t.Fatalf("slot %d still maps to exercise %d, want %d", squatPos, slot.Exercise.ID, plankID)
 	}
@@ -795,7 +795,7 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 			}
 
 			var sets []domain.Set
-			for _, es := range session.ExerciseSets {
+			for _, es := range session.Slots {
 				if es.Exercise.ID == deadliftID {
 					sets = es.Sets
 					break
@@ -926,10 +926,10 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	if squatPos < 0 || squatPos >= len(session.ExerciseSets) {
-		t.Fatalf("squat position %d out of range (session has %d slots)", squatPos, len(session.ExerciseSets))
+	if squatPos < 0 || squatPos >= len(session.Slots) {
+		t.Fatalf("squat position %d out of range (session has %d slots)", squatPos, len(session.Slots))
 	}
-	slot := session.ExerciseSets[squatPos]
+	slot := session.Slots[squatPos]
 	if slot.Exercise.ID != deadliftID {
 		t.Fatalf("slot still maps to exercise %d, want deadlift %d", slot.Exercise.ID, deadliftID)
 	}
@@ -972,7 +972,7 @@ func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
 		found       bool
 	)
 	for _, s := range sessions {
-		if len(s.ExerciseSets) > 0 {
+		if len(s.Slots) > 0 {
 			session, workoutDate, found = s, s.Date, true
 			break
 		}
@@ -986,12 +986,12 @@ func Test_ListSwapCandidates_ExcludesSessionExercises(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListSwapCandidates: %v", err)
 	}
-	if current.ID != session.ExerciseSets[0].Exercise.ID {
-		t.Errorf("current.ID = %d, want %d", current.ID, session.ExerciseSets[0].Exercise.ID)
+	if current.ID != session.Slots[0].Exercise.ID {
+		t.Errorf("current.ID = %d, want %d", current.ID, session.Slots[0].Exercise.ID)
 	}
 
-	sessionIDs := make(map[int]bool, len(session.ExerciseSets))
-	for _, es := range session.ExerciseSets {
+	sessionIDs := make(map[int]bool, len(session.Slots))
+	for _, es := range session.Slots {
 		sessionIDs[es.Exercise.ID] = true
 	}
 	for _, c := range candidates {
@@ -1027,7 +1027,7 @@ func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
 		found       bool
 	)
 	for _, s := range sessions {
-		if len(s.ExerciseSets) > 0 {
+		if len(s.Slots) > 0 {
 			workoutDate, found = s.Date, true
 			break
 		}

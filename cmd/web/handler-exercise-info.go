@@ -69,11 +69,11 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 		app.serverError(w, r, err)
 		return
 	}
-	if pos >= len(session.ExerciseSets) {
+	if pos >= len(session.Slots) {
 		app.notFound(w, r)
 		return
 	}
-	exercise := session.ExerciseSets[pos].Exercise
+	exercise := session.Slots[pos].Exercise
 
 	// Fetch the progress data.
 	progressData, err := app.generateExerciseProgressData(r.Context(), date, exercise)

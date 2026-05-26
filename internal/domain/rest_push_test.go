@@ -45,14 +45,14 @@ func TestPlanRestPush(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		slot     domain.ExerciseSet
+		slot     domain.ExerciseSlot
 		pt       domain.PeriodizationType
 		isDeload bool
 		want     domain.RestPushDecision
 	}{
 		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
 			name: "empty slot returns Cancel",
-			slot: domain.ExerciseSet{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: squat, Sets: []domain.Set{},
 			},
 			pt: domain.PeriodizationStrength,
@@ -61,7 +61,7 @@ func TestPlanRestPush(t *testing.T) {
 		},
 		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
 			name: "all sets complete returns Cancel",
-			slot: domain.ExerciseSet{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: squat,
 				Sets:     []domain.Set{completedSet, completedSet, completedSet},
 			},
@@ -71,7 +71,7 @@ func TestPlanRestPush(t *testing.T) {
 		},
 		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
 			name: "no sets completed yet (warmup-just-done) schedules set 1",
-			slot: domain.ExerciseSet{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: squat,
 				Sets:     []domain.Set{incompleteSet, incompleteSet, incompleteSet},
 			},
@@ -90,7 +90,7 @@ func TestPlanRestPush(t *testing.T) {
 		},
 		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
 			name: "mid-exercise schedules next set",
-			slot: domain.ExerciseSet{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: squat,
 				Sets:     []domain.Set{completedSet, completedSet, incompleteSet},
 			},
@@ -109,7 +109,7 @@ func TestPlanRestPush(t *testing.T) {
 		},
 		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
 			name: "time-based exercise (RestSecondsFor returns 0) returns NoOp",
-			slot: domain.ExerciseSet{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: plank,
 				Sets:     []domain.Set{incompleteSet, incompleteSet},
 			},
@@ -119,7 +119,7 @@ func TestPlanRestPush(t *testing.T) {
 		},
 		{
 			name: "deload session uses deload rest mapping",
-			slot: domain.ExerciseSet{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: curl,
 				Sets:     []domain.Set{incompleteSet, incompleteSet},
 			},

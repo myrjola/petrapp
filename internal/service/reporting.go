@@ -19,7 +19,7 @@ func (s *Service) GetSessionsWithExerciseSince(ctx context.Context, exerciseID i
 
 	var result []domain.Session
 	for _, session := range sessions {
-		for _, es := range session.ExerciseSets {
+		for _, es := range session.Slots {
 			if es.Exercise.ID == exerciseID {
 				result = append(result, session)
 				break

@@ -86,10 +86,10 @@ func Test_RecordSetCompletion(t *testing.T) {
 		t.Fatalf("GetSession: %v", err)
 	}
 
-	var es *domain.ExerciseSet
-	for i := range sess.ExerciseSets {
-		if sess.ExerciseSets[i].Exercise.ID == exerciseID {
-			es = &sess.ExerciseSets[i]
+	var es *domain.ExerciseSlot
+	for i := range sess.Slots {
+		if sess.Slots[i].Exercise.ID == exerciseID {
+			es = &sess.Slots[i]
 			break
 		}
 	}

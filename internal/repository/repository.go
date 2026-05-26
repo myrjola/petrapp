@@ -28,7 +28,7 @@ type Repositories struct {
 }
 
 // New constructs all seven SQLite-backed repositories. SessionRepository
-// hydrates ExerciseSet.Exercise inline by joining `exercises` and batching
+// hydrates ExerciseSlot.Exercise inline by joining `exercises` and batching
 // muscle-group lookups, so it no longer depends on ExerciseRepository.
 func New(db *sqlite.Database) *Repositories {
 	prefs := newSQLitePreferencesRepository(db)
@@ -86,7 +86,7 @@ type WeekPlanRepository interface {
 	// against the hydrated *domain.WeekPlan, and persists the result via
 	// delete-then-reinsert across the week's date range. Returning nil from fn
 	// commits; returning an error rolls back. Slot identity is the array index
-	// in Session.ExerciseSets, persisted as the workout_exercises.position
+	// in Session.Slots, persisted as the workout_exercises.position
 	// column, so the reinsert is a single pass and no autoincrement collisions
 	// are possible. Sentinel errors from domain (e.g. ErrAlreadyStarted)
 	// propagate so callers can detect no-op cases via errors.Is.

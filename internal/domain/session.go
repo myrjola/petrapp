@@ -21,45 +21,45 @@ const (
 	SessionCompleted  SessionStatus = "completed"
 )
 
-// ExerciseSet is one slot in a Session: an exercise plus its sets. Slot
-// identity is the slot's position in Session.ExerciseSets — there is no
+// ExerciseSlot is one slot in a Session: an exercise plus its sets. Slot
+// identity is the slot's position in Session.Slots — there is no
 // surrogate ID. Position is stable under SwapExerciseInSlot, so URLs and
 // schedule keys keyed on it survive swaps.
-type ExerciseSet struct {
+type ExerciseSlot struct {
 	Exercise          Exercise
 	Sets              []Set
 	WarmupCompletedAt *time.Time // Nullable timestamp when warmup for this exercise was completed
 }
 
-// ExerciseSetState is the completion state of an exercise slot, for display.
-type ExerciseSetState string
+// ExerciseSlotState is the completion state of an exercise slot, for display.
+type ExerciseSlotState string
 
 const (
-	ExerciseSetNotStarted ExerciseSetState = "not-started"
-	ExerciseSetStarted    ExerciseSetState = "started"
-	ExerciseSetCompleted  ExerciseSetState = "completed"
+	ExerciseSlotNotStarted ExerciseSlotState = "not-started"
+	ExerciseSlotStarted    ExerciseSlotState = "started"
+	ExerciseSlotCompleted  ExerciseSlotState = "completed"
 )
 
 // CompletionState reports whether none, some, or all of the slot's sets have
 // been completed. A slot with no sets is reported as not started. The string
 // values double as CSS state tokens used by the workout page.
-func (es ExerciseSet) CompletionState() ExerciseSetState {
+func (es ExerciseSlot) CompletionState() ExerciseSlotState {
 	completed := es.CompletedSetCount()
 	if len(es.Sets) == 0 {
-		return ExerciseSetNotStarted
+		return ExerciseSlotNotStarted
 	}
 	switch completed {
 	case 0:
-		return ExerciseSetNotStarted
+		return ExerciseSlotNotStarted
 	case len(es.Sets):
-		return ExerciseSetCompleted
+		return ExerciseSlotCompleted
 	default:
-		return ExerciseSetStarted
+		return ExerciseSlotStarted
 	}
 }
 
 // CompletedSetCount returns how many of the slot's sets have been completed.
-func (es ExerciseSet) CompletedSetCount() int {
+func (es ExerciseSlot) CompletedSetCount() int {
 	n := 0
 	for i := range es.Sets {
 		if es.Sets[i].CompletedAt != nil {
@@ -73,7 +73,7 @@ func (es ExerciseSet) CompletedSetCount() int {
 // when setIndex is out of range. The value receiver still yields a usable
 // pointer: es.Sets shares its backing array with the caller's slot, so
 // mutations through the returned pointer land on the original set.
-func (es ExerciseSet) setAt(setIndex int) (*Set, error) {
+func (es ExerciseSlot) setAt(setIndex int) (*Set, error) {
 	if setIndex < 0 || setIndex >= len(es.Sets) {
 		return nil, ErrSetIndexOutOfBounds
 	}
@@ -100,7 +100,7 @@ type Session struct {
 	DifficultyRating  *int
 	StartedAt         time.Time
 	CompletedAt       time.Time
-	ExerciseSets      []ExerciseSet
+	Slots             []ExerciseSlot
 	PeriodizationType PeriodizationType
 	IsDeload          bool
 }
@@ -220,17 +220,17 @@ func (s *Session) UpdateCompletedValue(pos, setIndex, value int, now time.Time) 
 }
 
 // AddExercise appends a new exercise slot to the session. The slot's position
-// is len(s.ExerciseSets) at the time of the append, persisted by the
+// is len(s.Slots) at the time of the append, persisted by the
 // repository as the row's position column. Returns
 // ErrExerciseAlreadyInSession when an existing slot already references the
 // same Exercise.ID.
 func (s *Session) AddExercise(ex Exercise, sets []Set) error {
-	for _, existing := range s.ExerciseSets {
+	for _, existing := range s.Slots {
 		if existing.Exercise.ID == ex.ID {
 			return ErrExerciseAlreadyInSession
 		}
 	}
-	s.ExerciseSets = append(s.ExerciseSets, ExerciseSet{ //nolint:exhaustruct // WarmupCompletedAt nil.
+	s.Slots = append(s.Slots, ExerciseSlot{ //nolint:exhaustruct // WarmupCompletedAt nil.
 		Exercise: ex,
 		Sets:     sets,
 	})
@@ -277,8 +277,8 @@ func (s *Session) UpdateSetWeight(pos, setIndex int, weightKg float64) error {
 // upper or lower is present. An empty session defaults to full body.
 func (s Session) WorkoutType() Category {
 	hasUpper, hasLower := false, false
-	for i := range s.ExerciseSets {
-		switch s.ExerciseSets[i].Exercise.Category {
+	for i := range s.Slots {
+		switch s.Slots[i].Exercise.Category {
 		case CategoryFullBody:
 			return CategoryFullBody
 		case CategoryUpper:
@@ -303,8 +303,8 @@ func (s Session) WorkoutType() Category {
 // every set completed. Used by the workout overview to show progress.
 func (s Session) CompletedExerciseCount() int {
 	n := 0
-	for i := range s.ExerciseSets {
-		if s.ExerciseSets[i].CompletionState() == ExerciseSetCompleted {
+	for i := range s.Slots {
+		if s.Slots[i].CompletionState() == ExerciseSlotCompleted {
 			n++
 		}
 	}
@@ -314,7 +314,7 @@ func (s Session) CompletedExerciseCount() int {
 // IncompleteExerciseCount returns how many of the session's exercise slots
 // still have at least one set to complete (including slots not started).
 func (s Session) IncompleteExerciseCount() int {
-	return len(s.ExerciseSets) - s.CompletedExerciseCount()
+	return len(s.Slots) - s.CompletedExerciseCount()
 }
 
 // Status reports the session's lifecycle state from its timestamps.
@@ -333,9 +333,9 @@ func (s Session) Status() SessionStatus {
 // whether a just-completed set is the final set of the workout — if so, no
 // rest push should be scheduled.
 func (s *Session) HasIncompleteSets() bool {
-	for i := range s.ExerciseSets {
-		for j := range s.ExerciseSets[i].Sets {
-			if s.ExerciseSets[i].Sets[j].CompletedAt == nil {
+	for i := range s.Slots {
+		for j := range s.Slots[i].Sets {
+			if s.Slots[i].Sets[j].CompletedAt == nil {
 				return true
 			}
 		}
@@ -343,12 +343,12 @@ func (s *Session) HasIncompleteSets() bool {
 	return false
 }
 
-// slotAt returns a pointer to the exercise slot at pos within ExerciseSets,
+// slotAt returns a pointer to the exercise slot at pos within Slots,
 // or ErrSlotNotFound when pos is out of range. The pointer aliases into
-// ExerciseSets so callers can mutate the slot in place.
-func (s *Session) slotAt(pos int) (*ExerciseSet, error) {
-	if pos < 0 || pos >= len(s.ExerciseSets) {
+// Slots so callers can mutate the slot in place.
+func (s *Session) slotAt(pos int) (*ExerciseSlot, error) {
+	if pos < 0 || pos >= len(s.Slots) {
 		return nil, ErrSlotNotFound
 	}
-	return &s.ExerciseSets[pos], nil
+	return &s.Slots[pos], nil
 }

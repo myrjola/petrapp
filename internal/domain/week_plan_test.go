@@ -30,7 +30,7 @@ func sessionOn(offset int, started bool, completed bool, isDeload bool) domain.S
 	if completed {
 		s.CompletedAt = d.Add(9 * time.Hour)
 	}
-	s.ExerciseSets = []domain.ExerciseSet{{ //nolint:exhaustruct // test scaffolding.
+	s.Slots = []domain.ExerciseSlot{{ //nolint:exhaustruct // test scaffolding.
 		Sets: []domain.Set{{}}, //nolint:exhaustruct // test scaffolding.
 	}}
 	s.PeriodizationType = domain.PeriodizationStrength

@@ -20,7 +20,7 @@ func Test_WeeklyMuscleGroupVolume_PlannedAndCompleted(t *testing.T) {
 
 	sess := domain.Session{ //nolint:exhaustruct // test fixture only needs these fields
 		Date: time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{
 				Exercise:          chest,
 				WarmupCompletedAt: nil,

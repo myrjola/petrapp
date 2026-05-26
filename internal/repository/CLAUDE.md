@@ -27,7 +27,7 @@ template logic, no business orchestration.
   - Session-shaped persistence on `baseRepository` (write helpers in
     `shared.go`, read helpers in `sessions.go`): `insertSessionRowInTx`,
     `saveOneSlotInTx` (writes one slot at a caller-supplied position),
-    `saveExerciseSetsInTx` (single pass over `Session.ExerciseSets`,
+    `saveExerciseSetsInTx` (single pass over `Session.Slots`,
     passing each slot's array index as `position`), `insertSessionInTx`
     (the composite of row + sets), `deleteWeekInTx`, plus read-side
     `listSessionRows`, `listSessionRowsBetween`, and
@@ -74,7 +74,7 @@ transactional boundary at week scope.
 `workout_sessions` row in `[monday, monday+6]` inside the tx (CASCADE
 clears `workout_exercises` and `exercise_sets`) and re-inserting the
 sessions in a single pass. Slot identity is the array index in
-`Session.ExerciseSets`, written into the row's `position` column —
+`Session.Slots`, written into the row's `position` column —
 there is no autoincrement, so the order in which slots are inserted
 does not matter and there is nothing for SQLite to collide on. For
 PetrApp's data sizes (a handful of exercises × a handful of sets per
@@ -82,7 +82,7 @@ session) the cost is negligible and the simplicity is worth the trade.
 
 ## Hydration policy
 
-`SessionRepository.Get` and `List` always populate `ExerciseSet.Exercise`
+`SessionRepository.Get` and `List` always populate `ExerciseSlot.Exercise`
 inline: the base exercise columns are joined in via
 `workout_exercises.exercise_id → exercises.id`, and primary/secondary
 muscle groups are fetched in a single follow-up query keyed by the
@@ -130,7 +130,7 @@ SQL-shaped contract, not the business rule.
     persists; on a returned error the transaction rolls back and the
     on-disk state is unchanged.
   - Slot-position stability — each slot's array index in
-    `Session.ExerciseSets` survives the delete-and-reinsert cycle inside
+    `Session.Slots` survives the delete-and-reinsert cycle inside
     `WeekPlanRepository.Update`, including across `SwapExerciseInSlot`.
 - **What NOT to test here:** business rules and aggregate invariants
   (those live in `internal/domain/`), and end-to-end orchestration

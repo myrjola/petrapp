@@ -112,7 +112,7 @@ func Test_Session_MarkWarmupComplete_KnownSlot(t *testing.T) {
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // Test sets omit irrelevant fields.
 				Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Test exercises omit display fields.
 			},
@@ -125,11 +125,11 @@ func Test_Session_MarkWarmupComplete_KnownSlot(t *testing.T) {
 	if err := sess.MarkWarmupComplete(1, now); err != nil {
 		t.Fatalf("MarkWarmupComplete: %v", err)
 	}
-	if sess.ExerciseSets[1].WarmupCompletedAt == nil || !sess.ExerciseSets[1].WarmupCompletedAt.Equal(now) {
-		t.Errorf("pos 1 WarmupCompletedAt = %v, want %v", sess.ExerciseSets[1].WarmupCompletedAt, now)
+	if sess.Slots[1].WarmupCompletedAt == nil || !sess.Slots[1].WarmupCompletedAt.Equal(now) {
+		t.Errorf("pos 1 WarmupCompletedAt = %v, want %v", sess.Slots[1].WarmupCompletedAt, now)
 	}
-	if sess.ExerciseSets[0].WarmupCompletedAt != nil {
-		t.Errorf("pos 0 WarmupCompletedAt mutated to %v, want nil", sess.ExerciseSets[0].WarmupCompletedAt)
+	if sess.Slots[0].WarmupCompletedAt != nil {
+		t.Errorf("pos 0 WarmupCompletedAt mutated to %v, want nil", sess.Slots[0].WarmupCompletedAt)
 	}
 }
 
@@ -138,7 +138,7 @@ func Test_Session_MarkWarmupComplete_OutOfRange(t *testing.T) {
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // Test sets omit irrelevant fields.
 				Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Test exercises omit display fields.
 			},
@@ -154,8 +154,8 @@ func Test_Session_MarkWarmupComplete_OutOfRange(t *testing.T) {
 func Test_Session_UpdateSetWeight_KnownSlotAndIndex(t *testing.T) {
 	t.Parallel()
 
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ID: 1}, //nolint:exhaustruct // Only Exercise.ID is read.
 				Sets: []domain.Set{
@@ -169,11 +169,11 @@ func Test_Session_UpdateSetWeight_KnownSlotAndIndex(t *testing.T) {
 	if err := sess.UpdateSetWeight(0, 1, 80.0); err != nil {
 		t.Fatalf("UpdateSetWeight: %v", err)
 	}
-	if sess.ExerciseSets[0].Sets[1].WeightKg == nil || *sess.ExerciseSets[0].Sets[1].WeightKg != 80.0 {
-		t.Errorf("WeightKg = %v, want 80.0", sess.ExerciseSets[0].Sets[1].WeightKg)
+	if sess.Slots[0].Sets[1].WeightKg == nil || *sess.Slots[0].Sets[1].WeightKg != 80.0 {
+		t.Errorf("WeightKg = %v, want 80.0", sess.Slots[0].Sets[1].WeightKg)
 	}
-	if sess.ExerciseSets[0].Sets[0].WeightKg != nil {
-		t.Errorf("set 0 WeightKg mutated to %v, want nil", sess.ExerciseSets[0].Sets[0].WeightKg)
+	if sess.Slots[0].Sets[0].WeightKg != nil {
+		t.Errorf("set 0 WeightKg mutated to %v, want nil", sess.Slots[0].Sets[0].WeightKg)
 	}
 }
 
@@ -190,8 +190,8 @@ func Test_Session_UpdateSetWeight_OutOfRange(t *testing.T) {
 func Test_Session_UpdateSetWeight_OutOfBoundsIndex(t *testing.T) {
 	t.Parallel()
 
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ID: 1},         //nolint:exhaustruct // Only Exercise.ID is read.
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -208,8 +208,8 @@ func Test_Session_UpdateCompletedValue_Sets(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ID: 1},         //nolint:exhaustruct // Only Exercise.ID is read.
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -220,7 +220,7 @@ func Test_Session_UpdateCompletedValue_Sets(t *testing.T) {
 	if err := sess.UpdateCompletedValue(0, 0, 6, now); err != nil {
 		t.Fatalf("UpdateCompletedValue: %v", err)
 	}
-	got := sess.ExerciseSets[0].Sets[0]
+	got := sess.Slots[0].Sets[0]
 	if got.CompletedValue == nil || *got.CompletedValue != 6 {
 		t.Errorf("CompletedValue = %v, want 6", got.CompletedValue)
 	}
@@ -243,8 +243,8 @@ func Test_Session_UpdateCompletedValue_OutOfBoundsIndex(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ID: 1},         //nolint:exhaustruct // Only Exercise.ID is read.
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -261,8 +261,8 @@ func Test_Session_RecordSet_Weighted(t *testing.T) {
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
 	weight := 80.0
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ID: 1},         //nolint:exhaustruct // Only Exercise.ID is read.
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -276,7 +276,7 @@ func Test_Session_RecordSet_Weighted(t *testing.T) {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
-	got := sess.ExerciseSets[0].Sets[0]
+	got := sess.Slots[0].Sets[0]
 	if got.WeightKg == nil || *got.WeightKg != weight {
 		t.Errorf("WeightKg = %v, want %v", got.WeightKg, weight)
 	}
@@ -295,8 +295,8 @@ func Test_Session_RecordSet_Timed_NoWeight(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ //nolint:exhaustruct // Only ID and ExerciseType are read.
 					ID: 1, ExerciseType: domain.ExerciseTypeTime,
@@ -312,7 +312,7 @@ func Test_Session_RecordSet_Timed_NoWeight(t *testing.T) {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
-	got := sess.ExerciseSets[0].Sets[0]
+	got := sess.Slots[0].Sets[0]
 	if got.WeightKg != nil {
 		t.Errorf("WeightKg = %v, want nil for timed set", got.WeightKg)
 	}
@@ -340,8 +340,8 @@ func Test_Session_RecordSet_OutOfBoundsIndex(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 5, 10, 9, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: domain.Exercise{ID: 1},         //nolint:exhaustruct // Only Exercise.ID is read.
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -360,8 +360,8 @@ func Test_Session_AddExercise_Append(t *testing.T) {
 
 	bench := domain.Exercise{ID: 1, Name: "Bench"} //nolint:exhaustruct // Only ID and Name read.
 	squat := domain.Exercise{ID: 2, Name: "Squat"} //nolint:exhaustruct // Only ID and Name read.
-	sess := domain.Session{                        //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{                        //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{Exercise: bench, Sets: nil, WarmupCompletedAt: nil},
 		},
 	}
@@ -370,10 +370,10 @@ func Test_Session_AddExercise_Append(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddExercise: %v", err)
 	}
-	if len(sess.ExerciseSets) != 2 {
-		t.Fatalf("ExerciseSets length = %d, want 2", len(sess.ExerciseSets))
+	if len(sess.Slots) != 2 {
+		t.Fatalf("Slots length = %d, want 2", len(sess.Slots))
 	}
-	added := sess.ExerciseSets[1]
+	added := sess.Slots[1]
 	if added.Exercise.ID != squat.ID {
 		t.Errorf("Exercise.ID = %d, want %d", added.Exercise.ID, squat.ID)
 	}
@@ -386,8 +386,8 @@ func Test_Session_AddExercise_DuplicateExerciseID_ReturnsErr(t *testing.T) {
 	t.Parallel()
 
 	bench := domain.Exercise{ID: 1, Name: "Bench"} //nolint:exhaustruct // Only ID read.
-	sess := domain.Session{                        //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{                        //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{Exercise: bench, Sets: nil, WarmupCompletedAt: nil},
 		},
 	}
@@ -396,8 +396,8 @@ func Test_Session_AddExercise_DuplicateExerciseID_ReturnsErr(t *testing.T) {
 	if !errors.Is(err, domain.ErrExerciseAlreadyInSession) {
 		t.Fatalf("got %v, want ErrExerciseAlreadyInSession", err)
 	}
-	if len(sess.ExerciseSets) != 1 {
-		t.Errorf("ExerciseSets length = %d, want 1 (no append on error)", len(sess.ExerciseSets))
+	if len(sess.Slots) != 1 {
+		t.Errorf("Slots length = %d, want 1 (no append on error)", len(sess.Slots))
 	}
 }
 
@@ -409,8 +409,8 @@ func Test_Session_SwapExerciseInSlot_PreservesPosition(t *testing.T) {
 	dip := domain.Exercise{ID: 3, Name: "Dip"}     //nolint:exhaustruct // Only ID read.
 	row := domain.Exercise{ID: 4, Name: "Row"}     //nolint:exhaustruct // Only ID read.
 	warmupAt := time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)
-	sess := domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-		ExerciseSets: []domain.ExerciseSet{
+	sess := domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+		Slots: []domain.ExerciseSlot{
 			{
 				Exercise:          bench,
 				Sets:              []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other Set fields nil.
@@ -433,7 +433,7 @@ func Test_Session_SwapExerciseInSlot_PreservesPosition(t *testing.T) {
 	if err := sess.SwapExerciseInSlot(1, dip, newSets); err != nil {
 		t.Fatalf("SwapExerciseInSlot: %v", err)
 	}
-	got := sess.ExerciseSets[1]
+	got := sess.Slots[1]
 	if got.Exercise.ID != dip.ID {
 		t.Errorf("Exercise.ID = %d, want %d (swapped at pos 1)", got.Exercise.ID, dip.ID)
 	}
@@ -443,11 +443,11 @@ func Test_Session_SwapExerciseInSlot_PreservesPosition(t *testing.T) {
 	if got.WarmupCompletedAt != nil {
 		t.Errorf("WarmupCompletedAt = %v, want nil (reset on swap)", got.WarmupCompletedAt)
 	}
-	if sess.ExerciseSets[0].Exercise.ID != bench.ID {
-		t.Errorf("pos 0 Exercise.ID = %d, want %d (unchanged)", sess.ExerciseSets[0].Exercise.ID, bench.ID)
+	if sess.Slots[0].Exercise.ID != bench.ID {
+		t.Errorf("pos 0 Exercise.ID = %d, want %d (unchanged)", sess.Slots[0].Exercise.ID, bench.ID)
 	}
-	if sess.ExerciseSets[2].Exercise.ID != row.ID {
-		t.Errorf("pos 2 Exercise.ID = %d, want %d (unchanged)", sess.ExerciseSets[2].Exercise.ID, row.ID)
+	if sess.Slots[2].Exercise.ID != row.ID {
+		t.Errorf("pos 2 Exercise.ID = %d, want %d (unchanged)", sess.Slots[2].Exercise.ID, row.ID)
 	}
 }
 
@@ -465,16 +465,16 @@ func Test_Session_WorkoutType(t *testing.T) {
 	t.Parallel()
 
 	sessionWith := func(cats ...domain.Category) domain.Session {
-		sets := make([]domain.ExerciseSet, 0, len(cats))
+		sets := make([]domain.ExerciseSlot, 0, len(cats))
 		for _, c := range cats {
-			sets = append(sets, domain.ExerciseSet{ //nolint:exhaustruct // Test sets omit irrelevant fields.
+			sets = append(sets, domain.ExerciseSlot{ //nolint:exhaustruct // Test sets omit irrelevant fields.
 				Exercise: domain.Exercise{ //nolint:exhaustruct // Only Category is read.
 					Category: c,
 				},
 			})
 		}
 		return domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
-			ExerciseSets: sets,
+			Slots: sets,
 		}
 	}
 	tests := []struct {
@@ -511,7 +511,7 @@ func TestSession_RecordSet_NilSignalIsAllowed(t *testing.T) {
 
 	now := time.Date(2026, time.May, 4, 10, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // only fields used by RecordSet
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt not relevant to RecordSet
 				Exercise: domain.Exercise{ //nolint:exhaustruct // only ID and ExerciseType matter here
 					ID:           1,
@@ -524,7 +524,7 @@ func TestSession_RecordSet_NilSignalIsAllowed(t *testing.T) {
 	if err := sess.RecordSet(0, 0, nil, nil, 11, now); err != nil {
 		t.Fatalf("RecordSet with nil signal: %v", err)
 	}
-	got := sess.ExerciseSets[0].Sets[0]
+	got := sess.Slots[0].Sets[0]
 	if got.Signal != nil {
 		t.Errorf("Signal = %v, want nil", got.Signal)
 	}
@@ -581,17 +581,17 @@ func Test_ExerciseSet_CompletionState(t *testing.T) {
 	tests := []struct {
 		name string
 		sets []domain.Set
-		want domain.ExerciseSetState
+		want domain.ExerciseSlotState
 	}{
-		{"no sets is not started", nil, domain.ExerciseSetNotStarted},
-		{"all pending is not started", []domain.Set{pending, pending}, domain.ExerciseSetNotStarted},
-		{"some completed is started", []domain.Set{completed, pending}, domain.ExerciseSetStarted},
-		{"all completed is completed", []domain.Set{completed, completed}, domain.ExerciseSetCompleted},
+		{"no sets is not started", nil, domain.ExerciseSlotNotStarted},
+		{"all pending is not started", []domain.Set{pending, pending}, domain.ExerciseSlotNotStarted},
+		{"some completed is started", []domain.Set{completed, pending}, domain.ExerciseSlotStarted},
+		{"all completed is completed", []domain.Set{completed, completed}, domain.ExerciseSlotCompleted},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			es := domain.ExerciseSet{Sets: tt.sets} //nolint:exhaustruct // Only Sets is relevant here.
+			es := domain.ExerciseSlot{Sets: tt.sets} //nolint:exhaustruct // Only Sets is relevant here.
 			if got := es.CompletionState(); got != tt.want {
 				t.Errorf("CompletionState() = %q, want %q", got, tt.want)
 			}
@@ -625,8 +625,8 @@ func TestSessionHasIncompleteSets(t *testing.T) {
 		},
 		{
 			name: "all sets complete",
-			sess: domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-				ExerciseSets: []domain.ExerciseSet{
+			sess: domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+				Slots: []domain.ExerciseSlot{
 					{ //nolint:exhaustruct // Only Sets is read.
 						Sets: []domain.Set{completedSet, completedSet},
 					},
@@ -636,8 +636,8 @@ func TestSessionHasIncompleteSets(t *testing.T) {
 		},
 		{
 			name: "one set incomplete in a later slot",
-			sess: domain.Session{ //nolint:exhaustruct // Test only sets ExerciseSets.
-				ExerciseSets: []domain.ExerciseSet{
+			sess: domain.Session{ //nolint:exhaustruct // Test only sets Slots.
+				Slots: []domain.ExerciseSlot{
 					{ //nolint:exhaustruct // Only Sets is read.
 						Sets: []domain.Set{completedSet, completedSet},
 					},

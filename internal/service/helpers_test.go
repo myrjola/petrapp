@@ -59,8 +59,8 @@ func setupTestServiceWithDB(t *testing.T) (context.Context, *service.Service, *s
 }
 
 func extractExerciseIDs(session domain.Session) []int {
-	ids := make([]int, len(session.ExerciseSets))
-	for i, es := range session.ExerciseSets {
+	ids := make([]int, len(session.Slots))
+	for i, es := range session.Slots {
 		ids[i] = es.Exercise.ID
 	}
 	return ids
@@ -131,8 +131,8 @@ func countExerciseSetsForWorkout(ctx context.Context, t *testing.T, svc *service
 
 	// Count total sets across all exercises
 	totalSets := 0
-	for _, exerciseSet := range session.ExerciseSets {
-		totalSets += len(exerciseSet.Sets)
+	for _, exerciseSlot := range session.Slots {
+		totalSets += len(exerciseSlot.Sets)
 	}
 
 	return totalSets, nil
@@ -153,8 +153,8 @@ func exerciseExistsInWorkout(
 	}
 
 	// Check if any exercise set has the specified exercise ID
-	for _, exerciseSet := range session.ExerciseSets {
-		if exerciseSet.Exercise.ID == exerciseID {
+	for _, exerciseSlot := range session.Slots {
+		if exerciseSlot.Exercise.ID == exerciseID {
 			return true, nil
 		}
 	}

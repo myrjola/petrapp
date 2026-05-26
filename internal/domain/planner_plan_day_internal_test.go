@@ -60,8 +60,8 @@ func TestPlanner_PlanDay_IsolatedDateDefaultsToFullBody(t *testing.T) {
 		t.Errorf("WorkoutType = %s, want full body", sess.WorkoutType())
 	}
 	// Default exercise count for unscheduled day = exercisesMedium = 3.
-	if len(sess.ExerciseSets) != exercisesMedium {
-		t.Errorf("ExerciseSets count = %d, want %d", len(sess.ExerciseSets), exercisesMedium)
+	if len(sess.Slots) != exercisesMedium {
+		t.Errorf("Slots count = %d, want %d", len(sess.Slots), exercisesMedium)
 	}
 }
 
@@ -98,7 +98,7 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *te
 	}
 	for i := range weekly.Sessions {
 		want := weekly.Sessions[i]
-		if len(want.ExerciseSets) == 0 {
+		if len(want.Slots) == 0 {
 			continue
 		}
 		var got Session
@@ -127,7 +127,7 @@ func TestPlanner_PlanDay_AvoidsUsedExercises(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
-	for _, es := range sess.ExerciseSets {
+	for _, es := range sess.Slots {
 		if used[es.Exercise.ID] {
 			t.Errorf("PlanDay returned used exercise id=%d", es.Exercise.ID)
 		}
@@ -148,8 +148,8 @@ func TestPlanner_PlanDay_UsesPrefsExerciseCountWhenScheduled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
-	if len(sess.ExerciseSets) != exercisesLong {
-		t.Errorf("ExerciseSets count = %d, want %d (long day)", len(sess.ExerciseSets), exercisesLong)
+	if len(sess.Slots) != exercisesLong {
+		t.Errorf("Slots count = %d, want %d (long day)", len(sess.Slots), exercisesLong)
 	}
 }
 

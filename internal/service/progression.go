@@ -125,7 +125,7 @@ func (s *Service) BuildProgression(
 	}
 
 	var completed []domain.SetResult
-	for _, es := range sess.ExerciseSets {
+	for _, es := range sess.Slots {
 		if es.Exercise.ID != exerciseID {
 			continue
 		}
@@ -200,7 +200,7 @@ func (s *Service) BuildTimedProgression(
 	}
 
 	var completed []domain.TimedSetResult
-	for _, es := range sess.ExerciseSets {
+	for _, es := range sess.Slots {
 		if es.Exercise.ID != exerciseID {
 			continue
 		}

@@ -48,7 +48,7 @@ func TestSessionRepository_GetHydratesExercise(t *testing.T) {
 	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero by design.
 		Date:              monday,
 		PeriodizationType: domain.PeriodizationStrength,
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID assigned by DB; WarmupCompletedAt nil.
 				Exercise: exercise,
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -69,10 +69,10 @@ func TestSessionRepository_GetHydratesExercise(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if len(got.ExerciseSets) != 1 {
-		t.Fatalf("want 1 ExerciseSet, got %d", len(got.ExerciseSets))
+	if len(got.Slots) != 1 {
+		t.Fatalf("want 1 ExerciseSlot, got %d", len(got.Slots))
 	}
-	hydrated := got.ExerciseSets[0].Exercise
+	hydrated := got.Slots[0].Exercise
 	if hydrated.ID != exercise.ID {
 		t.Errorf("Exercise.ID: want %d, got %d", exercise.ID, hydrated.ID)
 	}
@@ -100,7 +100,7 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 		return domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
 			Date:              day,
 			PeriodizationType: domain.PeriodizationStrength,
-			ExerciseSets: []domain.ExerciseSet{
+			Slots: []domain.ExerciseSlot{
 				{ //nolint:exhaustruct // ID assigned by DB; WarmupCompletedAt nil.
 					Exercise: exercise,
 					Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // Other fields nil.
@@ -135,18 +135,18 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 	// The batched query must hydrate every session, not just the first.
 	for _, sess := range got {
 		label := sess.Date.Format(time.DateOnly)
-		if len(sess.ExerciseSets) != 1 {
-			t.Fatalf("session %s: want 1 ExerciseSet, got %d", label, len(sess.ExerciseSets))
+		if len(sess.Slots) != 1 {
+			t.Fatalf("session %s: want 1 ExerciseSlot, got %d", label, len(sess.Slots))
 		}
-		ex := sess.ExerciseSets[0].Exercise
+		ex := sess.Slots[0].Exercise
 		if ex.ID != exercise.ID || ex.Name != exercise.Name {
 			t.Errorf("session %s: exercise not hydrated: %+v", label, ex)
 		}
 		if len(ex.PrimaryMuscleGroups) != 1 || ex.PrimaryMuscleGroups[0] != "Chest" {
 			t.Errorf("session %s: PrimaryMuscleGroups = %v, want [Chest]", label, ex.PrimaryMuscleGroups)
 		}
-		if len(sess.ExerciseSets[0].Sets) != 1 || sess.ExerciseSets[0].Sets[0].TargetValue != 5 {
-			t.Errorf("session %s: sets not hydrated: %+v", label, sess.ExerciseSets[0].Sets)
+		if len(sess.Slots[0].Sets) != 1 || sess.Slots[0].Sets[0].TargetValue != 5 {
+			t.Errorf("session %s: sets not hydrated: %+v", label, sess.Slots[0].Sets)
 		}
 	}
 }
@@ -202,7 +202,7 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 		Date:              mondayNormal,
 		PeriodizationType: domain.PeriodizationHypertrophy,
 		IsDeload:          false,
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID and WarmupCompletedAt not needed for round-trip test
 				Exercise: exercise,
 				Sets: []domain.Set{
@@ -221,7 +221,7 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 		Date:              mondayDeload,
 		PeriodizationType: domain.PeriodizationHypertrophy,
 		IsDeload:          true,
-		ExerciseSets: []domain.ExerciseSet{
+		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID and WarmupCompletedAt not needed for round-trip test
 				Exercise: exercise,
 				Sets: []domain.Set{

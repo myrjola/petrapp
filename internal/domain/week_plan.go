@@ -6,7 +6,7 @@ import (
 
 // WeekPlan is the aggregate root for one calendar week of a user's training.
 // It owns seven Session values indexed by day-of-week (0 = Monday). Rest days
-// carry an empty Session{Date: ...} with no ExerciseSets.
+// carry an empty Session{Date: ...} with no Slots.
 //
 // All cross-week operations (regenerate, deload flip, mesocycle restart) are
 // methods on *WeekPlan and are atomic when invoked inside a
@@ -21,7 +21,7 @@ type WeekPlan struct {
 // Returns the zero value when the week has no scheduled sessions.
 func (wp *WeekPlan) PeriodizationType() PeriodizationType {
 	for i := range wp.Sessions {
-		if len(wp.Sessions[i].ExerciseSets) > 0 {
+		if len(wp.Sessions[i].Slots) > 0 {
 			return wp.Sessions[i].PeriodizationType
 		}
 	}
@@ -57,7 +57,7 @@ func (wp *WeekPlan) IsDeloadWeek() bool {
 	scheduled := 0
 	deload := 0
 	for i := range wp.Sessions {
-		if len(wp.Sessions[i].ExerciseSets) == 0 {
+		if len(wp.Sessions[i].Slots) == 0 {
 			continue
 		}
 		scheduled++
@@ -84,7 +84,7 @@ func (wp *WeekPlan) FlipDeloadFromToday(today time.Time) error {
 		if s.Date.Before(t) {
 			continue
 		}
-		if len(s.ExerciseSets) == 0 {
+		if len(s.Slots) == 0 {
 			continue
 		}
 		if s.Status() == SessionCompleted {
@@ -107,7 +107,7 @@ func (wp *WeekPlan) ClearDeloadFromToday(today time.Time) error {
 		if s.Date.Before(t) {
 			continue
 		}
-		if len(s.ExerciseSets) == 0 {
+		if len(s.Slots) == 0 {
 			continue
 		}
 		if s.Status() == SessionCompleted {

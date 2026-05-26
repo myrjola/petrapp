@@ -1,7 +1,7 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
 
 {{ define "warmup" }}
-    {{ if not .ExerciseSet.WarmupCompletedAt }}
+    {{ if not .ExerciseSlot.WarmupCompletedAt }}
         <div class="warmup-row cluster" role="region" aria-label="Warmup">
             <style {{ $.Nonce }}>
                 @scope (.warmup-row) {
