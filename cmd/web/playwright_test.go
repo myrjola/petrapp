@@ -720,6 +720,117 @@ func Test_playwright_stacknav(t *testing.T) {
 	}
 }
 
+// Test_playwright_preferences_fragment_redirect drives the bug where the new
+// /preferences/* POST handlers redirect with #panel fragments (e.g.
+// /preferences#deload-title). The stack-navigator's sameUrl() compares
+// origin+pathname+search only, so a fragment-only redirect lands in the
+// replace branch of popOrPushTo and resolves as a same-document
+// hash-change navigation — the document is never re-fetched, the GET
+// handler that pops the flash never runs, and the success banner stays
+// stuck in the session. The next unrelated GET (e.g. clicking back to
+// the home page or a workout) pops the orphaned flash and renders it on
+// the wrong page.
+//
+// Before the fix: the success banner never appears on /preferences and
+// the message later surfaces on another page (workoutGET hard-codes the
+// variant to error, so a success message renders as an error banner).
+//
+// After the fix: the banner renders inside the recovery panel, the
+// session flash is consumed, and navigating away leaves the next page
+// banner-free.
+func Test_playwright_preferences_fragment_redirect(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("skipping slow playwright preferences-flash test")
+	}
+
+	page, serverURL := setupPlaywrightPage(t)
+	var err error
+
+	// Register: lands at /schedule with an empty schedule.
+	if err = page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
+		t.Fatalf("expect /schedule after registration: %v", err)
+	}
+	// Fill at least one day so the schedule submit doesn't bounce back with
+	// a validation error.
+	if _, err = page.GetByLabel("Monday").SelectOption(playwright.SelectOptionValues{
+		Labels: &[]string{"1 hour"},
+	}); err != nil {
+		t.Fatalf("select Monday duration: %v", err)
+	}
+	if err = page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Start Tracking"}).Click(); err != nil {
+		t.Fatalf("submit schedule: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("expect / after schedule submit: %v", err)
+	}
+
+	// Go to /preferences and submit the recovery form. The handler sets a
+	// success flash and redirects to /preferences#deload-title.
+	if _, err = page.Goto(serverURL + "/preferences"); err != nil {
+		t.Fatalf("goto /preferences: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/preferences", serverURL)); err != nil {
+		t.Fatalf("wait for /preferences: %v", err)
+	}
+	saveRecoveryBtn := page.GetByRole("button",
+		playwright.PageGetByRoleOptions{Name: "Save recovery settings"})
+	if err = saveRecoveryBtn.WaitFor(); err != nil {
+		t.Fatalf("wait for Save recovery settings button: %v", err)
+	}
+	if err = saveRecoveryBtn.Click(); err != nil {
+		t.Fatalf("click Save recovery settings: %v", err)
+	}
+
+	// The success banner must appear on /preferences. WaitFor() with a
+	// generous deadline so a slow CI run isn't the failure mode; the
+	// regression fails fast because no document load ever happens.
+	banner := page.GetByText("Recovery settings saved.")
+	if err = banner.WaitFor(playwright.LocatorWaitForOptions{
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Fatalf("expected success banner on /preferences after recovery save: %v", err)
+	}
+
+	// URL should end on /preferences (with or without the fragment); the
+	// important property is that we're still on the preferences page.
+	if got := page.URL(); !strings.HasPrefix(got, serverURL+"/preferences") {
+		t.Errorf("URL after recovery save = %q, want prefix %q", got, serverURL+"/preferences")
+	}
+
+	// The Save button must not still be in a busy state — a stuck spinner
+	// is the visible symptom of the same hang.
+	busy, err := saveRecoveryBtn.GetAttribute("aria-busy")
+	if err != nil {
+		t.Fatalf("read aria-busy on Save button: %v", err)
+	}
+	if busy == "true" {
+		t.Errorf("Save recovery settings button still has aria-busy=true — spinner stuck")
+	}
+
+	// Navigate away to /. The flash was consumed on the previous GET, so
+	// the home page must not render the message.
+	if _, err = page.Goto(serverURL + "/"); err != nil {
+		t.Fatalf("goto / after recovery save: %v", err)
+	}
+	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
+		t.Fatalf("wait for / after recovery save: %v", err)
+	}
+	leakedCount, err := page.GetByText("Recovery settings saved.").Count()
+	if err != nil {
+		t.Fatalf("count leaked banner on home: %v", err)
+	}
+	if leakedCount != 0 {
+		t.Errorf("success flash leaked to home page (count=%d) — flash must be consumed on /preferences", leakedCount)
+	}
+}
+
 // Test_playwright_bfcache_staleness drives a flow where the home page (/)
 // is rendered before any POST (bakedToken == ""), then a POST rotates the
 // inv_bfcache cookie, then the user navigates back. The browser restores /

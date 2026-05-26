@@ -229,12 +229,28 @@ async function submitForm(e) {
 
 async function popOrPushTo(target, {replace = false} = {}) {
     const targetUrl = new URL(target, location.origin)
+    const currentUrl = new URL(navigation.currentEntry.url)
 
     // Replace mode: server-flagged via X-Replace-Url, or same-URL submit
     // (auto-detected so backend doesn't have to think about it). We
     // deliberately do not walk back looking for a traverse target —
     // replace is about erasing the current entry, not jumping elsewhere.
-    if (replace || sameUrl(new URL(navigation.currentEntry.url), targetUrl)) {
+    if (replace || sameUrl(currentUrl, targetUrl)) {
+        // Fragment-only redirects (same pathname+search, different hash —
+        // e.g. POST /preferences/deload → /preferences#deload-title) are
+        // treated by the browser as same-document hash-change navigations,
+        // even via location.replace. The GET handler never runs and the
+        // freshly-set session flash leaks onto the next page the user
+        // visits. replaceState updates the URL bar (consuming the new
+        // hash) without navigation, then location.reload() forces a real
+        // round-trip at the now-updated URL — the server re-renders, the
+        // flash banner appears inside the targeted panel, and the browser
+        // scrolls to the fragment after load.
+        if (sameUrl(currentUrl, targetUrl) && currentUrl.hash !== targetUrl.hash) {
+            history.replaceState(null, '', target)
+            location.reload()
+            return
+        }
         navigation.navigate(target, {history: 'replace'})
         return
     }
