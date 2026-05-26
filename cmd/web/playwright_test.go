@@ -816,6 +816,15 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 	if got := page.URL(); !strings.HasPrefix(got, serverURL+"/preferences") {
 		t.Errorf("URL after recovery save = %q, want prefix %q", got, serverURL+"/preferences")
 	}
+	// URL cleanup: the inline script in base.gohtml must have stripped
+	// ?bf_inv=... from the URL bar by the time the banner is visible.
+	// The canonical form is /preferences#deload-title.
+	if got := page.URL(); strings.Contains(got, "bf_inv") {
+		t.Errorf("URL still carries bf_inv after recovery save: %q", got)
+	}
+	if got := page.URL(); !strings.HasSuffix(got, "#deload-title") {
+		t.Errorf("URL after recovery save = %q, want suffix %q", got, "#deload-title")
+	}
 
 	// The Save button must not still be in a busy state — a stuck spinner
 	// is the visible symptom of the same hang.
@@ -853,7 +862,9 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 	// ExpectResponse for GET /preferences gates the click on a real
 	// document fetch; if the reload never happens the matcher times out
 	// and we get an actionable failure.
-	prefsURLRe := regexp.MustCompile(regexp.QuoteMeta(serverURL+"/preferences") + "$")
+	// After this fix the second-submit GET is /preferences?bf_inv=... ;
+	// before it was /preferences . Accept either.
+	prefsURLRe := regexp.MustCompile("^" + regexp.QuoteMeta(serverURL+"/preferences") + `(\?|$)`)
 	if _, err = page.ExpectResponse(prefsURLRe, func() error {
 		return saveRecoveryBtn.Click()
 	}, playwright.PageExpectResponseOptions{
@@ -867,6 +878,12 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 		Timeout: playwright.Float(5000),
 	}); err != nil {
 		t.Fatalf("expected success banner after second recovery save: %v", err)
+	}
+	if got := page.URL(); strings.Contains(got, "bf_inv") {
+		t.Errorf("URL still carries bf_inv after second recovery save: %q", got)
+	}
+	if got := page.URL(); !strings.HasSuffix(got, "#deload-title") {
+		t.Errorf("URL after second recovery save = %q, want suffix %q", got, "#deload-title")
 	}
 
 	// Navigate away to /. The flash was consumed on the previous GET, so

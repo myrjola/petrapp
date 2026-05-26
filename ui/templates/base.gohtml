@@ -37,6 +37,22 @@
               }]
             }
         </script>
+        <script {{ $.Nonce }}>
+            // Strip the bf_inv cache-bust query param injected by
+            // popOrPushTo's replace branch in main.js. The param exists
+            // only to force a cross-document fetch; once parsing has
+            // started, the URL bar should carry the canonical target.
+            // Runs synchronously during HTML parse, before main.js
+            // loads, so the user never sees ?bf_inv=... after first
+            // paint.
+            // See docs/superpowers/specs/2026-05-26-stack-navigator-replace-force-fresh-design.md
+            (() => {
+                const u = new URL(location.href);
+                if (!u.searchParams.has('bf_inv')) return;
+                u.searchParams.delete('bf_inv');
+                history.replaceState(null, '', u.toString());
+            })();
+        </script>
         <script {{ $.Nonce }} src="/main.js"></script>
         <script {{ $.Nonce }}>
             if ('serviceWorker' in navigator) {

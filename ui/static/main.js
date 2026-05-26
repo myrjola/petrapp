@@ -21,9 +21,17 @@
  * Two modes, decided per-response:
  *
  *   1. Replace mode — server set X-Replace-Url: true, OR the target URL
- *      equals the current entry's URL (same-URL submit). The current entry
- *      is replaced. We do not walk the history stack: replace is about
- *      erasing the current entry, not jumping to an existing one.
+ *      equals the current entry's URL ignoring fragment (same-URL submit).
+ *      The current entry is replaced. ALWAYS forces a real cross-document
+ *      fetch by appending a bf_inv cache-bust query param (carrying the
+ *      rotated inv_bfcache cookie) and calling location.replace. Without
+ *      the cache-bust, the Navigation API would resolve identical-URL or
+ *      fragment-change navigations as same-document operations that skip
+ *      the GET, leaving the freshly-set server state unread. An inline
+ *      cleanup script in base.gohtml strips bf_inv before first paint so
+ *      the URL bar lands on the canonical fragment-bearing target.
+ *      We do not walk the history stack: replace is about erasing the
+ *      current entry, not jumping to an existing one.
  *
  *   2. Pop-or-push mode — default. Walk back through history looking for
  *      an entry whose URL matches the target; traverse to it if found,
@@ -235,28 +243,25 @@ async function popOrPushTo(target, {replace = false} = {}) {
     // (auto-detected so backend doesn't have to think about it). We
     // deliberately do not walk back looking for a traverse target —
     // replace is about erasing the current entry, not jumping elsewhere.
+    //
+    // The replace branch ALWAYS forces a cross-document fetch via a
+    // bf_inv query param carrying the rotated inv_bfcache cookie. The
+    // Navigation API resolves some same-pathname navigations (identical
+    // URL, or same path + a fragment change) as same-document operations
+    // that skip the GET — the freshly-rotated server state never reaches
+    // the user, and the freshly-set session flash either stays unread or
+    // leaks onto the next page. Differentiating the search component
+    // forces a real cross-doc fetch; an inline cleanup script in
+    // base.gohtml strips bf_inv before first paint so the URL bar
+    // carries the canonical target form (fragment included, for native
+    // scroll-to-anchor on the new document).
+    // See docs/superpowers/specs/2026-05-26-stack-navigator-replace-force-fresh-design.md
     if (replace || sameUrl(currentUrl, targetUrl)) {
-        // Same-URL submits that involve a fragment on either side need a
-        // forced reload — navigation.navigate to a URL whose pathname and
-        // search match the current entry is resolved by the browser as a
-        // same-document operation when a fragment is in play (whether the
-        // hash changes, or both hashes match exactly, or only the current
-        // URL carries one). The GET handler never runs and the freshly-set
-        // session flash either stays unread or leaks onto the next page.
-        // replaceState consumes the target's fragment into the URL bar,
-        // then location.reload() forces a real round-trip at the
-        // now-updated URL — the server re-renders, the flash banner
-        // appears inside the targeted panel, and the browser scrolls to
-        // the fragment after load. Same-URL no-fragment submits (set
-        // updates, warmup completion) keep their existing behavior:
-        // navigation.navigate(currentURL, replace) reloads cleanly through
-        // the Navigation API.
-        if (sameUrl(currentUrl, targetUrl) && (currentUrl.hash !== '' || targetUrl.hash !== '')) {
-            history.replaceState(null, '', target)
-            location.reload()
-            return
-        }
-        navigation.navigate(target, {history: 'replace'})
+        const cookieValue = document.cookie
+            .match(/(?:^|;\s*)inv_bfcache=([^;]+)/)?.[1] ?? ''
+        const bust = new URL(target, location.origin)
+        bust.searchParams.set('bf_inv', cookieValue || String(Date.now()))
+        location.replace(bust.toString())
         return
     }
 
