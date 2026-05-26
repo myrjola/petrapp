@@ -76,14 +76,14 @@ func TestWeeklyPlannedLoad(t *testing.T) {
 	// One session with two exercises: bench 4 sets, pulldown 3 sets.
 	session := domain.Session{ //nolint:exhaustruct // Rest fields unused in this test.
 		Slots: []domain.ExerciseSlot{
-			{
+			{ //nolint:exhaustruct // WarmupCompletedAt unused in this test.
 				Exercise: bench,
 				Sets:     make([]domain.Set, 4),
-			}, //nolint:exhaustruct // Sets carry no values in this test.
-			{
+			},
+			{ //nolint:exhaustruct // WarmupCompletedAt unused in this test.
 				Exercise: pulldown,
 				Sets:     make([]domain.Set, 3),
-			}, //nolint:exhaustruct // Sets carry no values in this test.
+			},
 		},
 	}
 
