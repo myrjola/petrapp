@@ -27,9 +27,13 @@
             {
               "prefetch": [{
                 "where": {
-                  "href_matches": "/*"
+                  "and": [
+                    { "href_matches": "/*" },
+                    { "not": { "href_matches": "/api/*" } },
+                    { "not": { "href_matches": "/preferences/export-data" } }
+                  ]
                 },
-                "eagerness": "conservative"
+                "eagerness": "moderate"
               }]
             }
         </script>
