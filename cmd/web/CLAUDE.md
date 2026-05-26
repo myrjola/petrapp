@@ -278,6 +278,16 @@ Two helpers cover all redirect needs. Both negotiate the stack-navigator wire pr
 
 The client treats every 200 response with `X-Location` as a navigation; an additional `X-Replace-Url: true` header (set by `redirectReplace`) flips the strategy from pop-or-push to replace.
 
+Redirect paths may include a `#fragment` to land the user at a specific
+section after a form submit (e.g. `redirect(w, r, "/preferences#deload-title")`).
+The JS shim's `popOrPushTo` replace branch guarantees a real cross-
+document fetch via a `bf_inv` cache-bust query param it injects, then
+strips after parse — so any flash banner the handler sets is rendered
+on the next GET and native scroll-to-anchor fires on the new document.
+Handlers don't think about same-document semantics; emit the redirect
+with the fragment you want and the shim does the rest. See
+`docs/superpowers/specs/2026-05-26-stack-navigator-replace-force-fresh-design.md`.
+
 See `docs/superpowers/specs/2026-05-03-stack-navigator-push-default-design.md` for the wire protocol, per-flow behavior, and rationale.
 
 ## Testing with e2etest
