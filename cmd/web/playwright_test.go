@@ -748,6 +748,19 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 	page, serverURL := setupPlaywrightPage(t)
 	var err error
 
+	// Shrink the viewport so the #deload-title heading and the "Save
+	// recovery settings" submit button cannot fit on screen together.
+	// At default 1280x720 they do co-fit (~80px apart), so Playwright's
+	// pre-click auto-scroll lands both inside the viewport — and
+	// location.reload()'s scroll-restoration leaves them both visible
+	// even though no fragment-scroll happened. With the heading and
+	// button separated by more than the viewport height, the heading is
+	// only inside the viewport when a real fragment-scroll places it
+	// there.
+	if err = page.SetViewportSize(360, 480); err != nil {
+		t.Fatalf("shrink viewport: %v", err)
+	}
+
 	// Register: lands at /schedule with an empty schedule.
 	if err = page.GetByRole("button",
 		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
@@ -812,6 +825,20 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 	}
 	if busy == "true" {
 		t.Errorf("Save recovery settings button still has aria-busy=true — spinner stuck")
+	}
+
+	// Scroll-to-panel regression check. The whole point of including
+	// #deload-title in the redirect target is to land the user with the
+	// deload heading visible. location.reload() — the prior workaround —
+	// triggers scroll-restoration on most browsers, ignoring the URL
+	// fragment. With the shrunk viewport above, the heading is only
+	// inside the viewport when a real cross-document fragment-scroll
+	// placed it there.
+	assertions := playwright.NewPlaywrightAssertions()
+	if err = assertions.Locator(
+		page.Locator("#deload-title"),
+	).ToBeInViewport(); err != nil {
+		t.Errorf("deload heading not in viewport after recovery save: %v", err)
 	}
 
 	// Second submit from the same URL. After the first reload the URL is
