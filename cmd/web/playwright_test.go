@@ -814,6 +814,34 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 		t.Errorf("Save recovery settings button still has aria-busy=true — spinner stuck")
 	}
 
+	// Second submit from the same URL. After the first reload the URL is
+	// /preferences#deload-title, so currentUrl.hash matches targetUrl.hash
+	// exactly. A naive "hash differs" check skips the reload branch and
+	// hands off to navigation.navigate, which on identical URL+fragment is
+	// also a same-document no-op — the page never re-renders and the
+	// freshly-set flash leaks just like before. The fix must force a
+	// reload for any same-URL submit involving a fragment, not only when
+	// the hashes differ.
+	//
+	// ExpectResponse for GET /preferences gates the click on a real
+	// document fetch; if the reload never happens the matcher times out
+	// and we get an actionable failure.
+	prefsURLRe := regexp.MustCompile(regexp.QuoteMeta(serverURL+"/preferences") + "$")
+	if _, err = page.ExpectResponse(prefsURLRe, func() error {
+		return saveRecoveryBtn.Click()
+	}, playwright.PageExpectResponseOptions{
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Fatalf("second recovery save did not trigger a GET /preferences reload: %v", err)
+	}
+	// Banner must reappear after the reload — proves the GET actually
+	// rendered the re-popped flash, not just a no-op response.
+	if err = banner.WaitFor(playwright.LocatorWaitForOptions{
+		Timeout: playwright.Float(5000),
+	}); err != nil {
+		t.Fatalf("expected success banner after second recovery save: %v", err)
+	}
+
 	// Navigate away to /. The flash was consumed on the previous GET, so
 	// the home page must not render the message.
 	if _, err = page.Goto(serverURL + "/"); err != nil {

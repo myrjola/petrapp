@@ -236,17 +236,22 @@ async function popOrPushTo(target, {replace = false} = {}) {
     // deliberately do not walk back looking for a traverse target —
     // replace is about erasing the current entry, not jumping elsewhere.
     if (replace || sameUrl(currentUrl, targetUrl)) {
-        // Fragment-only redirects (same pathname+search, different hash —
-        // e.g. POST /preferences/deload → /preferences#deload-title) are
-        // treated by the browser as same-document hash-change navigations,
-        // even via location.replace. The GET handler never runs and the
-        // freshly-set session flash leaks onto the next page the user
-        // visits. replaceState updates the URL bar (consuming the new
-        // hash) without navigation, then location.reload() forces a real
-        // round-trip at the now-updated URL — the server re-renders, the
-        // flash banner appears inside the targeted panel, and the browser
-        // scrolls to the fragment after load.
-        if (sameUrl(currentUrl, targetUrl) && currentUrl.hash !== targetUrl.hash) {
+        // Same-URL submits that involve a fragment on either side need a
+        // forced reload — navigation.navigate to a URL whose pathname and
+        // search match the current entry is resolved by the browser as a
+        // same-document operation when a fragment is in play (whether the
+        // hash changes, or both hashes match exactly, or only the current
+        // URL carries one). The GET handler never runs and the freshly-set
+        // session flash either stays unread or leaks onto the next page.
+        // replaceState consumes the target's fragment into the URL bar,
+        // then location.reload() forces a real round-trip at the
+        // now-updated URL — the server re-renders, the flash banner
+        // appears inside the targeted panel, and the browser scrolls to
+        // the fragment after load. Same-URL no-fragment submits (set
+        // updates, warmup completion) keep their existing behavior:
+        // navigation.navigate(currentURL, replace) reloads cleanly through
+        // the Navigation API.
+        if (sameUrl(currentUrl, targetUrl) && (currentUrl.hash !== '' || targetUrl.hash !== '')) {
             history.replaceState(null, '', target)
             location.reload()
             return
