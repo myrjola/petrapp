@@ -49,20 +49,7 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("POST /preferences/mesocycle/start-deload-now",
 		app.mustSessionStack(http.HandlerFunc(app.preferencesStartDeloadNowPOST)))
 
-	mux.Handle("POST /api/push/subscribe",
-		app.mustSessionStack(http.HandlerFunc(app.pushSubscribePOST)))
-	mux.Handle("POST /api/push/unsubscribe",
-		app.mustSessionStack(http.HandlerFunc(app.pushUnsubscribePOST)))
-
-	mux.Handle("POST /api/registration/start", app.noStoreSessionStack(http.HandlerFunc(app.beginRegistration)))
-	mux.Handle("POST /api/registration/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishRegistration)))
-	mux.Handle("POST /api/login/start", app.noStoreSessionStack(http.HandlerFunc(app.beginLogin)))
-	mux.Handle("POST /api/login/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishLogin)))
-	mux.Handle("POST /api/logout", app.noStoreSessionStack(http.HandlerFunc(app.logout)))
-
-	mux.Handle("GET /api/healthy", app.sessionStack(http.HandlerFunc(app.healthy)))
-	mux.Handle("POST /api/reports", app.noAuthStack(http.HandlerFunc(app.reportingAPI)))
-	mux.Handle("GET /api/test/timeout", app.noAuthStack(http.HandlerFunc(app.testTimeout)))
+	app.registerAPIRoutes(mux)
 
 	mux.Handle("GET /admin/exercises", app.mustAdminStack(http.HandlerFunc(app.adminExercisesGET)))
 	mux.Handle("GET /admin/exercises/{id}", app.mustAdminStack(http.HandlerFunc(app.adminExerciseEditGET)))
@@ -102,6 +89,27 @@ func (app *application) routes() (*http.ServeMux, error) {
 	mux.Handle("/", fileServerHandler)
 
 	return mux, nil
+}
+
+// registerAPIRoutes registers the /api/* surface. Auth and CSRF stack varies
+// per endpoint; the reports/vitals/timeout trio is noAuthStack so beacons
+// (which can't carry custom headers) work.
+func (app *application) registerAPIRoutes(mux *http.ServeMux) {
+	mux.Handle("POST /api/push/subscribe",
+		app.mustSessionStack(http.HandlerFunc(app.pushSubscribePOST)))
+	mux.Handle("POST /api/push/unsubscribe",
+		app.mustSessionStack(http.HandlerFunc(app.pushUnsubscribePOST)))
+
+	mux.Handle("POST /api/registration/start", app.noStoreSessionStack(http.HandlerFunc(app.beginRegistration)))
+	mux.Handle("POST /api/registration/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishRegistration)))
+	mux.Handle("POST /api/login/start", app.noStoreSessionStack(http.HandlerFunc(app.beginLogin)))
+	mux.Handle("POST /api/login/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishLogin)))
+	mux.Handle("POST /api/logout", app.noStoreSessionStack(http.HandlerFunc(app.logout)))
+
+	mux.Handle("GET /api/healthy", app.sessionStack(http.HandlerFunc(app.healthy)))
+	mux.Handle("POST /api/reports", app.noAuthStack(http.HandlerFunc(app.reportingAPI)))
+	mux.Handle("POST /api/vitals", app.noAuthStack(http.HandlerFunc(app.vitalsPOST)))
+	mux.Handle("GET /api/test/timeout", app.noAuthStack(http.HandlerFunc(app.testTimeout)))
 }
 
 // registerDevRoutes registers developer-only routes. Each handler gates on

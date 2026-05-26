@@ -365,6 +365,93 @@ window.addEventListener('pageshow', (event) => {
     if (event.persisted) clearLoad()
 })
 
+// Web Vitals reporter — observes LCP, INP, FCP, TTFB and beacons one
+// batched JSON payload on pagehide / visibility:hidden. INP picks the
+// worst event duration seen so far rather than the web-vitals 98th-
+// percentile interaction — slightly conservative, fine for regression
+// monitoring. CLS is omitted; its session-window math doesn't earn its
+// bytes at this scale. `target` carries a best-effort element selector
+// for LCP / INP so log lines can be triaged.
+;(() => {
+    if (!('PerformanceObserver' in window) || !navigator.sendBeacon) return
+
+    const thresholds = {
+        LCP: [2500, 4000], INP: [200, 500],
+        FCP: [1800, 3000], TTFB: [800, 1800],
+    }
+    const rate = (name, value) => {
+        const t = thresholds[name]
+        if (!t) return ''
+        return value <= t[0] ? 'good' : value <= t[1] ? 'needs-improvement' : 'poor'
+    }
+
+    const describeNode = (el) => {
+        if (!el || !el.tagName) return ''
+        let s = el.tagName.toLowerCase()
+        if (el.id) {
+            s += '#' + el.id
+        } else if (typeof el.className === 'string') {
+            const cls = el.className.trim().split(/\s+/).slice(0, 2).join('.')
+            if (cls) s += '.' + cls
+        }
+        return s.slice(0, 80)
+    }
+
+    const reports = new Map()
+    const record = (name, value, target) => {
+        reports.set(name, {name, value, rating: rate(name, value), target: target || ''})
+    }
+
+    const observe = (type, options, handler) => {
+        try {
+            new PerformanceObserver(handler).observe({type, buffered: true, ...options})
+        } catch (_) {
+            // Browser doesn't support this entry type — skip.
+        }
+    }
+
+    observe('largest-contentful-paint', {}, (list) => {
+        const entries = list.getEntries()
+        const last = entries[entries.length - 1]
+        record('LCP', last.renderTime || last.loadTime, describeNode(last.element))
+    })
+
+    observe('paint', {}, (list) => {
+        for (const entry of list.getEntries()) {
+            if (entry.name === 'first-contentful-paint') record('FCP', entry.startTime)
+        }
+    })
+
+    let worstInp = 0
+    observe('event', {durationThreshold: 16}, (list) => {
+        for (const entry of list.getEntries()) {
+            if (entry.interactionId && entry.duration > worstInp) {
+                worstInp = entry.duration
+                record('INP', worstInp, describeNode(entry.target))
+            }
+        }
+    })
+
+    const nav = performance.getEntriesByType('navigation')[0]
+    if (nav) record('TTFB', nav.responseStart)
+
+    const flush = () => {
+        if (reports.size === 0) return
+        const payload = JSON.stringify({
+            path: location.pathname,
+            navigationType: nav?.type || '',
+            metrics: Array.from(reports.values()),
+        })
+        navigator.sendBeacon('/api/vitals', new Blob([payload], {type: 'application/json'}))
+        reports.clear()
+    }
+
+    addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') flush()
+    })
+    addEventListener('pagehide', flush)
+})()
+
 // Staleness check runs on every reveal — fresh load, prefetched-and-
 // promoted load, bfcache restore. Catches three classes of stale-doc:
 //   1. bfcache restore of a page rendered before a since-POSTed mutation
