@@ -503,6 +503,39 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 	return PeriodizationStrength
 }
 
+// scoreCandidate returns the gain in target-balance from adding ex to a
+// session: positive when the exercise pulls the running per-MG load
+// closer to its target, negative when it pushes an MG further from
+// target. The metric is the change in the sum of squared distances
+// over targeted muscle groups; untargeted MGs are ignored. Set count
+// comes from the same deriveSchemeForExercise the planner uses to
+// persist sets, so deload halving and periodization-driven set-count
+// shifts are reflected automatically.
+func scoreCandidate(
+	ex Exercise,
+	pt PeriodizationType, //nolint:unparam // upcoming selection loop passes hypertrophy sessions too.
+	isDeload bool,
+	load map[string]float64,
+	targets map[string]int,
+) float64 {
+	_, nSets := deriveSchemeForExercise(ex, pt, isDeload)
+	n := float64(nSets)
+	contrib := make(map[string]float64, len(ex.PrimaryMuscleGroups)+len(ex.SecondaryMuscleGroups))
+	for _, mg := range ex.PrimaryMuscleGroups {
+		contrib[mg] += n * PrimarySetWeight
+	}
+	for _, mg := range ex.SecondaryMuscleGroups {
+		contrib[mg] += n * SecondarySetWeight
+	}
+	var delta float64
+	for mg, target := range targets {
+		before := float64(target) - load[mg]
+		after := before - contrib[mg]
+		delta += before*before - after*after
+	}
+	return delta
+}
+
 // MondayOf returns the Monday of the week containing date, at 00:00 UTC.
 // The calendar date is taken from date's own location so the user's local
 // week boundary is preserved, but the result is anchored to UTC so it

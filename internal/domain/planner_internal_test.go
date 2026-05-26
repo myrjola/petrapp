@@ -996,6 +996,82 @@ func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
 	}
 }
 
+func Test_scoreCandidate(t *testing.T) {
+	t.Parallel()
+
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID:                    1,
+		Category:              CategoryUpper,
+		ExerciseType:          ExerciseTypeWeighted,
+		PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
+		SecondaryMuscleGroups: []string{"Shoulders"},
+		RepMin:                new(5), RepMax: new(10),
+	}
+
+	targets := map[string]int{"Chest": 10, "Triceps": 8, "Shoulders": 10}
+
+	t.Run("positive when pulling under-target MGs up", func(t *testing.T) {
+		t.Parallel()
+		// Empty load: every targeted MG at full deficit.
+		load := map[string]float64{}
+		// Strength + 5-10 window: reps=5, sets=4 (DeriveScheme low band).
+		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
+		// Chest: before=10, after=10-4=6; contribution 100-36=64.
+		// Triceps: before=8, after=8-4=4; contribution 64-16=48.
+		// Shoulders: before=10, after=10-2=8; contribution 100-64=36.
+		// Total = 64 + 48 + 36 = 148.
+		if score != 148 {
+			t.Errorf("score = %v, want 148", score)
+		}
+	})
+
+	t.Run("negative when pushing on-target MG further over", func(t *testing.T) {
+		t.Parallel()
+		// Shoulders already at 12 (2 over target 10); other MGs at target.
+		load := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 12}
+		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
+		// Chest: before=0, after=-4; 0-16=-16.
+		// Triceps: before=0, after=-4; 0-16=-16.
+		// Shoulders: before=-2, after=-4; 4-16=-12.
+		// Total = -16 + -16 + -12 = -44.
+		if score != -44 {
+			t.Errorf("score = %v, want -44", score)
+		}
+	})
+
+	t.Run("zero when no targeted MG is touched", func(t *testing.T) {
+		t.Parallel()
+		calfRaise := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID:                    99,
+			Category:              CategoryLower,
+			ExerciseType:          ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Calves"},
+			SecondaryMuscleGroups: nil,
+			RepMin:                new(10), RepMax: new(20),
+		}
+		load := map[string]float64{}
+		score := scoreCandidate(calfRaise, PeriodizationStrength, false, load, targets)
+		if score != 0 {
+			t.Errorf("score = %v, want 0", score)
+		}
+	})
+
+	t.Run("deload halves set count", func(t *testing.T) {
+		t.Parallel()
+		load := map[string]float64{}
+		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
+		// base sets = 3 (mid band, 6 <= reps <= 10), halved to 2.
+		score := scoreCandidate(bench, PeriodizationStrength, true, load, targets)
+		// Chest: 100 - (10-2)^2 = 100 - 64 = 36.
+		// Triceps: 64 - (8-2)^2 = 64 - 36 = 28.
+		// Shoulders: 100 - (10-1)^2 = 100 - 81 = 19.
+		// Total = 36 + 28 + 19 = 83.
+		if score != 83 {
+			t.Errorf("score = %v, want 83", score)
+		}
+	})
+}
+
 func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	t.Parallel()
 
