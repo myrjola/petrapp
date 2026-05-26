@@ -47,9 +47,11 @@ func setupTestServiceWithDB(t *testing.T) (context.Context, *service.Service, *s
 	// Set preferences: Mon, Wed, Fri at 60 min.
 	svc := service.NewService(db, logger, "")
 	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
-		MondayMinutes:    60,
-		WednesdayMinutes: 60,
-		FridayMinutes:    60,
+		Minutes: [7]int{
+			time.Monday:    60,
+			time.Wednesday: 60,
+			time.Friday:    60,
+		},
 	}); err != nil {
 		t.Fatalf("save preferences: %v", err)
 	}

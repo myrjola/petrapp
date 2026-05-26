@@ -58,9 +58,11 @@ func TestPreferencesRepository_SetThenGetRoundTrip(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
 	set := domain.Preferences{ //nolint:exhaustruct // Untouched days stay zero.
-		MondayMinutes:    60,
-		WednesdayMinutes: 45,
-		FridayMinutes:    90,
+		Minutes: [7]int{
+			time.Monday:    60,
+			time.Wednesday: 45,
+			time.Friday:    90,
+		},
 	}
 	if err := repos.Preferences.Set(ctx, set); err != nil {
 		t.Fatalf("Set: %v", err)
@@ -84,13 +86,12 @@ func TestPreferencesRepository_SetUpdatesExisting(t *testing.T) {
 	ctx, repos := setupTestRepos(t)
 
 	if err := repos.Preferences.Set(ctx, domain.Preferences{ //nolint:exhaustruct // First write.
-		MondayMinutes: 45,
+		Minutes: [7]int{time.Monday: 45},
 	}); err != nil {
 		t.Fatalf("first Set: %v", err)
 	}
 	updated := domain.Preferences{ //nolint:exhaustruct // Second write — Monday changes, others stay zero.
-		MondayMinutes:  90,
-		TuesdayMinutes: 45,
+		Minutes: [7]int{time.Monday: 90, time.Tuesday: 45},
 	}
 	if err := repos.Preferences.Set(ctx, updated); err != nil {
 		t.Fatalf("second Set: %v", err)

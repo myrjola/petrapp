@@ -71,13 +71,13 @@ func getWorkoutDurationOptions() []workoutDurationOption {
 
 func preferencesToWeekdays(prefs domain.Preferences) []weekdayPreference {
 	return []weekdayPreference{
-		{ID: "monday", Name: "Monday", Minutes: prefs.MondayMinutes},
-		{ID: "tuesday", Name: "Tuesday", Minutes: prefs.TuesdayMinutes},
-		{ID: "wednesday", Name: "Wednesday", Minutes: prefs.WednesdayMinutes},
-		{ID: "thursday", Name: "Thursday", Minutes: prefs.ThursdayMinutes},
-		{ID: "friday", Name: "Friday", Minutes: prefs.FridayMinutes},
-		{ID: "saturday", Name: "Saturday", Minutes: prefs.SaturdayMinutes},
-		{ID: "sunday", Name: "Sunday", Minutes: prefs.SundayMinutes},
+		{ID: "monday", Name: "Monday", Minutes: prefs.Minutes[time.Monday]},
+		{ID: "tuesday", Name: "Tuesday", Minutes: prefs.Minutes[time.Tuesday]},
+		{ID: "wednesday", Name: "Wednesday", Minutes: prefs.Minutes[time.Wednesday]},
+		{ID: "thursday", Name: "Thursday", Minutes: prefs.Minutes[time.Thursday]},
+		{ID: "friday", Name: "Friday", Minutes: prefs.Minutes[time.Friday]},
+		{ID: "saturday", Name: "Saturday", Minutes: prefs.Minutes[time.Saturday]},
+		{ID: "sunday", Name: "Sunday", Minutes: prefs.Minutes[time.Sunday]},
 	}
 }
 
@@ -167,13 +167,13 @@ func (app *application) preferencesScheduleSavePOST(w http.ResponseWriter, r *ht
 		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
 	}
-	prefs.MondayMinutes = parseMinutes(r.Form.Get("monday_minutes"))
-	prefs.TuesdayMinutes = parseMinutes(r.Form.Get("tuesday_minutes"))
-	prefs.WednesdayMinutes = parseMinutes(r.Form.Get("wednesday_minutes"))
-	prefs.ThursdayMinutes = parseMinutes(r.Form.Get("thursday_minutes"))
-	prefs.FridayMinutes = parseMinutes(r.Form.Get("friday_minutes"))
-	prefs.SaturdayMinutes = parseMinutes(r.Form.Get("saturday_minutes"))
-	prefs.SundayMinutes = parseMinutes(r.Form.Get("sunday_minutes"))
+	prefs.Minutes[time.Monday] = parseMinutes(r.Form.Get("monday_minutes"))
+	prefs.Minutes[time.Tuesday] = parseMinutes(r.Form.Get("tuesday_minutes"))
+	prefs.Minutes[time.Wednesday] = parseMinutes(r.Form.Get("wednesday_minutes"))
+	prefs.Minutes[time.Thursday] = parseMinutes(r.Form.Get("thursday_minutes"))
+	prefs.Minutes[time.Friday] = parseMinutes(r.Form.Get("friday_minutes"))
+	prefs.Minutes[time.Saturday] = parseMinutes(r.Form.Get("saturday_minutes"))
+	prefs.Minutes[time.Sunday] = parseMinutes(r.Form.Get("sunday_minutes"))
 
 	if prefs.IsEmpty() {
 		app.putFlashErrorWithAnchor(r.Context(),

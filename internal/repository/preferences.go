@@ -41,8 +41,10 @@ func (r *sqlitePreferencesRepository) Get(ctx context.Context) (domain.Preferenc
 		       deload_enabled, mesocycle_length, mesocycle_anchor
 		FROM workout_preferences
 		WHERE user_id = ?`, userID).Scan(
-		&prefs.MondayMinutes, &prefs.TuesdayMinutes, &prefs.WednesdayMinutes, &prefs.ThursdayMinutes,
-		&prefs.FridayMinutes, &prefs.SaturdayMinutes, &prefs.SundayMinutes,
+		&prefs.Minutes[time.Monday], &prefs.Minutes[time.Tuesday],
+		&prefs.Minutes[time.Wednesday], &prefs.Minutes[time.Thursday],
+		&prefs.Minutes[time.Friday], &prefs.Minutes[time.Saturday],
+		&prefs.Minutes[time.Sunday],
 		&prefs.RestNotificationsEnabled,
 		&prefs.DeloadEnabled, &prefs.MesocycleLength, &anchorStr,
 	)
@@ -97,8 +99,10 @@ func (r *sqlitePreferencesRepository) Set(ctx context.Context, prefs domain.Pref
 			mesocycle_length = excluded.mesocycle_length,
 			mesocycle_anchor = excluded.mesocycle_anchor`,
 		userID,
-		prefs.MondayMinutes, prefs.TuesdayMinutes, prefs.WednesdayMinutes, prefs.ThursdayMinutes,
-		prefs.FridayMinutes, prefs.SaturdayMinutes, prefs.SundayMinutes,
+		prefs.Minutes[time.Monday], prefs.Minutes[time.Tuesday],
+		prefs.Minutes[time.Wednesday], prefs.Minutes[time.Thursday],
+		prefs.Minutes[time.Friday], prefs.Minutes[time.Saturday],
+		prefs.Minutes[time.Sunday],
 		prefs.RestNotificationsEnabled,
 		prefs.DeloadEnabled, length, anchorStr,
 	); err != nil {

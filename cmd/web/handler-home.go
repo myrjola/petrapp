@@ -24,28 +24,6 @@ const (
 	statusPastIncomplete = "past-incomplete"
 )
 
-// isWorkoutScheduled determines if a workout is scheduled for the given date based on user preferences.
-func isWorkoutScheduled(date time.Time, preferences domain.Preferences) bool {
-	switch date.Weekday() {
-	case time.Monday:
-		return preferences.Monday()
-	case time.Tuesday:
-		return preferences.Tuesday()
-	case time.Wednesday:
-		return preferences.Wednesday()
-	case time.Thursday:
-		return preferences.Thursday()
-	case time.Friday:
-		return preferences.Friday()
-	case time.Saturday:
-		return preferences.Saturday()
-	case time.Sunday:
-		return preferences.Sunday()
-	default:
-		return false
-	}
-}
-
 type homeTemplateData struct {
 	BaseTemplateData
 
@@ -316,7 +294,7 @@ func toDays(sessions []domain.Session, preferences domain.Preferences) []dayView
 
 	for i, session := range sessions {
 		date := session.Date
-		isScheduled := isWorkoutScheduled(date, preferences)
+		isScheduled := preferences.IsWorkoutDay(date.Weekday())
 		isToday := date.Format("2006-01-02") == today.Format("2006-01-02")
 		isPast := date.Before(today)
 

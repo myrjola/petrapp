@@ -131,9 +131,11 @@ func Test_RegenerateWeeklyPlanIfUnstarted_RegeneratesWhenNoWorkoutStarted(t *tes
 
 	// Change to Tue, Thu, Sat at 45 min.
 	if err := svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
-		TuesdayMinutes:  45,
-		ThursdayMinutes: 45,
-		SaturdayMinutes: 45,
+		Minutes: [7]int{
+			time.Tuesday:  45,
+			time.Thursday: 45,
+			time.Saturday: 45,
+		},
 	}); err != nil {
 		t.Fatalf("save preferences: %v", err)
 	}
@@ -179,9 +181,11 @@ func Test_RegenerateWeeklyPlanIfUnstarted_SkipsRegenerateWhenWorkoutStarted(t *t
 
 	// Change preferences to Tue, Thu, Sat.
 	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
-		TuesdayMinutes:  45,
-		ThursdayMinutes: 45,
-		SaturdayMinutes: 45,
+		Minutes: [7]int{
+			time.Tuesday:  45,
+			time.Thursday: 45,
+			time.Saturday: 45,
+		},
 	}); err != nil {
 		t.Fatalf("save preferences: %v", err)
 	}
@@ -329,10 +333,12 @@ func Test_StartSession_CreatesNewlyScheduledMidWeekDay(t *testing.T) {
 	}
 
 	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days omitted.
-		MondayMinutes:    60,
-		TuesdayMinutes:   60,
-		WednesdayMinutes: 60,
-		FridayMinutes:    60,
+		Minutes: [7]int{
+			time.Monday:    60,
+			time.Tuesday:   60,
+			time.Wednesday: 60,
+			time.Friday:    60,
+		},
 	}); err != nil {
 		t.Fatalf("SaveUserPreferences: %v", err)
 	}
@@ -415,9 +421,11 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 
 	// Save preferences with Mon, Wed, Fri as workout days.
 	if err = svc.SaveUserPreferences(ctx, domain.Preferences{ //nolint:exhaustruct // Rest days intentionally omitted.
-		MondayMinutes:    60,
-		WednesdayMinutes: 60,
-		FridayMinutes:    60,
+		Minutes: [7]int{
+			time.Monday:    60,
+			time.Wednesday: 60,
+			time.Friday:    60,
+		},
 	}); err != nil {
 		t.Fatalf("save preferences: %v", err)
 	}

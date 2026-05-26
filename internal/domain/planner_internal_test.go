@@ -16,32 +16,9 @@ func date(base time.Time, offsetDays int) time.Time {
 }
 
 func prefs(days ...time.Weekday) Preferences {
-	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled irrelevant to planner tests.
-		MondayMinutes:    0,
-		TuesdayMinutes:   0,
-		WednesdayMinutes: 0,
-		ThursdayMinutes:  0,
-		FridayMinutes:    0,
-		SaturdayMinutes:  0,
-		SundayMinutes:    0,
-	}
+	p := Preferences{} //nolint:exhaustruct // RestNotificationsEnabled irrelevant to planner tests.
 	for _, d := range days {
-		switch d {
-		case time.Monday:
-			p.MondayMinutes = minutesMedium
-		case time.Tuesday:
-			p.TuesdayMinutes = minutesMedium
-		case time.Wednesday:
-			p.WednesdayMinutes = minutesMedium
-		case time.Thursday:
-			p.ThursdayMinutes = minutesMedium
-		case time.Friday:
-			p.FridayMinutes = minutesMedium
-		case time.Saturday:
-			p.SaturdayMinutes = minutesMedium
-		case time.Sunday:
-			p.SundayMinutes = minutesMedium
-		}
+		p.Minutes[d] = minutesMedium
 	}
 	return p
 }
@@ -596,13 +573,7 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 
 	wp := &Planner{
 		Prefs: Preferences{ //nolint:exhaustruct // RestNotificationsEnabled irrelevant to planner tests.
-			MondayMinutes:    60,
-			TuesdayMinutes:   0,
-			WednesdayMinutes: 0,
-			ThursdayMinutes:  0,
-			FridayMinutes:    0,
-			SaturdayMinutes:  0,
-			SundayMinutes:    0,
+			Minutes: [7]int{time.Monday: 60},
 		},
 		Exercises: []Exercise{plank},
 		Targets:   []MuscleGroupTarget{{MuscleGroupName: "Abs", WeeklySetTarget: 8}},
@@ -651,8 +622,7 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 	planMonday := anchor.AddDate(0, 0, 21)                         // week 3 of 4 → deload
 
 	prefs := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and other UI prefs irrelevant.
-		MondayMinutes:   60,
-		TuesdayMinutes:  60,
+		Minutes:         [7]int{time.Monday: 60, time.Tuesday: 60},
 		DeloadEnabled:   true,
 		MesocycleLength: 4,
 		MesocycleAnchor: anchor,
@@ -731,7 +701,7 @@ func TestPlanner_NonDeloadWeekUnchanged(t *testing.T) {
 	planMonday := anchor.AddDate(0, 0, 7) // week 1 → not a deload
 
 	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and other UI prefs irrelevant.
-		MondayMinutes:   60,
+		Minutes:         [7]int{time.Monday: 60},
 		DeloadEnabled:   true,
 		MesocycleLength: 4,
 		MesocycleAnchor: anchor,
@@ -987,13 +957,11 @@ func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
 	// Build a Preferences value where each weekday carries a different minutes
 	// value, so the test can pick a weekday to control the minutes input.
 	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and mesocycle fields irrelevant.
-		MondayMinutes:    minutesLong,   // 90
-		TuesdayMinutes:   minutesMedium, // 60
-		WednesdayMinutes: 45,
-		ThursdayMinutes:  0,
-		FridayMinutes:    0,
-		SaturdayMinutes:  0,
-		SundayMinutes:    0,
+		Minutes: [7]int{
+			time.Monday:    minutesLong,   // 90
+			time.Tuesday:   minutesMedium, // 60
+			time.Wednesday: 45,
+		},
 	}
 
 	tests := []struct {
@@ -1045,13 +1013,10 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	// Strength-first alternation on a 2-day week → [strength, hypertrophy] →
 	// [exercisesMedium=3, exercisesMediumHypertrophy=4] under the new bump rule.
 	p := Preferences{ //nolint:exhaustruct // RestNotificationsEnabled and mesocycle fields irrelevant.
-		MondayMinutes:    minutesMedium,
-		TuesdayMinutes:   0,
-		WednesdayMinutes: 0,
-		ThursdayMinutes:  minutesMedium,
-		FridayMinutes:    0,
-		SaturdayMinutes:  0,
-		SundayMinutes:    0,
+		Minutes: [7]int{
+			time.Monday:   minutesMedium,
+			time.Thursday: minutesMedium,
+		},
 	}
 	wp := NewPlanner(p, minimalExercises(), minimalTargets())
 

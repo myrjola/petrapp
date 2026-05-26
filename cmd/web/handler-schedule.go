@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type scheduleTemplateData struct {
@@ -53,13 +54,13 @@ func (app *application) schedulePOST(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, fmt.Errorf("get user preferences: %w", err))
 		return
 	}
-	prefs.MondayMinutes = parseMinutes(r.Form.Get("monday_minutes"))
-	prefs.TuesdayMinutes = parseMinutes(r.Form.Get("tuesday_minutes"))
-	prefs.WednesdayMinutes = parseMinutes(r.Form.Get("wednesday_minutes"))
-	prefs.ThursdayMinutes = parseMinutes(r.Form.Get("thursday_minutes"))
-	prefs.FridayMinutes = parseMinutes(r.Form.Get("friday_minutes"))
-	prefs.SaturdayMinutes = parseMinutes(r.Form.Get("saturday_minutes"))
-	prefs.SundayMinutes = parseMinutes(r.Form.Get("sunday_minutes"))
+	prefs.Minutes[time.Monday] = parseMinutes(r.Form.Get("monday_minutes"))
+	prefs.Minutes[time.Tuesday] = parseMinutes(r.Form.Get("tuesday_minutes"))
+	prefs.Minutes[time.Wednesday] = parseMinutes(r.Form.Get("wednesday_minutes"))
+	prefs.Minutes[time.Thursday] = parseMinutes(r.Form.Get("thursday_minutes"))
+	prefs.Minutes[time.Friday] = parseMinutes(r.Form.Get("friday_minutes"))
+	prefs.Minutes[time.Saturday] = parseMinutes(r.Form.Get("saturday_minutes"))
+	prefs.Minutes[time.Sunday] = parseMinutes(r.Form.Get("sunday_minutes"))
 
 	if prefs.IsEmpty() {
 		app.putFlashError(r.Context(), "Please schedule at least one workout day.")

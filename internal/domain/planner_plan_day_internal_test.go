@@ -138,7 +138,9 @@ func TestPlanner_PlanDay_UsesPrefsExerciseCountWhenScheduled(t *testing.T) {
 	t.Parallel()
 
 	// Long-day prefs (90 min) on Wednesday yields exercisesLong (4).
-	p := Preferences{WednesdayMinutes: 90} //nolint:exhaustruct // only Wednesday duration is relevant to this test.
+	p := Preferences{ //nolint:exhaustruct // only Wednesday duration is relevant to this test.
+		Minutes: [7]int{time.Wednesday: 90},
+	}
 	wp := newPlanDayPlanner(t, p)
 	wed := date(monday2026Date(), 2)
 

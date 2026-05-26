@@ -14,7 +14,7 @@ func Test_SaveUserPreferences_SnapsAnchorOnEnable(t *testing.T) {
 
 	// Anchor starts zero. Enable deload and confirm anchor lands on a Monday >= today.
 	prefs := domain.Preferences{ //nolint:exhaustruct // only deload-related fields exercised
-		MondayMinutes:   60,
+		Minutes:         [7]int{time.Monday: 60},
 		DeloadEnabled:   true,
 		MesocycleLength: 5,
 	}
@@ -44,7 +44,7 @@ func Test_SaveUserPreferences_NoSnapWhenAnchorAlreadySet(t *testing.T) {
 	existing := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC)
 	// First enable with an explicit anchor.
 	first := domain.Preferences{ //nolint:exhaustruct // only deload-related fields exercised
-		MondayMinutes:   60,
+		Minutes:         [7]int{time.Monday: 60},
 		DeloadEnabled:   true,
 		MesocycleLength: 5,
 		MesocycleAnchor: existing,
@@ -54,7 +54,7 @@ func Test_SaveUserPreferences_NoSnapWhenAnchorAlreadySet(t *testing.T) {
 	}
 
 	// Toggle a non-deload field; anchor should not move.
-	first.MondayMinutes = 90
+	first.Minutes[time.Monday] = 90
 	if err := svc.SaveUserPreferences(ctx, first); err != nil {
 		t.Fatalf("second save: %v", err)
 	}
