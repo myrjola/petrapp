@@ -99,6 +99,27 @@ TLC printout artifact, not a verification failure.)
   cache as never auto-invalidated (worst case) so a real bug isn't
   hidden behind a "browser will probably do the right thing" assumption.
 
+## Implementation note: cache-bust on replace
+
+The JS shim's `popOrPushTo` always rewrites every replace-branch target
+with a `bf_inv` query param (carrying the rotated `inv_bfcache` cookie)
+before calling `location.replace`. The model treats `Urls` as a finite
+opaque set and assumes every replace-branch firing transitions
+`docState → Loading / inFlight → GetPending` — i.e. a real cross-
+document fetch. Without the cache-bust, the browser would resolve some
+same-pathname navigations (identical URL, or same path + a fragment
+change) as same-document operations that skip the GET, leaving
+`docState = Loaded` with a stale `bakedToken` — a `NoStaleSettled`
+violation the model does NOT catch because URL distinctions below
+`Urls`-equality (fragments, identical-URL semantics) are abstracted
+away. The cache-bust enforces the model's assumption.
+
+An inline cleanup script in `ui/templates/base.gohtml` strips
+`?bf_inv=...` via `history.replaceState` before first paint, so the
+URL bar carries the canonical target form (fragment included).
+
+See `docs/superpowers/specs/2026-05-26-stack-navigator-replace-force-fresh-design.md`.
+
 ## Property of interest
 
 ```
