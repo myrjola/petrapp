@@ -416,7 +416,7 @@ func TestExhaustivePeriodizationCoverage(t *testing.T) {
 	}
 }
 
-func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
+func TestProgression_DeloadFirstSetUsesStartingWeight(t *testing.T) {
 	t.Parallel()
 
 	cfg := domain.Config{
@@ -435,25 +435,80 @@ func TestProgression_DeloadHoldsStartingWeight(t *testing.T) {
 	if target.TargetReps != 12 {
 		t.Errorf("initial CurrentSet TargetReps = %d, want 12 (hypertrophy → repMax)", target.TargetReps)
 	}
+}
 
-	// Even with completed sets recorded (signals present), deload returns
-	// the starting weight every time — no autoregulation.
+// Deload sets are recorded with a nil signal (the form has only a single
+// "Done!" button). Subsequent sets must echo whatever weight the user
+// actually lifted on the previous set so a one-time correction (e.g. the
+// rack only has 60 kg, not the seeded 61 kg) propagates forward without
+// the user having to re-enter it for every remaining set.
+func TestProgression_DeloadCarriesUserOverrideForward(t *testing.T) {
+	t.Parallel()
+
+	cfg := domain.Config{
+		Type:           domain.PeriodizationHypertrophy,
+		RepMin:         8,
+		RepMax:         12,
+		StartingWeight: 61.0,
+		IsDeload:       true,
+	}
+	p := domain.NewProgression(cfg)
+
+	// User adjusts the seeded weight down to 60 kg and signals "Done!"
+	// (deload submits no signal — the zero-value Signal stands in).
 	p.RecordCompletion(domain.SetResult{
 		ActualReps: 12,
-		Signal:     domain.SignalTooLight,
-		WeightKg:   67.5,
+		Signal:     "",
+		WeightKg:   60.0,
 	})
-	if got := p.CurrentSet().WeightKg; got != 67.5 {
-		t.Errorf("after SignalTooLight, deload CurrentSet WeightKg = %v, want 67.5 (no progression)", got)
+	if got := p.CurrentSet().WeightKg; got != 60.0 {
+		t.Errorf("after override, deload CurrentSet WeightKg = %v, want 60.0", got)
 	}
 
+	// A second set at the same weight keeps the recommendation steady.
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 10,
-		Signal:     domain.SignalTooHeavy,
-		WeightKg:   67.5,
+		ActualReps: 12,
+		Signal:     "",
+		WeightKg:   60.0,
 	})
-	if got := p.CurrentSet().WeightKg; got != 67.5 {
-		t.Errorf("after SignalTooHeavy, deload CurrentSet WeightKg = %v, want 67.5 (no autoreg)", got)
+	if got := p.CurrentSet().WeightKg; got != 60.0 {
+		t.Errorf("after second set, deload CurrentSet WeightKg = %v, want 60.0", got)
+	}
+
+	// Another override (e.g. the user takes a heavier dumbbell) propagates too.
+	p.RecordCompletion(domain.SetResult{
+		ActualReps: 12,
+		Signal:     "",
+		WeightKg:   62.5,
+	})
+	if got := p.CurrentSet().WeightKg; got != 62.5 {
+		t.Errorf("after second override, deload CurrentSet WeightKg = %v, want 62.5", got)
+	}
+}
+
+func TestFloorWeightKg(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   float64
+		want float64
+	}{
+		{"whole kg is unchanged", 60.0, 60.0},
+		{"61.5 floors to 61", 61.5, 61.0},
+		{"60.75 floors to 60", 60.75, 60.0},
+		{"60.25 floors to 60", 60.25, 60.0},
+		{"100.99 floors to 100", 100.99, 100.0},
+		{"sub-kg dumbbell floors to 0", 0.9, 0.0},
+		{"9.5 dumbbell floors to 9", 9.5, 9.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := domain.FloorWeightKg(tt.in); got != tt.want {
+				t.Errorf("FloorWeightKg(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 

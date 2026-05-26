@@ -65,12 +65,21 @@ func NewProgressionFromHistory(config Config, completed []SetResult) *Progressio
 }
 
 // CurrentSet returns the recommended target for the next set.
+//
+// Deload sessions hold the seeded starting weight for the first set but then
+// carry whatever weight the user actually lifted on the previous set forward
+// — no autoregulation, just the override. This lets a one-time correction
+// (e.g. dropping a seeded 61 kg to 60 kg because that's what the rack offers)
+// propagate to the remaining sets without forcing the user to re-enter it.
 func (p *Progression) CurrentSet() SetTarget {
 	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type, p.config.IsDeload).TargetReps
-	if p.config.IsDeload || len(p.completed) == 0 {
+	if len(p.completed) == 0 {
 		return SetTarget{WeightKg: p.config.StartingWeight, TargetReps: reps}
 	}
 	last := p.completed[len(p.completed)-1]
+	if p.config.IsDeload {
+		return SetTarget{WeightKg: last.WeightKg, TargetReps: reps}
+	}
 	weight := adjustedWeight(last)
 	return SetTarget{WeightKg: weight, TargetReps: reps}
 }
@@ -112,10 +121,10 @@ func incrementFor(weight float64) float64 {
 	return weightIncrementKgHigh
 }
 
-// SnapWeightKg rounds a kilo value to the nearest realisable load: 1kg
-// inside the dumbbell range (|w| < 10kg), 0.5kg above. Exposed for service
-// callers that derive weights outside the per-set progression flow.
-func SnapWeightKg(kg float64) float64 {
+// snapWeight rounds a kilo value to the nearest realisable load: 1kg in the
+// dumbbell range (|w| < 10kg), 0.5kg above. User overrides may sit off-grid,
+// so each per-set adjustment is snapped before being recommended.
+func snapWeight(kg float64) float64 {
 	if math.Abs(kg) < dumbbellThresholdKg {
 		return math.Round(kg)
 	}
@@ -123,7 +132,10 @@ func SnapWeightKg(kg float64) float64 {
 	return math.Round(kg/halfKg) * halfKg
 }
 
-// snapWeight rounds to the nearest realisable load: 1kg in the dumbbell
-// range, 0.5kg above. User overrides may sit off-grid, so each adjustment
-// is snapped before being recommended.
-func snapWeight(kg float64) float64 { return SnapWeightKg(kg) }
+// FloorWeightKg rounds a kilo value DOWN to the nearest whole kg. Use this
+// when the caller wants a conservative, definitely-loadable weight — the
+// commonly-stocked plate set (1, 2.5, 5 kg) cannot reach 0.5 kg precision,
+// so a calculated 61.5 kg has to become 61 kg in practice. The deload seed
+// uses this so the user never has to round a 60.75-kg recommendation down
+// by hand.
+func FloorWeightKg(kg float64) float64 { return math.Floor(kg) }

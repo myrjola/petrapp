@@ -124,29 +124,44 @@ func (s *Service) BuildProgression(
 		IsDeload:       sess.IsDeload,
 	}
 
+	return domain.NewProgressionFromHistory(config, collectWeightedHistory(sess, exerciseID)), nil
+}
+
+// collectWeightedHistory returns the completed weighted sets for the given
+// exercise in sess, in completion order. Deload sets are recorded without a
+// signal (the form has only "Done!"), so a nil signal is expected for them
+// and we keep the set so the deload progression can carry the user's weight
+// forward; non-deload sessions still require a signal.
+func collectWeightedHistory(sess domain.Session, exerciseID int) []domain.SetResult {
 	var completed []domain.SetResult
 	for _, es := range sess.Slots {
 		if es.Exercise.ID != exerciseID {
 			continue
 		}
 		for _, set := range es.Sets {
-			if set.CompletedValue == nil || set.Signal == nil {
+			if set.CompletedValue == nil {
+				continue
+			}
+			if !sess.IsDeload && set.Signal == nil {
 				continue
 			}
 			var kg float64
 			if set.WeightKg != nil {
 				kg = *set.WeightKg
 			}
+			var sig domain.Signal
+			if set.Signal != nil {
+				sig = *set.Signal
+			}
 			completed = append(completed, domain.SetResult{
 				ActualReps: *set.CompletedValue,
-				Signal:     *set.Signal,
+				Signal:     sig,
 				WeightKg:   kg,
 			})
 		}
 		break
 	}
-
-	return domain.NewProgressionFromHistory(config, completed), nil
+	return completed
 }
 
 const (
@@ -157,7 +172,9 @@ const (
 // GetDeloadStartingWeight returns the seed weight for a deload week's first
 // set of the given exercise: 90% of the most recent hypertrophy working
 // weight, falling back to 80% of any recent working weight, then to zero
-// when no history exists. Snapped via the existing weight-grid rule.
+// when no history exists. The result is floored to whole kg so it lands on a
+// definitely-loadable weight under the common 1 / 2.5 / 5 kg plate set —
+// rounding down keeps the deload genuinely lighter than the working weight.
 //
 // The repository's GetLatestStartingWeightBefore already excludes deload
 // sessions (Task 11), so the lookups below see only normal-week history.
@@ -171,11 +188,11 @@ func (s *Service) GetDeloadStartingWeight(
 		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
 	if prev.PeriodizationType == domain.PeriodizationHypertrophy && prev.WeightKg > 0 {
-		return domain.SnapWeightKg(prev.WeightKg * deloadFactor), nil
+		return domain.FloorWeightKg(prev.WeightKg * deloadFactor), nil
 	}
 	// No hypertrophy history (or zero weight): use the broader fallback.
 	if prev.WeightKg > 0 {
-		return domain.SnapWeightKg(prev.WeightKg * deloadFallback), nil
+		return domain.FloorWeightKg(prev.WeightKg * deloadFallback), nil
 	}
 	return 0, nil
 }

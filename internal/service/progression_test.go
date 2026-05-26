@@ -553,6 +553,86 @@ func Test_BuildProgression(t *testing.T) {
 	}
 }
 
+// Test_BuildProgression_DeloadCarriesOverride verifies that a user-overridden
+// weight on a deload set propagates to the next set's recommendation. Deload
+// sets are recorded with a nil signal (the form has only "Done!"), so the
+// service must include them in the progression history despite the missing
+// signal. Without that, BuildProgression's second-set recommendation would
+// fall back to the original deload seed and silently ignore the override.
+func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("dl-user"), "Deload User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	var exerciseID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
+		 VALUES (?, 'upper', '', 5, 8) RETURNING id`,
+		"Deload Override Press").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type, is_deload)
+		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy', 1)`,
+		userID, today)
+	if err != nil {
+		t.Fatalf("insert deload session: %v", err)
+	}
+	const pos = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
+		userID, today, pos, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercises: %v", err)
+	}
+	// Seed three sets at 61 kg (the original deload seed for this session).
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		 VALUES (?, ?, ?, 1, 61.0, 8), (?, ?, ?, 2, 61.0, 8), (?, ?, ?, 3, 61.0, 8)`,
+		userID, today, pos, userID, today, pos, userID, today, pos)
+	if err != nil {
+		t.Fatalf("insert seeded sets: %v", err)
+	}
+
+	svc := service.NewService(db, logger, "")
+	date, _ := time.Parse("2006-01-02", today)
+
+	// User completes set 0 with an override weight of 60 kg and no signal
+	// (the deload form sends no signal field).
+	override := 60.0
+	if err = svc.RecordSet(ctx, date, pos, 0, nil, &override, 8); err != nil {
+		t.Fatalf("RecordSet: %v", err)
+	}
+
+	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	if err != nil {
+		t.Fatalf("BuildProgression: %v", err)
+	}
+	target := prog.CurrentSet()
+	if target.WeightKg != 60.0 {
+		t.Errorf("after deload override, second-set weight = %v, want 60.0", target.WeightKg)
+	}
+}
+
 func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	t.Parallel()
 
@@ -714,13 +794,88 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 		t.Fatalf("insert sets: %v", err)
 	}
 
-	// GetDeloadStartingWeight returns 80 × 0.9 = 72 (snapped to 0.5).
+	// GetDeloadStartingWeight returns 80 × 0.9 = 72 (already whole kg).
 	got, err := svc.GetDeloadStartingWeight(ctx, exerciseID, deloadMonday)
 	if err != nil {
 		t.Fatalf("GetDeloadStartingWeight: %v", err)
 	}
 	if got != 72.0 {
-		t.Errorf("got %v, want 72.0 (= 80 * 0.9, snapped)", got)
+		t.Errorf("got %v, want 72.0 (= 80 * 0.9, floored)", got)
+	}
+}
+
+// Test_GetDeloadStartingWeight_FloorsFractionalResult locks in that the
+// deload seed is floored to a definitely-loadable whole-kg weight under the
+// common 1 / 2.5 / 5 kg plate set. A 75 kg working weight × 0.9 lands at
+// 67.5 kg, which can't be plated with 1 kg as the smallest increment, so
+// the deload seed must round DOWN to 67 kg.
+func Test_GetDeloadStartingWeight_FloorsFractionalResult(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("floor-user"), "Floor User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	var exerciseID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
+		 VALUES (?, 'upper', '', 5, 8) RETURNING id`,
+		"Deload Floor Press").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+
+	svc := service.NewService(db, logger, "")
+
+	monday := time.Date(2026, time.April, 27, 0, 0, 0, 0, time.UTC)
+	deloadMonday := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	mondayStr := monday.Format("2006-01-02")
+	ts := monday.Format("2006-01-02T15:04:05.000Z")
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, ?, 'hypertrophy')`,
+		userID, mondayStr, ts)
+	if err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		 VALUES (?, ?, 0, ?)`,
+		userID, mondayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercises: %v", err)
+	}
+	// 75 kg on_target → deload seed = floor(75 * 0.9) = floor(67.5) = 67.
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
+		 weight_kg, target_value, completed_value, completed_at, signal)
+		 VALUES (?, ?, 0, 1, 75.0, 8, 8, ?, 'on_target')`,
+		userID, mondayStr, ts)
+	if err != nil {
+		t.Fatalf("insert exercise_sets: %v", err)
+	}
+
+	got, err := svc.GetDeloadStartingWeight(ctx, exerciseID, deloadMonday)
+	if err != nil {
+		t.Fatalf("GetDeloadStartingWeight: %v", err)
+	}
+	if got != 67.0 {
+		t.Errorf("got %v, want 67.0 (floor(75 * 0.9) = floor(67.5))", got)
 	}
 }
 
