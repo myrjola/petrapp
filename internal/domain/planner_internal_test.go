@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"math/rand/v2"
 	"testing"
 	"time"
 )
@@ -269,7 +268,6 @@ func TestSelectExercisesForDay(t *testing.T) {
 
 	p := prefs(time.Monday, time.Tuesday, time.Thursday)
 	wp := NewPlanner(p, minimalExercises(), minimalTargets())
-	wp.rng = rand.New(rand.NewPCG(42, 0)) // fixed seed for determinism
 
 	t.Run("lower day only selects lower exercises", func(t *testing.T) {
 		t.Parallel()
@@ -362,7 +360,6 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 
 		p := prefs(time.Tuesday) // 3 exercises
 		wp := NewPlanner(p, exercises, nil)
-		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Request 3 exercises with priority Chest, Shoulders, Triceps.
 		// Expected: one exercise per primary muscle group, no overlaps.
@@ -412,7 +409,6 @@ func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
 
 		p := prefs(time.Tuesday) // 3 exercises
 		wp := NewPlanner(p, exercises, nil)
-		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Request 3 exercises, but only 1 non-overlapping is available.
 		// Expected: graceful degradation — select 1 exercise covering Chest.
@@ -471,7 +467,6 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 
 		p := prefs(time.Tuesday)
 		wp := NewPlanner(p, exercises, nil)
-		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Simulate that exercise 1 was already used earlier in the week.
 		weekUsedExercises := map[int]bool{1: true}
@@ -505,7 +500,6 @@ func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
 		monday := monday2026Date()
 		p := prefs(time.Monday, time.Tuesday, time.Thursday)
 		wp := NewPlanner(p, exercises, targets)
-		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		plan, err := wp.Plan(monday)
 		if err != nil {
@@ -555,7 +549,6 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 
 		p := prefs(time.Tuesday) // Requests 3 exercises.
 		wp := NewPlanner(p, exercises, nil)
-		wp.rng = rand.New(rand.NewPCG(42, 0))
 
 		// Request 3 exercises, but only 2 non-overlapping available.
 		// Expected: plan succeeds with 2 exercises, no error.
@@ -613,7 +606,6 @@ func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
 		},
 		Exercises: []Exercise{plank},
 		Targets:   []MuscleGroupTarget{{MuscleGroupName: "Abs", WeeklySetTarget: 8}},
-		rng:       nil,
 	}
 
 	sets := wp.selectExercisesForDayWithPeriodization(
@@ -802,7 +794,6 @@ func TestPlan(t *testing.T) {
 		t.Parallel()
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
 		wp := NewPlanner(p, exercises, targets)
-		wp.rng = rand.New(rand.NewPCG(1, 0))
 
 		plan, err := wp.Plan(monday)
 		if err != nil {
@@ -823,7 +814,6 @@ func TestPlan(t *testing.T) {
 		t.Parallel()
 		p := prefs(time.Monday, time.Wednesday, time.Friday)
 		wp := NewPlanner(p, exercises, targets)
-		wp.rng = rand.New(rand.NewPCG(1, 0))
 
 		plan, err := wp.Plan(monday)
 		if err != nil {
@@ -848,7 +838,6 @@ func TestPlan(t *testing.T) {
 		// 60 min: strength → 3 exercises, hypertrophy → 4 exercises.
 		p := prefs(time.Monday, time.Wednesday)
 		wp := NewPlanner(p, exercises, targets)
-		wp.rng = rand.New(rand.NewPCG(2, 0))
 
 		plan, err := wp.Plan(monday)
 		if err != nil {
@@ -876,7 +865,6 @@ func TestPlan(t *testing.T) {
 		t.Parallel()
 		p := prefs(time.Monday, time.Tuesday)
 		wp := NewPlanner(p, exercises, targets)
-		wp.rng = rand.New(rand.NewPCG(3, 0))
 
 		plan, err := wp.Plan(monday)
 		if err != nil {
@@ -1066,7 +1054,6 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 		SundayMinutes:    0,
 	}
 	wp := NewPlanner(p, minimalExercises(), minimalTargets())
-	wp.rng = rand.New(rand.NewPCG(7, 0))
 
 	plan, err := wp.Plan(monday)
 	if err != nil {

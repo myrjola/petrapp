@@ -3,7 +3,6 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"slices"
 	"time"
 )
@@ -33,18 +32,14 @@ type Planner struct {
 	Prefs     Preferences
 	Exercises []Exercise
 	Targets   []MuscleGroupTarget
-	rng       *rand.Rand
 }
 
-// NewPlanner creates a Planner with a randomly seeded RNG.
+// NewPlanner creates a Planner over the supplied inputs.
 func NewPlanner(prefs Preferences, exercises []Exercise, targets []MuscleGroupTarget) *Planner {
-	// Non-cryptographic randomness is intentional for exercise selection.
-	rng := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)) //nolint:gosec // not security-sensitive
 	return &Planner{
 		Prefs:     prefs,
 		Exercises: exercises,
 		Targets:   targets,
-		rng:       rng,
 	}
 }
 
