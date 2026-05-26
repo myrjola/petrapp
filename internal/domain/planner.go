@@ -396,7 +396,8 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 				continue
 			}
 			score := scoreCandidate(ex, pt, isDeload, load, targets)
-			if bestIdx < 0 || score > bestScore {
+			if bestIdx < 0 || score > bestScore ||
+				(score == bestScore && ex.ID < wp.Exercises[bestIdx].ID) {
 				bestIdx = i
 				bestScore = score
 			}
