@@ -79,6 +79,72 @@ func StripDeadResourceLinks(desc string, aliveURLs map[string]bool) string {
 	return strings.Join(out, "\n")
 }
 
+// repGuidancePatterns lists patterns that identify ordered-list items in the
+// ## Instructions section that convey rep / set / duration targets. These
+// targets are tracked separately by the app and must not appear in prose.
+//
+// Each pattern is intentionally narrow so it does not fire on:
+//   - "Take 2 deep breaths" (no reps/sets keyword)
+//   - "3-second tempo" (no hold/perform/do/complete verb)
+//   - Common Mistakes items like "Doing 50 reps at once: pace yourself"
+//     (those are outside ## Instructions, handled by inInstructions guard).
+//
+//nolint:gochecknoglobals // compiled once at startup; patterns are read-only.
+var repGuidancePatterns = []*regexp.Regexp{
+	// "perform 8-12 reps", "perform 10 repetitions", "perform 8 times"
+	regexp.MustCompile(`(?i)\bperform\s+\d+(?:\s*[-–]\s*\d+)?\s*(?:reps?|repetitions?|times)\b`),
+	// "do 8-12 reps", "do 10 repetitions"
+	regexp.MustCompile(`(?i)\bdo\s+\d+(?:\s*[-–]\s*\d+)?\s*(?:reps?|repetitions?)\b`),
+	// "complete 3 sets"
+	regexp.MustCompile(`(?i)\bcomplete\s+\d+(?:\s*[-–]\s*\d+)?\s*sets?\b`),
+	// "8-12 reps" / "8 reps" / "3 sets" at the start of an instruction step
+	regexp.MustCompile(`(?i)^\s*\d+\.\s*\d+(?:\s*[-–]\s*\d+)?\s*(?:reps?|repetitions?|sets?)\b`),
+	// "hold for 30 seconds", "hold for 5s"
+	regexp.MustCompile(`(?i)\bhold\s+for\s+\d+\s*(?:seconds?|s)\b`),
+	// Literal template-leak phrase
+	regexp.MustCompile(`(?i)\brepetition guidance\b`),
+}
+
+// orderedListItemPattern matches a markdown ordered-list item like "5. text".
+var orderedListItemPattern = regexp.MustCompile(`^\s*\d+\.\s+`)
+
+// StripRepGuidanceLines drops ordered-list items in the ## Instructions
+// section whose text matches any repGuidancePatterns entry. Other sections
+// (## Common Mistakes, ## Resources) are passed through unchanged — rep
+// mentions there describe errors to avoid, not targets to hit.
+func StripRepGuidanceLines(desc string) string {
+	lines := strings.Split(desc, "\n")
+	out := make([]string, 0, len(lines))
+	inInstructions := false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## Instructions") {
+			inInstructions = true
+			out = append(out, line)
+			continue
+		}
+		if inInstructions && strings.HasPrefix(line, "##") {
+			inInstructions = false
+		}
+
+		if inInstructions && orderedListItemPattern.MatchString(line) && matchesRepGuidance(line) {
+			continue
+		}
+		out = append(out, line)
+	}
+
+	return strings.Join(out, "\n")
+}
+
+func matchesRepGuidance(line string) bool {
+	for _, p := range repGuidancePatterns {
+		if p.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
 // dropResourcesHeader removes the "## Resources" line at idx and any
 // immediately-trailing blank lines that were the separator before the
 // (now empty) section content. Returns the trimmed slice.
