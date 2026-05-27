@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-//nolint:unparam // level will vary once later tasks add LevelError tests.
 func makeRecord(level slog.Level, msg string, attrs ...slog.Attr) slog.Record {
 	rec := slog.NewRecord(time.Unix(0, 0), level, msg, 0)
 	rec.AddAttrs(attrs...)
