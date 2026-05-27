@@ -415,6 +415,74 @@ func TestSelectExercises_TimeBasedExerciseGetsThreeSets(t *testing.T) {
 	}
 }
 
+func TestSelectExercises_WeightedExerciseSetCountMatchesDeriveScheme(t *testing.T) {
+	t.Parallel()
+	// A weighted exercise picked via selectExercisesForDayWithPeriodization
+	// should carry the set count and per-set target reps that
+	// DeriveScheme produces for the same exercise + periodization.
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+		RepMin: new(5), RepMax: new(10),
+	}
+	wp := NewPlanner(prefs(time.Tuesday), []Exercise{bench}, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+	})
+	load := map[string]float64{}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Fatalf("want 1 slot, got %d", len(slots))
+	}
+	wantReps, wantSets := deriveSchemeForExercise(bench, PeriodizationStrength, false)
+	if len(slots[0].Sets) != wantSets {
+		t.Errorf("set count = %d, want %d", len(slots[0].Sets), wantSets)
+	}
+	for i, s := range slots[0].Sets {
+		if s.TargetValue != wantReps {
+			t.Errorf("set %d target reps = %d, want %d", i, s.TargetValue, wantReps)
+		}
+	}
+}
+
+func TestSelectExercises_GracefulDegradationWhenAllSharePrimaryMG(t *testing.T) {
+	t.Parallel()
+	// Pool: three exercises all primary on Chest. The session asks for 3
+	// slots but only the first pick can satisfy the no-primary-overlap
+	// rule; the loop must stop early and return one slot (graceful
+	// degradation), not loop forever or panic.
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+	}
+	wp := NewPlanner(prefs(time.Tuesday), exercises, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+	})
+	load := map[string]float64{}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 3, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Errorf("want 1 slot (graceful degradation under primary-overlap exhaustion), got %d", len(slots))
+	}
+}
+
 func TestPlan_DoesNotRepeatExercisesAcrossDays(t *testing.T) {
 	t.Parallel()
 	exercises := minimalExercises()
@@ -958,12 +1026,13 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	}
 }
 
-// prodLikePool returns a 15-exercise pool that mirrors the prod
-// secondary-footprint asymmetry: dense secondary coverage on Shoulders/
-// Upper Back/Triceps (so they could balloon under the old algorithm)
-// and sparse secondary coverage on Chest/Quads (so they could only
-// accumulate via primary picks).
-func prodLikePool() []Exercise {
+// seedExercises mirrors the 39 exercises in internal/sqlite/fixtures.sql
+// verbatim (IDs, categories, types, rep windows, and primary/secondary
+// muscle groups all match). It keeps the regression test pure-domain while
+// exercising the algorithm against the actual seed users start with.
+// Update both this helper and fixtures.sql together when seed exercises
+// change.
+func seedExercises() []Exercise {
 	return []Exercise{
 		{ //nolint:exhaustruct // Test exercise omits display fields.
 			ID: 1, Name: "Deadlift", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
@@ -996,15 +1065,15 @@ func prodLikePool() []Exercise {
 			RepMin:                new(10), RepMax: new(20),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 6, Name: "Shoulder Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			ID: 6, Name: "Dumbbell Shoulder Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups:   []string{"Shoulders"},
 			SecondaryMuscleGroups: []string{"Triceps", "Upper Back"},
 			RepMin:                new(5), RepMax: new(10),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 7, Name: "Push-Up", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
-			PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
-			SecondaryMuscleGroups: []string{"Abs", "Forearms", "Shoulders", "Upper Back"},
+			ID: 7, Name: "Dumbbell Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps"},
 			RepMin:                new(5), RepMax: new(10),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
@@ -1020,45 +1089,189 @@ func prodLikePool() []Exercise {
 			RepMin:                new(5), RepMax: new(10),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 10, Name: "Face Pull", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups:   []string{"Shoulders", "Upper Back"},
-			SecondaryMuscleGroups: []string{"Traps", "Triceps"},
+			ID: 10, Name: "Pulldown, Reverse Grip", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Biceps", "Lats"},
+			SecondaryMuscleGroups: []string{"Forearms", "Upper Back"},
 			RepMin:                new(5), RepMax: new(10),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 11, Name: "Leg Press", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			ID: 11, Name: "Seated Cable Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Lower Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 12, Name: "One-Arm Dumbbell Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Forearms"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 13, Name: "Abdominal Machine Crunch", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Abs"},
+			SecondaryMuscleGroups: []string{"Obliques"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 14, Name: "Leg Press", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
 			SecondaryMuscleGroups: []string{"Calves", "Hamstrings"},
 			RepMin:                new(5), RepMax: new(10),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 12, Name: "Leg Extension", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			ID: 15, Name: "Leg Extension", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups:   []string{"Quads"},
 			SecondaryMuscleGroups: []string{"Hip Flexors"},
 			RepMin:                new(8), RepMax: new(12),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 13, Name: "Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
-			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
-			SecondaryMuscleGroups: []string{"Hamstrings", "Lower Back"},
-			RepMin:                new(3), RepMax: new(6),
-		},
-		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 14, Name: "Leg Curl", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			ID: 16, Name: "Leg Curl", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups:   []string{"Hamstrings"},
 			SecondaryMuscleGroups: []string{"Calves"},
 			RepMin:                new(8), RepMax: new(12),
 		},
 		{ //nolint:exhaustruct // Test exercise omits display fields.
-			ID: 15, Name: "Romanian Deadlift", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			ID: 17, Name: "Calf Raise", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Calves"},
+			SecondaryMuscleGroups: []string{"Quads"},
+			RepMin:                new(10), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 18, Name: "Back Extension", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lower Back"},
+			SecondaryMuscleGroups: []string{"Glutes", "Hamstrings"},
+			RepMin:                new(8), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 19, Name: "Push-Up", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
+			SecondaryMuscleGroups: []string{"Abs", "Forearms", "Shoulders", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 20, Name: "Ab Wheel Rollout", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Abs", "Obliques"},
+			SecondaryMuscleGroups: []string{"Calves", "Glutes", "Hamstrings", "Lats", "Quads", "Shoulders"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 21, Name: "Plank", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Abs"},
+			SecondaryMuscleGroups: []string{"Glutes", "Hip Flexors", "Lower Back", "Obliques", "Quads", "Shoulders"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 22, Name: "Incline Dumbbell Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 23, Name: "Romanian Deadlift", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups:   []string{"Glutes", "Hamstrings"},
 			SecondaryMuscleGroups: []string{"Lower Back"},
 			RepMin:                new(8), RepMax: new(20),
 		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 24, Name: "Assisted Pull-Up", Category: CategoryUpper, ExerciseType: ExerciseTypeAssisted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Forearms"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 25, Name: "Hip Abductor", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes"},
+			SecondaryMuscleGroups: nil,
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 26, Name: "Hip Adductor", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Adductors"},
+			SecondaryMuscleGroups: []string{"Glutes"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 27, Name: "Rotary Torso", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Obliques"},
+			SecondaryMuscleGroups: []string{"Abs"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 28, Name: "Seated Calf Raise", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Calves"},
+			SecondaryMuscleGroups: nil,
+			RepMin:                new(10), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 29, Name: "Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Hamstrings", "Lower Back"},
+			RepMin:                new(3), RepMax: new(6),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 30, Name: "Pec Fly", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 31, Name: "Smith Machine Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Abs", "Hamstrings"},
+			RepMin:                new(3), RepMax: new(6),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 32, Name: "Overhead Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Shoulders", "Triceps"},
+			SecondaryMuscleGroups: []string{"Abs", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 33, Name: "Barbell Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Lower Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 34, Name: "Face Pull", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Shoulders", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Traps", "Triceps"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 35, Name: "Hip Thrust", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes"},
+			SecondaryMuscleGroups: []string{"Hamstrings", "Quads"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 36, Name: "Bulgarian Split Squat", Category: CategoryLower, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Abs", "Hamstrings"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 37, Name: "Hammer Curl", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Biceps", "Forearms"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 38, Name: "Skull Crusher", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Triceps"},
+			SecondaryMuscleGroups: []string{"Forearms", "Shoulders"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 39, Name: "Hanging Leg Raise", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Abs", "Hip Flexors"},
+			SecondaryMuscleGroups: []string{"Forearms", "Obliques"},
+			RepMin:                new(5), RepMax: new(10),
+		},
 	}
 }
 
-func prodLikeTargets() []MuscleGroupTarget {
+func seedTargets() []MuscleGroupTarget {
 	return []MuscleGroupTarget{
 		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
 		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
@@ -1082,13 +1295,13 @@ func prefs90(days ...time.Weekday) Preferences {
 	return p
 }
 
-func TestPlan_TargetAwareBalanceUnderProdLikePool(t *testing.T) {
+func TestPlan_TargetAwareBalanceUnderSeedExercises(t *testing.T) {
 	t.Parallel()
 	// Tue/Thu/Sat 90 min, all FullBody. This is user 24's current schedule;
 	// under the old algorithm Shoulders/Triceps/Upper Back ballooned and
 	// Chest/Quads sat under target.
 	p := prefs90(time.Tuesday, time.Thursday, time.Saturday)
-	wp := NewPlanner(p, prodLikePool(), prodLikeTargets())
+	wp := NewPlanner(p, seedExercises(), seedTargets())
 
 	plan, err := wp.Plan(monday2026Date())
 	if err != nil {
@@ -1096,22 +1309,28 @@ func TestPlan_TargetAwareBalanceUnderProdLikePool(t *testing.T) {
 	}
 
 	load := WeeklyPlannedLoad(planSessions(plan))
-	for _, target := range prodLikeTargets() {
+	for _, target := range seedTargets() {
 		l := load[target.MuscleGroupName]
 		t.Logf("%s planned %.1f / target %d", target.MuscleGroupName, l, target.WeeklySetTarget)
 	}
 
-	// 1.85x cap rather than the spec's 1.5x: on this synthetic 15-exercise
-	// pool the dense secondary footprint on Shoulders/Triceps forces them to
-	// 1.6x / 1.81x even after the rewrite (down from 1.75x / 1.81x under
-	// the old algorithm). Real prod has 38 exercises with more escape
-	// routes; the 1.85x bound here catches major regressions without
-	// constraining the synthetic worst case.
-	for _, target := range prodLikeTargets() {
+	// Spec bounds: every targeted MG within [0.7x, 1.4x] of target, and
+	// no MG exceeds 1.5x (a hard ceiling). Chest >= 8 sets is the
+	// regression floor — under the old algorithm Chest sat at 8.0 (-20%)
+	// while Shoulders/Triceps/Upper Back ballooned to 1.65-1.81x.
+	for _, target := range seedTargets() {
 		l := load[target.MuscleGroupName]
-		upper := 1.85 * float64(target.WeeklySetTarget)
+		lower := 0.7 * float64(target.WeeklySetTarget)
+		upper := 1.4 * float64(target.WeeklySetTarget)
+		hardCeiling := 1.5 * float64(target.WeeklySetTarget)
+		if l < lower {
+			t.Errorf("%s planned %.1f is below 0.7x target (%v)", target.MuscleGroupName, l, lower)
+		}
 		if l > upper {
-			t.Errorf("%s planned %.1f exceeds 1.85x target (%v)", target.MuscleGroupName, l, upper)
+			t.Errorf("%s planned %.1f exceeds 1.4x target (%v)", target.MuscleGroupName, l, upper)
+		}
+		if l > hardCeiling {
+			t.Errorf("%s planned %.1f exceeds 1.5x hard ceiling (%v)", target.MuscleGroupName, l, hardCeiling)
 		}
 	}
 	if got := load["Chest"]; got < 8 {
@@ -1134,7 +1353,7 @@ func TestPlan_DeterministicAcrossRuns(t *testing.T) {
 	// Same inputs twice → byte-equal Sessions output. Guards against map
 	// iteration order leaking into selection.
 	p := prefs90(time.Tuesday, time.Thursday, time.Saturday)
-	wp := NewPlanner(p, prodLikePool(), prodLikeTargets())
+	wp := NewPlanner(p, seedExercises(), seedTargets())
 
 	monday := monday2026Date()
 	planA, err := wp.Plan(monday)
