@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/myrjola/petrapp/internal/logging"
 )
 
 // IdleMonitorConfig configures an IdleMonitor.
@@ -40,8 +42,12 @@ func (m *IdleMonitor) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			tickCtx := logging.WithAttrs(ctx,
+				slog.String("trace_id", logging.NewTraceID()),
+				slog.String("component", "idle_monitor"),
+			)
 			if m.shouldTrigger() {
-				m.cfg.Logger.LogAttrs(ctx, slog.LevelInfo, "idle monitor triggering shutdown")
+				m.cfg.Logger.LogAttrs(tickCtx, slog.LevelInfo, "idle monitor triggering shutdown")
 				m.cfg.Trigger()
 				return
 			}
