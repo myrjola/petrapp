@@ -244,11 +244,13 @@ Two admin pages exist today. Each gets:
 ### Exercises
 
 - File: `cmd/web/handler-admin-exercises.go`
-- Affected handlers: `adminExercisesGET`, `adminExerciseEditGET`
-  (both render the same admin-exercises template tree; both set
-  `Active: "exercises"`).
-- Template: `ui/templates/pages/admin-exercises/admin-exercises.gohtml`
-  (and the edit-form template that lives under the same directory).
+- Affected handlers: `adminExercisesGET`, `adminExerciseEditGET` — both
+  set `Active: "exercises"`.
+- Templates:
+  - `ui/templates/pages/admin-exercises/admin-exercises.gohtml` (the list)
+  - `ui/templates/pages/admin-exercise-edit/admin-exercise-edit.gohtml` (the edit form)
+
+  Both templates include the partial with the same active value.
 
 ### Feature flags
 
