@@ -157,6 +157,21 @@ func matchesRepGuidance(line string) bool {
 	return false
 }
 
+// ExtractResourceURLs returns every URL referenced by a markdown resource
+// list item (`- [Title](URL)`) anywhere in desc, in the order they appear.
+// Duplicates are preserved so the caller can decide on deduplication.
+func ExtractResourceURLs(desc string) []string {
+	var urls []string
+	for line := range strings.SplitSeq(desc, "\n") {
+		m := resourceLinkPattern.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		urls = append(urls, m[1])
+	}
+	return urls
+}
+
 // dropResourcesHeader removes the "## Resources" line at idx and any
 // immediately-trailing blank lines that were the separator before the
 // (now empty) section content. Returns the trimmed slice.

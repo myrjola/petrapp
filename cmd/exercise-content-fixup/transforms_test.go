@@ -207,3 +207,29 @@ func TestStripDeadResourceLinks(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractResourceURLs(t *testing.T) {
+	t.Parallel()
+
+	desc := "## Instructions\n1. Set up.\n\n## Resources\n" +
+		"- [A](https://a.example.org/x)\n" +
+		"- [B](http://b.example.org/y)\n" +
+		"- [C without link]\n" +
+		"- [D](https://a.example.org/x)\n" // duplicate
+
+	got := ExtractResourceURLs(desc)
+
+	want := []string{
+		"https://a.example.org/x",
+		"http://b.example.org/y",
+		"https://a.example.org/x", // ExtractResourceURLs preserves duplicates; caller dedupes
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d URLs, want %d: %v", len(got), len(want), got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("URL[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
