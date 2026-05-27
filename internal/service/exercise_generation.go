@@ -24,6 +24,9 @@ import (
 	"github.com/openai/openai-go/v3/option"
 )
 
+// resourceURLValidationTimeout caps each HEAD check issued by validateResourceURLs.
+const resourceURLValidationTimeout = 5 * time.Second
+
 // exerciseJSONSchema is the JSON-schema description that the OpenAI
 // chat completion endpoint validates the AI's response against. The
 // muscle-group enum is dynamic — the generator constructs the schema
@@ -115,7 +118,7 @@ func newExerciseGenerator(openaiAPIKey string, muscleGroups []string, logger *sl
 	client := openai.NewClient(option.WithAPIKey(openaiAPIKey))
 	return &exerciseGenerator{
 		client:       client,
-		httpClient:   &http.Client{Timeout: 5 * time.Second},
+		httpClient:   &http.Client{Timeout: resourceURLValidationTimeout},
 		logger:       logger,
 		muscleGroups: muscleGroups,
 	}
@@ -342,7 +345,7 @@ func (eg *exerciseGenerator) validateResourceURLs(
 			continue
 		}
 		_ = resp.Body.Close()
-		if resp.StatusCode >= 400 {
+		if resp.StatusCode >= http.StatusBadRequest {
 			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad status",
 				slog.String("url", r.URL), slog.Int("status", resp.StatusCode))
 			continue
