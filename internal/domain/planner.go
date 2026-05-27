@@ -114,10 +114,16 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 // after Plan(monday) already ran). weekUsedExerciseIDs is the set of
 // exercise IDs already used in other sessions this week; weekLoad is
 // the running per-MG weighted load from those sessions (built by the
-// caller via WeeklyPlannedLoad). The planner mutates a copy of
-// weekLoad internally for scoring this day's picks and returns the
-// resulting Session. Returns errNoExercisesForCategory (wrapped) if
-// the derived category has no compatible exercises.
+// caller via WeeklyPlannedLoad).
+//
+// weekLoad is copied internally before scoring this day's picks, so
+// the caller's map is not mutated. weekUsedExerciseIDs is NOT copied —
+// the selection loop adds this day's picked IDs to it so a single
+// shared map can be threaded through multiple PlanDay calls in the
+// same week. Pass a fresh map if you don't want this side effect.
+//
+// Returns errNoExercisesForCategory (wrapped) if the derived category
+// has no compatible exercises.
 func (wp *Planner) PlanDay(
 	date time.Time,
 	weekUsedExerciseIDs map[int]bool,
@@ -322,6 +328,10 @@ func (wp *Planner) pickBestExerciseIdx(
 			continue
 		}
 		score := scoreCandidate(ex, pt, isDeload, load, targets)
+		// Exact float equality is safe here: scores are derived from
+		// integer targets, integer set counts, and fixed half-integer
+		// weights (PrimarySetWeight, SecondarySetWeight), so ties round-trip
+		// cleanly through IEEE 754.
 		if bestIdx < 0 || score > bestScore ||
 			(score == bestScore && ex.ID < wp.Exercises[bestIdx].ID) {
 			bestIdx = i
@@ -378,8 +388,11 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 // scoreCandidate returns the gain in target-balance from adding ex to a
 // session: positive when the exercise pulls the running per-MG load
 // closer to its target, negative when it pushes an MG further from
-// target. The metric is the change in the sum of squared distances
-// over targeted muscle groups; untargeted MGs are ignored. Set count
+// target. An MG that is already over target contributes negatively
+// proportional to how far it would overshoot — picks that re-load an
+// already-saturated MG score lower than picks that touch fresh ground.
+// The metric is the change in the sum of squared distances over
+// targeted muscle groups; untargeted MGs are ignored. Set count
 // comes from the same deriveSchemeForExercise the planner uses to
 // persist sets, so deload halving and periodization-driven set-count
 // shifts are reflected automatically.
