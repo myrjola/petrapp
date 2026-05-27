@@ -3,7 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"slices"
+	"maps"
 	"time"
 )
 
@@ -17,8 +17,7 @@ const (
 	exercisesMediumHypertrophy = 4
 	exercisesShort             = 2
 
-	maxMuscleGroupDaysPerWeek = 2
-	numPeriodizationTypes     = 2
+	numPeriodizationTypes = 2
 
 	hoursPerDay = 24
 )
@@ -67,7 +66,6 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		}
 	}
 
-	// Collect scheduled workout days Mon–Sun.
 	var workoutDays []time.Time
 	for i := range 7 {
 		day := startingDate.AddDate(0, 0, i)
@@ -79,51 +77,35 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		return WeekPlan{}, errors.New("no workout days scheduled in preferences")
 	}
 
-	// Phase 1: determine category for each scheduled day.
-	categories := make(map[time.Time]Category, len(workoutDays))
 	for _, day := range workoutDays {
 		cat := wp.determineCategory(day)
 		if !wp.hasExercisesForCategory(cat) {
 			return WeekPlan{}, fmt.Errorf("%w: %s day (%s)", errNoExercisesForCategory, cat, day.Weekday())
 		}
-		categories[day] = cat
 	}
 
-	// Phase 2: allocate muscle group slots across days.
-	dayMuscleGroups := wp.allocateMuscleGroups(workoutDays, categories)
-
-	// Determine periodization type for first session.
 	firstPT := wp.firstSessionPeriodizationType(startingDate)
-	isDeload := IsDeloadWeek(startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
+	isDeload := IsDeloadWeek(
+		startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
+	)
 
-	// Phase 3: select exercises and write into the day-indexed slot.
-	weekUsedExercises := make(map[int]bool)
+	weekUsedExercises := map[int]bool{}
+	load := map[string]float64{}
 	for i, day := range workoutDays {
 		pt := nextPeriodizationType(firstPT, i)
 		if isDeload {
 			pt = PeriodizationHypertrophy
 		}
 		n := exercisesPerSession(wp.Prefs, day.Weekday(), pt, isDeload)
-		exerciseSlots := wp.selectExercisesForDayWithPeriodization(
-			categories[day],
-			dayMuscleGroups[day],
-			n,
-			pt,
-			isDeload,
-			weekUsedExercises,
+		slots := wp.selectExercisesForDayWithPeriodization(
+			wp.determineCategory(day), n, pt, isDeload, weekUsedExercises, load,
 		)
-
-		// Record which exercises were used this week.
-		for _, es := range exerciseSlots {
-			weekUsedExercises[es.Exercise.ID] = true
-		}
-
 		dayOffset := int(day.Sub(startingDate).Hours() / hoursPerDay)
-		result.Sessions[dayOffset] = Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+		result.Sessions[dayOffset] = Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
 			Date:              day,
 			PeriodizationType: pt,
 			IsDeload:          isDeload,
-			Slots:             exerciseSlots,
+			Slots:             slots,
 		}
 	}
 
@@ -131,23 +113,38 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 }
 
 // PlanDay generates one Session for date, suitable for ad-hoc workouts on
-// days outside the weekly plan (extra workouts, or days added mid-week after
-// Plan(monday) already ran). weekUsedExerciseIDs is the set of exercise IDs
-// already used in other sessions this week; the planner avoids repeating
-// them when possible. Returns errNoExercisesForCategory (wrapped) if the
-// derived category has no compatible exercises.
-func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Session, error) {
+// days outside the weekly plan (extra workouts, or days added mid-week
+// after Plan(monday) already ran). weekUsedExerciseIDs is the set of
+// exercise IDs already used in other sessions this week; weekLoad is
+// the running per-MG weighted load from those sessions (built by the
+// caller via WeeklyPlannedLoad).
+//
+// weekLoad is copied internally before scoring this day's picks, so
+// the caller's map is not mutated. weekUsedExerciseIDs is NOT copied —
+// the selection loop adds this day's picked IDs to it so a single
+// shared map can be threaded through multiple PlanDay calls in the
+// same week. Pass a fresh map if you don't want this side effect.
+//
+// Returns errNoExercisesForCategory (wrapped) if the derived category
+// has no compatible exercises.
+func (wp *Planner) PlanDay(
+	date time.Time,
+	weekUsedExerciseIDs map[int]bool,
+	weekLoad map[string]float64,
+) (Session, error) {
 	category := wp.determineCategory(date)
 	if !wp.hasExercisesForCategory(category) {
 		return Session{}, fmt.Errorf(
-			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday())
+			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday(),
+		)
 	}
 
-	// Periodization: replicate the weekly planner's per-day alternation.
 	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
 	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
 	// handles Sunday correctly: time.Sunday = 0 < time.Monday = 1, so an int
-	// range would never count anything for a Sunday date.
+	// range would never count anything for a Sunday date. Sunday falls
+	// through the loop with the full Mon..Sat count — exactly the index
+	// workoutDays[i==len-1] would have produced for it in Plan.
 	idx := 0
 	target := date.Weekday()
 	for _, d := range []time.Weekday{
@@ -161,21 +158,17 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 			idx++
 		}
 	}
-	// Sunday never matches any d above, so it falls through with the full count
-	// of scheduled Mon..Sat days — exactly the index workoutDays[i==len-1] would
-	// have produced for it.
 	monday := MondayOf(date)
 	firstPT := wp.firstSessionPeriodizationType(monday)
 	pt := nextPeriodizationType(firstPT, idx)
 
-	isDeload := IsDeloadWeek(monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
+	isDeload := IsDeloadWeek(
+		monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
+	)
 	if isDeload {
 		pt = PeriodizationHypertrophy
 	}
 
-	// Exercise count: from prefs if the day is scheduled, otherwise medium
-	// (bumped to medium-hypertrophy when the ad-hoc day is hypertrophy and
-	// not deload, matching the scheduled-day rule).
 	n := exercisesPerSession(wp.Prefs, date.Weekday(), pt, isDeload)
 	if n == 0 {
 		n = exercisesMedium
@@ -186,17 +179,17 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 
 	used := weekUsedExerciseIDs
 	if used == nil {
-		used = make(map[int]bool)
+		used = map[int]bool{}
 	}
-	exerciseSlots := wp.selectExercisesForDayWithPeriodization(
-		category, nil, n, pt, isDeload, used,
-	)
+	load := make(map[string]float64, len(weekLoad))
+	maps.Copy(load, weekLoad)
+	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, used, load)
 
-	return Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+	return Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
 		Date:              date,
 		PeriodizationType: pt,
 		IsDeload:          isDeload,
-		Slots:             exerciseSlots,
+		Slots:             slots,
 	}, nil
 }
 
@@ -265,84 +258,6 @@ func isCategoryCompatible(exerciseCategory, dayCategory Category) bool {
 	return exerciseCategory == dayCategory
 }
 
-// hasCategoryExerciseForMuscleGroup reports whether the pool contains at least
-// one exercise compatible with dayCategory whose primary muscles include muscleGroup.
-func (wp *Planner) hasCategoryExerciseForMuscleGroup(dayCategory Category, muscleGroup string) bool {
-	for _, ex := range wp.Exercises {
-		if !isCategoryCompatible(ex.Category, dayCategory) {
-			continue
-		}
-		if slices.Contains(ex.PrimaryMuscleGroups, muscleGroup) {
-			return true
-		}
-	}
-	return false
-}
-
-// allocateMuscleGroups assigns each tracked muscle group to up to 2 workout days
-// using a most-constrained-first greedy algorithm. A muscle group is valid for a
-// day if at least one compatible exercise targets it as a primary muscle.
-func (wp *Planner) allocateMuscleGroups(
-	workoutDays []time.Time,
-	categories map[time.Time]Category,
-) map[time.Time][]string {
-	// Build valid-day lists for each muscle group.
-	type mgEntry struct {
-		name      string
-		validDays []time.Time
-	}
-	entries := make([]mgEntry, len(wp.Targets))
-	for i, target := range wp.Targets {
-		var valid []time.Time
-		for _, day := range workoutDays {
-			if wp.hasCategoryExerciseForMuscleGroup(categories[day], target.MuscleGroupName) {
-				valid = append(valid, day)
-			}
-		}
-		entries[i] = mgEntry{name: target.MuscleGroupName, validDays: valid}
-	}
-
-	// Sort ascending by number of valid days (most constrained first).
-	// Alphabetical name as tiebreaker for determinism.
-	slices.SortFunc(entries, func(a, b mgEntry) int {
-		if len(a.validDays) != len(b.validDays) {
-			return len(a.validDays) - len(b.validDays)
-		}
-		if a.name < b.name {
-			return -1
-		}
-		if a.name > b.name {
-			return 1
-		}
-		return 0
-	})
-
-	assignmentCount := make(map[time.Time]int)
-	result := make(map[time.Time][]string)
-
-	for _, entry := range entries {
-		if len(entry.validDays) == 0 {
-			continue
-		}
-
-		// Sort valid days by current assignment count (least loaded first).
-		sortedDays := slices.Clone(entry.validDays)
-		slices.SortFunc(sortedDays, func(a, b time.Time) int {
-			return assignmentCount[a] - assignmentCount[b]
-		})
-
-		// Assign to up to maxMuscleGroupDaysPerWeek days.
-		limit := min(maxMuscleGroupDaysPerWeek, len(sortedDays))
-		for i := range limit {
-			day := sortedDays[i]
-			result[day] = append(result[day], entry.name)
-			assignmentCount[day]++
-		}
-	}
-
-	return result
-}
-
 // primaryMuscleGroupsOverlap returns true if any of the exercise's primary muscle groups
 // are already in the selectedPrimaryMuscles set.
 func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]bool) bool {
@@ -354,121 +269,97 @@ func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]b
 	return false
 }
 
-// scoreExerciseForPriority scores an exercise by how many unsatisfied priority muscle groups it covers.
-func scoreExerciseForPriority(ex Exercise, priorityMuscleGroups []string, satisfied map[string]bool) int {
-	score := 0
-	for _, mg := range ex.PrimaryMuscleGroups {
-		if slices.Contains(priorityMuscleGroups, mg) && !satisfied[mg] {
-			score++
-		}
-	}
-	return score
-}
-
-// findBestExerciseInPool finds the highest-scoring exercise from the pool that doesn't conflict.
-// Returns the index in pool, or -1 if no suitable exercise found.
-func (wp *Planner) findBestExerciseInPool(
-	pool []Exercise,
-	priorityMuscleGroups []string,
-	selectedPrimaryMuscles map[string]bool,
-	weekUsedExercises map[int]bool,
-) int {
-	bestScore := -1
-	bestIdx := -1
-
-	for i := range pool {
-		if weekUsedExercises[pool[i].ID] || primaryMuscleGroupsOverlap(pool[i], selectedPrimaryMuscles) {
-			continue
-		}
-
-		score := scoreExerciseForPriority(pool[i], priorityMuscleGroups, selectedPrimaryMuscles)
-		if score > bestScore {
-			bestScore = score
-			bestIdx = i
-		}
-	}
-
-	return bestIdx
-}
-
-// selectAndRemoveFromPool selects an exercise from the pool and removes it.
-func selectAndRemoveFromPool(pool *[]Exercise, idx int, selectedPrimaryMuscles map[string]bool) Exercise {
-	ex := (*pool)[idx]
-	for _, mg := range ex.PrimaryMuscleGroups {
-		selectedPrimaryMuscles[mg] = true
-	}
-	*pool = append((*pool)[:idx], (*pool)[idx+1:]...)
-	return ex
-}
-
-// selectExercisesForDay picks n exercises for a day via category-filtered, score-based
-// greedy selection. Uses Strength periodization by default.
-func (wp *Planner) selectExercisesForDay(
-	category Category,
-	priorityMuscleGroups []string,
-	n int,
-) []ExerciseSlot {
-	return wp.selectExercisesForDayWithPeriodization(
-		category,
-		priorityMuscleGroups,
-		n,
-		PeriodizationStrength,
-		false,
-		make(map[int]bool),
-	)
-}
-
+// selectExercisesForDayWithPeriodization picks up to n category-compatible
+// exercises for a session, mutating load with each pick's primary
+// (PrimarySetWeight) and secondary (SecondarySetWeight) contributions
+// and marking each picked exercise's ID in weekUsedExercises so later
+// days in the same week skip it. The chosen exercise on every slot is
+// the one that maximises scoreCandidate against the current load and
+// the planner's Targets, with the lowest exercise ID winning ties.
+// Within a session, exercises whose primary MGs overlap with already
+// selected primaries are skipped (no two chest-primary picks in one
+// session). When no eligible candidate remains, selection stops early
+// (graceful degradation: the session may have fewer than n slots).
 func (wp *Planner) selectExercisesForDayWithPeriodization(
 	category Category,
-	priorityMuscleGroups []string,
 	n int,
 	pt PeriodizationType,
 	isDeload bool,
 	weekUsedExercises map[int]bool,
+	load map[string]float64,
 ) []ExerciseSlot {
-	// Filter exercise pool by category compatibility.
-	pool := make([]Exercise, 0, len(wp.Exercises))
-	for _, ex := range wp.Exercises {
-		if isCategoryCompatible(ex.Category, category) {
-			pool = append(pool, ex)
-		}
+	targets := make(map[string]int, len(wp.Targets))
+	for _, t := range wp.Targets {
+		targets[t.MuscleGroupName] = t.WeeklySetTarget
 	}
 
-	selectedPrimaryMuscles := make(map[string]bool)
-	var selected []Exercise
+	selectedPrimaryMGs := make(map[string]bool)
+	selected := make([]ExerciseSlot, 0, n)
 
-	// Phase A: Try to satisfy each priority muscle group with a non-conflicting exercise.
-	for _, priorityMG := range priorityMuscleGroups {
-		if len(selected) >= n || selectedPrimaryMuscles[priorityMG] {
-			continue
-		}
-
-		bestIdx := wp.findBestExerciseInPool(pool, priorityMuscleGroups, selectedPrimaryMuscles, weekUsedExercises)
-		if bestIdx >= 0 {
-			ex := selectAndRemoveFromPool(&pool, bestIdx, selectedPrimaryMuscles)
-			selected = append(selected, ex)
-		}
-	}
-
-	// Phase B: Fill remaining slots with any non-conflicting exercise from the pool.
-	for len(selected) < n && len(pool) > 0 {
-		bestIdx := wp.findBestExerciseInPool(pool, priorityMuscleGroups, selectedPrimaryMuscles, weekUsedExercises)
+	for len(selected) < n {
+		bestIdx := wp.pickBestExerciseIdx(category, pt, isDeload, selectedPrimaryMGs, weekUsedExercises, load, targets)
 		if bestIdx < 0 {
 			break
 		}
-
-		ex := selectAndRemoveFromPool(&pool, bestIdx, selectedPrimaryMuscles)
-		selected = append(selected, ex)
+		ex := wp.Exercises[bestIdx]
+		slot := buildPlannedExerciseSlot(ex, pt, isDeload)
+		selected = append(selected, slot)
+		for _, mg := range ex.PrimaryMuscleGroups {
+			selectedPrimaryMGs[mg] = true
+		}
+		weekUsedExercises[ex.ID] = true
+		applyLoad(load, ex, float64(len(slot.Sets)))
 	}
 
-	// Build Slots. Time-based exercises use their own
-	// DefaultStartingSeconds with a fixed set count; rep-based exercises
-	// derive their full prescription from the per-exercise window via DeriveScheme.
-	result := make([]ExerciseSlot, len(selected))
-	for i, ex := range selected {
-		result[i] = buildPlannedExerciseSlot(ex, pt, isDeload)
+	return selected
+}
+
+// pickBestExerciseIdx returns the index into wp.Exercises of the exercise that
+// maximises scoreCandidate among candidates that are category-compatible,
+// not already used this week, and don't share a primary MG with selectedPrimaryMGs.
+// Ties are broken by lowest exercise ID. Returns -1 if no candidate qualifies.
+func (wp *Planner) pickBestExerciseIdx(
+	category Category,
+	pt PeriodizationType,
+	isDeload bool,
+	selectedPrimaryMGs map[string]bool,
+	weekUsedExercises map[int]bool,
+	load map[string]float64,
+	targets map[string]int,
+) int {
+	bestIdx := -1
+	bestScore := 0.0
+	for i := range wp.Exercises {
+		ex := wp.Exercises[i]
+		if !isCategoryCompatible(ex.Category, category) ||
+			weekUsedExercises[ex.ID] ||
+			primaryMuscleGroupsOverlap(ex, selectedPrimaryMGs) {
+			continue
+		}
+		score := scoreCandidate(ex, pt, isDeload, load, targets)
+		// Exact float equality is safe here: scores are derived from
+		// integer targets, integer set counts, and fixed half-integer
+		// weights (PrimarySetWeight, SecondarySetWeight), so ties round-trip
+		// cleanly through IEEE 754.
+		if bestIdx < 0 || score > bestScore ||
+			(score == bestScore && ex.ID < wp.Exercises[bestIdx].ID) {
+			bestIdx = i
+			bestScore = score
+		}
 	}
-	return result
+	return bestIdx
+}
+
+// applyLoad accumulates the per-set MG contribution from ex into load:
+// PrimarySetWeight per primary MG, SecondarySetWeight per secondary, scaled
+// by nSets. Mutates load in place.
+func applyLoad(load map[string]float64, ex Exercise, nSets float64) {
+	for _, mg := range ex.PrimaryMuscleGroups {
+		load[mg] += nSets * PrimarySetWeight
+	}
+	for _, mg := range ex.SecondaryMuscleGroups {
+		load[mg] += nSets * SecondarySetWeight
+	}
 }
 
 // buildPlannedExerciseSlot creates an ExerciseSlot for one exercise using
@@ -501,6 +392,42 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 		return PeriodizationHypertrophy
 	}
 	return PeriodizationStrength
+}
+
+// scoreCandidate returns the gain in target-balance from adding ex to a
+// session: positive when the exercise pulls the running per-MG load
+// closer to its target, negative when it pushes an MG further from
+// target. An MG that is already over target contributes negatively
+// proportional to how far it would overshoot — picks that re-load an
+// already-saturated MG score lower than picks that touch fresh ground.
+// The metric is the change in the sum of squared distances over
+// targeted muscle groups; untargeted MGs are ignored. Set count
+// comes from the same deriveSchemeForExercise the planner uses to
+// persist sets, so deload halving and periodization-driven set-count
+// shifts are reflected automatically.
+func scoreCandidate(
+	ex Exercise,
+	pt PeriodizationType,
+	isDeload bool,
+	load map[string]float64,
+	targets map[string]int,
+) float64 {
+	_, nSets := deriveSchemeForExercise(ex, pt, isDeload)
+	n := float64(nSets)
+	contrib := make(map[string]float64, len(ex.PrimaryMuscleGroups)+len(ex.SecondaryMuscleGroups))
+	for _, mg := range ex.PrimaryMuscleGroups {
+		contrib[mg] += n * PrimarySetWeight
+	}
+	for _, mg := range ex.SecondaryMuscleGroups {
+		contrib[mg] += n * SecondarySetWeight
+	}
+	var delta float64
+	for mg, target := range targets {
+		before := float64(target) - load[mg]
+		after := before - contrib[mg]
+		delta += before*before - after*after
+	}
+	return delta
 }
 
 // MondayOf returns the Monday of the week containing date, at 00:00 UTC.

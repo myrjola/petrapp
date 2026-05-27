@@ -186,74 +186,24 @@ func minimalTargets() []MuscleGroupTarget {
 	}
 }
 
-func TestAllocateMuscleGroups(t *testing.T) {
+func TestSelectExercises_CategoryFilter(t *testing.T) {
 	t.Parallel()
 
-	// Mon(Lower), Tue(Upper), Thu(Full Body) schedule.
-	monday := monday2026Date()
-	p := prefs(time.Monday, time.Tuesday, time.Thursday)
-	wp := NewPlanner(p, minimalExercises(), minimalTargets())
-
-	mon := monday          // Lower
-	tue := date(monday, 1) // Upper
-	thu := date(monday, 3) // Full Body
-
-	workoutDays := []time.Time{mon, tue, thu}
-	categories := map[time.Time]Category{
-		mon: CategoryLower,
-		tue: CategoryUpper,
-		thu: CategoryFullBody,
-	}
-
-	alloc := wp.allocateMuscleGroups(workoutDays, categories)
-
-	// Lower muscle groups (Quads, Hamstrings, Glutes) must appear on Mon (Lower
-	// compatible) and/or Thu (Full Body compatible), never on Tue (Upper only).
-	for _, mg := range []string{"Quads", "Hamstrings", "Glutes"} {
-		for _, assignedMG := range alloc[tue] {
-			if assignedMG == mg {
-				t.Errorf("lower muscle group %q must not be assigned to Upper day", mg)
-			}
-		}
-	}
-
-	// Upper muscle groups must not appear on Mon (Lower only).
-	for _, mg := range []string{"Chest", "Shoulders", "Triceps", "Biceps", "Upper Back", "Lats"} {
-		for _, assignedMG := range alloc[mon] {
-			if assignedMG == mg {
-				t.Errorf("upper muscle group %q must not be assigned to Lower day", mg)
-			}
-		}
-	}
-
-	// Every tracked muscle group must appear in at least 1 day's allocation.
-	allGroups := make(map[string]bool)
-	for _, groups := range alloc {
-		for _, g := range groups {
-			allGroups[g] = true
-		}
-	}
-	for _, target := range minimalTargets() {
-		if !allGroups[target.MuscleGroupName] {
-			t.Errorf("muscle group %q not assigned to any day", target.MuscleGroupName)
-		}
-	}
-}
-
-func TestSelectExercisesForDay(t *testing.T) {
-	t.Parallel()
-
-	p := prefs(time.Monday, time.Tuesday, time.Thursday)
+	p := prefs(time.Tuesday)
 	wp := NewPlanner(p, minimalExercises(), minimalTargets())
 
 	t.Run("lower day only selects lower exercises", func(t *testing.T) {
 		t.Parallel()
-		sets := wp.selectExercisesForDay(CategoryLower, []string{"Quads", "Hamstrings"}, 2)
-		if len(sets) != 2 {
-			t.Fatalf("want 2 exercise sets, got %d", len(sets))
+		load := map[string]float64{}
+		used := map[int]bool{}
+		slots := wp.selectExercisesForDayWithPeriodization(
+			CategoryLower, 2, PeriodizationStrength, false, used, load,
+		)
+		if len(slots) != 2 {
+			t.Fatalf("want 2 slots, got %d", len(slots))
 		}
-		for _, es := range sets {
-			ex := findExercise(wp.Exercises, es.Exercise.ID)
+		for _, s := range slots {
+			ex := findExercise(wp.Exercises, s.Exercise.ID)
 			if ex.Category != CategoryLower {
 				t.Errorf("lower day got exercise with category %s", ex.Category)
 			}
@@ -262,9 +212,13 @@ func TestSelectExercisesForDay(t *testing.T) {
 
 	t.Run("upper day only selects upper exercises", func(t *testing.T) {
 		t.Parallel()
-		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest", "Lats"}, 2)
-		for _, es := range sets {
-			ex := findExercise(wp.Exercises, es.Exercise.ID)
+		load := map[string]float64{}
+		used := map[int]bool{}
+		slots := wp.selectExercisesForDayWithPeriodization(
+			CategoryUpper, 2, PeriodizationStrength, false, used, load,
+		)
+		for _, s := range slots {
+			ex := findExercise(wp.Exercises, s.Exercise.ID)
 			if ex.Category != CategoryUpper {
 				t.Errorf("upper day got exercise with category %s", ex.Category)
 			}
@@ -273,282 +227,63 @@ func TestSelectExercisesForDay(t *testing.T) {
 
 	t.Run("full body day can select any category", func(t *testing.T) {
 		t.Parallel()
-		sets := wp.selectExercisesForDay(CategoryFullBody, []string{"Hamstrings", "Chest"}, 3)
-		categorySet := make(map[Category]bool)
-		for _, es := range sets {
-			ex := findExercise(wp.Exercises, es.Exercise.ID)
-			categorySet[ex.Category] = true
+		load := map[string]float64{}
+		used := map[int]bool{}
+		slots := wp.selectExercisesForDayWithPeriodization(
+			CategoryFullBody, 3, PeriodizationStrength, false, used, load,
+		)
+		seen := map[Category]bool{}
+		for _, s := range slots {
+			ex := findExercise(wp.Exercises, s.Exercise.ID)
+			seen[ex.Category] = true
 		}
-		// With Hamstrings and Chest as priorities, expect both lower and upper exercises selected.
-		if !categorySet[CategoryLower] || !categorySet[CategoryUpper] {
-			t.Error("full body day should draw from multiple categories when priorities span both")
-		}
-	})
-
-	t.Run("rep-based exercise set count comes from DeriveScheme", func(t *testing.T) {
-		t.Parallel()
-		sets := wp.selectExercisesForDay(CategoryUpper, []string{"Chest"}, 1)
-		if len(sets) != 1 {
-			t.Fatalf("want 1 exercise set, got %d", len(sets))
-		}
-		// With Strength + window 5-10, DeriveScheme returns 4 sets (reps=5 ≤ 5).
-		expectedSets := DeriveScheme(5, 10, PeriodizationStrength, false).TargetSets
-		if len(sets[0].Sets) != expectedSets {
-			t.Errorf("want %d sets, got %d", expectedSets, len(sets[0].Sets))
-		}
-	})
-
-	t.Run("strength periodization sets correct target value", func(t *testing.T) {
-		t.Parallel()
-		sets := wp.selectExercisesForDay(CategoryUpper, nil, 1)
-		expectedReps := DeriveScheme(5, 10, PeriodizationStrength, false).TargetReps
-		for _, s := range sets[0].Sets {
-			if s.TargetValue != expectedReps {
-				t.Errorf("strength set: want TargetValue=%d, got %d", expectedReps, s.TargetValue)
-			}
+		if !seen[CategoryLower] || !seen[CategoryUpper] {
+			t.Error("full body day should draw from multiple categories with targets across both")
 		}
 	})
 }
 
-func TestSelectExercisesForDaySessionDiversity(t *testing.T) {
+func TestSelectExercises_SessionDiversity(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no primary muscle group overlap within session", func(t *testing.T) {
+	t.Run("no primary muscle group repeats within a session", func(t *testing.T) {
 		t.Parallel()
-		// Exercise pool: multiple exercises that could target overlapping muscles.
+		// Three Chest-primary exercises in the pool; we ask for 3 slots.
+		// Only one can be picked (no primary overlap); the other 2 must come
+		// from non-Chest primaries (Triceps-only exercise).
 		exercises := []Exercise{
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Triceps"},
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Shoulders"},
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Shoulders", "Triceps"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 4, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-		}
-
-		p := prefs(time.Tuesday) // 3 exercises
-		wp := NewPlanner(p, exercises, nil)
-
-		// Request 3 exercises with priority Chest, Shoulders, Triceps.
-		// Expected: one exercise per primary muscle group, no overlaps.
-		sets := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper,
-			[]string{"Chest", "Shoulders", "Triceps"},
-			3,
-			PeriodizationStrength,
-			false,
-			make(map[int]bool), // Empty week-used set.
-		)
-
-		if len(sets) < 2 {
-			t.Fatalf("want at least 2 exercises, got %d", len(sets))
-		}
-
-		// Collect all primary muscle groups across selected exercises.
-		seenPrimary := make(map[string]bool)
-		for _, es := range sets {
-			ex := findExercise(exercises, es.Exercise.ID)
-			for _, mg := range ex.PrimaryMuscleGroups {
-				if seenPrimary[mg] {
-					t.Errorf("primary muscle group %q appears in multiple exercises in the same session", mg)
-				}
-				seenPrimary[mg] = true
-			}
-		}
-	})
-
-	t.Run("skip priority muscle group when no non-conflicting exercise available", func(t *testing.T) {
-		t.Parallel()
-		// Exercise pool: all Chest exercises have overlapping primary muscles.
-		exercises := []Exercise{
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+			{ //nolint:exhaustruct // Test exercises omit display fields.
 				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				RepMin: new(5), RepMax: new(10),
+			},
+			{ //nolint:exhaustruct // Test exercises omit display fields.
 				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Chest", "Triceps"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest", "Shoulders"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-		}
-
-		p := prefs(time.Tuesday) // 3 exercises
-		wp := NewPlanner(p, exercises, nil)
-
-		// Request 3 exercises, but only 1 non-overlapping is available.
-		// Expected: graceful degradation — select 1 exercise covering Chest.
-		sets := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper,
-			[]string{"Chest", "Shoulders", "Triceps"}, // Three priorities, but can't all be satisfied.
-			3,
-			PeriodizationStrength,
-			false,
-			make(map[int]bool),
-		)
-
-		if len(sets) == 0 {
-			t.Fatalf("want at least 1 exercise, got 0")
-		}
-
-		// Should select 1 exercise (Chest), then can't add more without overlap.
-		if len(sets) > 1 {
-			// Check that no primary muscle groups repeat.
-			seenPrimary := make(map[string]bool)
-			for _, es := range sets {
-				ex := findExercise(exercises, es.Exercise.ID)
-				for _, mg := range ex.PrimaryMuscleGroups {
-					if seenPrimary[mg] {
-						t.Errorf(
-							"primary muscle group %q appears twice; expected graceful degradation to 1 exercise",
-							mg,
-						)
-					}
-					seenPrimary[mg] = true
-				}
-			}
-		}
-	})
-}
-
-func TestSelectExercisesForDayWeekDeduplication(t *testing.T) {
-	t.Parallel()
-
-	t.Run("exercise used earlier in week is skipped", func(t *testing.T) {
-		t.Parallel()
-		exercises := []Exercise{
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
+				RepMin: new(5), RepMax: new(10),
+			},
+			{ //nolint:exhaustruct // Test exercises omit display fields.
 				ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 				PrimaryMuscleGroups: []string{"Triceps"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
+				RepMin: new(5), RepMax: new(10),
+			},
 		}
-
-		p := prefs(time.Tuesday)
-		wp := NewPlanner(p, exercises, nil)
-
-		// Simulate that exercise 1 was already used earlier in the week.
-		weekUsedExercises := map[int]bool{1: true}
-
-		// Request exercises with Chest priority, but exercise 1 (Chest) is already used.
-		// Expected: select exercise 2 (Shoulders) or 3 (Triceps) instead.
-		sets := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper,
-			[]string{"Chest"},
-			1,
-			PeriodizationStrength,
-			false,
-			weekUsedExercises,
+		wp := NewPlanner(prefs(time.Tuesday), exercises, []MuscleGroupTarget{
+			{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+			{MuscleGroupName: "Triceps", WeeklySetTarget: 8},
+		})
+		load := map[string]float64{}
+		used := map[int]bool{}
+		slots := wp.selectExercisesForDayWithPeriodization(
+			CategoryUpper, 3, PeriodizationStrength, false, used, load,
 		)
 
-		if len(sets) == 0 {
-			t.Fatalf("want 1 exercise, got 0")
-		}
-
-		selectedID := sets[0].Exercise.ID
-		if selectedID == 1 {
-			t.Errorf("exercise 1 was already used this week; expected a different exercise, got %d", selectedID)
-		}
-	})
-
-	t.Run("plan() does not repeat exercises across days", func(t *testing.T) {
-		t.Parallel()
-		exercises := minimalExercises() // Use existing test fixture.
-		targets := minimalTargets()
-
-		monday := monday2026Date()
-		p := prefs(time.Monday, time.Tuesday, time.Thursday)
-		wp := NewPlanner(p, exercises, targets)
-
-		plan, err := wp.Plan(monday)
-		if err != nil {
-			t.Fatalf("Plan failed: %v", err)
-		}
-		var sessions []Session
-		for i := range plan.Sessions {
-			if len(plan.Sessions[i].Slots) > 0 {
-				sessions = append(sessions, plan.Sessions[i])
-			}
-		}
-
-		// Collect all exercise IDs across all sessions.
-		usedExercises := make(map[int]bool)
-		for _, session := range sessions {
-			for _, es := range session.Slots {
-				if usedExercises[es.Exercise.ID] {
-					t.Errorf("exercise %d appears in multiple sessions across the week", es.Exercise.ID)
-				}
-				usedExercises[es.Exercise.ID] = true
-			}
-		}
-
-		// Verify that we have more than one session (to make the test meaningful).
-		if len(sessions) < 2 {
-			t.Logf("note: only %d session(s) planned, test less meaningful", len(sessions))
-		}
-	})
-}
-
-func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns fewer exercises if constraints can't be fully satisfied", func(t *testing.T) {
-		t.Parallel()
-		// Exercise pool: only 2 non-overlapping exercises available.
-		exercises := []Exercise{
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-			{ //nolint:exhaustruct // Test exercises omit unused display fields.
-				ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
-				PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
-				DefaultStartingSeconds: nil, RepMin: new(5), RepMax: new(10)},
-		}
-
-		p := prefs(time.Tuesday) // Requests 3 exercises.
-		wp := NewPlanner(p, exercises, nil)
-
-		// Request 3 exercises, but only 2 non-overlapping available.
-		// Expected: plan succeeds with 2 exercises, no error.
-		sets := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper,
-			[]string{"Chest", "Shoulders", "Triceps"},
-			3,
-			PeriodizationStrength,
-			false,
-			make(map[int]bool),
-		)
-
-		if len(sets) != 2 {
-			t.Errorf("want 2 exercises (graceful degradation), got %d", len(sets))
-		}
-
-		// Verify the 2 selected have no overlapping primary muscles.
-		seenPrimary := make(map[string]bool)
-		for _, es := range sets {
-			ex := findExercise(exercises, es.Exercise.ID)
+		seenPrimary := map[string]bool{}
+		for _, s := range slots {
+			ex := findExercise(exercises, s.Exercise.ID)
 			for _, mg := range ex.PrimaryMuscleGroups {
 				if seenPrimary[mg] {
-					t.Errorf("primary muscle group %q appears twice", mg)
+					t.Errorf("primary muscle group %q appears in two picks in the same session", mg)
 				}
 				seenPrimary[mg] = true
 			}
@@ -556,50 +291,218 @@ func TestSelectExercisesForDayGracefulDegradation(t *testing.T) {
 	})
 }
 
-func TestSelectExercisesForDay_TimeBasedTarget(t *testing.T) {
+func TestSelectExercises_WeekUsedExclusion(t *testing.T) {
 	t.Parallel()
 
-	starting := 30
-	plank := Exercise{ //nolint:exhaustruct // Test exercise omits unused display fields.
-		ID:                     21,
-		Category:               CategoryUpper,
-		ExerciseType:           ExerciseTypeTime,
-		PrimaryMuscleGroups:    []string{"Abs"},
-		SecondaryMuscleGroups:  nil,
-		DefaultStartingSeconds: &starting,
-		RepMin:                 nil,
-		RepMax:                 nil,
-	}
-
-	wp := &Planner{
-		Prefs: Preferences{ //nolint:exhaustruct // RestNotificationsEnabled irrelevant to planner tests.
-			Minutes: [7]int{time.Monday: 60},
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
 		},
-		Exercises: []Exercise{plank},
-		Targets:   []MuscleGroupTarget{{MuscleGroupName: "Abs", WeeklySetTarget: 8}},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
 	}
+	wp := NewPlanner(prefs(time.Tuesday), exercises, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
+	})
+	load := map[string]float64{}
+	used := map[int]bool{1: true} // Exercise 1 was used earlier in the week.
 
-	sets := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper,
-		[]string{"Abs"},
-		1,
-		PeriodizationStrength,
-		false,
-		map[int]bool{},
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 1, PeriodizationStrength, false, used, load,
 	)
+	if len(slots) != 1 {
+		t.Fatalf("want 1 slot, got %d", len(slots))
+	}
+	if slots[0].Exercise.ID == 1 {
+		t.Errorf("week-used exercise was picked anyway")
+	}
+}
 
-	if len(sets) != 1 {
-		t.Fatalf("got %d Slots, want 1", len(sets))
+func TestSelectExercises_TargetAwarePrefersUnderloadedMG(t *testing.T) {
+	t.Parallel()
+	// Pool has two equally-eligible exercises. Chest is at zero load,
+	// Shoulders already at target. The Chest exercise must win.
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
 	}
-	if sets[0].Exercise.ID != plank.ID {
-		t.Fatalf("got exerciseID %d, want %d", sets[0].Exercise.ID, plank.ID)
+	wp := NewPlanner(prefs(time.Tuesday), exercises, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
+	})
+	load := map[string]float64{"Shoulders": 10}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Fatalf("want 1 slot, got %d", len(slots))
 	}
-	if len(sets[0].Sets) != defaultTimedSets {
-		t.Fatalf("got %d sets, want %d", len(sets[0].Sets), defaultTimedSets)
+	if slots[0].Exercise.ID != 2 {
+		t.Errorf("picked exercise %d (Shoulders); expected exercise 2 (Chest, under target)", slots[0].Exercise.ID)
 	}
-	for i, s := range sets[0].Sets {
+}
+
+func TestSelectExercises_FallsBackToLowestIDWhenScoresEqual(t *testing.T) {
+	t.Parallel()
+	// Empty targets: every candidate scores 0. Picker must return the
+	// lowest-id eligible candidate deterministically.
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 7, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+	}
+	wp := NewPlanner(prefs(time.Tuesday), exercises, nil)
+	load := map[string]float64{}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Fatalf("want 1 slot, got %d", len(slots))
+	}
+	if slots[0].Exercise.ID != 3 {
+		t.Errorf("got exercise %d; expected exercise 3 (lowest id among ties)", slots[0].Exercise.ID)
+	}
+}
+
+func TestSelectExercises_TimeBasedExerciseGetsThreeSets(t *testing.T) {
+	t.Parallel()
+	plank := Exercise{ //nolint:exhaustruct // Test exercises omit display fields.
+		ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeTime,
+		PrimaryMuscleGroups: []string{"Abs"}, SecondaryMuscleGroups: nil,
+		DefaultStartingSeconds: new(30),
+	}
+	wp := NewPlanner(prefs(time.Tuesday), []Exercise{plank}, []MuscleGroupTarget{
+		{MuscleGroupName: "Abs", WeeklySetTarget: 4},
+	})
+	load := map[string]float64{}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Fatalf("want 1 slot, got %d", len(slots))
+	}
+	if len(slots[0].Sets) != defaultTimedSets {
+		t.Errorf("time-based slot has %d sets, want %d", len(slots[0].Sets), defaultTimedSets)
+	}
+	for _, s := range slots[0].Sets {
 		if s.TargetValue != 30 {
-			t.Errorf("set %d: TargetValue = %d, want 30 (DefaultStartingSeconds)", i, s.TargetValue)
+			t.Errorf("target seconds = %d, want 30", s.TargetValue)
+		}
+	}
+}
+
+func TestSelectExercises_WeightedExerciseSetCountMatchesDeriveScheme(t *testing.T) {
+	t.Parallel()
+	// A weighted exercise picked via selectExercisesForDayWithPeriodization
+	// should carry the set count and per-set target reps that
+	// DeriveScheme produces for the same exercise + periodization.
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+		RepMin: new(5), RepMax: new(10),
+	}
+	wp := NewPlanner(prefs(time.Tuesday), []Exercise{bench}, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+	})
+	load := map[string]float64{}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Fatalf("want 1 slot, got %d", len(slots))
+	}
+	wantReps, wantSets := deriveSchemeForExercise(bench, PeriodizationStrength, false)
+	if len(slots[0].Sets) != wantSets {
+		t.Errorf("set count = %d, want %d", len(slots[0].Sets), wantSets)
+	}
+	for i, s := range slots[0].Sets {
+		if s.TargetValue != wantReps {
+			t.Errorf("set %d target reps = %d, want %d", i, s.TargetValue, wantReps)
+		}
+	}
+}
+
+func TestSelectExercises_GracefulDegradationWhenAllSharePrimaryMG(t *testing.T) {
+	t.Parallel()
+	// Pool: three exercises all primary on Chest. The session asks for 3
+	// slots but only the first pick can satisfy the no-primary-overlap
+	// rule; the loop must stop early and return one slot (graceful
+	// degradation), not loop forever or panic.
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercises omit display fields.
+			ID: 3, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+	}
+	wp := NewPlanner(prefs(time.Tuesday), exercises, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+	})
+	load := map[string]float64{}
+	used := map[int]bool{}
+	slots := wp.selectExercisesForDayWithPeriodization(
+		CategoryUpper, 3, PeriodizationStrength, false, used, load,
+	)
+	if len(slots) != 1 {
+		t.Errorf("want 1 slot (graceful degradation under primary-overlap exhaustion), got %d", len(slots))
+	}
+}
+
+func TestPlan_DoesNotRepeatExercisesAcrossDays(t *testing.T) {
+	t.Parallel()
+	exercises := minimalExercises()
+	targets := minimalTargets()
+	monday := monday2026Date()
+	p := prefs(time.Monday, time.Tuesday, time.Thursday)
+	wp := NewPlanner(p, exercises, targets)
+
+	plan, err := wp.Plan(monday)
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	used := map[int]bool{}
+	for i := range plan.Sessions {
+		for _, slot := range plan.Sessions[i].Slots {
+			if used[slot.Exercise.ID] {
+				t.Errorf("exercise %d appears in two sessions across the week", slot.Exercise.ID)
+			}
+			used[slot.Exercise.ID] = true
 		}
 	}
 }
@@ -996,6 +899,82 @@ func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
 	}
 }
 
+func Test_scoreCandidate(t *testing.T) {
+	t.Parallel()
+
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID:                    1,
+		Category:              CategoryUpper,
+		ExerciseType:          ExerciseTypeWeighted,
+		PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
+		SecondaryMuscleGroups: []string{"Shoulders"},
+		RepMin:                new(5), RepMax: new(10),
+	}
+
+	targets := map[string]int{"Chest": 10, "Triceps": 8, "Shoulders": 10}
+
+	t.Run("positive when pulling under-target MGs up", func(t *testing.T) {
+		t.Parallel()
+		// Empty load: every targeted MG at full deficit.
+		load := map[string]float64{}
+		// Strength + 5-10 window: reps=5, sets=4 (DeriveScheme low band).
+		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
+		// Chest: before=10, after=10-4=6; contribution 100-36=64.
+		// Triceps: before=8, after=8-4=4; contribution 64-16=48.
+		// Shoulders: before=10, after=10-2=8; contribution 100-64=36.
+		// Total = 64 + 48 + 36 = 148.
+		if score != 148 {
+			t.Errorf("score = %v, want 148", score)
+		}
+	})
+
+	t.Run("negative when pushing on-target MG further over", func(t *testing.T) {
+		t.Parallel()
+		// Shoulders already at 12 (2 over target 10); other MGs at target.
+		load := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 12}
+		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
+		// Chest: before=0, after=-4; 0-16=-16.
+		// Triceps: before=0, after=-4; 0-16=-16.
+		// Shoulders: before=-2, after=-4; 4-16=-12.
+		// Total = -16 + -16 + -12 = -44.
+		if score != -44 {
+			t.Errorf("score = %v, want -44", score)
+		}
+	})
+
+	t.Run("zero when no targeted MG is touched", func(t *testing.T) {
+		t.Parallel()
+		calfRaise := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID:                    99,
+			Category:              CategoryLower,
+			ExerciseType:          ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Calves"},
+			SecondaryMuscleGroups: nil,
+			RepMin:                new(10), RepMax: new(20),
+		}
+		load := map[string]float64{}
+		score := scoreCandidate(calfRaise, PeriodizationStrength, false, load, targets)
+		if score != 0 {
+			t.Errorf("score = %v, want 0", score)
+		}
+	})
+
+	t.Run("deload halves set count", func(t *testing.T) {
+		t.Parallel()
+		load := map[string]float64{}
+		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
+		// base sets = 3 (mid band, 6 <= reps <= 10), halved to 2.
+		score := scoreCandidate(bench, PeriodizationStrength, true, load, targets)
+		// Chest: 100 - (10-2)^2 = 100 - 64 = 36.
+		// Triceps: 64 - (8-2)^2 = 64 - 36 = 28.
+		// Shoulders: 100 - (10-1)^2 = 100 - 81 = 19.
+		// Total = 36 + 28 + 19 = 83.
+		if score != 83 {
+			t.Errorf("score = %v, want 83", score)
+		}
+	})
+}
+
 func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	t.Parallel()
 
@@ -1045,4 +1024,370 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 				i, sess.PeriodizationType, wantCount[i], got)
 		}
 	}
+}
+
+// seedExercises mirrors the 39 exercises in internal/sqlite/fixtures.sql
+// verbatim (IDs, categories, types, rep windows, and primary/secondary
+// muscle groups all match). It keeps the regression test pure-domain while
+// exercising the algorithm against the actual seed users start with.
+// Update both this helper and fixtures.sql together when seed exercises
+// change.
+func seedExercises() []Exercise {
+	return []Exercise{
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 1, Name: "Deadlift", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Hamstrings", "Lower Back"},
+			SecondaryMuscleGroups: []string{"Forearms", "Lats", "Quads", "Traps", "Upper Back"},
+			RepMin:                new(3), RepMax: new(6),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 2, Name: "Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
+			SecondaryMuscleGroups: []string{"Abs", "Forearms", "Shoulders"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 3, Name: "Tricep Pushdown", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Triceps"},
+			SecondaryMuscleGroups: []string{"Shoulders"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 4, Name: "Dumbbell Biceps Curl", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Biceps"},
+			SecondaryMuscleGroups: []string{"Forearms"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 5, Name: "Lateral Raise", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Shoulders"},
+			SecondaryMuscleGroups: []string{"Traps", "Upper Back"},
+			RepMin:                new(10), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 6, Name: "Dumbbell Shoulder Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Shoulders"},
+			SecondaryMuscleGroups: []string{"Triceps", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 7, Name: "Dumbbell Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 8, Name: "Cable Fly", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 9, Name: "Pulldown", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Shoulders"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 10, Name: "Pulldown, Reverse Grip", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Biceps", "Lats"},
+			SecondaryMuscleGroups: []string{"Forearms", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 11, Name: "Seated Cable Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Lower Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 12, Name: "One-Arm Dumbbell Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Forearms"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 13, Name: "Abdominal Machine Crunch", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Abs"},
+			SecondaryMuscleGroups: []string{"Obliques"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 14, Name: "Leg Press", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Calves", "Hamstrings"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 15, Name: "Leg Extension", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Quads"},
+			SecondaryMuscleGroups: []string{"Hip Flexors"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 16, Name: "Leg Curl", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Hamstrings"},
+			SecondaryMuscleGroups: []string{"Calves"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 17, Name: "Calf Raise", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Calves"},
+			SecondaryMuscleGroups: []string{"Quads"},
+			RepMin:                new(10), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 18, Name: "Back Extension", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lower Back"},
+			SecondaryMuscleGroups: []string{"Glutes", "Hamstrings"},
+			RepMin:                new(8), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 19, Name: "Push-Up", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Chest", "Triceps"},
+			SecondaryMuscleGroups: []string{"Abs", "Forearms", "Shoulders", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 20, Name: "Ab Wheel Rollout", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Abs", "Obliques"},
+			SecondaryMuscleGroups: []string{"Calves", "Glutes", "Hamstrings", "Lats", "Quads", "Shoulders"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 21, Name: "Plank", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Abs"},
+			SecondaryMuscleGroups: []string{"Glutes", "Hip Flexors", "Lower Back", "Obliques", "Quads", "Shoulders"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 22, Name: "Incline Dumbbell Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 23, Name: "Romanian Deadlift", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Hamstrings"},
+			SecondaryMuscleGroups: []string{"Lower Back"},
+			RepMin:                new(8), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 24, Name: "Assisted Pull-Up", Category: CategoryUpper, ExerciseType: ExerciseTypeAssisted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Forearms"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 25, Name: "Hip Abductor", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes"},
+			SecondaryMuscleGroups: nil,
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 26, Name: "Hip Adductor", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Adductors"},
+			SecondaryMuscleGroups: []string{"Glutes"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 27, Name: "Rotary Torso", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Obliques"},
+			SecondaryMuscleGroups: []string{"Abs"},
+			RepMin:                new(8), RepMax: new(15),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 28, Name: "Seated Calf Raise", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Calves"},
+			SecondaryMuscleGroups: nil,
+			RepMin:                new(10), RepMax: new(20),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 29, Name: "Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Hamstrings", "Lower Back"},
+			RepMin:                new(3), RepMax: new(6),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 30, Name: "Pec Fly", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Chest"},
+			SecondaryMuscleGroups: []string{"Shoulders"},
+			RepMin:                new(8), RepMax: new(12),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 31, Name: "Smith Machine Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Abs", "Hamstrings"},
+			RepMin:                new(3), RepMax: new(6),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 32, Name: "Overhead Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Shoulders", "Triceps"},
+			SecondaryMuscleGroups: []string{"Abs", "Upper Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 33, Name: "Barbell Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Lats", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Biceps", "Lower Back"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 34, Name: "Face Pull", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Shoulders", "Upper Back"},
+			SecondaryMuscleGroups: []string{"Traps", "Triceps"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 35, Name: "Hip Thrust", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Glutes"},
+			SecondaryMuscleGroups: []string{"Hamstrings", "Quads"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 36, Name: "Bulgarian Split Squat", Category: CategoryLower, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Glutes", "Quads"},
+			SecondaryMuscleGroups: []string{"Abs", "Hamstrings"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 37, Name: "Hammer Curl", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Biceps", "Forearms"},
+			SecondaryMuscleGroups: []string{"Shoulders", "Triceps"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 38, Name: "Skull Crusher", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups:   []string{"Triceps"},
+			SecondaryMuscleGroups: []string{"Forearms", "Shoulders"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 39, Name: "Hanging Leg Raise", Category: CategoryUpper, ExerciseType: ExerciseTypeBodyweight,
+			PrimaryMuscleGroups:   []string{"Abs", "Hip Flexors"},
+			SecondaryMuscleGroups: []string{"Forearms", "Obliques"},
+			RepMin:                new(5), RepMax: new(10),
+		},
+	}
+}
+
+func seedTargets() []MuscleGroupTarget {
+	return []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
+		{MuscleGroupName: "Triceps", WeeklySetTarget: 8},
+		{MuscleGroupName: "Biceps", WeeklySetTarget: 8},
+		{MuscleGroupName: "Upper Back", WeeklySetTarget: 10},
+		{MuscleGroupName: "Lats", WeeklySetTarget: 10},
+		{MuscleGroupName: "Quads", WeeklySetTarget: 10},
+		{MuscleGroupName: "Hamstrings", WeeklySetTarget: 8},
+		{MuscleGroupName: "Glutes", WeeklySetTarget: 8},
+	}
+}
+
+// prefs90 returns prefs with the given weekdays scheduled at 90 minutes
+// (the size that triggers exercisesLong / exercisesLongHypertrophy).
+func prefs90(days ...time.Weekday) Preferences {
+	p := Preferences{} //nolint:exhaustruct // Other prefs irrelevant to this test.
+	for _, d := range days {
+		p.Minutes[d] = 90
+	}
+	return p
+}
+
+func TestPlan_TargetAwareBalanceUnderSeedExercises(t *testing.T) {
+	t.Parallel()
+	// Tue/Thu/Sat 90 min, all FullBody. This is user 24's current schedule;
+	// under the old algorithm Shoulders/Triceps/Upper Back ballooned and
+	// Chest/Quads sat under target.
+	p := prefs90(time.Tuesday, time.Thursday, time.Saturday)
+	wp := NewPlanner(p, seedExercises(), seedTargets())
+
+	plan, err := wp.Plan(monday2026Date())
+	if err != nil {
+		t.Fatalf("Plan failed: %v", err)
+	}
+
+	load := WeeklyPlannedLoad(planSessions(plan))
+	for _, target := range seedTargets() {
+		l := load[target.MuscleGroupName]
+		t.Logf("%s planned %.1f / target %d", target.MuscleGroupName, l, target.WeeklySetTarget)
+	}
+
+	// Spec bounds: every targeted MG within [0.7x, 1.4x] of target, and
+	// no MG exceeds 1.5x (a hard ceiling). Chest >= 8 sets is the
+	// regression floor — under the old algorithm Chest sat at 8.0 (-20%)
+	// while Shoulders/Triceps/Upper Back ballooned to 1.65-1.81x.
+	for _, target := range seedTargets() {
+		l := load[target.MuscleGroupName]
+		lower := 0.7 * float64(target.WeeklySetTarget)
+		upper := 1.4 * float64(target.WeeklySetTarget)
+		hardCeiling := 1.5 * float64(target.WeeklySetTarget)
+		if l < lower {
+			t.Errorf("%s planned %.1f is below 0.7x target (%v)", target.MuscleGroupName, l, lower)
+		}
+		if l > upper {
+			t.Errorf("%s planned %.1f exceeds 1.4x target (%v)", target.MuscleGroupName, l, upper)
+		}
+		if l > hardCeiling {
+			t.Errorf("%s planned %.1f exceeds 1.5x hard ceiling (%v)", target.MuscleGroupName, l, hardCeiling)
+		}
+	}
+	if got := load["Chest"]; got < 8 {
+		t.Errorf("Chest planned %.1f is below the prior under-load floor (8.0)", got)
+	}
+}
+
+func planSessions(plan WeekPlan) []Session {
+	var ss []Session
+	for i := range plan.Sessions {
+		if len(plan.Sessions[i].Slots) > 0 {
+			ss = append(ss, plan.Sessions[i])
+		}
+	}
+	return ss
+}
+
+func TestPlan_DeterministicAcrossRuns(t *testing.T) {
+	t.Parallel()
+	// Same inputs twice → byte-equal Sessions output. Guards against map
+	// iteration order leaking into selection.
+	p := prefs90(time.Tuesday, time.Thursday, time.Saturday)
+	wp := NewPlanner(p, seedExercises(), seedTargets())
+
+	monday := monday2026Date()
+	planA, err := wp.Plan(monday)
+	if err != nil {
+		t.Fatalf("Plan A failed: %v", err)
+	}
+	planB, err := wp.Plan(monday)
+	if err != nil {
+		t.Fatalf("Plan B failed: %v", err)
+	}
+
+	for i := range 7 {
+		if got, want := slotIDs(planA.Sessions[i]), slotIDs(planB.Sessions[i]); !sliceEqInt(got, want) {
+			t.Errorf("day %d differs: A=%v B=%v", i, got, want)
+		}
+	}
+}
+
+func slotIDs(s Session) []int {
+	ids := make([]int, len(s.Slots))
+	for i, slot := range s.Slots {
+		ids[i] = slot.Exercise.ID
+	}
+	return ids
+}
+
+func sliceEqInt(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

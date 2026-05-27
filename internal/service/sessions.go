@@ -145,9 +145,12 @@ func usedExerciseIDs(plan domain.WeekPlan) map[int]bool {
 
 // planSingleDay builds a Session for date via the Planner, seeding deload
 // weights if needed. Pure in-memory; no DB writes. Returns the session ready
-// to be placed into a WeekPlan at the right offset.
+// to be placed into a WeekPlan at the right offset. The supplied plan is
+// the current week's persisted state: planSingleDay derives the no-repeat
+// used-set and the per-MG weighted-load seed from it so PlanDay's
+// target-aware selection sees what the rest of the week already covers.
 func (s *Service) planSingleDay(
-	ctx context.Context, date time.Time, used map[int]bool,
+	ctx context.Context, date time.Time, plan domain.WeekPlan,
 ) (domain.Session, error) {
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
@@ -161,8 +164,16 @@ func (s *Service) planSingleDay(
 	if err != nil {
 		return domain.Session{}, fmt.Errorf("get muscle group targets: %w", err)
 	}
+	used := usedExerciseIDs(plan)
+	var sessions []domain.Session
+	for i := range plan.Sessions {
+		if len(plan.Sessions[i].Slots) > 0 {
+			sessions = append(sessions, plan.Sessions[i])
+		}
+	}
+	weekLoad := domain.WeeklyPlannedLoad(sessions)
 	planner := domain.NewPlanner(prefs, exercises, targets)
-	sess, err := planner.PlanDay(date, used)
+	sess, err := planner.PlanDay(date, used, weekLoad)
 	if err != nil {
 		return domain.Session{}, fmt.Errorf("plan day %s: %w", date.Format(time.DateOnly), err)
 	}
@@ -177,9 +188,9 @@ func (s *Service) planSingleDay(
 // createAdHocSession plans and persists a single session for date via the
 // WeekPlanRepository.Update closure. Used by StartSession when the user
 // starts an unscheduled day (extra workout) or a day added to the schedule
-// mid-week after another in-week session was already started. used is the
-// set of exercise IDs already used in other in-week sessions, passed
-// through to PlanDay's no-repeat selection.
+// mid-week after another in-week session was already started. plan is the
+// current week's persisted state; planSingleDay derives both the no-repeat
+// used-set and the per-MG weighted-load seed from it.
 //
 // The closure overwrites the rest-day placeholder at the right offset; the
 // single-pass reinsert in WeekPlanRepository.Update writes each slot's
@@ -187,8 +198,8 @@ func (s *Service) planSingleDay(
 // sessions' slot positions survive untouched.
 // Callers must ensure the week row exists first (StartSession does so via
 // WeekPlans.Create) — Update returns domain.ErrNotFound otherwise.
-func (s *Service) createAdHocSession(ctx context.Context, date time.Time, used map[int]bool) error {
-	sess, err := s.planSingleDay(ctx, date, used)
+func (s *Service) createAdHocSession(ctx context.Context, date time.Time, plan domain.WeekPlan) error {
+	sess, err := s.planSingleDay(ctx, date, plan)
 	if err != nil {
 		return err
 	}
@@ -241,8 +252,7 @@ func (s *Service) StartSession(ctx context.Context, date time.Time) error {
 	sessOnDate := plan.SessionOn(date)
 	hasDate := sessOnDate != nil && len(sessOnDate.Slots) > 0
 	if !hasDate {
-		used := usedExerciseIDs(plan)
-		if err = s.createAdHocSession(ctx, date, used); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
+		if err = s.createAdHocSession(ctx, date, plan); err != nil && !errors.Is(err, domain.ErrAlreadyExists) {
 			return fmt.Errorf("create ad-hoc %s: %w", date.Format(time.DateOnly), err)
 		}
 	}
