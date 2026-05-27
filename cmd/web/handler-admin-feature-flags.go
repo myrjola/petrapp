@@ -12,6 +12,7 @@ type featureFlagsAdminTemplateData struct {
 	BaseTemplateData
 
 	Header       PageHeaderData
+	AdminNav     AdminNavData
 	FeatureFlags []domain.FeatureFlag
 }
 
@@ -31,6 +32,10 @@ func (app *application) adminFeatureFlagsGET(w http.ResponseWriter, r *http.Requ
 			Title:    "Feature Flags Administration",
 			Subtitle: "",
 			Nonce:    base.Nonce,
+		},
+		AdminNav: AdminNavData{
+			Active: adminSectionFeatureFlags,
+			Nonce:  base.Nonce,
 		},
 		FeatureFlags: flags,
 	}

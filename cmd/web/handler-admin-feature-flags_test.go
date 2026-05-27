@@ -88,6 +88,18 @@ func Test_application_adminFeatureFlags(t *testing.T) {
 				t.Errorf("Expected header %s, got %s", expected, actual)
 			}
 		}
+
+		// Admin nav renders with Feature Flags marked active.
+		nav := doc.Find(`nav.admin-nav[aria-label="Admin sections"]`)
+		if nav.Length() == 0 {
+			t.Fatal("expected admin-nav landmark on /admin/feature-flags")
+		}
+		if nav.Find(`a.admin-nav__tab[href="/admin/feature-flags"][aria-current="page"]`).Length() == 0 {
+			t.Error("expected Feature Flags tab to be marked aria-current=page")
+		}
+		if nav.Find(`a.admin-nav__tab[href="/admin/exercises"][aria-current="page"]`).Length() != 0 {
+			t.Error("Exercises tab must not be active on the feature-flags page")
+		}
 	})
 
 	t.Run("Test health endpoint accessibility", func(t *testing.T) {
