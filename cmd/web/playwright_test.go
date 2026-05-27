@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -29,10 +30,17 @@ var installPlaywrightOnce = sync.OnceValue(func() error {
 
 // setupPlaywrightPage installs Playwright, starts the app server, launches
 // Chromium, opens a page at "/", and wires a virtual WebAuthn authenticator
-// via CDP. Uncaught JS exceptions fail the test; console errors are logged.
+// via CDP. Uncaught JS exceptions and unexpected console errors fail the
+// test; a screenshot is captured on any failure for post-mortem.
 //
-//nolint:ireturn // playwright.Page is the public interface from the binding
-func setupPlaywrightPage(t *testing.T) (playwright.Page, string) {
+// allowedConsoleErrors lets a test opt-in to specific known-benign console
+// errors (matched by substring on the message text). Anything not on the
+// list fails the test in a t.Cleanup. Tests with no benign errors pass no
+// arguments.
+//
+//nolint:ireturn,unparam // playwright.Page is the public interface from the binding;
+// allowedConsoleErrors is an extension point that current tests don't exercise.
+func setupPlaywrightPage(t *testing.T, allowedConsoleErrors ...string) (playwright.Page, string) {
 	t.Helper()
 
 	if err := installPlaywrightOnce(); err != nil {
@@ -86,18 +94,47 @@ func setupPlaywrightPage(t *testing.T) (playwright.Page, string) {
 		t.Fatalf("new page: %v", err)
 	}
 
-	// Console errors are logged for debugging — they include benign network
-	// resource failures (e.g., stale-history 404s per Flow 2 in the stacknav
-	// spec) that don't indicate JS bugs. Uncaught JS exceptions surface
-	// through pageerror and fail the test.
+	// Console errors fail the test unless the caller allowlisted them. Real
+	// JS bugs land here as console.error; benign cases (e.g., resource
+	// fetches the app deliberately ignores) must be explicitly allowed by
+	// passing a substring match to setupPlaywrightPage. Uncaught JS
+	// exceptions surface through pageerror and always fail.
+	var (
+		consoleErrMu  sync.Mutex
+		consoleErrors []string
+	)
 	page.On("console", func(msg playwright.ConsoleMessage) {
-		if msg.Type() == "error" {
-			t.Logf("browser console error: %s", msg.Text())
+		if msg.Type() != "error" {
+			return
 		}
+		text := msg.Text()
+		for _, allowed := range allowedConsoleErrors {
+			if strings.Contains(text, allowed) {
+				t.Logf("allowed browser console error: %s", text)
+				return
+			}
+		}
+		consoleErrMu.Lock()
+		consoleErrors = append(consoleErrors, text)
+		consoleErrMu.Unlock()
 	})
 	page.On("pageerror", func(err error) {
 		t.Errorf("browser page error: %v", err)
 	})
+	t.Cleanup(func() {
+		consoleErrMu.Lock()
+		defer consoleErrMu.Unlock()
+		if len(consoleErrors) > 0 {
+			t.Errorf("%d unexpected browser console error(s):\n  %s",
+				len(consoleErrors), strings.Join(consoleErrors, "\n  "))
+		}
+	})
+
+	// Screenshot-on-failure: any t.Errorf / t.Fatalf in the test makes the
+	// browser state visible after the run. The file lands in os.TempDir()
+	// (preserved past the test exit) and its path is logged so CI artifact
+	// upload or local inspection can find it.
+	t.Cleanup(func() { capturePlaywrightFailureScreenshot(t, page) })
 
 	if _, err = page.Goto(serverURL + "/"); err != nil {
 		t.Fatalf("navigate to home: %v", err)
@@ -141,11 +178,11 @@ func Test_playwright_smoketest(t *testing.T) {
 	page, serverURL := setupPlaywrightPage(t)
 	var err error
 
-	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Begin training"})
 	signInBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Sign in"})
+	registerBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Begin training"})
 	logOutBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Log out"})
 
-	// Step 1: Verify unauthenticated state.
+	// Step 1: Verify unauthenticated state — both auth buttons must be present.
 	if err = registerBtn.WaitFor(); err != nil {
 		t.Fatalf("wait for Begin training button: %v", err)
 	}
@@ -153,44 +190,22 @@ func Test_playwright_smoketest(t *testing.T) {
 		t.Fatalf("wait for Sign in button: %v", err)
 	}
 
-	// Step 2: Register — JS calls window.location.reload() after finishing.
-	if err = registerBtn.Click(); err != nil {
-		t.Fatalf("register click: %v", err)
-	}
-	// Home handler redirects users with empty preferences to /schedule.
-	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
-		t.Fatalf("expect redirect to /schedule after registration: %v", err)
-	}
+	// Step 2: Register, land on /schedule (home redirects empty-prefs users).
+	registerAndWaitSchedule(t, page, serverURL)
 
 	// Step 2a: Verify error handling for empty schedule submission.
 	startTrackingBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start Tracking"})
 	if err = startTrackingBtn.Click(); err != nil {
 		t.Fatalf("click Start Tracking with empty schedule: %v", err)
 	}
-	validationError := page.GetByRole("alert")
-	if err = validationError.WaitFor(); err != nil {
+	if err = page.GetByRole("alert").WaitFor(); err != nil {
 		t.Fatalf("wait for validation error after empty schedule: %v", err)
 	}
 
-	// Step 2b: Submit a valid schedule. Schedule both today and the next weekday so that a
-	// midnight crossing between setting preferences and the server's notion of "today" still
-	// leaves today scheduled — covering both sides of the boundary.
-	testStart := time.Now()
-	todayWeekday := testStart.Weekday().String()
-	nextWeekday := testStart.AddDate(0, 0, 1).Weekday().String()
-	for _, day := range []string{todayWeekday, nextWeekday} {
-		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
-			Labels: &[]string{"1 hour"},
-		}); err != nil {
-			t.Fatalf("select %s duration: %v", day, err)
-		}
-	}
-	if err = startTrackingBtn.Click(); err != nil {
-		t.Fatalf("click Start Tracking with valid schedule: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect redirect to / after valid schedule submission: %v", err)
-	}
+	// Step 2b: Submit a valid schedule. Schedule today AND tomorrow so a
+	// midnight crossing between selection and the server's notion of "today"
+	// still leaves today scheduled — covers both sides of the boundary.
+	selectAndSubmitSchedule(t, page, serverURL, todayAndTomorrowWeekdays())
 
 	// Step 3: Start today's workout. Extract today's date from the resulting URL rather than
 	// from the test's clock: if midnight crossed between scheduling and now, the server's
@@ -384,14 +399,8 @@ func Test_playwright_stacknav(t *testing.T) {
 	page, serverURL := setupPlaywrightPage(t)
 	var err error
 
-	// Setup: register and configure all weekdays so today always has a workout.
-	if err = page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
-		t.Fatalf("register: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
-		t.Fatalf("expect /schedule after registration: %v", err)
-	}
+	// Setup: register and land on /schedule.
+	registerAndWaitSchedule(t, page, serverURL)
 
 	// === Flow 5: Validation error (empty schedule submit). Run before filling
 	// the form so we see the error path first. The flash + redirect-to-form
@@ -415,22 +424,11 @@ func Test_playwright_stacknav(t *testing.T) {
 	// click. To exercise the "pop" branch in Flow 3 below, we first submit the
 	// schedule once (landing at /) and then revisit /schedule directly. The
 	// second submit is the actual Flow 3 exercise.
-	for _, day := range []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"} {
-		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
-			Labels: &[]string{"1 hour"},
-		}); err != nil {
-			t.Fatalf("select %s duration: %v", day, err)
-		}
-	}
+	//
 	// First submit: prefs saved, server responds with pop-or-push → /.
 	// No / in history yet, so popOrPushTo pushes / on top of /schedule.
 	// History after: [..., /schedule, /].
-	if err = startTrackingBtn.Click(); err != nil {
-		t.Fatalf("first schedule submit: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect / after first schedule submit: %v", err)
-	}
+	selectAndSubmitSchedule(t, page, serverURL, allWeekdays())
 	// Navigate to /schedule directly — now history is [..., /, /schedule].
 	if _, err = page.Goto(serverURL + "/schedule"); err != nil {
 		t.Fatalf("goto /schedule for flow 3 setup: %v", err)
@@ -443,19 +441,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	// Re-fill the form, then submit. Now / IS in history (we navigated back to
 	// /schedule via Goto, which pushed another /schedule on top), so popOrPushTo
 	// traverses to / instead of pushing a duplicate.
-	for _, day := range []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"} {
-		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
-			Labels: &[]string{"1 hour"},
-		}); err != nil {
-			t.Fatalf("re-select %s: %v", day, err)
-		}
-	}
-	if err = startTrackingBtn.Click(); err != nil {
-		t.Fatalf("submit valid schedule (flow 3): %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect / after flow 3 schedule submit: %v", err)
-	}
+	selectAndSubmitSchedule(t, page, serverURL, allWeekdays())
 	// Verify pop-or-push traversed (rather than pushed): /schedule must be in
 	// the FORWARD stack (not backward), which we prove by GoForward returning
 	// to /schedule. A naive push would have placed a fresh / on top of the
@@ -503,7 +489,11 @@ func Test_playwright_stacknav(t *testing.T) {
 	// The weekly planner exhausts its exercise pool after a few days when
 	// scheduling all 7 days (weekUsedExercises prevents reuse). So later in the
 	// week (Saturday) may end up with 0 exercises. Add one manually if needed.
-	if noExercises, _ := page.Locator("a[href*='/exercises/']").Count(); noExercises == 0 {
+	noExercises, err := page.Locator("a[href*='/exercises/']").Count()
+	if err != nil {
+		t.Fatalf("count workout exercises: %v", err)
+	}
+	if noExercises == 0 {
 		addExerciseToWorkout(t, page, workoutURL)
 	}
 
@@ -555,7 +545,8 @@ func Test_playwright_stacknav(t *testing.T) {
 	if err = page.GetByLabel("Actual reps").First().Fill("8"); err != nil {
 		t.Fatalf("fill actual reps: %v", err)
 	}
-	if err = page.Locator("button.too-heavy-btn").First().Click(); err != nil {
+	tooHeavyBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Too heavy"}).First()
+	if err = tooHeavyBtn.Click(); err != nil {
 		t.Fatalf("click too-heavy signal: %v", err)
 	}
 	// After the set update, navigation.navigate(target, {history: 'replace'})
@@ -587,7 +578,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	// Swap redirects to the same workoutExerciseID slot, so the URL matches
 	// the original DETAIL the user came from. popOrPushTo finds it in the
 	// backward stack and traverses to it.
-	swapLink := page.Locator("a[href$='/swap']").First()
+	swapLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Swap exercise"}).First()
 	if err = swapLink.WaitFor(); err != nil {
 		t.Fatalf("wait for swap link: %v", err)
 	}
@@ -632,7 +623,8 @@ func Test_playwright_stacknav(t *testing.T) {
 	if _, err = page.Goto(newDetailURL); err != nil {
 		t.Fatalf("goto newDetailURL for flow 4: %v", err)
 	}
-	if err = page.Locator("a[href$='/swap']").First().Click(); err != nil {
+	if err = page.GetByRole("link",
+		playwright.PageGetByRoleOptions{Name: "Swap exercise"}).First().Click(); err != nil {
 		t.Fatalf("click swap from new detail: %v", err)
 	}
 	// Both the previous DETAIL page and the SWAP page render an
@@ -669,7 +661,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	if _, err = page.Goto(workoutURL); err != nil {
 		t.Fatalf("Flow 6: goto workoutURL: %v", err)
 	}
-	addExerciseLink := page.Locator("a.add-exercise-link")
+	addExerciseLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Add exercise"})
 	if err = addExerciseLink.WaitFor(); err != nil {
 		t.Fatalf("Flow 6: wait for add-exercise link: %v", err)
 	}
@@ -766,28 +758,10 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 		t.Fatalf("shrink viewport: %v", err)
 	}
 
-	// Register: lands at /schedule with an empty schedule.
-	if err = page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
-		t.Fatalf("register: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
-		t.Fatalf("expect /schedule after registration: %v", err)
-	}
-	// Fill at least one day so the schedule submit doesn't bounce back with
-	// a validation error.
-	if _, err = page.GetByLabel("Monday").SelectOption(playwright.SelectOptionValues{
-		Labels: &[]string{"1 hour"},
-	}); err != nil {
-		t.Fatalf("select Monday duration: %v", err)
-	}
-	if err = page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Start Tracking"}).Click(); err != nil {
-		t.Fatalf("submit schedule: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect / after schedule submit: %v", err)
-	}
+	// Register and fill at least one day so the schedule submit doesn't
+	// bounce back with a validation error.
+	registerAndWaitSchedule(t, page, serverURL)
+	selectAndSubmitSchedule(t, page, serverURL, []string{"Monday"})
 
 	// Go to /preferences and submit the recovery form. The handler sets a
 	// success flash and redirects to /preferences#deload-title.
@@ -832,13 +806,14 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 	}
 
 	// The Save button must not still be in a busy state — a stuck spinner
-	// is the visible symptom of the same hang.
-	busy, err := saveRecoveryBtn.GetAttribute("aria-busy")
-	if err != nil {
-		t.Fatalf("read aria-busy on Save button: %v", err)
-	}
-	if busy == "true" {
-		t.Errorf("Save recovery settings button still has aria-busy=true — spinner stuck")
+	// is the visible symptom of the same hang. Web-first ToHaveAttribute
+	// auto-retries until the timeout elapses, surviving any brief moment
+	// the busy flag is still in the act of clearing.
+	assertions := playwright.NewPlaywrightAssertions()
+	if err = assertions.Locator(saveRecoveryBtn).Not().ToHaveAttribute(
+		"aria-busy", "true",
+	); err != nil {
+		t.Errorf("Save recovery settings button still has aria-busy=true — spinner stuck: %v", err)
 	}
 
 	// Scroll-to-panel regression check. The whole point of including
@@ -848,7 +823,6 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 	// fragment. With the shrunk viewport above, the heading is only
 	// inside the viewport when a real cross-document fragment-scroll
 	// placed it there.
-	assertions := playwright.NewPlaywrightAssertions()
 	if err = assertions.Locator(
 		page.Locator("#deload-title"),
 	).ToBeInViewport(); err != nil {
@@ -934,30 +908,8 @@ func Test_playwright_bfcache_staleness(t *testing.T) {
 
 	// Register and schedule today + tomorrow so today has a workout
 	// (matches the smoketest setup pattern around the midnight boundary).
-	if err = page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Begin training"}).Click(); err != nil {
-		t.Fatalf("register: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/schedule", serverURL)); err != nil {
-		t.Fatalf("expect /schedule after registration: %v", err)
-	}
-	testStart := time.Now()
-	todayWeekday := testStart.Weekday().String()
-	nextWeekday := testStart.AddDate(0, 0, 1).Weekday().String()
-	for _, day := range []string{todayWeekday, nextWeekday} {
-		if _, err = page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
-			Labels: &[]string{"1 hour"},
-		}); err != nil {
-			t.Fatalf("select %s duration: %v", day, err)
-		}
-	}
-	if err = page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Start Tracking"}).Click(); err != nil {
-		t.Fatalf("submit schedule: %v", err)
-	}
-	if err = page.WaitForURL(fmt.Sprintf("%s/", serverURL)); err != nil {
-		t.Fatalf("expect / after schedule submit: %v", err)
-	}
+	registerAndWaitSchedule(t, page, serverURL)
+	selectAndSubmitSchedule(t, page, serverURL, todayAndTomorrowWeekdays())
 
 	// At this point / is loaded with meta == current inv_bfcache cookie
 	// (the schedule POST already rotated it). Drive a second POST so the
@@ -1056,7 +1008,8 @@ func dumpNavDiagnostics(t *testing.T, page playwright.Page, where, wantURL strin
 func addExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string) {
 	t.Helper()
 	var err error
-	if err = page.Locator("a.add-exercise-link").Click(); err != nil {
+	addLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Add exercise"})
+	if err = addLink.Click(); err != nil {
 		t.Fatalf("click Add Exercise link: %v", err)
 	}
 	if err = page.WaitForURL(func(u string) bool { return strings.Contains(u, "/add-exercise") }); err != nil {
@@ -1081,4 +1034,81 @@ func addExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string)
 	if _, err = page.Goto(workoutURL); err != nil {
 		t.Fatalf("goto workout overview after add: %v", err)
 	}
+}
+
+// registerAndWaitSchedule clicks "Begin training" on the unauthenticated home
+// page and waits for the /schedule landing. Use as the first step of any
+// authenticated-flow test.
+func registerAndWaitSchedule(t *testing.T, page playwright.Page, serverURL string) {
+	t.Helper()
+	beginBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Begin training"})
+	if err := beginBtn.Click(); err != nil {
+		t.Fatalf("click Begin training: %v", err)
+	}
+	if err := page.WaitForURL(serverURL + "/schedule"); err != nil {
+		t.Fatalf("wait for /schedule after registration: %v", err)
+	}
+}
+
+// selectAndSubmitSchedule selects each weekday for 1 hour and clicks "Start
+// Tracking", waiting for the post-submit landing at /. The caller is
+// responsible for being on /schedule beforehand and for choosing a valid
+// non-empty day set (an empty list lets the server's validation reject the
+// submit — useful for testing that path).
+func selectAndSubmitSchedule(t *testing.T, page playwright.Page, serverURL string, days []string) {
+	t.Helper()
+	for _, day := range days {
+		if _, err := page.GetByLabel(day).SelectOption(playwright.SelectOptionValues{
+			Labels: &[]string{"1 hour"},
+		}); err != nil {
+			t.Fatalf("select %s duration: %v", day, err)
+		}
+	}
+	startBtn := page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start Tracking"})
+	if err := startBtn.Click(); err != nil {
+		t.Fatalf("click Start Tracking: %v", err)
+	}
+	if err := page.WaitForURL(serverURL + "/"); err != nil {
+		t.Fatalf("wait for / after schedule submit: %v", err)
+	}
+}
+
+// todayAndTomorrowWeekdays returns the current and next weekday names as
+// shown by the schedule form's day labels. Scheduling both sides of the
+// midnight boundary keeps the test honest even if the local clock crosses
+// midnight between selection and the server's notion of "today".
+func todayAndTomorrowWeekdays() []string {
+	now := time.Now()
+	return []string{now.Weekday().String(), now.AddDate(0, 0, 1).Weekday().String()}
+}
+
+// allWeekdays returns every weekday name in the order the schedule form
+// renders them. Useful for tests that need today to have a workout no
+// matter when they run.
+func allWeekdays() []string {
+	return []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+}
+
+// capturePlaywrightFailureScreenshot writes a PNG of the page when the test
+// failed, to a stable os.TempDir path, and logs the location. Called from a
+// t.Cleanup wired in setupPlaywrightPage. Silent (best-effort) when the test
+// passed or the page is already torn down — those aren't actionable.
+func capturePlaywrightFailureScreenshot(t *testing.T, page playwright.Page) {
+	t.Helper()
+	if !t.Failed() {
+		return
+	}
+	safeName := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
+	// os.TempDir (not t.TempDir): the screenshot must outlive the test run
+	// so a human can inspect it. t.TempDir is wiped at test end.
+	path := filepath.Join(os.TempDir(), //nolint:usetesting // see comment above
+		fmt.Sprintf("playwright-failure-%s-%s.png", safeName, time.Now().Format("20060102-150405")))
+	if _, err := page.Screenshot(playwright.PageScreenshotOptions{
+		Path:     &path,
+		FullPage: new(true),
+	}); err != nil {
+		t.Logf("failure screenshot capture failed: %v", err)
+		return
+	}
+	t.Logf("failure screenshot: %s", path)
 }

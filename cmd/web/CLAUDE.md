@@ -337,6 +337,144 @@ if doc.Find("h1:contains('Add Exercise')").Length() == 0 {
 - Verify redirects after successful form submissions
 - Check that dynamic content updates correctly (e.g., exercise counts)
 
+## End-to-end testing with Playwright
+
+`cmd/web/playwright_test.go` drives real Chromium against a live server to
+cover flows that exercise the JS shim — stack-navigator behavior, bfcache
+staleness, WebAuthn auth. The Go binding is
+`github.com/playwright-community/playwright-go`. Tests skip under
+`testing.Short()` (so `go test -short ./...` stays fast) and run in
+parallel under `make ci`.
+
+### Shared setup
+
+`setupPlaywrightPage(t, allowedConsoleErrors...)` installs Chromium once
+(serialized by `sync.OnceValue` to avoid ETXTBSY in parallel runs), boots
+the app server via `e2etest.StartServer`, launches a browser context at a
+390x844 mobile viewport with `prefers-reduced-motion: reduce` emulated,
+wires a virtual WebAuthn authenticator via CDP, and returns a page parked
+at `/`. Petrapp is a mobile-first PWA — don't introduce desktop
+dimensions without a reason that's worth documenting in the test.
+
+The CSS honors `prefers-reduced-motion`: view transitions collapse to
+0.001ms, transforms drop, the loading-bar animation stops. Playwright's
+actionability checks wait on those transitions; emulating reduced motion
+keeps tests fast and stable. Don't override it unless you're specifically
+testing motion-sensitive behavior.
+
+### Selectors: role > data attribute > CSS class
+
+Prefer accessibility-API locators that match how a user finds the element:
+
+```go
+page.GetByRole("button", playwright.PageGetByRoleOptions{Name: "Start Tracking"})
+page.GetByLabel("Monday")
+page.GetByText("Recovery settings saved.")
+```
+
+`Name` is a case-insensitive substring against the accessible name — so
+a button with `aria-label="Too heavy — failed to reach target reps"`
+matches `Name: "Too heavy"`. Pass a `*regexp.Regexp` for finer control.
+
+Reach for data attributes (`a[data-back-button]`, `a[data-workout-exercise-id]`)
+when a stable contract attribute exists *specifically* as a test/JS hook —
+those won't move under a styling refactor. Use bare CSS classes
+(`button.too-heavy-btn`, `a.add-exercise-link`) only as a last resort; a
+class rename in `ui/templates/` shouldn't break tests.
+
+### Helpers for repeated flows
+
+Common flows live as helpers at the bottom of `playwright_test.go`:
+
+- `registerAndWaitSchedule(t, page, serverURL)` — register a new user, land on `/schedule`.
+- `selectAndSubmitSchedule(t, page, serverURL, days)` — fill the given weekdays for 1 hour, submit, wait for `/`.
+- `todayAndTomorrowWeekdays()` / `allWeekdays()` — day-name helpers for the schedule form.
+- `addExerciseToWorkout(t, page, workoutURL)` — fallback when the weekly planner exhausts its exercise pool.
+- `dumpNavDiagnostics(t, page, where, wantURL)` — log Navigation API state for URL-mismatch fatals.
+
+Add a helper when the third caller appears — earlier than that is
+premature.
+
+### Console errors fail the test
+
+`setupPlaywrightPage` collects browser console errors and fails the test
+in a `t.Cleanup` if any aren't allowlisted. Pass known-benign substrings
+as variadic args:
+
+```go
+page, serverURL := setupPlaywrightPage(t, "ResizeObserver loop")
+```
+
+If a test starts failing on a console error you didn't introduce, fix the
+underlying JS bug rather than expanding the allowlist. Uncaught JS
+exceptions surface separately through `pageerror` and always fail.
+
+### Failure screenshots
+
+When a test fails, `setupPlaywrightPage`'s cleanup writes a full-page PNG
+to `os.TempDir()` and logs the path:
+
+```
+playwright_test.go:136: failure screenshot: /tmp/playwright-failure-Test_playwright_smoketest-20260527-204631.png
+```
+
+The file persists past the test run. In CI, surface `os.TempDir()` as an
+artifact upload path to capture these automatically.
+
+### Web-first assertions for state that needs retry
+
+`playwright.NewPlaywrightAssertions()` returns matchers that auto-retry
+against a deadline — use them for anything that becomes true after a
+navigation, fetch, or DOM update settles. Compare these two forms:
+
+```go
+// Brittle: snapshot read, no retry. Flakes if the attribute clears
+// after the next paint.
+busy, _ := btn.GetAttribute("aria-busy")
+if busy == "true" { t.Errorf("...") }
+
+// Web-first: retries until the timeout. Survives any brief moment
+// the busy flag is still in the act of clearing.
+assertions := playwright.NewPlaywrightAssertions()
+assertions.Locator(btn).Not().ToHaveAttribute("aria-busy", "true")
+```
+
+`ToHaveURL`, `ToBeVisible`, `ToBeInViewport`, `ToHaveText` follow the
+same pattern. Imperative checks after a `WaitForURL` are fine — the
+wait already settled the state — but anything that races with a JS
+side-effect should go through web-first assertions.
+
+### Same-URL navigations and DOM-settle waits
+
+The stack-navigator auto-replaces same-URL submits, so `WaitForURL` can
+return against a stale DOM (URL never changed). Wait on a post-submit
+DOM marker instead:
+
+```go
+completedBefore, _ := completedSets.Count()
+// ...submit set...
+completedSets.Nth(completedBefore).WaitFor()   // new set rendered
+```
+
+The `Test_playwright_smoketest` set loop and `Test_playwright_stacknav`
+Flow 1 both use this pattern; copy it whenever a redirect lands at the
+same URL the form was submitted from.
+
+### Debugging
+
+Set `PWDEBUG=1` to run headed with no default timeouts and the
+Playwright Inspector wired up; `page.Pause()` in a test will drop into
+the inspector at that point.
+
+```
+PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/web/
+```
+
+Run a single test for fast iteration. For URL-mismatch failures, prefer
+`dumpNavDiagnostics(t, page, where, wantURL)` over ad-hoc logging — it
+dumps the Navigation API entry stack, current load state, and current
+heading in one line.
+
 ## Service Layer Integration
 
 ### Calling Service Methods
