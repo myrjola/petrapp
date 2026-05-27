@@ -53,6 +53,9 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		return WeekPlan{}, fmt.Errorf("startingDate must be a Monday, got %s", startingDate.Weekday())
 	}
 
+	// Pre-fill all 7 slots with rest-day placeholders. Scheduled days
+	// overwrite their slot below; the rest carry only their Date so
+	// WeekPlan.SessionOn returns a valid pointer for every day of the week.
 	result := WeekPlan{
 		Monday:   startingDate,
 		Sessions: [7]Session{},
@@ -136,6 +139,12 @@ func (wp *Planner) PlanDay(
 		)
 	}
 
+	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
+	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
+	// handles Sunday correctly: time.Sunday = 0 < time.Monday = 1, so an int
+	// range would never count anything for a Sunday date. Sunday falls
+	// through the loop with the full Mon..Sat count — exactly the index
+	// workoutDays[i==len-1] would have produced for it in Plan.
 	idx := 0
 	target := date.Weekday()
 	for _, d := range []time.Weekday{
