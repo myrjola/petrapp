@@ -81,3 +81,18 @@ type ExerciseSearchData struct {
 	Query string
 	Nonce template.HTMLAttr
 }
+
+// AdminNavData is the dot for the `admin-nav` component. Active is the
+// section-name string ("exercises" or "feature-flags") used to mark the
+// matching tab with aria-current="page".
+type AdminNavData struct {
+	Active string
+	Nonce  template.HTMLAttr
+}
+
+// Admin section names accepted by AdminNavData.Active. Keep aligned with
+// the values the admin-nav template branches on.
+const (
+	adminSectionExercises    = "exercises"
+	adminSectionFeatureFlags = "feature-flags"
+)
