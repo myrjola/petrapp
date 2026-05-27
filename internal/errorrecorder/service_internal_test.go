@@ -89,8 +89,8 @@ func TestService_PruneOnce_DropsExpiredSessions(t *testing.T) {
 	s := newServiceForTest(
 		t,
 		clk,
-		serviceTestParams{window: 5 * time.Minute},
-	) //nolint:exhaustruct // helper fills the rest.
+		serviceTestParams{window: 5 * time.Minute}, //nolint:exhaustruct // helper fills the rest.
+	)
 
 	s.record("old", makeRecord(slog.LevelInfo, "old"))
 	clk.Advance(10 * time.Minute)
