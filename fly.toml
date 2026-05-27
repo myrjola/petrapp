@@ -5,6 +5,7 @@ primary_region = "arn"
 [env]
 PETRAPP_SQLITE_URL = "/data/petrapp.sqlite3"
 PETRAPP_TRACES_DIRECTORY = "/data/traces"
+PETRAPP_LOGS_DIRECTORY = "/data/logs"
 LITESTREAM_REPLICA_TYPE = "s3"
 
 [build]
