@@ -2,10 +2,13 @@ package service
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/testhelpers"
@@ -233,6 +236,59 @@ func TestExerciseGenerator_PromptDataQualityRules(t *testing.T) {
 	// are caught.
 	if !strings.Contains(prompt, "rep counts") {
 		t.Errorf("prompt is missing the 'do not include rep counts' rule")
+	}
+}
+
+// TestExerciseGenerator_validateResourceURLs spins up an httptest.Server with
+// handlers covering the response classes we care about: 200, 301→200, 404,
+// 500, and a slow handler that exceeds the client timeout. Only 200 and the
+// redirect chain that ends in 200 should survive.
+func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ok", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ok", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/notfound", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/boom", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	// Override the default client timeout so the slow handler trips it
+	// inside the test budget.
+	eg.httpClient = &http.Client{Timeout: 200 * time.Millisecond}
+
+	in := []domain.Resource{
+		{Title: "OK", URL: srv.URL + "/ok"},
+		{Title: "Redirect", URL: srv.URL + "/redirect"},
+		{Title: "NotFound", URL: srv.URL + "/notfound"},
+		{Title: "Boom", URL: srv.URL + "/boom"},
+		{Title: "Slow", URL: srv.URL + "/slow"},
+	}
+
+	got := eg.validateResourceURLs(t.Context(), in)
+
+	wantTitles := map[string]bool{"OK": true, "Redirect": true}
+	if len(got) != len(wantTitles) {
+		t.Fatalf("got %d surviving resources, want %d: %#v", len(got), len(wantTitles), got)
+	}
+	for _, r := range got {
+		if !wantTitles[r.Title] {
+			t.Errorf("unexpected survivor %q (%s)", r.Title, r.URL)
+		}
 	}
 }
 

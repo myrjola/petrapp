@@ -14,8 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/openai/openai-go/v3"
@@ -103,6 +105,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 // exerciseGenerator generates exercises using OpenAI API.
 type exerciseGenerator struct {
 	client       openai.Client
+	httpClient   *http.Client
 	logger       *slog.Logger
 	muscleGroups []string
 }
@@ -112,6 +115,7 @@ func newExerciseGenerator(openaiAPIKey string, muscleGroups []string, logger *sl
 	client := openai.NewClient(option.WithAPIKey(openaiAPIKey))
 	return &exerciseGenerator{
 		client:       client,
+		httpClient:   &http.Client{Timeout: 5 * time.Second},
 		logger:       logger,
 		muscleGroups: muscleGroups,
 	}
@@ -313,6 +317,39 @@ Return only the JSON object.`, exercise.Name)
 	}
 
 	return nil
+}
+
+// validateResourceURLs HEAD-checks each resource URL with the generator's
+// http client and returns the subset whose final response is 2xx or 3xx.
+// Failures (network errors, timeouts, 4xx, 5xx) are logged at debug level
+// and the resource is silently dropped. Best-effort: never returns an error.
+func (eg *exerciseGenerator) validateResourceURLs(
+	ctx context.Context,
+	resources []domain.Resource,
+) []domain.Resource {
+	alive := make([]domain.Resource, 0, len(resources))
+	for _, r := range resources {
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, r.URL, nil)
+		if err != nil {
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad URL",
+				slog.String("url", r.URL), slog.Any("error", err))
+			continue
+		}
+		resp, err := eg.httpClient.Do(req)
+		if err != nil {
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: request failed",
+				slog.String("url", r.URL), slog.Any("error", err))
+			continue
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad status",
+				slog.String("url", r.URL), slog.Int("status", resp.StatusCode))
+			continue
+		}
+		alive = append(alive, r)
+	}
+	return alive
 }
 
 // updateResourcesInDescription replaces placeholder URLs with real ones.
