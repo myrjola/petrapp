@@ -132,6 +132,39 @@ func TestService_LRUEviction_DropsLeastRecentlySeen(t *testing.T) {
 	}
 }
 
+func TestService_TryReserveDump_AllowsUpToLimit(t *testing.T) {
+	t.Parallel()
+	clk := newFakeClock(time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC))
+	s := newServiceForTest(t, clk, serviceTestParams{rateLimit: 3}) //nolint:exhaustruct // helper fills the rest.
+
+	for i := range 3 {
+		if !s.tryReserveDump() {
+			t.Fatalf("reservation %d should have succeeded", i)
+		}
+		clk.Advance(1 * time.Second)
+	}
+	if s.tryReserveDump() {
+		t.Fatalf("reservation #4 within the window should have been refused")
+	}
+}
+
+func TestService_TryReserveDump_AllowsAgainAfterWindow(t *testing.T) {
+	t.Parallel()
+	clk := newFakeClock(time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC))
+	s := newServiceForTest(t, clk, serviceTestParams{rateLimit: 1}) //nolint:exhaustruct // helper fills the rest.
+
+	if !s.tryReserveDump() {
+		t.Fatalf("first reservation should have succeeded")
+	}
+	if s.tryReserveDump() {
+		t.Fatalf("second reservation within the window should have been refused")
+	}
+	clk.Advance(61 * time.Minute)
+	if !s.tryReserveDump() {
+		t.Fatalf("reservation after window expiry should have succeeded")
+	}
+}
+
 // serviceTestParams holds the optional knobs a test may override. Zero values
 // mean "use sensible defaults". newServiceForTest fills in the rest.
 type serviceTestParams struct {

@@ -14,6 +14,9 @@ const sessionKeyAttrSessionHash = "session_hash"
 // session_hash is present.
 const sessionKeyAttrTraceID = "trace_id"
 
+// rateLimitWindow is the time over which rateLimit caps the number of dumps.
+const rateLimitWindow = 1 * time.Hour
+
 // bufferedRecord holds a cloned slog.Record alongside the time it was added,
 // so the pruner can drop entries older than the configured window.
 type bufferedRecord struct {
@@ -37,6 +40,7 @@ type sessionBuffer struct {
 type Service struct {
 	mu            sync.Mutex
 	sessions      map[string]*sessionBuffer
+	dumpTimes     []time.Time
 	maxPerSession int
 	maxSessions   int
 	window        time.Duration
@@ -142,4 +146,27 @@ func (s *Service) pruneOnce() {
 			delete(s.sessions, key)
 		}
 	}
+}
+
+// tryReserveDump returns true iff a dump may proceed under the global
+// rate limit. Side effect on success: records the dump time in the
+// sliding window.
+func (s *Service) tryReserveDump() bool {
+	now := s.clock.Now()
+	cutoff := now.Add(-rateLimitWindow)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Drop entries that fell out of the sliding window.
+	kept := s.dumpTimes[:0]
+	for _, t := range s.dumpTimes {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	s.dumpTimes = kept
+	if len(s.dumpTimes) >= s.rateLimit {
+		return false
+	}
+	s.dumpTimes = append(s.dumpTimes, now)
+	return true
 }
