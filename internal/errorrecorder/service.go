@@ -180,6 +180,13 @@ func (s *Service) Close() error {
 	return nil
 }
 
+// WaitForDumps blocks until completedDumps reaches n or timeout elapses.
+// Intended for test synchronisation; safe to call from production code
+// but has no purpose there.
+func (s *Service) WaitForDumps(n int, timeout time.Duration) error {
+	return s.waitForDumps(n, timeout)
+}
+
 // observe is called by the Handler after the inner.Handle returned. It
 // buffers the record and, if it is an error, schedules a dump.
 func (s *Service) observe(rec slog.Record) {
