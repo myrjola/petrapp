@@ -46,6 +46,7 @@ type Service struct {
 	window        time.Duration
 	rateLimit     int
 	clock         Clock
+	inner         slog.Handler // for the recorder's own log lines and the wrapped chain.
 }
 
 // resolveKey returns the grouping key for rec, or "" if neither
@@ -146,6 +147,17 @@ func (s *Service) pruneOnce() {
 			delete(s.sessions, key)
 		}
 	}
+}
+
+// observe is the per-record entry point called by the Handler decorator.
+// It is responsible for buffering (and, in a later task, dump triggering).
+// Caller has already forwarded the record to the inner handler.
+func (s *Service) observe(rec slog.Record) {
+	key := resolveKey(rec)
+	if key == "" {
+		return
+	}
+	s.record(key, rec)
 }
 
 // tryReserveDump returns true iff a dump may proceed under the global
