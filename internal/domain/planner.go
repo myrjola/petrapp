@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -109,23 +110,26 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 }
 
 // PlanDay generates one Session for date, suitable for ad-hoc workouts on
-// days outside the weekly plan (extra workouts, or days added mid-week after
-// Plan(monday) already ran). weekUsedExerciseIDs is the set of exercise IDs
-// already used in other sessions this week; the planner avoids repeating
-// them when possible. Returns errNoExercisesForCategory (wrapped) if the
-// derived category has no compatible exercises.
-func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Session, error) {
+// days outside the weekly plan (extra workouts, or days added mid-week
+// after Plan(monday) already ran). weekUsedExerciseIDs is the set of
+// exercise IDs already used in other sessions this week; weekLoad is
+// the running per-MG weighted load from those sessions (built by the
+// caller via WeeklyPlannedLoad). The planner mutates a copy of
+// weekLoad internally for scoring this day's picks and returns the
+// resulting Session. Returns errNoExercisesForCategory (wrapped) if
+// the derived category has no compatible exercises.
+func (wp *Planner) PlanDay(
+	date time.Time,
+	weekUsedExerciseIDs map[int]bool,
+	weekLoad map[string]float64,
+) (Session, error) {
 	category := wp.determineCategory(date)
 	if !wp.hasExercisesForCategory(category) {
 		return Session{}, fmt.Errorf(
-			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday())
+			"%w: %s day (%s)", errNoExercisesForCategory, category, date.Weekday(),
+		)
 	}
 
-	// Periodization: replicate the weekly planner's per-day alternation.
-	// Count scheduled prefs days strictly before date.Weekday() in Mon-first
-	// week order. Iterating Mon..Sat explicitly (rather than as an int range)
-	// handles Sunday correctly: time.Sunday = 0 < time.Monday = 1, so an int
-	// range would never count anything for a Sunday date.
 	idx := 0
 	target := date.Weekday()
 	for _, d := range []time.Weekday{
@@ -139,21 +143,17 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 			idx++
 		}
 	}
-	// Sunday never matches any d above, so it falls through with the full count
-	// of scheduled Mon..Sat days — exactly the index workoutDays[i==len-1] would
-	// have produced for it.
 	monday := MondayOf(date)
 	firstPT := wp.firstSessionPeriodizationType(monday)
 	pt := nextPeriodizationType(firstPT, idx)
 
-	isDeload := IsDeloadWeek(monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled)
+	isDeload := IsDeloadWeek(
+		monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
+	)
 	if isDeload {
 		pt = PeriodizationHypertrophy
 	}
 
-	// Exercise count: from prefs if the day is scheduled, otherwise medium
-	// (bumped to medium-hypertrophy when the ad-hoc day is hypertrophy and
-	// not deload, matching the scheduled-day rule).
 	n := exercisesPerSession(wp.Prefs, date.Weekday(), pt, isDeload)
 	if n == 0 {
 		n = exercisesMedium
@@ -164,18 +164,17 @@ func (wp *Planner) PlanDay(date time.Time, weekUsedExerciseIDs map[int]bool) (Se
 
 	used := weekUsedExerciseIDs
 	if used == nil {
-		used = make(map[int]bool)
+		used = map[int]bool{}
 	}
-	load := map[string]float64{}
-	exerciseSlots := wp.selectExercisesForDayWithPeriodization(
-		category, n, pt, isDeload, used, load,
-	)
+	load := make(map[string]float64, len(weekLoad))
+	maps.Copy(load, weekLoad)
+	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, used, load)
 
-	return Session{ //nolint:exhaustruct // DifficultyRating, StartedAt, CompletedAt start zero.
+	return Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
 		Date:              date,
 		PeriodizationType: pt,
 		IsDeload:          isDeload,
-		Slots:             exerciseSlots,
+		Slots:             slots,
 	}, nil
 }
 

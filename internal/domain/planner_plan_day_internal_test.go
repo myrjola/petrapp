@@ -53,7 +53,7 @@ func TestPlanner_PlanDay_IsolatedDateDefaultsToFullBody(t *testing.T) {
 	wp := newPlanDayPlanner(t, Preferences{}) //nolint:exhaustruct // all zero on purpose.
 	wed := date(monday2026Date(), 2)
 
-	sess, err := wp.PlanDay(wed, nil)
+	sess, err := wp.PlanDay(wed, nil, nil)
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestPlanner_PlanDay_AdjacencyToScheduledTomorrowPicksLower(t *testing.T) {
 	wp := newPlanDayPlanner(t, prefs(time.Tuesday))
 	mon := monday2026Date()
 
-	sess, err := wp.PlanDay(mon, nil)
+	sess, err := wp.PlanDay(mon, nil, nil)
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *te
 			continue
 		}
 		var got Session
-		got, err = wp.PlanDay(want.Date, nil)
+		got, err = wp.PlanDay(want.Date, nil, nil)
 		if err != nil {
 			t.Fatalf("PlanDay(%s): %v", want.Date.Weekday(), err)
 		}
@@ -130,7 +130,7 @@ func TestPlanner_PlanDay_AvoidsUsedExercises(t *testing.T) {
 		preUsed[id] = true
 	}
 
-	sess, err := wp.PlanDay(tue, used)
+	sess, err := wp.PlanDay(tue, used, nil)
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestPlanner_PlanDay_UsesPrefsExerciseCountWhenScheduled(t *testing.T) {
 	wp := newPlanDayPlanner(t, p)
 	wed := date(monday2026Date(), 2)
 
-	sess, err := wp.PlanDay(wed, nil)
+	sess, err := wp.PlanDay(wed, nil, nil)
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestPlanner_PlanDay_EmptyCategoryPoolReturnsError(t *testing.T) {
 	wp := NewPlanner(prefs(time.Monday, time.Tuesday), noLower, nil)
 	mon := monday2026Date()
 
-	_, err := wp.PlanDay(mon, nil)
+	_, err := wp.PlanDay(mon, nil, nil)
 	if err == nil {
 		t.Fatal("PlanDay must error when category pool is empty")
 	}
@@ -207,12 +207,49 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *t
 		}
 	}
 
-	got, err := wp.PlanDay(sun, nil)
+	got, err := wp.PlanDay(sun, nil, nil)
 	if err != nil {
 		t.Fatalf("PlanDay(Sunday): %v", err)
 	}
 	if got.PeriodizationType != planSunPT {
 		t.Errorf("Sunday PeriodizationType = %s, want %s (matches weekly planner)",
 			got.PeriodizationType, planSunPT)
+	}
+}
+
+func TestPlanner_PlanDay_AvoidsAlreadyLoadedMuscleGroup(t *testing.T) {
+	t.Parallel()
+	// Pool: one Shoulders-primary exercise, one Chest-primary exercise.
+	exercises := []Exercise{
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+		{ //nolint:exhaustruct // Test exercise omits display fields.
+			ID: 2, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
+			RepMin: new(5), RepMax: new(10),
+		},
+	}
+	targets := []MuscleGroupTarget{
+		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
+		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+	}
+	// Tuesday scheduled so category=FullBody (isolated day).
+	p := Preferences{} //nolint:exhaustruct // Other prefs irrelevant.
+	p.Minutes[time.Tuesday] = 60
+	wp := NewPlanner(p, exercises, targets)
+
+	weekLoad := map[string]float64{"Shoulders": 10} // Already at target.
+	sess, err := wp.PlanDay(time.Date(2026, 1, 6, 0, 0, 0, 0, time.UTC), nil, weekLoad)
+	if err != nil {
+		t.Fatalf("PlanDay: %v", err)
+	}
+	if len(sess.Slots) == 0 {
+		t.Fatalf("no slots picked")
+	}
+	if sess.Slots[0].Exercise.ID != 2 {
+		t.Errorf("first pick is exercise %d; expected exercise 2 (Chest, under target)", sess.Slots[0].Exercise.ID)
 	}
 }

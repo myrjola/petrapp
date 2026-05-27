@@ -162,7 +162,7 @@ func (s *Service) planSingleDay(
 		return domain.Session{}, fmt.Errorf("get muscle group targets: %w", err)
 	}
 	planner := domain.NewPlanner(prefs, exercises, targets)
-	sess, err := planner.PlanDay(date, used)
+	sess, err := planner.PlanDay(date, used, nil)
 	if err != nil {
 		return domain.Session{}, fmt.Errorf("plan day %s: %w", date.Format(time.DateOnly), err)
 	}
