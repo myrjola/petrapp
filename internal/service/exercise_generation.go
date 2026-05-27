@@ -165,6 +165,11 @@ For "default_starting_seconds", set a reasonable beginner duration in seconds (e
 when exercise_type is "time_based"; otherwise set it to null.
 For "muscle_groups", use only from this list: %s
 
+Muscle-group rule: only credit a muscle as primary or secondary if it performs a
+working contraction (concentric or eccentric load). Pure isometric stabilizers
+(e.g. the lats during a push-up, the upper back during a bench press, the core
+during an overhead press) do not count and must be omitted.
+
 The "description_markdown" must follow this exact structure:
 
 ## Instructions
@@ -172,7 +177,6 @@ The "description_markdown" must follow this exact structure:
 2. [Step 2 with positioning details]
 3. [Step 3 with movement description]
 4. [Optional step 4 with breathing/tempo guidance]
-5. [Optional step 5 with repetition guidance]
 
 ## Common Mistakes
 - [Mistake 1: explanation of error and correction]
@@ -180,10 +184,13 @@ The "description_markdown" must follow this exact structure:
 - [Mistake 3: explanation of error and correction]
 - [Optional Mistake 4: explanation of error and correction]
 
-## Resources
-- [Video tutorial](https://example.com/exercise-video)
-- [Form guide](https://example.com/exercise-form)
-- [Optional additional resource](https://example.com/exercise-variations)
+Description content rules:
+- Do not include rep counts, set counts, weights, or durations anywhere in the
+  description. The app tracks rep and set targets separately and shows them to
+  the user. Mentions like "perform 8-12 reps", "do 3 sets", or "hold for 30
+  seconds" must not appear.
+- Do not include a Resources section. Tutorial links are added by a
+  follow-up search step and appended automatically.
 
 Instructions must be clear, concise, and focus on proper form using simple language for beginners.
 Include relevant safety considerations. The entire description should be 150-200 words.

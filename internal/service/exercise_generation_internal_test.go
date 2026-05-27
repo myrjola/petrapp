@@ -204,6 +204,38 @@ func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 	})
 }
 
+// TestExerciseGenerator_PromptDataQualityRules asserts the prompt instructs
+// the AI to (a) omit rep counts from the description text — those are
+// tracked separately on the exercise — and (b) credit only working
+// muscles, not stabilizers. Also asserts the Pass-1 template no longer
+// emits the ## Resources block with example.com placeholders.
+func TestExerciseGenerator_PromptDataQualityRules(t *testing.T) {
+	t.Parallel()
+
+	eg := newExerciseGenerator("dummy-key", []string{"Chest"},
+		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	prompt := eg.baseExercisePrompt("Bench Press")
+
+	if strings.Contains(prompt, "example.com") {
+		t.Errorf("prompt contains example.com placeholder URLs; Pass 2 should append " +
+			"the Resources section only when web search returns valid URLs")
+	}
+	if strings.Contains(prompt, "repetition guidance") {
+		t.Errorf("prompt still asks for 'repetition guidance' step")
+	}
+	if strings.Contains(prompt, "## Resources") {
+		t.Errorf("prompt's Pass-1 structure template still contains a ## Resources block")
+	}
+	if !strings.Contains(prompt, "stabilizer") {
+		t.Errorf("prompt is missing the stabilizer-exclusion rule for muscle groups")
+	}
+	// Spot-check the rep-rule wording so accidental edits that remove it
+	// are caught.
+	if !strings.Contains(prompt, "rep counts") {
+		t.Errorf("prompt is missing the 'do not include rep counts' rule")
+	}
+}
+
 func TestCreateMinimalExercise(t *testing.T) {
 	t.Parallel()
 
