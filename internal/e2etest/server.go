@@ -7,7 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
+	"github.com/myrjola/petrapp/internal/errorrecorder"
 	"github.com/myrjola/petrapp/internal/logging"
 )
 
@@ -24,6 +26,13 @@ const LogAddrKey = "addr"
 
 // LogDsnKey is the data source name key used to log the SQL DSN.
 const LogDsnKey = "sqlDsn"
+
+const (
+	// errorRecorderWindow mirrors cmd/web/main.go: ten-minute lookback buffer.
+	errorRecorderWindow = 10 * time.Minute
+	// errorRecorderRateLimit mirrors cmd/web/main.go: 60 dumps per rolling hour.
+	errorRecorderRateLimit = 60
+)
 
 // StartServer starts the test server, waits for it to be ready, and return the server URL for testing.
 //
@@ -52,7 +61,7 @@ func StartServer(
 	addrCh := make(chan string, 1)
 	// We need the sqlite DSN for the client to do database manipulation in tests.
 	dsnCh := make(chan string, 1)
-	logger := slog.New(logging.NewContextHandler(slog.NewTextHandler(logSink, &slog.HandlerOptions{
+	innerHandler := slog.NewTextHandler(logSink, &slog.HandlerOptions{
 		AddSource: false,
 		Level:     slog.LevelDebug,
 		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
@@ -64,13 +73,28 @@ func StartServer(
 			}
 			return a
 		},
-	})))
+	})
+
+	logsDir, _ := lookupEnv("PETRAPP_LOGS_DIRECTORY")
+	recorder, err := errorrecorder.New(errorrecorder.Config{ //nolint:exhaustruct // HandlerOptions/Clock default.
+		Inner:         innerHandler,
+		LogsDirectory: logsDir,
+		Window:        errorRecorderWindow,
+		RateLimit:     errorRecorderRateLimit,
+	})
+	if err != nil {
+		cancel(err)
+		return nil, fmt.Errorf("build error recorder: %w", err)
+	}
+	t.Cleanup(func() { _ = recorder.Close() })
+
+	logger := slog.New(logging.NewContextHandler(recorder.Handler()))
 
 	// Start the server and wait for it to be ready.
 	go func() {
 		defer close(serverDone)
-		if err := run(ctx, logger, lookupEnv); err != nil {
-			cancel(err)
+		if runErr := run(ctx, logger, lookupEnv); runErr != nil {
+			cancel(runErr)
 		}
 	}()
 	addr := ""
@@ -84,10 +108,7 @@ func StartServer(
 		}
 	}
 
-	var (
-		err    error
-		client *Client
-	)
+	var client *Client
 	serverURL := fmt.Sprintf("http://%s", addr)
 	if client, err = NewClient(serverURL, "localhost", serverURL); err != nil {
 		return nil, fmt.Errorf("new client: %w", err)
