@@ -106,6 +106,32 @@ func TestService_PruneOnce_DropsExpiredSessions(t *testing.T) {
 	}
 }
 
+func TestService_LRUEviction_DropsLeastRecentlySeen(t *testing.T) {
+	t.Parallel()
+	clk := newFakeClock(time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC))
+	s := newServiceForTest(t, clk, serviceTestParams{maxSessions: 2}) //nolint:exhaustruct // helper fills the rest.
+
+	s.record("a", makeRecord(slog.LevelInfo, "a-record"))
+	clk.Advance(1 * time.Second)
+	s.record("b", makeRecord(slog.LevelInfo, "b-record"))
+	clk.Advance(1 * time.Second)
+	// Refresh "a" so "b" becomes the LRU.
+	s.record("a", makeRecord(slog.LevelInfo, "a-record-2"))
+	clk.Advance(1 * time.Second)
+	// Adding "c" should evict "b".
+	s.record("c", makeRecord(slog.LevelInfo, "c-record"))
+
+	if got := len(s.snapshot("b")); got != 0 {
+		t.Errorf("expected 'b' evicted, got %d records", got)
+	}
+	if got := len(s.snapshot("a")); got != 2 {
+		t.Errorf("expected 'a' to survive with 2 records, got %d", got)
+	}
+	if got := len(s.snapshot("c")); got != 1 {
+		t.Errorf("expected 'c' to have 1 record, got %d", got)
+	}
+}
+
 // serviceTestParams holds the optional knobs a test may override. Zero values
 // mean "use sensible defaults". newServiceForTest fills in the rest.
 type serviceTestParams struct {

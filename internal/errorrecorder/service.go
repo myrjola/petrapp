@@ -71,8 +71,13 @@ func (s *Service) record(key string, rec slog.Record) {
 	now := s.clock.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
 	buf, ok := s.sessions[key]
 	if !ok {
+		// New session — evict LRU if we are at the cap.
+		if len(s.sessions) >= s.maxSessions {
+			s.evictLRULocked()
+		}
 		buf = &sessionBuffer{ //nolint:exhaustruct // head/full/lastSeen are zero-initialised.
 			records: make([]bufferedRecord, 0, s.maxPerSession),
 		}
@@ -83,10 +88,26 @@ func (s *Service) record(key string, rec slog.Record) {
 		buf.records = append(buf.records, bufferedRecord{record: cloned, addedAt: now})
 		return
 	}
-	// Ring is full — overwrite at head.
 	buf.records[buf.head] = bufferedRecord{record: cloned, addedAt: now}
 	buf.head = (buf.head + 1) % s.maxPerSession
 	buf.full = true
+}
+
+// evictLRULocked drops the session with the oldest lastSeen. Caller MUST hold s.mu.
+func (s *Service) evictLRULocked() {
+	var oldestKey string
+	var oldestSeen time.Time
+	first := true
+	for k, b := range s.sessions {
+		if first || b.lastSeen.Before(oldestSeen) {
+			oldestKey = k
+			oldestSeen = b.lastSeen
+			first = false
+		}
+	}
+	if oldestKey != "" {
+		delete(s.sessions, oldestKey)
+	}
 }
 
 // snapshot returns the buffered records for key in chronological order.
