@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -31,13 +30,12 @@ func main() {
 		os.Exit(exitUsage)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	if err := run(logger, *dbPath, *outPath); err != nil {
+	if err := run(*dbPath, *outPath); err != nil {
 		log.Fatalf("exercise-content-fixup: %v", err)
 	}
 }
 
-func run(logger *slog.Logger, dbPath, outPath string) error {
+func run(dbPath, outPath string) error {
 	db, err := sql.Open("sqlite3", "file:"+dbPath+"?mode=ro")
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
@@ -67,7 +65,7 @@ func run(logger *slog.Logger, dbPath, outPath string) error {
 		return fmt.Errorf("iterate rows: %w", err)
 	}
 
-	logger.Info("scanned exercises", slog.Int("count", count))
+	fmt.Printf("scanned %d exercises\n", count) //nolint:forbidigo // human-facing progress output.
 
 	// outPath is unused until task 9 adds UPDATE emission.
 	_ = outPath
