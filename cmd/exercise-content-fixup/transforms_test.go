@@ -66,6 +66,54 @@ func TestStripRepGuidanceLines(t *testing.T) {
 			wantHas:   []string{"Doing 50 reps at once"},
 			wantNotIn: []string{},
 		},
+		{
+			name:      "drops 'aim for 8-12 reps' (fixture form)",
+			input:     "## Instructions\n1. Set up.\n2. Aim for 8-12 reps, switch sides.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"Aim for 8-12 reps", "8-12 reps"},
+		},
+		{
+			name:      "drops 'perform 3 sets of 10-15 repetitions' (fixture form)",
+			input:     "## Instructions\n1. Set up.\n2. Perform 3 sets of 10-15 repetitions for activation.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"Perform 3 sets of 10-15 repetitions"},
+		},
+		{
+			name:      "drops 'start with 3 sets of 5-8 controlled reps' (fixture form)",
+			input:     "## Instructions\n1. Set up.\n2. Start with 3 sets of 5-8 controlled reps using a manageable weight.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"Start with 3 sets of 5-8 controlled reps"},
+		},
+		{
+			name:      "drops 'aim for 3 sets of 8-12 repetitions' (fixture form)",
+			input:     "## Instructions\n1. Set up.\n2. Aim for 3 sets of 8-12 repetitions, ensuring controlled form.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"Aim for 3 sets of 8-12 repetitions"},
+		},
+		{
+			name:      "drops 'aim for 8-12 controlled reps' (fixture compound form)",
+			input:     "## Instructions\n1. Set up.\n2. Start with light weight and aim for 8-12 controlled reps.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"aim for 8-12 controlled reps"},
+		},
+		{
+			name:      "drops 'do 3 sets' (symmetry with 'do N reps')",
+			input:     "## Instructions\n1. Set up.\n2. Do 3 sets of slow controlled movement.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"Do 3 sets"},
+		},
+		{
+			name:      "drops 'hold this position for 30 seconds' (fixture form)",
+			input:     "## Instructions\n1. Set up.\n2. Hold this position for 30 seconds at the bottom.\n",
+			wantHas:   []string{"Set up"},
+			wantNotIn: []string{"Hold this position for 30 seconds"},
+		},
+		{
+			name:      "keeps 'Start with your legs together' — start without sets phrase",
+			input:     "## Instructions\n1. Start with your legs together and slightly in front.\n",
+			wantHas:   []string{"Start with your legs together"},
+			wantNotIn: []string{},
+		},
 	}
 
 	for _, tt := range tests {

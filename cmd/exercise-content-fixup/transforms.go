@@ -103,6 +103,18 @@ var repGuidancePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bhold\s+for\s+\d+\s*(?:seconds?|s)\b`),
 	// Literal template-leak phrase
 	regexp.MustCompile(`(?i)\brepetition guidance\b`),
+	// "aim for 8-12 reps", "aim for 3 sets", "aim for 8-12 repetitions"
+	regexp.MustCompile(`(?i)\baim\s+for\s+\d+(?:\s*[-–]\s*\d+)?\s*(?:reps?|repetitions?|sets?)\b`),
+	// "perform 3 sets of 10-15 reps", "perform 3 sets of 8-12 repetitions"
+	regexp.MustCompile(`(?i)\bperform\s+\d+(?:\s*[-–]\s*\d+)?\s*sets?\s+of\b`),
+	// "start with 3 sets of 5-8 reps" — sets target form
+	regexp.MustCompile(`(?i)\bstart\s+with\s+\d+(?:\s*[-–]\s*\d+)?\s*sets?\s+of\b`),
+	// "do 3 sets" — symmetry with "do 8-12 reps"
+	regexp.MustCompile(`(?i)\bdo\s+\d+(?:\s*[-–]\s*\d+)?\s*sets?\b`),
+	// "for 8-12 reps" / "for 10-15 controlled reps" / "for 10 reps"
+	regexp.MustCompile(`(?i)\bfor\s+\d+(?:\s*[-–]\s*\d+)?\s*(?:\w+\s+)?(?:reps?|repetitions?)\b`),
+	// "hold this position for 30 seconds" — allow 1-3 intervening words
+	regexp.MustCompile(`(?i)\bhold\s+(?:\w+\s+){1,3}for\s+\d+\s*(?:seconds?|s)\b`),
 }
 
 // orderedListItemPattern matches a markdown ordered-list item like "5. text".
