@@ -129,7 +129,7 @@ func (app *application) logAndTraceRequest(next http.Handler) http.Handler {
 		)
 
 		ctx := r.Context()
-		traceID := rand.Text()
+		traceID := logging.NewTraceID()
 		ctx = logging.WithAttrs(
 			ctx,
 			slog.Any("trace_id", traceID),
