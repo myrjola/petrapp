@@ -70,3 +70,23 @@ func TestHandler_NoKey_SkipsBufferingButForwards(t *testing.T) {
 		t.Errorf("expected no buffered sessions, got %d", len(h.service.sessions))
 	}
 }
+
+func TestNew_DisabledWhenLogsDirectoryEmpty(t *testing.T) {
+	t.Parallel()
+	var sink bytes.Buffer
+	inner := slog.NewJSONHandler(&sink, nil)
+	svc, err := New(Config{ //nolint:exhaustruct // disabled mode intentionally leaves LogsDirectory zero.
+		Inner: inner,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	if got := svc.Handler(); got != inner {
+		t.Errorf("Handler() = %T, want exactly the inner handler", got)
+	}
+	if !svc.disabled {
+		t.Errorf("disabled flag = false, want true")
+	}
+}
