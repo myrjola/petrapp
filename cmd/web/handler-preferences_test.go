@@ -133,6 +133,51 @@ func Test_application_preferences(t *testing.T) {
 	verifySelected(t, doc, weekdaysAfterPersistence)
 }
 
+//nolint:paralleltest // subtest promotes the registered user to admin.
+func Test_application_preferences_adminEntry(t *testing.T) {
+	ctx := t.Context()
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("Failed to register: %v", err)
+	}
+
+	t.Run("Non-admin does not see the admin entry", func(t *testing.T) {
+		doc, getErr := client.GetDoc(ctx, "/preferences")
+		if getErr != nil {
+			t.Fatalf("Failed to get preferences: %v", getErr)
+		}
+		if doc.Find(`a[href="/admin"]`).Length() != 0 {
+			t.Error("non-admin user should not see a link to /admin on preferences")
+		}
+		if doc.Find(`section[aria-labelledby="admin-title"]`).Length() != 0 {
+			t.Error("non-admin user should not see the admin panel on preferences")
+		}
+	})
+
+	t.Run("Admin sees the admin entry", func(t *testing.T) {
+		if _, err = server.DB().Exec("UPDATE users SET is_admin = 1 WHERE TRUE"); err != nil {
+			t.Fatalf("Promote to admin: %v", err)
+		}
+		doc, getErr := client.GetDoc(ctx, "/preferences")
+		if getErr != nil {
+			t.Fatalf("Failed to get preferences: %v", getErr)
+		}
+		panel := doc.Find(`section.panel[aria-labelledby="admin-title"]`)
+		if panel.Length() == 0 {
+			t.Fatal("admin user should see an admin panel on preferences")
+		}
+		if panel.Find(`a[href="/admin"]`).Length() == 0 {
+			t.Error("admin panel should contain a link to /admin")
+		}
+	})
+}
+
 // Regression test for the rest-timer hotfix: submitting the weekday form must
 // not flip rest_notifications_enabled back to false. The bug was a partial
 // domain.Preferences{} literal in preferencesPOST that defaulted the column

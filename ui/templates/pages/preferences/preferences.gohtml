@@ -674,6 +674,19 @@
             </div>
         </section>
 
+        {{ if $.IsAdmin }}
+            <section class="panel" aria-labelledby="admin-title">
+                <header class="panel-head">
+                    <span class="panel-eyebrow"><span class="panel-eyebrow-num">05</span> Admin</span>
+                    <h2 class="panel-title" id="admin-title">Admin tools</h2>
+                    <p class="panel-blurb">Manage exercises and feature flags.</p>
+                </header>
+                <div class="panel-actions">
+                    <a href="/admin" class="btn btn--ghost btn--block">Open admin</a>
+                </div>
+            </section>
+        {{ end }}
+
         <section class="danger-zone" aria-labelledby="danger-title">
             <h2 id="danger-title">Danger Zone</h2>
             <p>Permanently delete your account and every workout you've logged. This action cannot be undone.</p>
