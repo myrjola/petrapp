@@ -118,6 +118,29 @@ func WeeklyMuscleGroupVolume(
 	return result
 }
 
+// WeeklyPlannedLoad returns the running planned weighted load per
+// muscle group across the supplied sessions. Each set in the plan
+// contributes PrimarySetWeight to every primary muscle group on its
+// exercise and SecondarySetWeight to every secondary. Muscle groups
+// with zero contributions do not appear in the map. The result is the
+// running tally the target-aware planner uses to score subsequent
+// picks against the configured weekly targets.
+func WeeklyPlannedLoad(sessions []Session) map[string]float64 {
+	load := make(map[string]float64)
+	for _, sess := range sessions {
+		for _, ex := range sess.Slots {
+			n := float64(len(ex.Sets))
+			for _, mg := range ex.Exercise.PrimaryMuscleGroups {
+				load[mg] += n * PrimarySetWeight
+			}
+			for _, mg := range ex.Exercise.SecondaryMuscleGroups {
+				load[mg] += n * SecondarySetWeight
+			}
+		}
+	}
+	return load
+}
+
 // aggregateMuscleGroupLoad walks every set in the supplied sessions and totals the
 // weighted load for each muscle group, accumulating into the planned and completed
 // maps. Primary contributions count as PrimarySetWeight, secondary as
