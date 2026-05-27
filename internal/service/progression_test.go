@@ -35,12 +35,12 @@ func Test_GetStartingWeight(t *testing.T) {
 
 	_, err = db.ReadWrite.ExecContext(ctx,
 		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Squat", "lower", "desc", 5, 8)
+		"Test Squat", "lower", "desc", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
 	var exerciseID int
-	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Squat'").Scan(&exerciseID)
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Test Squat'").Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("get exercise id: %v", err)
 	}
@@ -656,12 +656,12 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 
 	_, err = db.ReadWrite.ExecContext(ctx,
 		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Squat", "lower", "desc", 5, 8)
+		"Test Squat", "lower", "desc", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
 	var exerciseID int
-	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Squat'").Scan(&exerciseID)
+	err = db.ReadOnly.QueryRowContext(ctx, "SELECT id FROM exercises WHERE name = 'Test Squat'").Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("get exercise id: %v", err)
 	}

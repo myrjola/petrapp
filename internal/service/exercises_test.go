@@ -437,7 +437,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 			t.Fatalf("insert muscle group: %v", err)
 		}
 	}
-	exerciseID, err := createTestExercise(ctx, t, db, "Squat", "lower")
+	exerciseID, err := createTestExercise(ctx, t, db, "Test Squat", "lower")
 	if err != nil {
 		t.Fatalf("create exercise: %v", err)
 	}
@@ -635,7 +635,7 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		}
 	}
 
-	squatID, err := createTestExercise(ctx, t, db, "Squat", "lower")
+	squatID, err := createTestExercise(ctx, t, db, "Test Squat", "lower")
 	if err != nil {
 		t.Fatalf("create squat: %v", err)
 	}
