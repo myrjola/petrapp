@@ -22,7 +22,7 @@ type fakeClock struct {
 }
 
 func newFakeClock(start time.Time) *fakeClock {
-	return &fakeClock{now: start}
+	return &fakeClock{now: start} //nolint:exhaustruct // mu is zero-valued by design.
 }
 
 func (c *fakeClock) Now() time.Time {

@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+//nolint:unparam // level will vary once later tasks add LevelError tests.
 func makeRecord(level slog.Level, msg string, attrs ...slog.Attr) slog.Record {
 	rec := slog.NewRecord(time.Unix(0, 0), level, msg, 0)
 	rec.AddAttrs(attrs...)
@@ -13,6 +14,7 @@ func makeRecord(level slog.Level, msg string, attrs ...slog.Attr) slog.Record {
 }
 
 func TestResolveKey_SessionHashWinsOverTraceID(t *testing.T) {
+	t.Parallel()
 	rec := makeRecord(slog.LevelInfo, "x",
 		slog.String("session_hash", "sess1"),
 		slog.String("trace_id", "trc1"),
@@ -23,6 +25,7 @@ func TestResolveKey_SessionHashWinsOverTraceID(t *testing.T) {
 }
 
 func TestResolveKey_TraceIDFallback(t *testing.T) {
+	t.Parallel()
 	rec := makeRecord(slog.LevelInfo, "x",
 		slog.String("trace_id", "trc1"),
 	)
@@ -32,6 +35,7 @@ func TestResolveKey_TraceIDFallback(t *testing.T) {
 }
 
 func TestResolveKey_NoKeyReturnsEmpty(t *testing.T) {
+	t.Parallel()
 	rec := makeRecord(slog.LevelInfo, "x")
 	if got := resolveKey(rec); got != "" {
 		t.Fatalf("resolveKey = %q, want empty", got)
@@ -39,8 +43,9 @@ func TestResolveKey_NoKeyReturnsEmpty(t *testing.T) {
 }
 
 func TestService_RecordAndSnapshot_Roundtrip(t *testing.T) {
+	t.Parallel()
 	clk := newFakeClock(time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC))
-	s := newServiceForTest(t, clk, serviceTestParams{})
+	s := newServiceForTest(t, clk, serviceTestParams{}) //nolint:exhaustruct // defaults filled in helper.
 
 	s.record("sess1", makeRecord(slog.LevelInfo, "first"))
 	clk.Advance(1 * time.Second)
@@ -78,7 +83,7 @@ func newServiceForTest(t *testing.T, clk Clock, p serviceTestParams) *Service {
 	if p.rateLimit == 0 {
 		p.rateLimit = 60
 	}
-	return &Service{
+	return &Service{ //nolint:exhaustruct // mu and dump-related fields default-init for tests.
 		clock:         clk,
 		sessions:      map[string]*sessionBuffer{},
 		maxPerSession: p.maxPerSession,

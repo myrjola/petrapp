@@ -73,7 +73,9 @@ func (s *Service) record(key string, rec slog.Record) {
 	defer s.mu.Unlock()
 	buf, ok := s.sessions[key]
 	if !ok {
-		buf = &sessionBuffer{records: make([]bufferedRecord, 0, s.maxPerSession)}
+		buf = &sessionBuffer{ //nolint:exhaustruct // head/full/lastSeen are zero-initialised.
+			records: make([]bufferedRecord, 0, s.maxPerSession),
+		}
 		s.sessions[key] = buf
 	}
 	buf.lastSeen = now
