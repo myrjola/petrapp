@@ -2,9 +2,17 @@ package logging
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log/slog"
 )
+
+// NewTraceID returns a fresh URL-safe random trace ID. Matches the same
+// generator used by the existing HTTP middleware so format consistency
+// holds across HTTP and background-job contexts.
+func NewTraceID() string {
+	return rand.Text()
+}
 
 type contextKey string
 
