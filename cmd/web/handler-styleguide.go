@@ -50,6 +50,8 @@ type styleguideTemplateData struct {
 	PageHeaderExample PageHeaderData
 	// FieldExamples drives the Field section of the styleguide.
 	FieldExamples []FieldData
+	// AdminNavExamples drives the Admin nav section of the styleguide.
+	AdminNavExamples []AdminNavData
 }
 
 // styleguideGET renders the design-token reference page.
@@ -126,6 +128,7 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		BannerExamples:    styleguideBannerExamples(base.Nonce),
 		PageHeaderExample: styleguidePageHeaderExample(base.Nonce),
 		FieldExamples:     styleguideFieldExamples(base.Nonce),
+		AdminNavExamples:  styleguideAdminNavExamples(base.Nonce),
 	}
 	app.render(w, r, http.StatusOK, "styleguide", data)
 }
@@ -181,5 +184,14 @@ func styleguideFieldExamples(nonce template.HTMLAttr) []FieldData {
 			Step:  "1",
 			Nonce: nonce,
 		},
+	}
+}
+
+// styleguideAdminNavExamples returns the admin-nav examples demoed on
+// the styleguide page — one render per active section.
+func styleguideAdminNavExamples(nonce template.HTMLAttr) []AdminNavData {
+	return []AdminNavData{
+		{Active: adminSectionExercises, Nonce: nonce},
+		{Active: adminSectionFeatureFlags, Nonce: nonce},
 	}
 }

@@ -1,0 +1,57 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/web.AdminNavData*/ -}}
+{{ define "admin-nav" }}
+<style {{ .Nonce }}>
+    @scope (.admin-nav) {
+        :scope {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--size-2);
+            margin-block-end: var(--size-4);
+        }
+
+        .admin-nav__tab {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            min-height: 3rem;
+            padding-inline: var(--size-3);
+            padding-block: var(--size-2);
+            border-radius: var(--radius-2);
+            background: var(--color-surface-elevated);
+            color: var(--color-text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .admin-nav__tab[aria-current="page"] {
+            background: var(--color-surface-active);
+            color: var(--color-text-primary);
+            font-weight: 600;
+        }
+
+        .admin-nav__tab[aria-current="page"]::after {
+            content: "";
+            position: absolute;
+            inset-inline: var(--size-3);
+            inset-block-end: -2px;
+            block-size: 2px;
+            background: var(--color-text-primary);
+        }
+
+        .admin-nav__tab:focus-visible {
+            outline: 2px solid var(--color-text-primary);
+            outline-offset: 2px;
+        }
+    }
+</style>
+<nav class="admin-nav" aria-label="Admin sections">
+    <a class="admin-nav__tab" href="/admin/exercises"
+       {{ if eq .Active "exercises" }}aria-current="page"{{ end }}>
+        Exercises
+    </a>
+    <a class="admin-nav__tab" href="/admin/feature-flags"
+       {{ if eq .Active "feature-flags" }}aria-current="page"{{ end }}>
+        Feature Flags
+    </a>
+</nav>
+{{ end }}

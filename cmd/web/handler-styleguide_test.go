@@ -152,4 +152,19 @@ func Test_application_styleguide(t *testing.T) {
 	if doc.Find(`.btn[aria-busy="true"]`).Length() == 0 {
 		t.Error("expected an aria-busy button example on the styleguide")
 	}
+
+	// Admin nav component — both states render on the styleguide.
+	if doc.Find("h2:contains('Admin nav')").Length() == 0 {
+		t.Error("expected an 'Admin nav' section on the styleguide")
+	}
+	if doc.Find(".admin-nav").Length() < 2 {
+		t.Errorf("expected at least two .admin-nav examples on the styleguide, got %d",
+			doc.Find(".admin-nav").Length())
+	}
+	if doc.Find(`.admin-nav .admin-nav__tab[aria-current="page"][href="/admin/exercises"]`).Length() == 0 {
+		t.Error("expected an Exercises-active example with aria-current=page")
+	}
+	if doc.Find(`.admin-nav .admin-nav__tab[aria-current="page"][href="/admin/feature-flags"]`).Length() == 0 {
+		t.Error("expected a Feature-Flags-active example with aria-current=page")
+	}
 }

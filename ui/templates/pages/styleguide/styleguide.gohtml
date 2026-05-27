@@ -423,6 +423,17 @@
         </section>
 
         <section>
+            <h2>Admin nav</h2>
+            <div class="component-sample">
+                <div class="stack">
+                    {{ range .AdminNavExamples }}
+                        {{ template "admin-nav" . }}
+                    {{ end }}
+                </div>
+            </div>
+        </section>
+
+        <section>
             <h2>Components</h2>
 
             <h3>Button variants</h3>
