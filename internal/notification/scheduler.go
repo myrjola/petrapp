@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/logging"
 )
 
 // DispatchFunc is called when a scheduled push fires. Implementations should
@@ -182,6 +183,7 @@ func (s *Scheduler) fire(selfBox **time.Timer, key slotKey, push domain.Schedule
 	// the 60s push TTL so we don't outlive the message we'd dispatch.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint:mnd // see above.
 	defer cancel()
+	ctx = logging.WithAttrs(ctx, slog.String("trace_id", logging.NewTraceID()))
 
 	if err := s.cfg.Dispatch(ctx, push); err != nil {
 		s.cfg.Logger.LogAttrs(ctx, slog.LevelWarn, "push dispatch failed",
