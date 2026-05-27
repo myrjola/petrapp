@@ -21,6 +21,7 @@ import (
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/envstruct"
+	"github.com/myrjola/petrapp/internal/errorrecorder"
 	"github.com/myrjola/petrapp/internal/flightrecorder"
 	"github.com/myrjola/petrapp/internal/logging"
 	"github.com/myrjola/petrapp/internal/notification"
@@ -75,6 +76,10 @@ type config struct {
 	TemplatePath string `env:"PETRAPP_TEMPLATE_PATH" envDefault:""`
 	// TracesDirectory is the path to the directory where trace files are written.
 	TracesDirectory string `env:"PETRAPP_TRACES_DIRECTORY" envDefault:""`
+	// LogsDirectory is the path to the root directory under which the
+	// error recorder writes per-occurrence dump files. Empty disables the
+	// recorder.
+	LogsDirectory string `env:"PETRAPP_LOGS_DIRECTORY" envDefault:""`
 	// OpenAIAPIKey is optional. It's used to authenticate with the OpenAI API.
 	OpenAIAPIKey string `env:"OPENAI_API_KEY" envDefault:""`
 	// VAPIDPublic is the base64url-encoded VAPID public key used by both the
@@ -367,25 +372,61 @@ func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
 }
 
 func main() {
+	os.Exit(runMain())
+}
+
+// runMain wires the slog chain (including the error recorder), invokes run,
+// and ensures recorder.Close() executes even when run returns an error. main()
+// is a thin wrapper because os.Exit would otherwise skip the deferred Close.
+func runMain() int {
 	ctx := context.Background()
 	handlerOptions := &slog.HandlerOptions{
 		AddSource:   false,
 		Level:       slog.LevelDebug,
 		ReplaceAttr: nil,
 	}
-	var loggerHandler slog.Handler
-	loggerHandler = slog.NewTextHandler(os.Stdout, handlerOptions)
+	var baseHandler slog.Handler
+	baseHandler = slog.NewTextHandler(os.Stdout, handlerOptions)
 	if os.Getenv("FLY_MACHINE_ID") != "" {
-		loggerHandler = slog.NewJSONHandler(os.Stdout, handlerOptions)
+		baseHandler = slog.NewJSONHandler(os.Stdout, handlerOptions)
 	}
-	loggerHandler = logging.NewContextHandler(loggerHandler)
+
+	logsDirectory := os.Getenv("PETRAPP_LOGS_DIRECTORY")
+	recorder, err := errorrecorder.New(errorrecorder.Config{ //nolint:exhaustruct // Clock defaults to realClock.
+		Inner:          baseHandler,
+		LogsDirectory:  logsDirectory,
+		Window:         errorRecorderWindow,
+		RateLimit:      errorRecorderRateLimit,
+		HandlerOptions: handlerOptions,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "build error recorder: %v\n", err)
+		return 1
+	}
+	defer func() {
+		if closeErr := recorder.Close(); closeErr != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "close error recorder: %v\n", closeErr)
+		}
+	}()
+
+	loggerHandler := logging.NewContextHandler(recorder.Handler())
 	appName := os.Getenv("FLY_APP_NAME")
 	if appName == "" {
 		appName = "petra-local"
 	}
 	logger := slog.New(loggerHandler).With(slog.String("service_name", appName))
-	if err := run(ctx, logger, os.LookupEnv); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", slog.Any("error", err))
-		os.Exit(1)
+	if runErr := run(ctx, logger, os.LookupEnv); runErr != nil {
+		logger.LogAttrs(ctx, slog.LevelError, "failure starting application", slog.Any("error", runErr))
+		return 1
 	}
+	return 0
 }
+
+const (
+	// errorRecorderWindow bounds how far back the recorder buffers per-session
+	// records when an Error-level entry triggers a dump.
+	errorRecorderWindow = 10 * time.Minute
+	// errorRecorderRateLimit caps the number of dump files written in any
+	// rolling one-hour window across all sessions.
+	errorRecorderRateLimit = 60
+)
