@@ -8,33 +8,34 @@ import (
 
 // planDayExercises returns a small pool with Upper, Lower, and FullBody coverage
 // across distinct primary muscles so PlanDay's non-conflict selection has room.
-// FullBody is listed first so FullBody-day selection (greedy first-pick) includes it,
-// making sess.WorkoutType() return CategoryFullBody reliably in tests.
+// The FullBody Plank carries the lowest ID so the lowest-id tie-break picks it
+// first on FullBody days with empty targets, making sess.WorkoutType() return
+// CategoryFullBody reliably in tests.
 func planDayExercises() []Exercise {
 	intPtr := func(v int) *int { return &v }
 	return []Exercise{
 		{ //nolint:exhaustruct // Test exercises omit unused display fields.
-			ID: 6, Name: "Plank", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+			ID: 1, Name: "Plank", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Core"}, SecondaryMuscleGroups: nil,
 			RepMin: intPtr(5), RepMax: intPtr(10)},
 		{ //nolint:exhaustruct // Test exercises omit unused display fields.
-			ID: 1, Name: "Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			ID: 2, Name: "Bench Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: []string{"Triceps"},
 			RepMin: intPtr(5), RepMax: intPtr(10)},
 		{ //nolint:exhaustruct // Test exercises omit unused display fields.
-			ID: 2, Name: "Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			ID: 3, Name: "Row", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Upper Back"}, SecondaryMuscleGroups: []string{"Biceps"},
 			RepMin: intPtr(5), RepMax: intPtr(10)},
 		{ //nolint:exhaustruct // Test exercises omit unused display fields.
-			ID: 3, Name: "Overhead Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+			ID: 4, Name: "Overhead Press", Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Shoulders"}, SecondaryMuscleGroups: []string{"Triceps"},
 			RepMin: intPtr(5), RepMax: intPtr(10)},
 		{ //nolint:exhaustruct // Test exercises omit unused display fields.
-			ID: 4, Name: "Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			ID: 5, Name: "Squat", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Quads"}, SecondaryMuscleGroups: []string{"Glutes"},
 			RepMin: intPtr(5), RepMax: intPtr(10)},
 		{ //nolint:exhaustruct // Test exercises omit unused display fields.
-			ID: 5, Name: "Deadlift", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
+			ID: 6, Name: "Deadlift", Category: CategoryLower, ExerciseType: ExerciseTypeWeighted,
 			PrimaryMuscleGroups: []string{"Hamstrings"}, SecondaryMuscleGroups: []string{"Glutes"},
 			RepMin: intPtr(5), RepMax: intPtr(10)},
 	}
@@ -117,18 +118,24 @@ func TestPlanner_PlanDay_AvoidsUsedExercises(t *testing.T) {
 	t.Parallel()
 
 	// Force the upper-only pool by picking Tue with Mon and Wed scheduled.
-	// Then mark exercises 1,2 as used; only id 3 (Overhead Press) remains.
+	// Mark exercises 1,2 as used; the planner must not return them. The
+	// selector mutates the supplied used-set with the IDs it picks, so we
+	// snapshot the pre-call IDs before checking.
 	p := prefs(time.Monday, time.Wednesday)
 	wp := newPlanDayPlanner(t, p)
 	tue := date(monday2026Date(), 1) // unscheduled Tuesday between two on days
 	used := map[int]bool{1: true, 2: true}
+	preUsed := map[int]bool{}
+	for id := range used {
+		preUsed[id] = true
+	}
 
 	sess, err := wp.PlanDay(tue, used)
 	if err != nil {
 		t.Fatalf("PlanDay: %v", err)
 	}
 	for _, es := range sess.Slots {
-		if used[es.Exercise.ID] {
+		if preUsed[es.Exercise.ID] {
 			t.Errorf("PlanDay returned used exercise id=%d", es.Exercise.ID)
 		}
 	}
