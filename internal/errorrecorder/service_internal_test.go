@@ -1,9 +1,16 @@
 package errorrecorder
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 )
@@ -195,4 +202,127 @@ func newServiceForTest(t *testing.T, clk Clock, p serviceTestParams) *Service {
 		window:        p.window,
 		rateLimit:     p.rateLimit,
 	}
+}
+
+func TestService_ErrorRecordProducesDumpFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	clk := newFakeClock(time.Date(2026, 5, 27, 14, 32, 17, 0, time.UTC))
+	var sink bytes.Buffer
+	svc, err := New(Config{ //nolint:exhaustruct // remaining Config fields are zero by design.
+		Inner:         slog.NewJSONHandler(&sink, nil),
+		LogsDirectory: dir,
+		Window:        10 * time.Minute,
+		RateLimit:     60,
+		Clock:         clk,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	logger := slog.New(svc.Handler())
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "step1",
+		slog.String("session_hash", "abcdef1234"))
+	logger.LogAttrs(context.Background(), slog.LevelError, "boom",
+		slog.String("session_hash", "abcdef1234"))
+
+	if err = svc.waitForDumps(1, 2*time.Second); err != nil {
+		t.Fatalf("waitForDumps: %v", err)
+	}
+
+	files := listJSONLFiles(t, dir)
+	if len(files) != 1 {
+		t.Fatalf("expected 1 dump file, got %d: %v", len(files), files)
+	}
+	body, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatalf("read dump: %v", err)
+	}
+	got := string(body)
+	if !strings.Contains(got, `"msg":"step1"`) || !strings.Contains(got, `"msg":"boom"`) {
+		t.Errorf("dump file missing expected records: %q", got)
+	}
+}
+
+func TestService_ErrorWithoutKey_NoDump(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	clk := newFakeClock(time.Date(2026, 5, 27, 14, 32, 17, 0, time.UTC))
+	var sink bytes.Buffer
+	svc, err := New(Config{ //nolint:exhaustruct // remaining Config fields are zero by design.
+		Inner:         slog.NewJSONHandler(&sink, nil),
+		LogsDirectory: dir,
+		Window:        10 * time.Minute,
+		RateLimit:     60,
+		Clock:         clk,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	logger := slog.New(svc.Handler())
+	logger.LogAttrs(context.Background(), slog.LevelError, "stray error")
+
+	if err = svc.waitForDumps(0, 200*time.Millisecond); err != nil {
+		t.Fatalf("waitForDumps: %v", err)
+	}
+	files := listJSONLFiles(t, dir)
+	if len(files) != 0 {
+		t.Fatalf("expected 0 dump files, got %d: %v", len(files), files)
+	}
+}
+
+func TestService_RateLimit_DropsExcessDumps(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	clk := newFakeClock(time.Date(2026, 5, 27, 14, 32, 17, 0, time.UTC))
+	var sink bytes.Buffer
+	svc, err := New(Config{ //nolint:exhaustruct // remaining Config fields are zero by design.
+		Inner:         slog.NewJSONHandler(&sink, nil),
+		LogsDirectory: dir,
+		Window:        10 * time.Minute,
+		RateLimit:     1,
+		Clock:         clk,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	logger := slog.New(svc.Handler())
+	for i := range 3 {
+		logger.LogAttrs(context.Background(), slog.LevelError, fmt.Sprintf("err-%d", i),
+			slog.String("session_hash", "sess1"))
+		clk.Advance(1 * time.Second)
+	}
+
+	if err = svc.waitForDumps(1, 2*time.Second); err != nil {
+		t.Fatalf("waitForDumps: %v", err)
+	}
+	files := listJSONLFiles(t, dir)
+	if len(files) != 1 {
+		t.Fatalf("expected exactly 1 dump file under the rate limit, got %d", len(files))
+	}
+}
+
+// listJSONLFiles returns all .jsonl files under root, sorted.
+func listJSONLFiles(t *testing.T, root string) []string {
+	t.Helper()
+	var out []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(path, ".jsonl") {
+			out = append(out, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	sort.Strings(out)
+	return out
 }
