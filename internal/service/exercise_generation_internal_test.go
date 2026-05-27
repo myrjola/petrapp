@@ -205,6 +205,25 @@ func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 			t.Errorf("real guide link not appended; got:\n%s", got)
 		}
 	})
+
+	t.Run("empty resources drops existing Resources section", func(t *testing.T) {
+		t.Parallel()
+
+		input := "## Instructions\n1. Step one\n\n## Resources\n" +
+			"- [Old video](https://example.com/video)\n" +
+			"- [Old guide](https://example.com/guide)\n"
+		got := eg.updateResourcesInDescription(input, nil)
+
+		if strings.Contains(got, "## Resources") {
+			t.Errorf("orphan ## Resources heading left behind; got:\n%s", got)
+		}
+		if strings.Contains(got, "https://example.com/") {
+			t.Errorf("placeholder URLs leaked through; got:\n%s", got)
+		}
+		if !strings.Contains(got, "## Instructions") {
+			t.Errorf("Instructions section was dropped; got:\n%s", got)
+		}
+	})
 }
 
 // TestExerciseGenerator_PromptDataQualityRules asserts the prompt instructs

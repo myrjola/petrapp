@@ -356,11 +356,12 @@ func (eg *exerciseGenerator) validateResourceURLs(
 }
 
 // updateResourcesInDescription replaces placeholder URLs with real ones.
+// When resources is empty the ## Resources section is dropped entirely so no
+// orphan heading is left behind.
 func (eg *exerciseGenerator) updateResourcesInDescription(
 	markdown string,
 	resources []domain.Resource,
 ) string {
-	// Find and replace the Resources section
 	lines := strings.Split(markdown, "\n")
 	var result []string
 	inResourcesSection := false
@@ -369,6 +370,9 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 		switch {
 		case strings.HasPrefix(line, "## Resources"):
 			inResourcesSection = true
+			if len(resources) == 0 {
+				continue
+			}
 			result = append(result, line)
 			for _, res := range resources {
 				result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
@@ -377,14 +381,12 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 			inResourcesSection = false
 			result = append(result, line)
 		case !inResourcesSection:
-			if !strings.HasPrefix(line, "- [") || !inResourcesSection {
-				result = append(result, line)
-			}
+			result = append(result, line)
 		}
 	}
 
-	// If no resources section found, append one
-	if !inResourcesSection && len(resources) > 0 {
+	// If no Resources section was present and we have resources to add, append one.
+	if !inResourcesSection && len(resources) > 0 && !containsResourcesHeading(result) {
 		result = append(result, "\n## Resources")
 		for _, res := range resources {
 			result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
@@ -392,6 +394,18 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// containsResourcesHeading reports whether any line in result already starts
+// with "## Resources". Used by updateResourcesInDescription to avoid emitting
+// a duplicate section when the input already had one and it was replaced.
+func containsResourcesHeading(lines []string) bool {
+	for _, l := range lines {
+		if strings.HasPrefix(l, "## Resources") {
+			return true
+		}
+	}
+	return false
 }
 
 // validateMuscleGroups checks if all muscle groups are in the allowed list.
