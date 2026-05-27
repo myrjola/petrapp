@@ -28,6 +28,7 @@ type exerciseAdminTemplateData struct {
 
 	Header    PageHeaderData
 	Flash     BannerData
+	AdminNav  AdminNavData
 	Exercises []adminExerciseRow
 	NameField FieldData
 }
@@ -52,6 +53,7 @@ type exerciseEditTemplateData struct {
 
 	Header                 PageHeaderData
 	Flash                  BannerData
+	AdminNav               AdminNavData
 	Exercise               domain.Exercise
 	NameField              FieldData
 	SecondsField           FieldData
@@ -95,6 +97,10 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 			Variant: flash.Variant,
 			Message: flash.Message,
 			Nonce:   base.Nonce,
+		},
+		AdminNav: AdminNavData{
+			Active: adminSectionExercises,
+			Nonce:  base.Nonce,
 		},
 		Exercises: rows,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.
@@ -157,6 +163,10 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 			Variant: flash.Variant,
 			Message: flash.Message,
 			Nonce:   base.Nonce,
+		},
+		AdminNav: AdminNavData{
+			Active: adminSectionExercises,
+			Nonce:  base.Nonce,
 		},
 		Exercise: exercise,
 		NameField: FieldData{ //nolint:exhaustruct // labelled text input; native-validation attrs unused here.

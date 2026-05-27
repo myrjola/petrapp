@@ -2,6 +2,7 @@
 {{ define "page" }}
     <main class="stack">
         {{ template "page-header" .Header }}
+        {{ template "admin-nav" .AdminNav }}
         {{ template "banner" .Flash }}
 
         <form method="post" action="/admin/exercises/{{ .Exercise.ID }}" class="card stack">

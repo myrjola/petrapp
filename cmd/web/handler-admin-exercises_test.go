@@ -82,6 +82,18 @@ func Test_application_adminExercises(t *testing.T) {
 		if doc.Find("form[action='/admin/exercises/generate']").Length() == 0 {
 			t.Error("Expected to find form to add new exercise")
 		}
+
+		// Admin nav renders with Exercises marked active.
+		nav := doc.Find(`nav.admin-nav[aria-label="Admin sections"]`)
+		if nav.Length() == 0 {
+			t.Fatal("expected admin-nav landmark on /admin/exercises")
+		}
+		if nav.Find(`a.admin-nav__tab[href="/admin/exercises"][aria-current="page"]`).Length() == 0 {
+			t.Error("expected Exercises tab to be marked aria-current=page")
+		}
+		if nav.Find(`a.admin-nav__tab[href="/admin/feature-flags"][aria-current="page"]`).Length() != 0 {
+			t.Error("Feature Flags tab must not be active on the exercises page")
+		}
 	})
 
 	// Test creating a new exercise
@@ -107,6 +119,15 @@ func Test_application_adminExercises(t *testing.T) {
 
 		if doc.Find("h1").Text() != "Edit Exercise: Test Squat" {
 			t.Error("Expected to be redirected to exercise editing page")
+		}
+
+		// The edit page also renders admin-nav with Exercises active.
+		editNav := doc.Find(`nav.admin-nav[aria-label="Admin sections"]`)
+		if editNav.Length() == 0 {
+			t.Fatal("expected admin-nav landmark on the exercise edit page")
+		}
+		if editNav.Find(`a.admin-nav__tab[href="/admin/exercises"][aria-current="page"]`).Length() == 0 {
+			t.Error("expected Exercises tab to be marked aria-current=page on the edit page")
 		}
 	})
 
