@@ -12,11 +12,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const exitUsage = 2
+const (
+	exitUsage            = 2
+	maxDroppedLinesShown = 3
+	sqlFileMode          = 0o600
+)
 
 func main() {
 	var (
@@ -30,45 +35,166 @@ func main() {
 		os.Exit(exitUsage)
 	}
 
-	if err := run(*dbPath, *outPath); err != nil {
+	if err := run(context.Background(), *dbPath, *outPath); err != nil {
 		log.Fatalf("exercise-content-fixup: %v", err)
 	}
 }
 
-func run(dbPath, outPath string) error {
+type exerciseRow struct {
+	id   int
+	name string
+	desc string
+}
+
+func run(ctx context.Context, dbPath, outPath string) error {
 	db, err := sql.Open("sqlite3", "file:"+dbPath+"?mode=ro")
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
 	defer func() { _ = db.Close() }()
 
-	ctx := context.Background()
-	rows, err := db.QueryContext(ctx, "SELECT id, name, description_markdown FROM exercises ORDER BY id")
+	rows, err := readExercises(ctx, db)
 	if err != nil {
-		return fmt.Errorf("select exercises: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	count := 0
-	for rows.Next() {
-		var (
-			id   int
-			name string
-			desc string
-		)
-		if err = rows.Scan(&id, &name, &desc); err != nil {
-			return fmt.Errorf("scan row: %w", err)
-		}
-		count++
-	}
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("iterate rows: %w", err)
+		return err
 	}
 
-	fmt.Printf("scanned %d exercises\n", count) //nolint:forbidigo // human-facing progress output.
+	// Collect every URL across every exercise, dedupe, HEAD-check.
+	allURLs := collectURLs(rows)
+	fmt.Printf("checking %d unique URLs...\n", len(allURLs)) //nolint:forbidigo // human-facing progress output.
+	alive := CheckURLs(ctx, allURLs)
 
-	// outPath is unused until task 9 adds UPDATE emission.
-	_ = outPath
+	updates := transformAll(rows, alive)
 
+	if err = writeSQL(outPath, updates); err != nil {
+		return fmt.Errorf("write sql: %w", err)
+	}
+
+	fmt.Printf( //nolint:forbidigo // human-facing progress output.
+		"\nsummary: scanned %d exercises, %d modified, output → %s\n",
+		len(rows),
+		len(updates),
+		outPath,
+	)
 	return nil
+}
+
+func readExercises(ctx context.Context, db *sql.DB) ([]exerciseRow, error) {
+	rs, err := db.QueryContext(ctx,
+		"SELECT id, name, description_markdown FROM exercises ORDER BY id")
+	if err != nil {
+		return nil, fmt.Errorf("select exercises: %w", err)
+	}
+	defer func() { _ = rs.Close() }()
+
+	var out []exerciseRow
+	for rs.Next() {
+		var r exerciseRow
+		if err = rs.Scan(&r.id, &r.name, &r.desc); err != nil {
+			return nil, fmt.Errorf("scan row: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err = rs.Err(); err != nil {
+		return nil, fmt.Errorf("iterate rows: %w", err)
+	}
+	return out, nil
+}
+
+func collectURLs(rows []exerciseRow) []string {
+	seen := make(map[string]bool)
+	var unique []string
+	for _, r := range rows {
+		for _, u := range ExtractResourceURLs(r.desc) {
+			if seen[u] {
+				continue
+			}
+			seen[u] = true
+			unique = append(unique, u)
+		}
+	}
+	return unique
+}
+
+type updateRow struct {
+	id      int
+	name    string
+	newDesc string
+}
+
+func transformAll(rows []exerciseRow, alive map[string]bool) []updateRow {
+	var updates []updateRow
+	for _, r := range rows {
+		newDesc := StripDeadResourceLinks(r.desc, alive)
+		newDesc = StripRepGuidanceLines(newDesc)
+		if newDesc == r.desc {
+			continue
+		}
+		fmt.Printf("\n--- exercise %d (%s) ---\n", r.id, r.name) //nolint:forbidigo // human-facing progress output.
+		fmt.Println(diffSummary(r.desc, newDesc))                //nolint:forbidigo // human-facing progress output.
+		updates = append(updates, updateRow{id: r.id, name: r.name, newDesc: newDesc})
+	}
+	return updates
+}
+
+// diffSummary produces a tiny human-readable change report — line counts
+// before/after and the first three dropped lines so a reviewer can spot
+// obviously wrong transforms before shipping the SQL.
+func diffSummary(before, after string) string {
+	beforeLines := strings.Split(before, "\n")
+	afterLines := strings.Split(after, "\n")
+	dropped := diffLines(beforeLines, afterLines)
+	if len(dropped) == 0 {
+		return "(no line drops — markdown structure changed in place)"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "  %d lines → %d lines, dropped:\n", len(beforeLines), len(afterLines))
+	for i, l := range dropped {
+		if i == maxDroppedLinesShown {
+			fmt.Fprintf(&b, "    ... and %d more\n", len(dropped)-maxDroppedLinesShown)
+			break
+		}
+		fmt.Fprintf(&b, "    - %s\n", strings.TrimSpace(l))
+	}
+	return b.String()
+}
+
+func diffLines(before, after []string) []string {
+	idx := make(map[string]int, len(after))
+	for _, l := range after {
+		idx[l]++
+	}
+	var dropped []string
+	for _, l := range before {
+		if idx[l] > 0 {
+			idx[l]--
+			continue
+		}
+		dropped = append(dropped, l)
+	}
+	return dropped
+}
+
+func writeSQL(path string, updates []updateRow) error {
+	var b strings.Builder
+	b.WriteString("-- Generated by cmd/exercise-content-fixup.\n")
+	b.WriteString("-- Apply via: make fly-sql-write SCRIPT=docs/<this-file>\n")
+	b.WriteString("BEGIN TRANSACTION;\n\n")
+	for _, u := range updates {
+		fmt.Fprintf(&b, "-- %d: %s\n", u.id, u.name)
+		fmt.Fprintf(&b, "UPDATE exercises SET description_markdown = '%s' WHERE id = %d;\n\n",
+			sqlEscape(u.newDesc), u.id)
+	}
+	b.WriteString("COMMIT;\n")
+	if err := os.WriteFile(path, []byte(b.String()), sqlFileMode); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+	return nil
+}
+
+// sqlEscape doubles single quotes for safe inlining of a literal into a
+// SQLite UPDATE statement. The input is description markdown sourced from
+// our own DB — it does not contain injection-grade payloads but does
+// frequently contain apostrophes (e.g. "don't").
+func sqlEscape(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
