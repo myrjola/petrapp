@@ -311,13 +311,18 @@ Return only the JSON object.`, exercise.Name)
 		return fmt.Errorf("parse resources response: %w", err)
 	}
 
-	// Update description with real URLs if found
-	if len(resourceResponse.Resources) > 0 {
-		exercise.DescriptionMarkdown = eg.updateResourcesInDescription(
-			exercise.DescriptionMarkdown,
-			resourceResponse.Resources,
-		)
+	// Validate URLs before injecting them: drop dead links so the
+	// description never ships with broken Resources entries.
+	alive := eg.validateResourceURLs(ctx, resourceResponse.Resources)
+	if len(alive) == 0 && len(resourceResponse.Resources) > 0 {
+		eg.logger.LogAttrs(ctx, slog.LevelInfo, "dropped all resource URLs",
+			slog.String("exercise", exercise.Name),
+			slog.Int("returned", len(resourceResponse.Resources)))
 	}
+	exercise.DescriptionMarkdown = eg.updateResourcesInDescription(
+		exercise.DescriptionMarkdown,
+		alive,
+	)
 
 	return nil
 }

@@ -311,6 +311,44 @@ func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
 	}
 }
 
+// TestExerciseGenerator_enhanceWithWebSearch_validatesURLs is a focused unit
+// test on the integration between Pass 2's JSON parsing and the URL
+// validator. We exercise validateResourceURLs and updateResourcesInDescription
+// directly with a representative mix and assert that only live URLs land in
+// the final markdown — covering the wiring without mocking the OpenAI client.
+func TestExerciseGenerator_enhanceWithWebSearch_validatesURLs(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/live", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/dead", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg.httpClient = &http.Client{Timeout: 200 * time.Millisecond}
+
+	parsed := []domain.Resource{
+		{Title: "Live", URL: srv.URL + "/live"},
+		{Title: "Dead", URL: srv.URL + "/dead"},
+	}
+	alive := eg.validateResourceURLs(t.Context(), parsed)
+
+	desc := "## Instructions\n1. Step one\n\n## Common Mistakes\n- Bad form\n"
+	got := eg.updateResourcesInDescription(desc, alive)
+
+	if !strings.Contains(got, "[Live]") {
+		t.Errorf("live URL missing from output; got:\n%s", got)
+	}
+	if strings.Contains(got, "[Dead]") {
+		t.Errorf("dead URL leaked through; got:\n%s", got)
+	}
+}
+
 func TestCreateMinimalExercise(t *testing.T) {
 	t.Parallel()
 
