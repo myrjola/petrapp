@@ -64,8 +64,13 @@ func setupPlaywrightPage(t *testing.T) (playwright.Page, string) {
 	// media feature and collapses view transitions to 0.001ms, removes
 	// button transforms, and disables the loading-bar animation — all of
 	// which Playwright waits on for actionability/stability checks.
+	//
+	// The viewport defaults to a portrait phone size (iPhone 13). Petrapp
+	// is a mobile-first PWA — running e2e flows at desktop dimensions
+	// exercises a layout users never see.
 	bCtx, err := browser.NewContext(playwright.BrowserNewContextOptions{
 		ReducedMotion: playwright.ReducedMotionReduce,
+		Viewport:      &playwright.Size{Width: 390, Height: 844},
 	})
 	if err != nil {
 		t.Fatalf("new browser context: %v", err)
@@ -750,12 +755,12 @@ func Test_playwright_preferences_fragment_redirect(t *testing.T) {
 
 	// Shrink the viewport so the #deload-title heading and the "Save
 	// recovery settings" submit button cannot fit on screen together.
-	// At default 1280x720 they do co-fit (~80px apart), so Playwright's
-	// pre-click auto-scroll lands both inside the viewport — and
-	// location.reload()'s scroll-restoration leaves them both visible
-	// even though no fragment-scroll happened. With the heading and
-	// button separated by more than the viewport height, the heading is
-	// only inside the viewport when a real fragment-scroll places it
+	// Even at the suite's mobile default (390x844) they co-fit, so
+	// Playwright's pre-click auto-scroll lands both inside the viewport
+	// — and location.reload()'s scroll-restoration leaves them both
+	// visible even though no fragment-scroll happened. With the heading
+	// and button separated by more than the viewport height, the heading
+	// is only inside the viewport when a real fragment-scroll places it
 	// there.
 	if err = page.SetViewportSize(360, 480); err != nil {
 		t.Fatalf("shrink viewport: %v", err)
