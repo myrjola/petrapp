@@ -280,3 +280,57 @@ func TestWeekPlanRepository_Create_ReturnsErrAlreadyExistsOnConflict(t *testing.
 		t.Fatalf("Create second: got %v, want ErrAlreadyExists", err)
 	}
 }
+
+// TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots covers the case
+// where the planner schedules a day (so PeriodizationType is set) but the
+// per-week exercise pool is exhausted and the session ends up with zero slots.
+// The row must persist through Create, hydrate through Get with its
+// PeriodizationType intact, and survive a subsequent Start through Update —
+// otherwise Start re-inserts a row with empty PeriodizationType and trips the
+// workout_sessions CHECK constraint.
+func TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots(t *testing.T) {
+	t.Parallel()
+	ctx, repos := setupTestRepos(t)
+	monday := time.Date(2026, 5, 25, 0, 0, 0, 0, time.UTC)
+	wednesday := monday.AddDate(0, 0, 2)
+	plan := domain.WeekPlan{Monday: monday} //nolint:exhaustruct // Sessions filled below.
+	for i := range 7 {
+		plan.Sessions[i] = domain.Session{Date: monday.AddDate(0, 0, i)} //nolint:exhaustruct // rest-day.
+	}
+	// Scheduled Wednesday with no exercise slots — what the planner produces
+	// when the week's pool has already been spent on earlier days.
+	plan.Sessions[2] = domain.Session{ //nolint:exhaustruct // Slots intentionally empty.
+		Date:              wednesday,
+		PeriodizationType: domain.PeriodizationStrength,
+	}
+	if err := repos.WeekPlans.Create(ctx, plan); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	reloaded, err := repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if reloaded.Sessions[2].PeriodizationType != domain.PeriodizationStrength {
+		t.Errorf("Wednesday PeriodizationType after Get = %q, want %q",
+			reloaded.Sessions[2].PeriodizationType, domain.PeriodizationStrength)
+	}
+
+	if err = repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		return wp.Start(wednesday, time.Now().UTC())
+	}); err != nil {
+		t.Fatalf("Update Start: %v", err)
+	}
+
+	reloaded, err = repos.WeekPlans.Get(ctx, monday)
+	if err != nil {
+		t.Fatalf("Get after Start: %v", err)
+	}
+	if reloaded.Sessions[2].StartedAt.IsZero() {
+		t.Error("Wednesday Start did not persist")
+	}
+	if reloaded.Sessions[2].PeriodizationType != domain.PeriodizationStrength {
+		t.Errorf("Wednesday PeriodizationType after Start = %q, want %q",
+			reloaded.Sessions[2].PeriodizationType, domain.PeriodizationStrength)
+	}
+}

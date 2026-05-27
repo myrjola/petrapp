@@ -175,10 +175,15 @@ func (r *sqliteWeekPlanRepository) reinsertWeekInTx(
 }
 
 // isRestDayPlaceholder reports whether sess has no persistent state worth
-// writing (no slots, no lifecycle, no deload flag). Used by Update to skip
-// pure rest-day placeholders during the reinsert pass.
+// writing. Used by Create and reinsertWeekInTx to skip pure rest-day
+// placeholders. A non-empty PeriodizationType marks a planner-scheduled day
+// even when its exercise pool was exhausted (zero slots): those rows must
+// persist so the day round-trips through Get and a later StartSession can
+// re-insert without losing the planner's periodization choice (which would
+// trip the workout_sessions.periodization_type CHECK constraint).
 func isRestDayPlaceholder(sess domain.Session) bool {
-	return len(sess.Slots) == 0 &&
+	return sess.PeriodizationType == "" &&
+		len(sess.Slots) == 0 &&
 		sess.StartedAt.IsZero() &&
 		sess.CompletedAt.IsZero() &&
 		sess.DifficultyRating == nil &&
