@@ -1,7 +1,9 @@
 package errorrecorder
 
 import (
+	"fmt"
 	"log/slog"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -57,6 +59,50 @@ func TestService_RecordAndSnapshot_Roundtrip(t *testing.T) {
 	}
 	if snap[0].record.Message != "first" || snap[1].record.Message != "second" {
 		t.Fatalf("snapshot order wrong: %q, %q", snap[0].record.Message, snap[1].record.Message)
+	}
+}
+
+func TestService_RingOverflow_DropsOldest(t *testing.T) {
+	t.Parallel()
+	clk := newFakeClock(time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC))
+	s := newServiceForTest(t, clk, serviceTestParams{maxPerSession: 3}) //nolint:exhaustruct // helper fills the rest.
+
+	for i := range 5 {
+		s.record("sess1", makeRecord(slog.LevelInfo, fmt.Sprintf("m%d", i)))
+		clk.Advance(1 * time.Second)
+	}
+
+	snap := s.snapshot("sess1")
+	if len(snap) != 3 {
+		t.Fatalf("snapshot length = %d, want 3", len(snap))
+	}
+	got := []string{snap[0].record.Message, snap[1].record.Message, snap[2].record.Message}
+	want := []string{"m2", "m3", "m4"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("snapshot = %v, want %v", got, want)
+	}
+}
+
+func TestService_PruneOnce_DropsExpiredSessions(t *testing.T) {
+	t.Parallel()
+	clk := newFakeClock(time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC))
+	s := newServiceForTest(
+		t,
+		clk,
+		serviceTestParams{window: 5 * time.Minute},
+	) //nolint:exhaustruct // helper fills the rest.
+
+	s.record("old", makeRecord(slog.LevelInfo, "old"))
+	clk.Advance(10 * time.Minute)
+	s.record("new", makeRecord(slog.LevelInfo, "new"))
+
+	s.pruneOnce()
+
+	if len(s.snapshot("old")) != 0 {
+		t.Errorf("expected 'old' session pruned, snapshot=%v", s.snapshot("old"))
+	}
+	if got := len(s.snapshot("new")); got != 1 {
+		t.Errorf("expected 'new' session to survive with 1 record, got %d", got)
 	}
 }
 

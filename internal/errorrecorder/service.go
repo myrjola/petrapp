@@ -108,3 +108,17 @@ func (s *Service) snapshot(key string) []bufferedRecord {
 	out = append(out, buf.records[:buf.head]...)
 	return out
 }
+
+// pruneOnce drops sessions whose lastSeen is older than now-window. Safe to
+// call concurrently with record/snapshot. Exposed package-private so tests
+// can drive pruning deterministically without waiting on the ticker.
+func (s *Service) pruneOnce() {
+	cutoff := s.clock.Now().Add(-s.window)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, buf := range s.sessions {
+		if buf.lastSeen.Before(cutoff) {
+			delete(s.sessions, key)
+		}
+	}
+}
