@@ -2,10 +2,13 @@ package service
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/testhelpers"
@@ -202,6 +205,148 @@ func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 			t.Errorf("real guide link not appended; got:\n%s", got)
 		}
 	})
+
+	t.Run("empty resources drops existing Resources section", func(t *testing.T) {
+		t.Parallel()
+
+		input := "## Instructions\n1. Step one\n\n## Resources\n" +
+			"- [Old video](https://example.com/video)\n" +
+			"- [Old guide](https://example.com/guide)\n"
+		got := eg.updateResourcesInDescription(input, nil)
+
+		if strings.Contains(got, "## Resources") {
+			t.Errorf("orphan ## Resources heading left behind; got:\n%s", got)
+		}
+		if strings.Contains(got, "https://example.com/") {
+			t.Errorf("placeholder URLs leaked through; got:\n%s", got)
+		}
+		if !strings.Contains(got, "## Instructions") {
+			t.Errorf("Instructions section was dropped; got:\n%s", got)
+		}
+	})
+}
+
+// TestExerciseGenerator_PromptDataQualityRules asserts the prompt instructs
+// the AI to (a) omit rep counts from the description text — those are
+// tracked separately on the exercise — and (b) credit only working
+// muscles, not stabilizers. Also asserts the Pass-1 template no longer
+// emits the ## Resources block with example.com placeholders.
+func TestExerciseGenerator_PromptDataQualityRules(t *testing.T) {
+	t.Parallel()
+
+	eg := newExerciseGenerator("dummy-key", []string{"Chest"},
+		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	prompt := eg.baseExercisePrompt("Bench Press")
+
+	if strings.Contains(prompt, "example.com") {
+		t.Errorf("prompt contains example.com placeholder URLs; Pass 2 should append " +
+			"the Resources section only when web search returns valid URLs")
+	}
+	if strings.Contains(prompt, "repetition guidance") {
+		t.Errorf("prompt still asks for 'repetition guidance' step")
+	}
+	if strings.Contains(prompt, "## Resources") {
+		t.Errorf("prompt's Pass-1 structure template still contains a ## Resources block")
+	}
+	if !strings.Contains(prompt, "stabilizer") {
+		t.Errorf("prompt is missing the stabilizer-exclusion rule for muscle groups")
+	}
+	// Spot-check the rep-rule wording so accidental edits that remove it
+	// are caught.
+	if !strings.Contains(prompt, "rep counts") {
+		t.Errorf("prompt is missing the 'do not include rep counts' rule")
+	}
+}
+
+// TestExerciseGenerator_validateResourceURLs spins up an httptest.Server with
+// handlers covering the response classes we care about: 200, 301→200, 404,
+// 500, and a slow handler that exceeds the client timeout. Only 200 and the
+// redirect chain that ends in 200 should survive.
+func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ok", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/redirect", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ok", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/notfound", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	mux.HandleFunc("/boom", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	// Override the default client timeout so the slow handler trips it
+	// inside the test budget.
+	eg.httpClient = &http.Client{Timeout: 200 * time.Millisecond}
+
+	in := []domain.Resource{
+		{Title: "OK", URL: srv.URL + "/ok"},
+		{Title: "Redirect", URL: srv.URL + "/redirect"},
+		{Title: "NotFound", URL: srv.URL + "/notfound"},
+		{Title: "Boom", URL: srv.URL + "/boom"},
+		{Title: "Slow", URL: srv.URL + "/slow"},
+	}
+
+	got := eg.validateResourceURLs(t.Context(), in)
+
+	wantTitles := map[string]bool{"OK": true, "Redirect": true}
+	if len(got) != len(wantTitles) {
+		t.Fatalf("got %d surviving resources, want %d: %#v", len(got), len(wantTitles), got)
+	}
+	for _, r := range got {
+		if !wantTitles[r.Title] {
+			t.Errorf("unexpected survivor %q (%s)", r.Title, r.URL)
+		}
+	}
+}
+
+// TestExerciseGenerator_enhanceWithWebSearch_validatesURLs is a focused unit
+// test on the integration between Pass 2's JSON parsing and the URL
+// validator. We exercise validateResourceURLs and updateResourcesInDescription
+// directly with a representative mix and assert that only live URLs land in
+// the final markdown — covering the wiring without mocking the OpenAI client.
+func TestExerciseGenerator_enhanceWithWebSearch_validatesURLs(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/live", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/dead", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg.httpClient = &http.Client{Timeout: 200 * time.Millisecond}
+
+	parsed := []domain.Resource{
+		{Title: "Live", URL: srv.URL + "/live"},
+		{Title: "Dead", URL: srv.URL + "/dead"},
+	}
+	alive := eg.validateResourceURLs(t.Context(), parsed)
+
+	desc := "## Instructions\n1. Step one\n\n## Common Mistakes\n- Bad form\n"
+	got := eg.updateResourcesInDescription(desc, alive)
+
+	if !strings.Contains(got, "[Live]") {
+		t.Errorf("live URL missing from output; got:\n%s", got)
+	}
+	if strings.Contains(got, "[Dead]") {
+		t.Errorf("dead URL leaked through; got:\n%s", got)
+	}
 }
 
 func TestCreateMinimalExercise(t *testing.T) {

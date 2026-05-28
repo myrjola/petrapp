@@ -14,13 +14,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
+
+// resourceURLValidationTimeout caps each HEAD check issued by validateResourceURLs.
+const resourceURLValidationTimeout = 5 * time.Second
 
 // exerciseJSONSchema is the JSON-schema description that the OpenAI
 // chat completion endpoint validates the AI's response against. The
@@ -103,6 +108,7 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 // exerciseGenerator generates exercises using OpenAI API.
 type exerciseGenerator struct {
 	client       openai.Client
+	httpClient   *http.Client
 	logger       *slog.Logger
 	muscleGroups []string
 }
@@ -112,6 +118,7 @@ func newExerciseGenerator(openaiAPIKey string, muscleGroups []string, logger *sl
 	client := openai.NewClient(option.WithAPIKey(openaiAPIKey))
 	return &exerciseGenerator{
 		client:       client,
+		httpClient:   &http.Client{Timeout: resourceURLValidationTimeout},
 		logger:       logger,
 		muscleGroups: muscleGroups,
 	}
@@ -165,6 +172,11 @@ For "default_starting_seconds", set a reasonable beginner duration in seconds (e
 when exercise_type is "time_based"; otherwise set it to null.
 For "muscle_groups", use only from this list: %s
 
+Muscle-group rule: only credit a muscle as primary or secondary if it performs a
+working contraction (concentric or eccentric load). Pure isometric stabilizers
+(e.g. the lats during a push-up, the upper back during a bench press, the core
+during an overhead press) do not count and must be omitted.
+
 The "description_markdown" must follow this exact structure:
 
 ## Instructions
@@ -172,7 +184,6 @@ The "description_markdown" must follow this exact structure:
 2. [Step 2 with positioning details]
 3. [Step 3 with movement description]
 4. [Optional step 4 with breathing/tempo guidance]
-5. [Optional step 5 with repetition guidance]
 
 ## Common Mistakes
 - [Mistake 1: explanation of error and correction]
@@ -180,10 +191,13 @@ The "description_markdown" must follow this exact structure:
 - [Mistake 3: explanation of error and correction]
 - [Optional Mistake 4: explanation of error and correction]
 
-## Resources
-- [Video tutorial](https://example.com/exercise-video)
-- [Form guide](https://example.com/exercise-form)
-- [Optional additional resource](https://example.com/exercise-variations)
+Description content rules:
+- Do not include rep counts, set counts, weights, or durations anywhere in the
+  description. The app tracks rep and set targets separately and shows them to
+  the user. Mentions like "perform 8-12 reps", "do 3 sets", or "hold for 30
+  seconds" must not appear.
+- Do not include a Resources section. Tutorial links are added by a
+  follow-up search step and appended automatically.
 
 Instructions must be clear, concise, and focus on proper form using simple language for beginners.
 Include relevant safety considerations. The entire description should be 150-200 words.
@@ -297,23 +311,62 @@ Return only the JSON object.`, exercise.Name)
 		return fmt.Errorf("parse resources response: %w", err)
 	}
 
-	// Update description with real URLs if found
-	if len(resourceResponse.Resources) > 0 {
-		exercise.DescriptionMarkdown = eg.updateResourcesInDescription(
-			exercise.DescriptionMarkdown,
-			resourceResponse.Resources,
-		)
+	// Validate URLs before injecting them: drop dead links so the
+	// description never ships with broken Resources entries.
+	alive := eg.validateResourceURLs(ctx, resourceResponse.Resources)
+	if len(alive) == 0 && len(resourceResponse.Resources) > 0 {
+		eg.logger.LogAttrs(ctx, slog.LevelInfo, "dropped all resource URLs",
+			slog.String("exercise", exercise.Name),
+			slog.Int("returned", len(resourceResponse.Resources)))
 	}
+	exercise.DescriptionMarkdown = eg.updateResourcesInDescription(
+		exercise.DescriptionMarkdown,
+		alive,
+	)
 
 	return nil
 }
 
+// validateResourceURLs HEAD-checks each resource URL with the generator's
+// http client and returns the subset whose final response is 2xx or 3xx.
+// Failures (network errors, timeouts, 4xx, 5xx) are logged at debug level
+// and the resource is silently dropped. Best-effort: never returns an error.
+func (eg *exerciseGenerator) validateResourceURLs(
+	ctx context.Context,
+	resources []domain.Resource,
+) []domain.Resource {
+	alive := make([]domain.Resource, 0, len(resources))
+	for _, r := range resources {
+		req, err := http.NewRequestWithContext(ctx, http.MethodHead, r.URL, nil)
+		if err != nil {
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad URL",
+				slog.String("url", r.URL), slog.Any("error", err))
+			continue
+		}
+		resp, err := eg.httpClient.Do(req)
+		if err != nil {
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: request failed",
+				slog.String("url", r.URL), slog.Any("error", err))
+			continue
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode >= http.StatusBadRequest {
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad status",
+				slog.String("url", r.URL), slog.Int("status", resp.StatusCode))
+			continue
+		}
+		alive = append(alive, r)
+	}
+	return alive
+}
+
 // updateResourcesInDescription replaces placeholder URLs with real ones.
+// When resources is empty the ## Resources section is dropped entirely so no
+// orphan heading is left behind.
 func (eg *exerciseGenerator) updateResourcesInDescription(
 	markdown string,
 	resources []domain.Resource,
 ) string {
-	// Find and replace the Resources section
 	lines := strings.Split(markdown, "\n")
 	var result []string
 	inResourcesSection := false
@@ -322,6 +375,9 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 		switch {
 		case strings.HasPrefix(line, "## Resources"):
 			inResourcesSection = true
+			if len(resources) == 0 {
+				continue
+			}
 			result = append(result, line)
 			for _, res := range resources {
 				result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
@@ -330,14 +386,12 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 			inResourcesSection = false
 			result = append(result, line)
 		case !inResourcesSection:
-			if !strings.HasPrefix(line, "- [") || !inResourcesSection {
-				result = append(result, line)
-			}
+			result = append(result, line)
 		}
 	}
 
-	// If no resources section found, append one
-	if !inResourcesSection && len(resources) > 0 {
+	// If no Resources section was present and we have resources to add, append one.
+	if !inResourcesSection && len(resources) > 0 && !containsResourcesHeading(result) {
 		result = append(result, "\n## Resources")
 		for _, res := range resources {
 			result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
@@ -345,6 +399,18 @@ func (eg *exerciseGenerator) updateResourcesInDescription(
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// containsResourcesHeading reports whether any line in result already starts
+// with "## Resources". Used by updateResourcesInDescription to avoid emitting
+// a duplicate section when the input already had one and it was replaced.
+func containsResourcesHeading(lines []string) bool {
+	for _, l := range lines {
+		if strings.HasPrefix(l, "## Resources") {
+			return true
+		}
+	}
+	return false
 }
 
 // validateMuscleGroups checks if all muscle groups are in the allowed list.
