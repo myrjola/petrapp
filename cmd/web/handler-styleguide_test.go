@@ -69,6 +69,17 @@ func Test_application_styleguide(t *testing.T) {
 		t.Error("expected a .muscle-chip--primary example on the styleguide")
 	}
 
+	// Rest-chip — countdown chip used by the exerciseset and workout pages.
+	if doc.Find("h2:contains('Rest chip')").Length() == 0 {
+		t.Error("expected a 'Rest chip' section on the styleguide")
+	}
+	if doc.Find(".rest-chip").Length() == 0 {
+		t.Error("expected a .rest-chip example on the styleguide")
+	}
+	if doc.Find(".rest-chip.ready").Length() == 0 {
+		t.Error("expected a .rest-chip.ready example on the styleguide")
+	}
+
 	// Sheet-dialog — slide-up modal used by exercise-add / -swap.
 	if doc.Find("h2:contains('Sheet dialog')").Length() == 0 {
 		t.Error("expected a 'Sheet dialog' section on the styleguide")

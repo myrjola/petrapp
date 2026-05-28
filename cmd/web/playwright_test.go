@@ -38,8 +38,9 @@ var installPlaywrightOnce = sync.OnceValue(func() error {
 // list fails the test in a t.Cleanup. Tests with no benign errors pass no
 // arguments.
 //
-//nolint:ireturn,unparam // playwright.Page is the public interface from the binding;
 // allowedConsoleErrors is an extension point that current tests don't exercise.
+//
+//nolint:ireturn,unparam // playwright.Page is the public interface from the binding;
 func setupPlaywrightPage(t *testing.T, allowedConsoleErrors ...string) (playwright.Page, string) {
 	t.Helper()
 

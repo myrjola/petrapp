@@ -39,6 +39,7 @@ type workoutExerciseView struct {
 	TargetText        string
 	SubLine           string
 	Dots              []workoutExerciseDot
+	RestEndAtMs       int64 // 0 when no rest chip should be shown for this row.
 }
 
 // workoutExerciseDot represents one set's done/not-done state for the dot indicator.
@@ -228,7 +229,10 @@ func newWorkoutTemplateData(
 
 	exerciseViews := make([]workoutExerciseView, 0, total)
 	for i, es := range session.Slots {
-		exerciseViews = append(exerciseViews, newWorkoutExerciseView(i, es))
+		exerciseViews = append(
+			exerciseViews,
+			newWorkoutExerciseView(i, es, session.PeriodizationType, session.IsDeload),
+		)
 	}
 
 	base := newBaseTemplateData(r)
@@ -268,7 +272,9 @@ func finishNoteFor(incomplete int) string {
 // newWorkoutExerciseView shapes one ExerciseSlot into a workoutExerciseView,
 // including the sub-line copy and the per-set dot indicator. pos is the
 // 0-based slot index in Session.Slots.
-func newWorkoutExerciseView(pos int, es domain.ExerciseSlot) workoutExerciseView {
+func newWorkoutExerciseView(
+	pos int, es domain.ExerciseSlot, pt domain.PeriodizationType, isDeload bool,
+) workoutExerciseView {
 	dots := make([]workoutExerciseDot, len(es.Sets))
 	for j, s := range es.Sets {
 		dots[j] = workoutExerciseDot{Done: s.CompletedAt != nil}
@@ -286,6 +292,10 @@ func newWorkoutExerciseView(pos int, es domain.ExerciseSlot) workoutExerciseView
 	default:
 		subLine = fmt.Sprintf("%d / %d sets done", completedSets, len(es.Sets))
 	}
+	var restEndAtMs int64
+	if restEnd, ok := es.RestEndAt(pt, isDeload); ok {
+		restEndAtMs = restEnd.UnixMilli()
+	}
 	return workoutExerciseView{
 		Position:          pos,
 		Index:             pos + 1,
@@ -296,6 +306,7 @@ func newWorkoutExerciseView(pos int, es domain.ExerciseSlot) workoutExerciseView
 		TargetText:        es.Exercise.TargetRangeText(),
 		SubLine:           subLine,
 		Dots:              dots,
+		RestEndAtMs:       restEndAtMs,
 	}
 }
 

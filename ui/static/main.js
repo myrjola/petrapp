@@ -457,6 +457,96 @@ window.addEventListener('pageshow', (event) => {
     addEventListener('pagehide', flush)
 })()
 
+// Rest-chip tick. Drives every [data-rest-end-at-ms] chip on the page —
+// the exerciseset active card and per-row chips on the workout overview
+// — so the same logic powers both contexts. Each chip carries its own
+// "chimed" flag so multiple in-progress slots (power sets) each chime
+// once when their rest elapses. A deadline already in the past renders
+// directly as "Ready" with no chime; the push notification covered that
+// window while the user was away.
+//
+// main.js is loaded synchronously in <head>, so wait for DOM ready
+// before querying for chip elements — they live in <body>.
+function initRestChips() {
+    const chips = document.querySelectorAll('[data-rest-end-at-ms]')
+    if (chips.length === 0) return
+
+    let audioCtx = null
+    const unlockAudio = () => {
+        const Ctor = window.AudioContext || window.webkitAudioContext
+        if (!Ctor) return
+        if (!audioCtx) audioCtx = new Ctor()
+        if (audioCtx.state === 'suspended') audioCtx.resume()
+    }
+    document.addEventListener('pointerdown', unlockAudio, {once: true})
+    document.addEventListener('keydown', unlockAudio, {once: true})
+    unlockAudio()
+
+    const playChime = () => {
+        if (!audioCtx || audioCtx.state !== 'running') return
+        const start = audioCtx.currentTime
+        ;[880, 1320].forEach((freq, i) => {
+            const t0 = start + i * 0.18
+            const t1 = t0 + 0.16
+            const osc = audioCtx.createOscillator()
+            const gain = audioCtx.createGain()
+            osc.type = 'sine'
+            osc.frequency.value = freq
+            gain.gain.setValueAtTime(0, t0)
+            gain.gain.linearRampToValueAtTime(0.3, t0 + 0.01)
+            gain.gain.setValueAtTime(0.3, t1 - 0.01)
+            gain.gain.linearRampToValueAtTime(0, t1)
+            osc.connect(gain).connect(audioCtx.destination)
+            osc.start(t0)
+            osc.stop(t1)
+        })
+    }
+
+    const states = Array.from(chips).map((chip) => ({
+        chip,
+        timeEl: chip.querySelector('[data-rest-time]'),
+        endAt: parseInt(chip.dataset.restEndAtMs, 10),
+        chimed: false,
+    }))
+
+    let intervalId = null
+    const tick = () => {
+        const now = Date.now()
+        let allReady = true
+        for (const st of states) {
+            const remaining = Math.max(0, st.endAt - now)
+            if (remaining === 0) {
+                st.chip.classList.add('ready')
+                if (st.timeEl) st.timeEl.textContent = 'Ready'
+                if (!st.chimed) {
+                    st.chimed = true
+                    if (document.visibilityState === 'visible' && now - st.endAt <= 1000) {
+                        playChime()
+                    }
+                }
+            } else {
+                allReady = false
+                const totalSec = Math.ceil(remaining / 1000)
+                const m = Math.floor(totalSec / 60)
+                const s = totalSec % 60
+                if (st.timeEl) st.timeEl.textContent = m + ':' + String(s).padStart(2, '0')
+            }
+        }
+        if (allReady && intervalId !== null) {
+            clearInterval(intervalId)
+            intervalId = null
+        }
+    }
+    tick()
+    intervalId = setInterval(tick, 250)
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRestChips, {once: true})
+} else {
+    initRestChips()
+}
+
 // Staleness check runs on every reveal — fresh load, prefetched-and-
 // promoted load, bfcache restore. Catches three classes of stale-doc:
 //   1. bfcache restore of a page rendered before a since-POSTed mutation

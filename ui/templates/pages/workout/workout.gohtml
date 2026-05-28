@@ -148,7 +148,7 @@
                     @scope (.exercise-list) {
                         .exercise {
                             display: grid;
-                            grid-template-columns: 2.25rem 1fr auto;
+                            grid-template-columns: 2.25rem minmax(0, 1fr) auto;
                             align-items: center;
                             gap: var(--size-3);
                             padding: var(--size-3);
@@ -164,6 +164,7 @@
                                 box-shadow var(--duration-2) var(--ease-out-quiet),
                                 background var(--duration-2) var(--ease-out-quiet);
                         }
+
 
                         a.exercise:active {
                             transform: translateY(0);
@@ -192,6 +193,13 @@
                             font-size: var(--font-size-0);
                             letter-spacing: var(--font-letterspacing-1);
                             color: var(--color-text-secondary);
+                        }
+
+                        .exercise-trailing {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: var(--size-2);
+                            flex-shrink: 0;
                         }
 
                         .exercise-dots {
@@ -379,13 +387,21 @@
                             <span class="exercise-name">{{ .Name }}</span>
                             <div class="exercise-sub">{{ .SubLine }}</div>
                         </div>
-                        {{ if .Dots }}
-                            <span class="exercise-dots" aria-hidden="true">
-                                {{ range .Dots }}
-                                    <span class="exercise-dot{{ if .Done }} exercise-dot--done{{ end }}"></span>
-                                {{ end }}
-                            </span>
-                        {{ end }}
+                        <span class="exercise-trailing">
+                            {{ if gt .RestEndAtMs 0 }}
+                                <span class="rest-chip" data-rest-end-at-ms="{{ .RestEndAtMs }}" aria-live="polite">
+                                    <span>Rest</span>
+                                    <span data-rest-time>—:—</span>
+                                </span>
+                            {{ end }}
+                            {{ if .Dots }}
+                                <span class="exercise-dots" aria-hidden="true">
+                                    {{ range .Dots }}
+                                        <span class="exercise-dot{{ if .Done }} exercise-dot--done{{ end }}"></span>
+                                    {{ end }}
+                                </span>
+                            {{ end }}
+                        </span>
                     </a>
                 {{ end }}
 

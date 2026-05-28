@@ -1132,6 +1132,101 @@ func Test_ExerciseSet_RestChipAfterWarmupComplete(t *testing.T) {
 	}
 }
 
+// Test_ExerciseSet_RestChipPersistsAfterElapsed verifies the chip keeps
+// rendering after its deadline has passed, so a user who rotated through
+// other exercises (power sets) and returned later still sees the slot's
+// rest state. The on-screen JS turns elapsed deadlines into "Ready" on the
+// client; the server-side job is just to keep the chip on the page.
+func Test_ExerciseSet_RestChipPersistsAfterElapsed(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule",
+		map[string]string{time.Now().Weekday().String(): "60"}); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	var slotURL string
+	doc.Find("a.exercise").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		if href, exists := s.Attr("href"); exists {
+			slotURL = href
+			return false
+		}
+		return true
+	})
+	if slotURL == "" {
+		t.Fatal("no exercise found on workout page")
+	}
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("get exercise: %v", err)
+	}
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark done')").Length() > 0
+	}).First()
+	if warmupForm.Length() == 0 {
+		t.Fatal("warmup form not found")
+	}
+	warmupAction, exists := warmupForm.Attr("action")
+	if !exists {
+		t.Fatal("warmup form has no action")
+	}
+	if _, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+		t.Fatalf("warmup complete: %v", err)
+	}
+
+	// Patch warmup_completed_at to one hour ago to simulate a long
+	// detour through other exercises during a power-set rotation.
+	old := time.Now().UTC().Add(-1 * time.Hour).Format("2006-01-02T15:04:05.000Z")
+	if _, err = server.DB().ExecContext(ctx,
+		`UPDATE workout_exercises SET warmup_completed_at = ?
+			WHERE workout_date = ? AND position = 0`,
+		old, today); err != nil {
+		t.Fatalf("patch warmup_completed_at: %v", err)
+	}
+
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("re-fetch exercise: %v", err)
+	}
+	chip := doc.Find(".exercise-set.active .rest-chip[data-rest-end-at-ms]")
+	if chip.Length() == 0 {
+		t.Fatal("expected rest-chip to persist on the active card after rest elapsed")
+	}
+	endAtStr, exists := chip.Attr("data-rest-end-at-ms")
+	if !exists {
+		t.Fatal("rest chip missing data-rest-end-at-ms attribute")
+	}
+	endAtMs, err := strconv.ParseInt(endAtStr, 10, 64)
+	if err != nil {
+		t.Fatalf("parse data-rest-end-at-ms: %v", err)
+	}
+	if endAtMs >= time.Now().UnixMilli() {
+		t.Errorf("expected data-rest-end-at-ms in the past, got %d (now %d)",
+			endAtMs, time.Now().UnixMilli())
+	}
+}
+
 // TestExerciseSetGET_DeloadHidesSignalButtons verifies that the exercise-set page for a
 // deload session renders the deload banner, no signal buttons, and a "Done!" button.
 func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {

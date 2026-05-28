@@ -82,18 +82,6 @@ func getFirstIncompleteIndex(sets []domain.Set) int {
 	return len(sets)
 }
 
-func getLastCompletedAt(sets []domain.Set) *time.Time {
-	var latest *time.Time
-	for _, set := range sets {
-		if set.CompletedAt != nil {
-			if latest == nil || set.CompletedAt.After(*latest) {
-				latest = set.CompletedAt
-			}
-		}
-	}
-	return latest
-}
-
 // buildProgressionTargets returns the current set target and timed target seconds for the
 // given exercise on the given date. Both are zero-valued when not applicable.
 func (app *application) buildProgressionTargets(
@@ -183,23 +171,13 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The rest clock zero point is the most recent of WarmupCompletedAt and
-	// the last set completion — mirrors PlanRestPush, which schedules a push
-	// from the same point on either trigger.
-	restClockStart := getLastCompletedAt(exerciseSlot.Sets)
-	if restClockStart == nil {
-		restClockStart = exerciseSlot.WarmupCompletedAt
-	}
-
+	// Render the chip whenever a rest is active for this slot — the chip
+	// stays put past expiration so a user rotating through other exercises
+	// (power sets) and returning later still sees the "Ready" state instead
+	// of nothing. The on-screen JS flips elapsed deadlines to "Ready" itself.
 	var restEndAtMs int64
-	if restClockStart != nil {
-		restSeconds := domain.RestSecondsFor(exerciseSlot.Exercise, session.PeriodizationType, false)
-		if restSeconds > 0 {
-			restEnd := restClockStart.Add(time.Duration(restSeconds) * time.Second)
-			if restEnd.After(time.Now()) {
-				restEndAtMs = restEnd.UnixMilli()
-			}
-		}
+	if restEnd, restActive := exerciseSlot.RestEndAt(session.PeriodizationType, session.IsDeload); restActive {
+		restEndAtMs = restEnd.UnixMilli()
 	}
 
 	data := exerciseSetTemplateData{

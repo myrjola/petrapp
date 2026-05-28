@@ -352,25 +352,9 @@
                     box-shadow: 0 0 0 3px var(--color-info);
                 }
 
-                /* In-card rest chip --------------------------------------------- */
-                .exercise-set.active .rest-chip {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: var(--size-2);
-                    padding: var(--size-1) var(--size-3);
-                    border-radius: var(--radius-round);
-                    background: var(--color-info-bg);
-                    color: var(--color-info);
-                    font-weight: var(--font-weight-6);
-                    font-size: var(--font-size-0);
-                    transition: background-color var(--duration-3) var(--ease-out-quiet),
-                                color var(--duration-3) var(--ease-out-quiet);
-                }
-
-                .exercise-set.active .rest-chip.ready {
-                    background: var(--color-success-bg);
-                    color: var(--color-success);
-                }
+                /* Rest chip styles live in main.css @layer components — the chip
+                   appears here and on the workout overview, so it's promoted to a
+                   global component class. */
             }
         </style>
 
@@ -796,81 +780,6 @@
                 {{ end }}
             </div>
 
-            {{ if $isActive }}
-                {{ if and (gt $.RestEndAtMs 0) (eq $index $.FirstIncompleteIndex) }}
-                <script {{ $.Nonce }}>
-                    (() => {
-                        const chips = document.querySelectorAll('.exercise-set.active .rest-chip[data-rest-end-at-ms]');
-                        if (chips.length === 0) return;
-
-                        let audioCtx = null;
-                        const unlockAudio = () => {
-                            const Ctor = window.AudioContext || window.webkitAudioContext;
-                            if (!Ctor) return;
-                            if (!audioCtx) audioCtx = new Ctor();
-                            if (audioCtx.state === 'suspended') audioCtx.resume();
-                        };
-                        // Resume the context on the next interaction so the chime can
-                        // sound even on a fresh page load with no prior user gesture.
-                        document.addEventListener('pointerdown', unlockAudio, { once: true });
-                        document.addEventListener('keydown', unlockAudio, { once: true });
-                        unlockAudio();
-
-                        const playChime = () => {
-                            if (!audioCtx || audioCtx.state !== 'running') return;
-                            const start = audioCtx.currentTime;
-                            [880, 1320].forEach((freq, i) => {
-                                const t0 = start + i * 0.18;
-                                const t1 = t0 + 0.16;
-                                const osc = audioCtx.createOscillator();
-                                const gain = audioCtx.createGain();
-                                osc.type = 'sine';
-                                osc.frequency.value = freq;
-                                gain.gain.setValueAtTime(0, t0);
-                                gain.gain.linearRampToValueAtTime(0.3, t0 + 0.01);
-                                gain.gain.setValueAtTime(0.3, t1 - 0.01);
-                                gain.gain.linearRampToValueAtTime(0, t1);
-                                osc.connect(gain).connect(audioCtx.destination);
-                                osc.start(t0);
-                                osc.stop(t1);
-                            });
-                        };
-
-                        let chimed = false;
-                        let intervalId = null;
-                        const tick = () => {
-                            const now = Date.now();
-                            chips.forEach((chip) => {
-                                const endAt = parseInt(chip.dataset.restEndAtMs, 10);
-                                const remaining = Math.max(0, endAt - now);
-                                const timeEl = chip.querySelector('[data-rest-time]');
-                                if (remaining === 0) {
-                                    chip.classList.add('ready');
-                                    if (timeEl) timeEl.textContent = 'Ready';
-                                    if (!chimed) {
-                                        chimed = true;
-                                        // Chime only when the rest just elapsed on a visible
-                                        // screen. A backgrounded tab whose timer resumes late
-                                        // stays silent — the push notification covered it.
-                                        if (document.visibilityState === 'visible' && now - endAt <= 1000) {
-                                            playChime();
-                                        }
-                                        if (intervalId !== null) clearInterval(intervalId);
-                                    }
-                                } else {
-                                    const totalSec = Math.ceil(remaining / 1000);
-                                    const m = Math.floor(totalSec / 60);
-                                    const s = totalSec % 60;
-                                    if (timeEl) timeEl.textContent = m + ':' + String(s).padStart(2, '0');
-                                }
-                            });
-                        };
-                        tick();
-                        intervalId = setInterval(tick, 250);
-                    })();
-                </script>
-                {{ end }}
-            {{ end }}
         {{ end }}
     </div>
 {{ end }}

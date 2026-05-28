@@ -69,6 +69,44 @@ func (es ExerciseSlot) CompletedSetCount() int {
 	return n
 }
 
+// RestEndAt returns when this slot's inter-set rest is scheduled to end
+// and whether a rest chip should be shown at all. The chip should appear
+// once the warmup is done and at least one set remains incomplete with a
+// defined rest period — the rest clock starts at the latest of the warmup
+// completion and the most recent set completion. The returned time may be
+// in the past; the on-screen chip renders that as "Ready" so a user who
+// rotates through other exercises (power sets) and returns later still
+// sees the slot's rest state instead of nothing.
+func (es ExerciseSlot) RestEndAt(periodization PeriodizationType, isDeload bool) (time.Time, bool) {
+	if es.WarmupCompletedAt == nil {
+		return time.Time{}, false
+	}
+	incomplete := false
+	var lastCompleted *time.Time
+	for i := range es.Sets {
+		s := &es.Sets[i]
+		if s.CompletedAt == nil {
+			incomplete = true
+			continue
+		}
+		if lastCompleted == nil || s.CompletedAt.After(*lastCompleted) {
+			lastCompleted = s.CompletedAt
+		}
+	}
+	if !incomplete {
+		return time.Time{}, false
+	}
+	restSeconds := RestSecondsFor(es.Exercise, periodization, isDeload)
+	if restSeconds <= 0 {
+		return time.Time{}, false
+	}
+	clockStart := *es.WarmupCompletedAt
+	if lastCompleted != nil && lastCompleted.After(clockStart) {
+		clockStart = *lastCompleted
+	}
+	return clockStart.Add(time.Duration(restSeconds) * time.Second), true
+}
+
 // setAt returns a pointer to the set at setIndex, or ErrSetIndexOutOfBounds
 // when setIndex is out of range. The value receiver still yields a usable
 // pointer: es.Sets shares its backing array with the caller's slot, so

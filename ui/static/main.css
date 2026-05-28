@@ -441,6 +441,29 @@
         color: var(--stone-8);
     }
 
+    /* Rest countdown chip. Appears in two contexts: the active exercise card
+       (sets-container.gohtml) and per-row on the workout overview. The JS
+       in main.js ticks every [data-rest-end-at-ms] chip on the page and adds
+       the .ready class once the deadline passes. */
+    .rest-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--size-2);
+        padding: var(--size-1) var(--size-3);
+        border-radius: var(--radius-round);
+        background: var(--color-info-bg);
+        color: var(--color-info);
+        font-weight: var(--font-weight-6);
+        font-size: var(--font-size-0);
+        transition: background-color var(--duration-3) var(--ease-out-quiet),
+                    color var(--duration-3) var(--ease-out-quiet);
+    }
+
+    .rest-chip.ready {
+        background: var(--color-success-bg);
+        color: var(--color-success);
+    }
+
     .muscle-chip--primary {
         background: var(--clay-1);
         color: var(--clay-6);

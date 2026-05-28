@@ -722,3 +722,133 @@ func Test_Session_ClearDeload_Idempotent(t *testing.T) {
 		t.Error("ClearDeload toggled IsDeload to true on already-clear session")
 	}
 }
+
+func Test_ExerciseSlot_RestEndAt(t *testing.T) {
+	t.Parallel()
+
+	repMin5, repMax5 := 5, 5     // strength → 180s rest.
+	repMin12, repMax15 := 12, 15 // hypertrophy → 90s rest.
+	startSecs := 30              // for the timed-exercise case.
+
+	squat := domain.Exercise{ //nolint:exhaustruct // Only rest-relevant fields set.
+		Name: "Squat", ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin: &repMin5, RepMax: &repMax5,
+	}
+	curl := domain.Exercise{ //nolint:exhaustruct // Only rest-relevant fields set.
+		Name: "Bicep Curl", ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin: &repMin12, RepMax: &repMax15,
+	}
+	plank := domain.Exercise{ //nolint:exhaustruct // Only rest-relevant fields set.
+		Name: "Plank", ExerciseType: domain.ExerciseTypeTime,
+		DefaultStartingSeconds: &startSecs,
+	}
+
+	warmupAt := time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC)
+	setDoneAt := warmupAt.Add(2 * time.Minute)
+	v := 5
+	w := 100.0
+	completedSet := domain.Set{ //nolint:exhaustruct // Only completion fields set.
+		WeightKg: &w, TargetValue: 5, CompletedValue: &v, CompletedAt: &setDoneAt,
+	}
+	incompleteSet := domain.Set{ //nolint:exhaustruct // Only target fields set.
+		WeightKg: &w, TargetValue: 5,
+	}
+
+	tests := []struct {
+		name      string
+		slot      domain.ExerciseSlot
+		pt        domain.PeriodizationType
+		isDeload  bool
+		wantOK    bool
+		wantEndAt time.Time
+	}{
+		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
+			name: "warmup not done returns false",
+			slot: domain.ExerciseSlot{ //nolint:exhaustruct // WarmupCompletedAt intentionally nil.
+				Exercise: squat, Sets: []domain.Set{incompleteSet, incompleteSet},
+			},
+			pt: domain.PeriodizationStrength,
+		},
+		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
+			name: "all sets complete returns false",
+			slot: domain.ExerciseSlot{
+				Exercise: squat, WarmupCompletedAt: &warmupAt,
+				Sets: []domain.Set{completedSet, completedSet},
+			},
+			pt: domain.PeriodizationStrength,
+		},
+		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
+			name: "no sets planned returns false",
+			slot: domain.ExerciseSlot{
+				Exercise: squat, WarmupCompletedAt: &warmupAt, Sets: []domain.Set{},
+			},
+			pt: domain.PeriodizationStrength,
+		},
+		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
+			name: "timed exercise returns false (no rest defined)",
+			slot: domain.ExerciseSlot{
+				Exercise: plank, WarmupCompletedAt: &warmupAt,
+				Sets: []domain.Set{incompleteSet, incompleteSet},
+			},
+			pt: domain.PeriodizationHypertrophy,
+		},
+		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
+			name: "warmup just done, no sets started: clock starts at warmup",
+			slot: domain.ExerciseSlot{
+				Exercise: squat, WarmupCompletedAt: &warmupAt,
+				Sets: []domain.Set{incompleteSet, incompleteSet, incompleteSet},
+			},
+			pt:        domain.PeriodizationStrength,
+			wantOK:    true,
+			wantEndAt: warmupAt.Add(180 * time.Second),
+		},
+		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
+			name: "first set done: clock starts at set completion (later of warmup/set)",
+			slot: domain.ExerciseSlot{
+				Exercise: squat, WarmupCompletedAt: &warmupAt,
+				Sets: []domain.Set{completedSet, incompleteSet, incompleteSet},
+			},
+			pt:        domain.PeriodizationStrength,
+			wantOK:    true,
+			wantEndAt: setDoneAt.Add(180 * time.Second),
+		},
+		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
+			name: "hypertrophy curls (15 reps): 90s rest",
+			slot: domain.ExerciseSlot{
+				Exercise: curl, WarmupCompletedAt: &warmupAt,
+				Sets: []domain.Set{completedSet, incompleteSet},
+			},
+			pt:        domain.PeriodizationHypertrophy,
+			wantOK:    true,
+			wantEndAt: setDoneAt.Add(90 * time.Second),
+		},
+		{
+			name: "deload forces hypertrophy mapping for the rest band",
+			slot: domain.ExerciseSlot{
+				Exercise: squat, WarmupCompletedAt: &warmupAt,
+				Sets: []domain.Set{incompleteSet, incompleteSet},
+			},
+			pt:        domain.PeriodizationStrength,
+			isDeload:  true,
+			wantOK:    true,
+			wantEndAt: warmupAt.Add(180 * time.Second),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotEndAt, gotOK := tt.slot.RestEndAt(tt.pt, tt.isDeload)
+			if gotOK != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if !tt.wantOK {
+				return
+			}
+			if !gotEndAt.Equal(tt.wantEndAt) {
+				t.Errorf("endAt = %v, want %v", gotEndAt, tt.wantEndAt)
+			}
+		})
+	}
+}

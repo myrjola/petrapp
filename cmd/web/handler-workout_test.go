@@ -721,3 +721,88 @@ func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_redirect
 		t.Errorf("Location = %q, want %q", got, wantLoc)
 	}
 }
+
+// Test_application_workoutOverview_restChipForInProgressSlot verifies the
+// workout overview shows a rest countdown chip next to any exercise whose
+// warmup has been completed and still has incomplete sets. Without this,
+// rotating between exercises (power sets) loses sight of the rest timer
+// for slots the user just stepped away from.
+func Test_application_workoutOverview_restChipForInProgressSlot(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", map[string]string{
+		time.Now().Weekday().String(): "60",
+	}); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+
+	today := time.Now().Format("2006-01-02")
+	if doc, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	// Up front: no slots have started, so no chips on the overview.
+	if doc.Find(".rest-chip").Length() != 0 {
+		t.Fatalf("rest-chip rendered before any warmup completed")
+	}
+
+	// Walk into the first weighted exercise's page and mark warmup done so
+	// that slot enters the "rest pending" state.
+	var slotURL string
+	doc.Find("a.exercise").EachWithBreak(func(_ int, s *goquery.Selection) bool {
+		if href, exists := s.Attr("href"); exists {
+			slotURL = href
+			return false
+		}
+		return true
+	})
+	if slotURL == "" {
+		t.Fatal("no exercise found on workout page")
+	}
+	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
+		t.Fatalf("get exercise: %v", err)
+	}
+	warmupForm := doc.Find("form").FilterFunction(func(_ int, s *goquery.Selection) bool {
+		return s.Find("button:contains('Mark done')").Length() > 0
+	}).First()
+	if warmupForm.Length() == 0 {
+		t.Fatal("warmup form not found")
+	}
+	warmupAction, exists := warmupForm.Attr("action")
+	if !exists {
+		t.Fatal("warmup form has no action")
+	}
+	if _, err = client.SubmitForm(ctx, doc, warmupAction, nil); err != nil {
+		t.Fatalf("warmup complete: %v", err)
+	}
+
+	// Back to the workout overview — that slot's row should now carry a chip.
+	if doc, err = client.GetDoc(ctx, "/workouts/"+today); err != nil {
+		t.Fatalf("get workout overview: %v", err)
+	}
+	chips := doc.Find("a.exercise .rest-chip[data-rest-end-at-ms]")
+	if chips.Length() == 0 {
+		t.Fatal("expected rest-chip on the workout overview after marking warmup complete")
+	}
+	if chips.Length() > 1 {
+		t.Errorf("expected exactly one rest-chip on overview, got %d", chips.Length())
+	}
+}
