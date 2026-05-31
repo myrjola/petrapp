@@ -93,6 +93,10 @@ The snapshot is created with sqlite3's `.backup` command, which produces a singl
 
 ### Recovering database
 
+> **Full disaster-recovery runbook:** see [`docs/disaster-recovery.md`](docs/disaster-recovery.md)
+> for the complete failure-scenario catalog and the "rebuild from nothing" procedure (including the
+> secrets and bucket that the Litestream backup does *not* cover). The notes below are the common case.
+
 One way to recover a lost or broken database is to restore it with Litestream. The process could still use some
 improvements but at least it works. Notably, you need to have a working machine running so that you can run commands on
 it. Another alternative is to clone the machine with an empty volume and populate it yourself using the `fly sftp shell`
