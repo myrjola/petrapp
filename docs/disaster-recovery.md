@@ -88,10 +88,20 @@ fly ssh console --app petra --user petrapp \
    deleted they are gone. Regenerating VAPID breaks all push subscriptions.
 3. **Record bucket name + endpoint outside Fly.** `BUCKET_NAME` and
    `AWS_ENDPOINT_URL_S3` are needed to rebuild and aren't in git.
-4. **Investigate the oversized WAL.** Staging showed a 244 MB
-   `petrapp.sqlite3-wal` against a 5.3 MB DB — Litestream isn't checkpointing
-   (likely a scale-to-zero interaction). On the 1 GB→5 GB auto-extend volume
-   this is a latent disk-pressure risk; confirm prod isn't similarly bloated.
+4. **(Informational — not a fault) Large WAL is expected.** Staging showed a
+   244 MB `petrapp.sqlite3-wal` against a 5.3 MB DB. This is by design: the app
+   disables SQLite autocheckpoint (`PRAGMA wal_autocheckpoint = 0`,
+   `internal/sqlite/sqlite.go`) and delegates checkpointing to Litestream, whose
+   0.5.x strategy only runs a WAL-shrinking **TRUNCATE** checkpoint at
+   `truncate-page-n` (default ≈121k pages ≈ **500 MB**); the cheaper PASSIVE
+   checkpoints replicate data but don't shrink the WAL *file*. So the WAL grows
+   to ≈500 MB before resetting — still well under the volume's ~800 MB
+   auto-extend trigger. Optional tuning: lower `truncate-page-n` / add a
+   `checkpoint-interval` in `litestream.yml` to keep cold-start WAL replay
+   smaller. Watch: on Litestream `v0.5.10` we are in the version range of
+   [issue #1083](https://github.com/benbjohnson/litestream/issues/1083) (silent
+   replication stall on WAL space reuse) — periodically confirm `litestream
+   status` txid tracks the live DB.
 
 ## Failure scenario catalog
 
