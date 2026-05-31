@@ -516,7 +516,7 @@ func findExercise(exercises []Exercise, id int) Exercise {
 	panic(fmt.Sprintf("exercise %d not found", id))
 }
 
-func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
+func TestPlanner_DeloadWeekForcesHypertrophyAndReducesSets(t *testing.T) {
 	t.Parallel()
 
 	// Anchor on the same Monday we'll plan: week 0 of length 4 would NOT be a
@@ -583,9 +583,9 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndHalvesSets(t *testing.T) {
 			)
 		}
 		for _, es := range s.Slots {
-			// Normal mid-rep band has 3 sets. Deload halves to 2.
+			// Normal high-rep band has 3 sets. Deload drops to 2.
 			if len(es.Sets) != 2 {
-				t.Errorf("session %s, exercise %s: %d sets, want 2 (deload halves)",
+				t.Errorf("session %s, exercise %s: %d sets, want 2 (deload drops one set)",
 					s.Date.Format("2006-01-02"), es.Exercise.Name, len(es.Sets))
 			}
 			for _, set := range es.Sets {
@@ -959,11 +959,11 @@ func Test_scoreCandidate(t *testing.T) {
 		}
 	})
 
-	t.Run("deload halves set count", func(t *testing.T) {
+	t.Run("deload reduces set count", func(t *testing.T) {
 		t.Parallel()
 		load := map[string]float64{}
 		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
-		// base sets = 3 (mid band, 6 <= reps <= 10), halved to 2.
+		// base sets = 3 (mid band, 6 <= reps <= 10), deload drops to 2.
 		score := scoreCandidate(bench, PeriodizationStrength, true, load, targets)
 		// Chest: 100 - (10-2)^2 = 100 - 64 = 36.
 		// Triceps: 64 - (8-2)^2 = 64 - 36 = 28.

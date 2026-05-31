@@ -14,6 +14,11 @@ const (
 	restMid  = 150 // seconds
 	setsHigh = 3
 	restHigh = 90 // seconds
+
+	// deloadSetFloor is the minimum set count a deload prescription will return.
+	// Preserves at least two working sets per exercise so deload still functions
+	// as training rather than a single confirmation set.
+	deloadSetFloor = 2
 )
 
 // Scheme is the per-exercise prescription for one planned session: the rep
@@ -78,13 +83,15 @@ func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme
 	return Scheme{TargetReps: reps, TargetSets: sets, RestSeconds: rest}
 }
 
-// deloadSets halves the set count for deload weeks, with a floor of 1.
+// deloadSets reduces the normal set count by one, floored at deloadSetFloor.
+// Targets ~25-33% volume reduction while preserving the Strength-vs-Hypertrophy
+// set-count distinction (Strength 4 → 3, Hypertrophy 3 → 2).
 func deloadSets(normalSets int) int {
-	half := (normalSets + 1) / 2 //nolint:mnd // ceil division by 2
-	if half < 1 {
-		return 1
+	reduced := normalSets - 1
+	if reduced < deloadSetFloor {
+		return deloadSetFloor
 	}
-	return half
+	return reduced
 }
 
 // RestSecondsFor returns the inter-set rest in seconds for the given exercise
