@@ -132,10 +132,26 @@ func snapWeight(kg float64) float64 {
 	return math.Round(kg/halfKg) * halfKg
 }
 
-// FloorWeightKg rounds a kilo value DOWN to the nearest whole kg. Use this
-// when the caller wants a conservative, definitely-loadable weight — the
-// commonly-stocked plate set (1, 2.5, 5 kg) cannot reach 0.5 kg precision,
-// so a calculated 61.5 kg has to become 61 kg in practice. The deload seed
-// uses this so the user never has to round a 60.75-kg recommendation down
-// by hand.
-func FloorWeightKg(kg float64) float64 { return math.Floor(kg) }
+// DeloadSeedWeight applies a deload reduction to a working weight, returning
+// a definitely-loadable seed for the deload week's first set under the
+// commonly-stocked plate set (1, 2.5, 5 kg) — which can't hit 0.5 kg
+// precision — and rounded toward the easier of the two adjacent whole-kg
+// loads so the deload is genuinely easier than the working weight without
+// the user having to round a 60.75-kg recommendation by hand.
+//
+// factor is a fraction in (0, 1] expressing the deload's relative intensity
+// against the working load. For weighted exercises (positive workingKg) the
+// load is scaled down and floored: 75 × 0.9 = 67.5 → 67. For assisted
+// exercises (negative workingKg, where |w| is machine assistance and a
+// larger magnitude means an easier lift) the magnitude is scaled UP by
+// 1/factor and rounded UP in magnitude, so -50 with factor 0.9 becomes
+// -ceil(50 / 0.9) = -ceil(55.56) = -56 — more assistance than the working
+// set, never less.
+//
+// Returns 0 for a zero working weight (no qualifying history).
+func DeloadSeedWeight(workingKg, factor float64) float64 {
+	if workingKg < 0 {
+		return -math.Ceil(math.Abs(workingKg) / factor)
+	}
+	return math.Floor(workingKg * factor)
+}

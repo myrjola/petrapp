@@ -486,27 +486,35 @@ func TestProgression_DeloadCarriesUserOverrideForward(t *testing.T) {
 	}
 }
 
-func TestFloorWeightKg(t *testing.T) {
+func TestDeloadSeedWeight(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		in   float64
-		want float64
+		name    string
+		working float64
+		factor  float64
+		want    float64
 	}{
-		{"whole kg is unchanged", 60.0, 60.0},
-		{"61.5 floors to 61", 61.5, 61.0},
-		{"60.75 floors to 60", 60.75, 60.0},
-		{"60.25 floors to 60", 60.25, 60.0},
-		{"100.99 floors to 100", 100.99, 100.0},
-		{"sub-kg dumbbell floors to 0", 0.9, 0.0},
-		{"9.5 dumbbell floors to 9", 9.5, 9.0},
+		// Weighted (positive): scale down, floor.
+		{"weighted whole kg stays whole", 60.0, 0.9, 54.0},
+		{"weighted 75 × 0.9 floors 67.5 → 67", 75.0, 0.9, 67.0},
+		{"weighted 80 × 0.9 stays 72", 80.0, 0.9, 72.0},
+		{"weighted 75 × 0.8 stays 60", 75.0, 0.8, 60.0},
+		{"weighted 100.99 × 0.9 floors 90.89 → 90", 100.99, 0.9, 90.0},
+		{"weighted zero stays zero", 0.0, 0.9, 0.0},
+		// Assisted (negative): more assistance = larger magnitude. Scale
+		// magnitude UP by 1/factor and ceil to whole kg, then re-apply sign.
+		{"assisted -50 with 0.9 → -ceil(55.56) = -56", -50.0, 0.9, -56.0},
+		{"assisted -50 with 0.8 → -ceil(62.5) = -63", -50.0, 0.8, -63.0},
+		{"assisted -45 with 0.9 → -ceil(50.0) = -50", -45.0, 0.9, -50.0},
+		{"assisted whole-kg result is preserved", -30.0, 1.0, -30.0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := domain.FloorWeightKg(tt.in); got != tt.want {
-				t.Errorf("FloorWeightKg(%v) = %v, want %v", tt.in, got, tt.want)
+			if got := domain.DeloadSeedWeight(tt.working, tt.factor); got != tt.want {
+				t.Errorf("DeloadSeedWeight(%v, %v) = %v, want %v",
+					tt.working, tt.factor, got, tt.want)
 			}
 		})
 	}

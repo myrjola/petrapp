@@ -879,6 +879,84 @@ func Test_GetDeloadStartingWeight_FloorsFractionalResult(t *testing.T) {
 	}
 }
 
+// Test_GetDeloadStartingWeight_Assisted is the regression test for the bug
+// where assisted exercises (negative weight = machine assistance) seeded the
+// deload week at 0 kg instead of more assistance than the previous working
+// set. Production hit this for assisted pull-up: a working set at -50 kg
+// fell to 0 kg of assistance on the next deload, leaving the user stranded
+// without help. The fix routes negative weights through DeloadSeedWeight,
+// which scales the assistance magnitude UP by 1/factor and ceils so the
+// deload is always at least as assisted as the working set.
+func Test_GetDeloadStartingWeight_Assisted(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	if err != nil {
+		t.Fatalf("create db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		[]byte("dl-assist-user"), "Deload Assisted User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	var exerciseID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		`INSERT INTO exercises (name, category, exercise_type, description_markdown, rep_min, rep_max)
+		 VALUES (?, 'upper', 'assisted', '', 5, 8) RETURNING id`,
+		"Assisted Pull-Up Test").Scan(&exerciseID)
+	if err != nil {
+		t.Fatalf("insert exercise: %v", err)
+	}
+
+	svc := service.NewService(db, logger, "")
+
+	monday := time.Date(2026, time.April, 27, 0, 0, 0, 0, time.UTC)
+	deloadMonday := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	mondayStr := monday.Format("2006-01-02")
+	ts := monday.Format("2006-01-02T15:04:05.000Z")
+
+	// Hypertrophy session with -50 kg of assistance, on target.
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		 VALUES (?, ?, ?, 'hypertrophy')`,
+		userID, mondayStr, ts)
+	if err != nil {
+		t.Fatalf("insert hypertrophy session: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		userID, mondayStr, exerciseID)
+	if err != nil {
+		t.Fatalf("insert workout_exercises: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
+		 weight_kg, target_value, completed_value, completed_at, signal)
+		 VALUES (?, ?, 0, 1, -50.0, 8, 8, ?, 'on_target')`,
+		userID, mondayStr, ts)
+	if err != nil {
+		t.Fatalf("insert set: %v", err)
+	}
+
+	// hypertrophy factor 0.9: -ceil(50 / 0.9) = -ceil(55.56) = -56.
+	got, err := svc.GetDeloadStartingWeight(ctx, exerciseID, deloadMonday)
+	if err != nil {
+		t.Fatalf("GetDeloadStartingWeight: %v", err)
+	}
+	if got != -56.0 {
+		t.Errorf("got %v, want -56.0 (more assistance than the -50 kg working set, never 0)", got)
+	}
+}
+
 func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 	t.Parallel()
 

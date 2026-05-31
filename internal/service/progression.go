@@ -172,9 +172,11 @@ const (
 // GetDeloadStartingWeight returns the seed weight for a deload week's first
 // set of the given exercise: 90% of the most recent hypertrophy working
 // weight, falling back to 80% of any recent working weight, then to zero
-// when no history exists. The result is floored to whole kg so it lands on a
-// definitely-loadable weight under the common 1 / 2.5 / 5 kg plate set —
-// rounding down keeps the deload genuinely lighter than the working weight.
+// when no history exists. domain.DeloadSeedWeight rounds toward a
+// definitely-loadable whole-kg load and handles the assisted-exercise sign
+// convention (negative weight = machine assistance, larger magnitude =
+// easier lift), so the deload always lands on the easier side of the
+// calculation regardless of sign.
 //
 // The repository's GetLatestStartingWeightBefore already excludes deload
 // sessions (Task 11), so the lookups below see only normal-week history.
@@ -187,14 +189,14 @@ func (s *Service) GetDeloadStartingWeight(
 	if err != nil {
 		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
-	if prev.PeriodizationType == domain.PeriodizationHypertrophy && prev.WeightKg > 0 {
-		return domain.FloorWeightKg(prev.WeightKg * deloadFactor), nil
+	if prev.WeightKg == 0 {
+		return 0, nil
 	}
-	// No hypertrophy history (or zero weight): use the broader fallback.
-	if prev.WeightKg > 0 {
-		return domain.FloorWeightKg(prev.WeightKg * deloadFallback), nil
+	factor := deloadFallback
+	if prev.PeriodizationType == domain.PeriodizationHypertrophy {
+		factor = deloadFactor
 	}
-	return 0, nil
+	return domain.DeloadSeedWeight(prev.WeightKg, factor), nil
 }
 
 // BuildTimedProgression constructs a domain.TimedProgression
