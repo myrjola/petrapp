@@ -1,6 +1,6 @@
 {{- /*gotype: github.com/myrjola/petrapp/cmd/web.ExerciseResultCardData*/ -}}
 {{ define "exercise-result-card" }}
-    <div class="exercise-result card stack">
+    <div class="exercise-result card stack" data-exercise-type="{{ .Exercise.ExerciseType }}">
         <div class="exercise-result__name">{{ .Exercise.Name }}</div>
         <div class="meta cluster">
             <span class="badge">{{ .Exercise.Category.Label }}</span>

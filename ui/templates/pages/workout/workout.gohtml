@@ -381,7 +381,8 @@
                 {{ range .Exercises }}
                     <a href="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ .Position }}"
                        class="exercise {{ .State }}"
-                       data-workout-exercise-id="{{ .Position }}">
+                       data-workout-exercise-id="{{ .Position }}"
+                       data-exercise-type="{{ .ExerciseType }}">
                         <span class="exercise-num">{{ printf "%02d" .Index }}</span>
                         <div>
                             <span class="exercise-name">{{ .Name }}</span>

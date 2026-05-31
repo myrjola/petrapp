@@ -487,24 +487,30 @@ func Test_playwright_stacknav(t *testing.T) {
 	workoutURL := page.URL()
 	workoutHref := strings.TrimPrefix(workoutURL, serverURL)
 
-	// The weekly planner exhausts its exercise pool after a few days when
-	// scheduling all 7 days (weekUsedExercises prevents reuse). So later in the
-	// week (Saturday) may end up with 0 exercises. Add one manually if needed.
-	noExercises, err := page.Locator("a[href*='/exercises/']").Count()
+	// Flow 1 below fills "Actual reps" and clicks the named "Too heavy" signal
+	// button — controls that only the weighted and assisted set forms render.
+	// Two planner outcomes can leave the workout without a usable exercise:
+	// (1) on all-7-day schedules the weekUsedExercises rule exhausts the pool
+	// by Saturday/Sunday, leaving 0 exercises; (2) on any day the planner can
+	// pick only bodyweight or time_based exercises. Swap one in via the
+	// add-exercise picker (also filtered by exercise type) when missing.
+	weightedSelector := `a[data-workout-exercise-id][data-exercise-type="weighted"], ` +
+		`a[data-workout-exercise-id][data-exercise-type="assisted"]`
+	weightedCount, err := page.Locator(weightedSelector).Count()
 	if err != nil {
-		t.Fatalf("count workout exercises: %v", err)
+		t.Fatalf("count weighted/assisted workout exercises: %v", err)
 	}
-	if noExercises == 0 {
-		addExerciseToWorkout(t, page, workoutURL)
+	if weightedCount == 0 {
+		addWeightedExerciseToWorkout(t, page, workoutURL)
 	}
 
-	// Click first exercise link to land on DETAIL.
-	exerciseLink := page.Locator("a[href*='/exercises/']").First()
+	// Click the first weighted/assisted exercise link to land on DETAIL.
+	exerciseLink := page.Locator(weightedSelector).First()
 	if err = exerciseLink.WaitFor(); err != nil {
 		if content, contentErr := page.Content(); contentErr == nil {
 			t.Logf("workout page content on timeout:\n%s", content)
 		}
-		t.Fatalf("wait for exercise link: %v", err)
+		t.Fatalf("wait for weighted/assisted exercise link: %v", err)
 	}
 	exerciseHref, err := exerciseLink.GetAttribute("href")
 	if err != nil {
@@ -521,10 +527,11 @@ func Test_playwright_stacknav(t *testing.T) {
 	detailURL := page.URL()
 
 	// === Flow 1: same-URL replace (set update) ===
-	// All test exercises are weighted. The page shows a warmup banner first —
-	// complete it before the set form appears. The set/warmup POSTs redirect
-	// back to the same DETAIL URL, and the client auto-detects same-URL and
-	// replaces in place — so history does not grow on either submit.
+	// The exercise selected above is weighted or assisted. The page shows a
+	// warmup banner first — complete it before the set form appears. The
+	// set/warmup POSTs redirect back to the same DETAIL URL, and the client
+	// auto-detects same-URL and replaces in place — so history does not grow
+	// on either submit.
 	warmupBtn := page.GetByRole("button",
 		playwright.PageGetByRoleOptions{Name: "Mark done"})
 	if err = warmupBtn.WaitFor(); err != nil {
@@ -998,15 +1005,19 @@ func dumpNavDiagnostics(t *testing.T, page playwright.Page, where, wantURL strin
 	t.Logf("[diag %s] state = %+v", where, state)
 }
 
-// addExerciseToWorkout navigates from the workout page to the add-exercise page,
-// adds the first available exercise, and returns the page to workoutURL.
-// Used when the weekly planner exhausts its exercise pool and creates an empty workout.
+// addWeightedExerciseToWorkout navigates from the workout page to the
+// add-exercise picker, adds the first weighted or assisted exercise (filtered
+// via the picker card's data-exercise-type attribute), and returns the page
+// to workoutURL. The type filter is what makes the suite robust to the
+// planner's exercise-pool composition: without it, callers downstream may
+// land on a bodyweight or time_based exercise whose form lacks the
+// "Actual reps" field and named signal buttons.
 //
 // Note: post add-exercise UX, the POST replaces /add-exercise with the new
 // exercise's DETAIL page rather than the workout overview. This helper
 // follows up with a Goto(workoutURL) so callers see the overview state they
 // expect.
-func addExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string) {
+func addWeightedExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string) {
 	t.Helper()
 	var err error
 	addLink := page.GetByRole("link", playwright.PageGetByRoleOptions{Name: "Add exercise"})
@@ -1016,10 +1027,13 @@ func addExerciseToWorkout(t *testing.T, page playwright.Page, workoutURL string)
 	if err = page.WaitForURL(func(u string) bool { return strings.Contains(u, "/add-exercise") }); err != nil {
 		t.Fatalf("wait for add-exercise page: %v", err)
 	}
-	addBtn := page.GetByRole("button",
-		playwright.PageGetByRoleOptions{Name: "Add this exercise"}).First()
+	weightedCard := page.Locator(
+		`.exercise-result[data-exercise-type="weighted"], ` +
+			`.exercise-result[data-exercise-type="assisted"]`).First()
+	addBtn := weightedCard.GetByRole("button",
+		playwright.LocatorGetByRoleOptions{Name: "Add this exercise"})
 	if err = addBtn.WaitFor(); err != nil {
-		t.Fatalf("wait for Add this exercise button: %v", err)
+		t.Fatalf("wait for weighted/assisted Add-this-exercise button: %v", err)
 	}
 	if err = addBtn.Click(); err != nil {
 		t.Fatalf("click Add this exercise: %v", err)

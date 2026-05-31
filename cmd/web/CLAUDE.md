@@ -389,7 +389,7 @@ Common flows live as helpers at the bottom of `playwright_test.go`:
 - `registerAndWaitSchedule(t, page, serverURL)` — register a new user, land on `/schedule`.
 - `selectAndSubmitSchedule(t, page, serverURL, days)` — fill the given weekdays for 1 hour, submit, wait for `/`.
 - `todayAndTomorrowWeekdays()` / `allWeekdays()` — day-name helpers for the schedule form.
-- `addExerciseToWorkout(t, page, workoutURL)` — fallback when the weekly planner exhausts its exercise pool.
+- `addWeightedExerciseToWorkout(t, page, workoutURL)` — fallback when the workout has no weighted/assisted exercise (either zero exercises, or only bodyweight/time_based were scheduled). Picks via the picker card's `data-exercise-type` attribute.
 - `dumpNavDiagnostics(t, page, where, wantURL)` — log Navigation API state for URL-mismatch fatals.
 
 Add a helper when the third caller appears — earlier than that is

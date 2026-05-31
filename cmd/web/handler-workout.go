@@ -33,6 +33,7 @@ type workoutExerciseView struct {
 	Position          int // 0-based slot index in Session.Slots — used in /exercises/{position} URLs and the view-transition name.
 	Index             int // 1-based position label ("01", "02", …)
 	Name              string
+	ExerciseType      domain.ExerciseType // exposed as data-exercise-type for Playwright flows that need a specific form shape.
 	State             domain.ExerciseSlotState
 	SetCount          int
 	CompletedSetCount int
@@ -300,6 +301,7 @@ func newWorkoutExerciseView(
 		Position:          pos,
 		Index:             pos + 1,
 		Name:              es.Exercise.Name,
+		ExerciseType:      es.Exercise.ExerciseType,
 		State:             es.CompletionState(),
 		SetCount:          len(es.Sets),
 		CompletedSetCount: completedSets,
