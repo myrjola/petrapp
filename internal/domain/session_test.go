@@ -679,16 +679,41 @@ func Test_Session_SwitchToDeload_SetsFlag(t *testing.T) {
 func Test_Session_SwitchToDeload_Idempotent(t *testing.T) {
 	t.Parallel()
 
-	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
-		Date:     time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
-		IsDeload: true,
+	repMin, repMax := 3, 5
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+			},
+		},
 	}
 
 	if err := sess.SwitchToDeload(); err != nil {
-		t.Fatalf("SwitchToDeload (already deload): %v", err)
+		t.Fatalf("SwitchToDeload first call: %v", err)
+	}
+	firstLen := len(sess.Slots[0].Sets)
+	firstTarget := sess.Slots[0].Sets[0].TargetValue
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload second call: %v", err)
 	}
 	if !sess.IsDeload {
 		t.Error("SwitchToDeload cleared IsDeload on already-deload session")
+	}
+	if got := len(sess.Slots[0].Sets); got != firstLen {
+		t.Errorf("second call changed len(Sets): %d -> %d", firstLen, got)
+	}
+	if got := sess.Slots[0].Sets[0].TargetValue; got != firstTarget {
+		t.Errorf("second call changed TargetValue: %d -> %d", firstTarget, got)
 	}
 }
 
@@ -711,15 +736,326 @@ func Test_Session_ClearDeload_ClearsFlag(t *testing.T) {
 func Test_Session_ClearDeload_Idempotent(t *testing.T) {
 	t.Parallel()
 
-	sess := domain.Session{ //nolint:exhaustruct // Test sessions omit irrelevant fields.
-		Date: time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
+	repMin, repMax := 3, 5
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+			},
+		},
 	}
 
 	if err := sess.ClearDeload(); err != nil {
-		t.Fatalf("ClearDeload (already clear): %v", err)
+		t.Fatalf("ClearDeload first call: %v", err)
+	}
+	firstLen := len(sess.Slots[0].Sets)
+
+	if err := sess.ClearDeload(); err != nil {
+		t.Fatalf("ClearDeload second call: %v", err)
 	}
 	if sess.IsDeload {
 		t.Error("ClearDeload toggled IsDeload to true on already-clear session")
+	}
+	if got := len(sess.Slots[0].Sets); got != firstLen {
+		t.Errorf("second call changed len(Sets): %d -> %d", firstLen, got)
+	}
+}
+
+func Test_Session_SwitchToDeload_RebuildsUncompletedSets(t *testing.T) {
+	t.Parallel()
+
+	repMin, repMax := 3, 5
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	// Build a Strength session as the planner would: 4 untouched sets, TargetValue=3 (repMin).
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+			},
+		},
+	}
+	if got := len(sess.Slots[0].Sets); got != 4 {
+		t.Fatalf("precondition: want 4 sets, got %d", got)
+	}
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload: %v", err)
+	}
+
+	if !sess.IsDeload {
+		t.Fatal("SwitchToDeload did not set IsDeload to true")
+	}
+	got := sess.Slots[0].Sets
+	if len(got) != 3 {
+		t.Fatalf("len(Sets) = %d, want 3 (deload drops one set)", len(got))
+	}
+	for i, s := range got {
+		if s.TargetValue != 5 { // repMax (deload forces hypertrophy)
+			t.Errorf("Sets[%d].TargetValue = %d, want 5 (repMax)", i, s.TargetValue)
+		}
+		if s.CompletedAt != nil {
+			t.Errorf("Sets[%d].CompletedAt = %v, want nil", i, s.CompletedAt)
+		}
+		if s.WeightKg != nil {
+			t.Errorf("Sets[%d].WeightKg = %v, want nil (planner shape)", i, s.WeightKg)
+		}
+	}
+}
+
+func Test_Session_SwitchToDeload_PreservesCompletedSets(t *testing.T) {
+	t.Parallel()
+
+	repMin, repMax := 3, 5
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	completedAt := time.Date(2026, 5, 31, 9, 0, 0, 0, time.UTC)
+	completedValue := 5
+	signal := domain.SignalOnTarget
+	weight := 100.0
+
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets: []domain.Set{
+					// Two completed sets.
+					{
+						TargetValue:    3,
+						WeightKg:       &weight,
+						CompletedValue: &completedValue,
+						CompletedAt:    &completedAt,
+						Signal:         &signal,
+					},
+					{
+						TargetValue:    3,
+						WeightKg:       &weight,
+						CompletedValue: &completedValue,
+						CompletedAt:    &completedAt,
+						Signal:         &signal,
+					},
+					// Two untouched sets.
+					{TargetValue: 3}, //nolint:exhaustruct // Untouched set: only TargetValue set.
+					{TargetValue: 3}, //nolint:exhaustruct // Untouched set: only TargetValue set.
+				},
+			},
+		},
+	}
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload: %v", err)
+	}
+
+	got := sess.Slots[0].Sets
+	// Strength 4 → deload 3 sets; 2 completed preserved + 1 fresh uncompleted = 3.
+	if len(got) != 3 {
+		t.Fatalf("len(Sets) = %d, want 3", len(got))
+	}
+	// First two slots: original completed sets, untouched.
+	for i := range 2 {
+		if got[i].CompletedAt == nil || !got[i].CompletedAt.Equal(completedAt) {
+			t.Errorf(
+				"Sets[%d].CompletedAt = %v, want %v (completed sets preserved)",
+				i,
+				got[i].CompletedAt,
+				completedAt,
+			)
+		}
+		if got[i].TargetValue != 3 {
+			t.Errorf("Sets[%d].TargetValue = %d, want 3 (completed set keeps original target)", i, got[i].TargetValue)
+		}
+		if got[i].WeightKg == nil || *got[i].WeightKg != 100.0 {
+			t.Errorf("Sets[%d].WeightKg = %v, want 100.0", i, got[i].WeightKg)
+		}
+	}
+	// Third slot: fresh planner-shape, TargetValue=repMax, all other fields nil.
+	if got[2].CompletedAt != nil {
+		t.Errorf("Sets[2].CompletedAt = %v, want nil (fresh set)", got[2].CompletedAt)
+	}
+	if got[2].TargetValue != 5 {
+		t.Errorf("Sets[2].TargetValue = %d, want 5 (repMax for deload)", got[2].TargetValue)
+	}
+	if got[2].WeightKg != nil {
+		t.Errorf("Sets[2].WeightKg = %v, want nil (planner shape)", got[2].WeightKg)
+	}
+}
+
+func Test_Session_SwitchToDeload_OverQuotaCompletedSetsKept(t *testing.T) {
+	t.Parallel()
+
+	repMin, repMax := 3, 5
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	completedAt := time.Date(2026, 5, 31, 9, 0, 0, 0, time.UTC)
+	completedValue := 5
+	signal := domain.SignalOnTarget
+
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				// 4 completed sets — all of a non-deload Strength prescription.
+				Sets: []domain.Set{
+					{
+						TargetValue:    3,
+						CompletedValue: &completedValue,
+						CompletedAt:    &completedAt,
+						Signal:         &signal,
+					}, //nolint:exhaustruct // WeightKg nil.
+					{
+						TargetValue:    3,
+						CompletedValue: &completedValue,
+						CompletedAt:    &completedAt,
+						Signal:         &signal,
+					}, //nolint:exhaustruct // WeightKg nil.
+					{
+						TargetValue:    3,
+						CompletedValue: &completedValue,
+						CompletedAt:    &completedAt,
+						Signal:         &signal,
+					}, //nolint:exhaustruct // WeightKg nil.
+					{
+						TargetValue:    3,
+						CompletedValue: &completedValue,
+						CompletedAt:    &completedAt,
+						Signal:         &signal,
+					}, //nolint:exhaustruct // WeightKg nil.
+				},
+			},
+		},
+	}
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload: %v", err)
+	}
+
+	got := sess.Slots[0].Sets
+	// Deload prescription would be 3, but 4 are already completed — keep all 4.
+	if len(got) != 4 {
+		t.Errorf("len(Sets) = %d, want 4 (no shrink below len(completed))", len(got))
+	}
+	for i, s := range got {
+		if s.CompletedAt == nil {
+			t.Errorf("Sets[%d].CompletedAt = nil, want preserved", i)
+		}
+	}
+}
+
+func Test_Session_ClearDeload_ExpandsUncompletedSets(t *testing.T) {
+	t.Parallel()
+
+	repMin, repMax := 3, 5
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	// Start in deload: 3 untouched sets, TargetValue=repMax=5.
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		IsDeload:          true,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true),
+			},
+		},
+	}
+	if got := len(sess.Slots[0].Sets); got != 3 {
+		t.Fatalf("precondition: want 3 deload sets, got %d", got)
+	}
+
+	if err := sess.ClearDeload(); err != nil {
+		t.Fatalf("ClearDeload: %v", err)
+	}
+
+	if sess.IsDeload {
+		t.Fatal("ClearDeload did not unset IsDeload")
+	}
+	got := sess.Slots[0].Sets
+	// Non-deload Strength: 4 sets, TargetValue=repMin=3.
+	if len(got) != 4 {
+		t.Fatalf("len(Sets) = %d, want 4 (ClearDeload restores Strength count)", len(got))
+	}
+	for i, s := range got {
+		if s.TargetValue != 3 {
+			t.Errorf("Sets[%d].TargetValue = %d, want 3 (repMin for Strength)", i, s.TargetValue)
+		}
+		if s.CompletedAt != nil {
+			t.Errorf("Sets[%d].CompletedAt = %v, want nil", i, s.CompletedAt)
+		}
+	}
+}
+
+func Test_Session_SwitchToDeload_TimeBasedExercise(t *testing.T) {
+	t.Parallel()
+
+	startingSeconds := 30
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:                     2,
+		Name:                   "Plank",
+		ExerciseType:           domain.ExerciseTypeTime,
+		DefaultStartingSeconds: &startingSeconds,
+	}
+	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
+		PeriodizationType: domain.PeriodizationStrength,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: ex,
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+			},
+		},
+	}
+	if got := len(sess.Slots[0].Sets); got != 3 {
+		t.Fatalf("precondition: want 3 time-based sets, got %d", got)
+	}
+
+	if err := sess.SwitchToDeload(); err != nil {
+		t.Fatalf("SwitchToDeload: %v", err)
+	}
+
+	// Time-based exercises keep a fixed defaultTimedSets count regardless of
+	// deload (the n-1/floor-2 formula only applies to rep-based schemes). The
+	// rebuild path still runs, but produces the same set count.
+	got := sess.Slots[0].Sets
+	want := len(domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true))
+	if len(got) != want {
+		t.Fatalf("len(Sets) = %d, want %d (matches BuildPlannedSets for deload)", len(got), want)
+	}
+	for i, s := range got {
+		if s.TargetValue != startingSeconds {
+			t.Errorf("Sets[%d].TargetValue = %d, want %d (DefaultStartingSeconds)", i, s.TargetValue, startingSeconds)
+		}
 	}
 }
 

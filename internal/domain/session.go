@@ -174,20 +174,23 @@ func (s *Session) SetDifficulty(rating int) error {
 	return nil
 }
 
-// SwitchToDeload marks the session as a deload session going forward.
-// Sets recorded prior to this call retain their stored values; the next
-// progression recommendation will be derived from GetDeloadStartingWeight
-// rather than GetStartingWeight. Idempotent.
+// SwitchToDeload marks the session as a deload session and rebuilds each
+// slot's uncompleted sets to match the deload prescription. Completed sets
+// (CompletedAt != nil) are preserved verbatim — work already done is never
+// erased. Idempotent: applying twice produces the same Sets slice.
 func (s *Session) SwitchToDeload() error {
 	s.IsDeload = true
+	s.rebuildUncompletedSetsForCurrentPrescription()
 	return nil
 }
 
-// ClearDeload marks the session as a non-deload session going forward.
-// Counterpart to SwitchToDeload; used by RestartMesocycleAnchor to undo
-// an ad-hoc early deload. Idempotent.
+// ClearDeload marks the session as a non-deload session and rebuilds each
+// slot's uncompleted sets to match the non-deload prescription. Counterpart
+// to SwitchToDeload; used by RestartMesocycleAnchor to undo an ad-hoc early
+// deload. Completed sets are preserved verbatim. Idempotent.
 func (s *Session) ClearDeload() error {
 	s.IsDeload = false
+	s.rebuildUncompletedSetsForCurrentPrescription()
 	return nil
 }
 
@@ -379,6 +382,39 @@ func (s *Session) HasIncompleteSets() bool {
 		}
 	}
 	return false
+}
+
+// rebuildUncompletedSetsForCurrentPrescription rewrites each slot's Sets so
+// completed sets stay verbatim and uncompleted sets match what BuildPlannedSets
+// would emit for the session's current PeriodizationType and IsDeload. Called
+// from SwitchToDeload and ClearDeload after toggling the flag so the persisted
+// shape never diverges from what a fresh BuildSetsForAdd would produce.
+//
+// The new length is max(len(completed), planner-prescribed n). Work already
+// done is never erased, but a shrinking prescription only truncates the
+// uncompleted tail.
+func (s *Session) rebuildUncompletedSetsForCurrentPrescription() {
+	for i := range s.Slots {
+		slot := &s.Slots[i]
+		fresh := BuildPlannedSets(slot.Exercise, s.PeriodizationType, s.IsDeload)
+		n := len(fresh)
+
+		var completed []Set
+		for _, st := range slot.Sets {
+			if st.CompletedAt != nil {
+				completed = append(completed, st)
+			}
+		}
+		final := max(n, len(completed))
+
+		rebuilt := make([]Set, final)
+		copy(rebuilt, completed)
+		for j := len(completed); j < final; j++ {
+			// fresh[0] suffices: BuildPlannedSets emits identical sets.
+			rebuilt[j] = fresh[0]
+		}
+		slot.Sets = rebuilt
+	}
 }
 
 // slotAt returns a pointer to the exercise slot at pos within Slots,
