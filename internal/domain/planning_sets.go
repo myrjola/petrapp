@@ -14,15 +14,19 @@ const defaultTimedSets = 3
 // count for an exercise within a session of the given periodization. For
 // time-based exercises, uses DefaultStartingSeconds and a fixed set count of
 // defaultTimedSets. For rep-based exercises, returns DeriveScheme values.
-// isDeload halves the set count and targets repMax (see DeriveScheme).
+// isDeload drops one set (floored at 2) and targets repMax (see DeriveScheme).
 func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool) (int, int) {
 	if ex.IsTimed() {
+		sets := defaultTimedSets
+		if isDeload {
+			sets = deloadSets(sets)
+		}
 		if ex.DefaultStartingSeconds != nil {
-			return *ex.DefaultStartingSeconds, defaultTimedSets
+			return *ex.DefaultStartingSeconds, sets
 		}
 		// Defensive: time_based exercises must have DefaultStartingSeconds per the
 		// schema CHECK, but fall back gracefully rather than panicking.
-		return defaultTargetValue, defaultTimedSets
+		return defaultTargetValue, sets
 	}
 	if ex.RepMin == nil || ex.RepMax == nil {
 		// Defensive: non-time_based exercises must have rep_min/rep_max per the
@@ -43,7 +47,7 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool) (
 // downstream code (notably BuildSetsForAdd's seed-weight lookup) relies on
 // `WeightKg == nil` meaning "never recorded".
 //
-// isDeload halves the set count and targets repMax (lighter load, fewer sets).
+// isDeload drops one set (floored at 2) and targets repMax (lighter load, fewer sets).
 func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDeload bool) []Set {
 	targetValue, n := deriveSchemeForExercise(exercise, periodization, isDeload)
 	sets := make([]Set, n)
@@ -66,7 +70,7 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDelo
 // isn't lost just because the prescription changed; otherwise the seed is 0.
 // Bodyweight and time-based exercises stay nil.
 //
-// isDeload halves the set count and targets repMax (see BuildPlannedSets).
+// isDeload drops one set (floored at 2) and targets repMax (see BuildPlannedSets).
 func BuildSetsForAdd(exercise Exercise, periodization PeriodizationType, isDeload bool, historicalSets []Set) []Set {
 	sets := BuildPlannedSets(exercise, periodization, isDeload)
 	if !exercise.HasWeight() {

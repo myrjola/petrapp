@@ -46,12 +46,12 @@ type Scheme struct {
 //	reps 6-10 → 3 sets, 150s rest  (moderate; longer rest improves hypertrophy in trained lifters per Schoenfeld 2016)
 //	reps ≥ 11 → 3 sets, 90s rest   (lighter; volume kept up, rest shortens)
 //
-// During deload the set count is halved (min 1); rest stays at the hypertrophy
+// During deload the set count drops one set (floored at 2); rest stays at the hypertrophy
 // mapping for the resulting rep band.
 func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme {
 	if isDeload {
 		// Deload forces hypertrophy targets regardless of incoming p, then
-		// halves the set count (min 1). Rest stays at the hypertrophy
+		// drops one set (floored at 2). Rest stays at the hypertrophy
 		// mapping for the resulting rep band.
 		p = PeriodizationHypertrophy
 	}

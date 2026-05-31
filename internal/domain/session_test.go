@@ -924,30 +924,30 @@ func Test_Session_SwitchToDeload_OverQuotaCompletedSetsKept(t *testing.T) {
 				Exercise: ex,
 				// 4 completed sets — all of a non-deload Strength prescription.
 				Sets: []domain.Set{
-					{
+					{ //nolint:exhaustruct // WeightKg nil.
 						TargetValue:    3,
 						CompletedValue: &completedValue,
 						CompletedAt:    &completedAt,
 						Signal:         &signal,
-					}, //nolint:exhaustruct // WeightKg nil.
-					{
+					},
+					{ //nolint:exhaustruct // WeightKg nil.
 						TargetValue:    3,
 						CompletedValue: &completedValue,
 						CompletedAt:    &completedAt,
 						Signal:         &signal,
-					}, //nolint:exhaustruct // WeightKg nil.
-					{
+					},
+					{ //nolint:exhaustruct // WeightKg nil.
 						TargetValue:    3,
 						CompletedValue: &completedValue,
 						CompletedAt:    &completedAt,
 						Signal:         &signal,
-					}, //nolint:exhaustruct // WeightKg nil.
-					{
+					},
+					{ //nolint:exhaustruct // WeightKg nil.
 						TargetValue:    3,
 						CompletedValue: &completedValue,
 						CompletedAt:    &completedAt,
 						Signal:         &signal,
-					}, //nolint:exhaustruct // WeightKg nil.
+					},
 				},
 			},
 		},
@@ -1044,13 +1044,9 @@ func Test_Session_SwitchToDeload_TimeBasedExercise(t *testing.T) {
 		t.Fatalf("SwitchToDeload: %v", err)
 	}
 
-	// Time-based exercises keep a fixed defaultTimedSets count regardless of
-	// deload (the n-1/floor-2 formula only applies to rep-based schemes). The
-	// rebuild path still runs, but produces the same set count.
 	got := sess.Slots[0].Sets
-	want := len(domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true))
-	if len(got) != want {
-		t.Fatalf("len(Sets) = %d, want %d (matches BuildPlannedSets for deload)", len(got), want)
+	if len(got) != 2 {
+		t.Fatalf("len(Sets) = %d, want 2 (3-1 floored at 2)", len(got))
 	}
 	for i, s := range got {
 		if s.TargetValue != startingSeconds {
