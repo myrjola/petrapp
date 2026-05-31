@@ -403,7 +403,7 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 // The metric is the change in the sum of squared distances over
 // targeted muscle groups; untargeted MGs are ignored. Set count
 // comes from the same deriveSchemeForExercise the planner uses to
-// persist sets, so deload halving and periodization-driven set-count
+// persist sets, so deload set reduction and periodization-driven set-count
 // shifts are reflected automatically.
 func scoreCandidate(
 	ex Exercise,

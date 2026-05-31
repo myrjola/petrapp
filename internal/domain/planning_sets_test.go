@@ -246,7 +246,7 @@ func TestBuildPlannedSets_Deload(t *testing.T) {
 	got := domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true)
 	// Normal high-rep band (repMax=12 ≥ 11): 3 sets. Deload drops to 2 (floor).
 	if len(got) != 2 {
-		t.Fatalf("len(got) = %d, want 2 (deload halves sets)", len(got))
+		t.Fatalf("len(got) = %d, want 2 (deload drops to 2 (floor))", len(got))
 	}
 	for i, s := range got {
 		if s.TargetValue != 12 {
