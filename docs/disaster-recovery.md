@@ -92,3 +92,28 @@ fly ssh console --app petra --user petrapp \
    `petrapp.sqlite3-wal` against a 5.3 MB DB — Litestream isn't checkpointing
    (likely a scale-to-zero interaction). On the 1 GB→5 GB auto-extend volume
    this is a latent disk-pressure risk; confirm prod isn't similarly bloated.
+
+## Failure scenario catalog
+
+Data-loss bounds come from `litestream.yml`: the finest replica level syncs every
+**5 minutes** (retention 1h), then 1h (24h), then 24h (168h). So the continuous
+recovery point is ≈5 min; older points coarsen with age. `make fly-backup` also
+takes on-machine `.backup` snapshots under `/data/snapshots/`.
+
+| # | Scenario | Detection | Recovery procedure | Data loss / RPO | Drill status |
+|---|---|---|---|---|---|
+| 1 | App deleted / destroyed | App 404s; `fly apps list` missing it | Full rebuild procedure above | ≈5 min (last replica sync) if bucket intact; **total** if bucket + creds both gone | Desk-checked; S3-only restore proven on staging 2026-05-31 |
+| 2 | Volume lost / corrupted, app intact | Boot fails to open DB; disk errors in `make fly-logs` | `fly ssh … -C "/dist/litestream restore -o /data/petrapp.sqlite3.new /data/petrapp.sqlite3"`, stop app, swap file in, restart | ≈5 min | Untested |
+| 3 | Corrupted DB file | `PRAGMA integrity_check` ≠ `ok`; app errors | Restore from Litestream (as #2), or copy the latest `/data/snapshots/*` from `make fly-backup` into place | ≈5 min (Litestream) / since last snapshot | Untested |
+| 4 | Bad migration shipped to prod | Post-deploy smoke test / errors; ideally CI `make migratetest` caught it against prod data first | Revert the offending commit on `main` (next push redeploys prior code). If data was mutated, restore the DB from the pre-deploy snapshot (`fly-sql-write` auto-snapshots before mutating) | Code: none. Data: back to pre-deploy snapshot if taken | Desk-checked |
+| 5 | Accidental data deletion (one user / table) | User report; row counts drop | Restore the backup to a temp path (as #2), extract the affected rows with `sqlite3`, re-insert into the live DB via `make fly-sql-write SCRIPT=…` | Since the deletion | Untested |
+| 6 | Tigris bucket lost / creds rotated or lost | Litestream replicate errors in `make fly-logs`; `litestream status` / `ltx` fail | Re-mint creds or recreate the bucket (`fly storage create`), set the `AWS_*` secrets, redeploy. If the bucket *data* is gone, restore from the newest `/data/snapshots/*` instead | None if creds-only; **total backup history** if bucket data is gone (last `.backup` snapshot is the floor) | Untested |
+| 7 | VAPID secrets lost | Push sends fail; `fly secrets list` missing the keys | Re-set from the offline stash. If unavailable, regenerate — this **breaks existing push subscriptions**, users must re-subscribe | None to DB; push subscriptions lost if regenerated | Untested |
+| 8 | Region (`arn`) outage | Fly status / app unreachable region-wide | Wait it out, or provision a volume in an alternate region and `fly deploy` there, restoring from the Litestream replica on boot | ≈5 min | Untested |
+
+### Next drill to run
+
+**Destructive full rebuild.** Actually `fly apps destroy petra-staging`, then
+rebuild from S3 only, to prove end-to-end that the bucket survives app deletion
+and that fresh Tigris credentials can be minted for it (gap-list item 1).
+Deferred from the 2026-05-31 pass, which was non-destructive by design.
