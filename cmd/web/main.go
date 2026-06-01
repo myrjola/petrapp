@@ -166,6 +166,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 			Logger:          logger,
 			MinAge:          0, // Use default
 			MaxBytes:        0, // Use default
+			MaxFiles:        0, // Use default
 			TracesDirectory: cfg.TracesDirectory,
 		}); err != nil {
 			return fmt.Errorf("new flight recorder: %w", err)

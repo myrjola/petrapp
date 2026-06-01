@@ -25,6 +25,7 @@ func TestService_StartStop(t *testing.T) {
 		Logger:          logger,
 		MinAge:          0, // Use default
 		MaxBytes:        0, // Use default
+		MaxFiles:        0,
 		TracesDirectory: traceDir,
 	})
 	if err != nil {
@@ -52,6 +53,7 @@ func TestService_CaptureTimeoutTrace(t *testing.T) {
 		Logger:          logger,
 		MinAge:          0, // Use default
 		MaxBytes:        0, // Use default
+		MaxFiles:        0,
 		TracesDirectory: traceDir,
 	})
 	if err != nil {
@@ -101,6 +103,7 @@ func TestService_CooldownPreventsCapture(t *testing.T) {
 		Logger:          logger,
 		MinAge:          0, // Use default
 		MaxBytes:        0, // Use default
+		MaxFiles:        0,
 		TracesDirectory: traceDir,
 	})
 	if err != nil {
@@ -142,6 +145,7 @@ func TestService_CapturesIntoNewlyCreatedDirectory(t *testing.T) {
 		Logger:          logger,
 		MinAge:          0,
 		MaxBytes:        0,
+		MaxFiles:        0,
 		TracesDirectory: traceDir,
 	})
 	if err != nil {
@@ -174,6 +178,7 @@ func TestService_CaptureSlowRequestTrace(t *testing.T) {
 		Logger:          logger,
 		MinAge:          0,
 		MaxBytes:        0,
+		MaxFiles:        0,
 		TracesDirectory: traceDir,
 	})
 	if err != nil {
@@ -213,6 +218,7 @@ func TestService_CooldownIsSharedAcrossCaptureKinds(t *testing.T) {
 		Logger:          logger,
 		MinAge:          0,
 		MaxBytes:        0,
+		MaxFiles:        0,
 		TracesDirectory: traceDir,
 	})
 	if err != nil {

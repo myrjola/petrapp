@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/trace"
+	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -22,6 +24,11 @@ const (
 
 	// cooldownDuration is the minimum time between trace captures.
 	cooldownDuration = 30 * time.Minute
+
+	// defaultMaxFiles is the number of trace files retained in the traces
+	// directory. Each capture is up to defaultMaxBytes, so this bounds the
+	// directory's footprint on the Fly volume.
+	defaultMaxFiles = 10
 )
 
 // Service manages flight recording for timeout detection.
@@ -29,6 +36,7 @@ type Service struct {
 	logger          *slog.Logger
 	flightRecorder  *trace.FlightRecorder
 	tracesDirectory string
+	maxFiles        int
 	lastCapture     atomic.Int64 // Unix timestamp of last capture
 }
 
@@ -37,6 +45,7 @@ type Config struct {
 	Logger          *slog.Logger
 	MinAge          time.Duration // Minimum age of trace events
 	MaxBytes        uint64        // Maximum size of trace buffer
+	MaxFiles        int           // Max trace files retained; 0 uses defaultMaxFiles
 	TracesDirectory string        // Directory where trace files are written
 }
 
@@ -69,6 +78,11 @@ func New(cfg Config) (*Service, error) {
 		maxBytes = defaultMaxBytes
 	}
 
+	maxFiles := cfg.MaxFiles
+	if maxFiles == 0 {
+		maxFiles = defaultMaxFiles
+	}
+
 	flightRecorderCfg := trace.FlightRecorderConfig{
 		MinAge:   minAge,
 		MaxBytes: maxBytes,
@@ -83,6 +97,7 @@ func New(cfg Config) (*Service, error) {
 		logger:          cfg.Logger,
 		flightRecorder:  flightRecorder,
 		tracesDirectory: cfg.TracesDirectory,
+		maxFiles:        maxFiles,
 		lastCapture:     atomic.Int64{},
 	}, nil
 }
@@ -188,4 +203,54 @@ func (s *Service) captureTrace(ctx context.Context, prefix string, extraAttrs ..
 	)
 	attrs = append(attrs, extraAttrs...)
 	s.logger.LogAttrs(ctx, slog.LevelWarn, "captured trace", attrs...)
+
+	s.pruneOldTraces(ctx)
+}
+
+// pruneOldTraces enforces the maxFiles retention cap by deleting the oldest
+// *.trace files (by modification time) until at most maxFiles remain. Pruning
+// failures are logged but never block a capture — keeping the fresh trace
+// matters more than reclaiming space immediately.
+func (s *Service) pruneOldTraces(ctx context.Context) {
+	entries, err := os.ReadDir(s.tracesDirectory)
+	if err != nil {
+		s.logger.LogAttrs(ctx, slog.LevelError, "failed to list traces for pruning",
+			slog.String("directory", s.tracesDirectory), slog.Any("error", err))
+		return
+	}
+
+	type traceFile struct {
+		name    string
+		modTime time.Time
+	}
+	traces := make([]traceFile, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".trace") {
+			continue
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			// File vanished between listing and stat; skip it.
+			continue
+		}
+		traces = append(traces, traceFile{name: entry.Name(), modTime: info.ModTime()})
+	}
+
+	if len(traces) <= s.maxFiles {
+		return
+	}
+
+	// Oldest first, so the head of the slice is what we delete.
+	sort.Slice(traces, func(i, j int) bool {
+		return traces[i].modTime.Before(traces[j].modTime)
+	})
+	for _, t := range traces[:len(traces)-s.maxFiles] {
+		fPath := filepath.Join(s.tracesDirectory, t.name)
+		if removeErr := os.Remove(fPath); removeErr != nil {
+			s.logger.LogAttrs(ctx, slog.LevelError, "failed to prune old trace",
+				slog.String("file", fPath), slog.Any("error", removeErr))
+			continue
+		}
+		s.logger.LogAttrs(ctx, slog.LevelInfo, "pruned old trace", slog.String("file", fPath))
+	}
 }
