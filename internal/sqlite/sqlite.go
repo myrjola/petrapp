@@ -147,6 +147,11 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 		"_synchronous=normal",
 		// Enables foreign key constraints.
 		"_foreign_keys=on",
+		// Caches up to 100 prepared statements per connection so repeated queries
+		// reuse their compiled sqlite3_stmt instead of re-running sqlite3_prepare_v2
+		// across the cgo boundary on every call. Defaults to 0 (disabled) in
+		// mattn/go-sqlite3; load profiling showed prepare dominating the hot read path.
+		"_stmt_cache_size=100",
 	}, "&")
 
 	// The options without leading underscore are SQLite URI parameters documented at https://www.sqlite.org/uri.html.
