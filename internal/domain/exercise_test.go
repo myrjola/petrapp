@@ -72,6 +72,63 @@ func Test_Exercise_HasWeight(t *testing.T) {
 	}
 }
 
+func Test_Exercise_LoadModel(t *testing.T) {
+	t.Parallel()
+
+	mkExercise := func(typ domain.ExerciseType) domain.Exercise {
+		return domain.Exercise{ //nolint:exhaustruct // Only ExerciseType is read.
+			ExerciseType: typ,
+		}
+	}
+
+	cases := []struct {
+		name     string
+		exercise domain.Exercise
+		want     domain.LoadModel
+	}{
+		{"weighted loads by weight", mkExercise(domain.ExerciseTypeWeighted), domain.LoadWeighted},
+		{"assisted loads by weight", mkExercise(domain.ExerciseTypeAssisted), domain.LoadWeighted},
+		{"bodyweight loads by bodyweight", mkExercise(domain.ExerciseTypeBodyweight), domain.LoadBodyweight},
+		{"time_based loads by time", mkExercise(domain.ExerciseTypeTime), domain.LoadTimed},
+		{"unknown loads as unknown", mkExercise(domain.ExerciseType("garbage")), domain.LoadUnknown},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := tc.exercise.LoadModel()
+			if got != tc.want {
+				t.Errorf("Exercise{%s}.LoadModel() = %v, want %v",
+					tc.exercise.ExerciseType, got, tc.want)
+			}
+		})
+	}
+}
+
+// Test_ExerciseType_behaviorExhaustive guards the single registration point:
+// every ExerciseType in allExerciseTypes must resolve to a real LoadModel.
+// A new ExerciseType const added without a behavior entry fails here.
+func Test_ExerciseType_behaviorExhaustive(t *testing.T) {
+	t.Parallel()
+
+	allExerciseTypes := []domain.ExerciseType{
+		domain.ExerciseTypeWeighted,
+		domain.ExerciseTypeBodyweight,
+		domain.ExerciseTypeAssisted,
+		domain.ExerciseTypeTime,
+	}
+
+	for _, et := range allExerciseTypes {
+		if !et.IsValid() {
+			t.Errorf("ExerciseType %q has no behavior entry", et)
+		}
+		ex := domain.Exercise{ExerciseType: et} //nolint:exhaustruct // Only ExerciseType is read.
+		if ex.LoadModel() == domain.LoadUnknown {
+			t.Errorf("ExerciseType %q resolves to LoadUnknown; add a behavior entry", et)
+		}
+	}
+}
+
 func Test_Category_IsValid(t *testing.T) {
 	t.Parallel()
 

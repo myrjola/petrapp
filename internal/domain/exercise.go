@@ -56,14 +56,66 @@ const (
 	ExerciseTypeTime       ExerciseType = "time_based"
 )
 
+// LoadModel is the axis that determines how a set is measured, progressed,
+// and recorded. Several ExerciseTypes can share a LoadModel (weighted and
+// assisted both load by weight); the workout handler branches on this rather
+// than on ExerciseType, so a new type that reuses an existing load model
+// needs no handler change.
+type LoadModel int
+
+const (
+	LoadUnknown    LoadModel = iota // Zero value: unregistered type; all behavior degrades to a no-op.
+	LoadWeighted                    // Carries a weight target; driven by the weight progression engine.
+	LoadBodyweight                  // Reps only; the stored target is used as-is.
+	LoadTimed                       // Duration target; driven by the timed progression engine.
+)
+
+// exerciseBehavior captures the per-ExerciseType rules the rest of the domain
+// and the display layer branch on. Adding an ExerciseType means adding one
+// entry to exerciseBehaviors; the exhaustiveness test in exercise_test.go
+// fails until it exists. This table replaces the hand-synced switch statements
+// these methods previously carried.
+type exerciseBehavior struct {
+	load         LoadModel        // How the set is loaded and measured.
+	assistedSign bool             // Negate the weight magnitude when the assisted flag is set.
+	formatSet    func(Set) string // History-line renderer; "" when the set lacks the values its type needs.
+}
+
+var exerciseBehaviors = map[ExerciseType]exerciseBehavior{ //nolint:gochecknoglobals // immutable lookup table
+	ExerciseTypeWeighted:   {load: LoadWeighted, assistedSign: false, formatSet: formatWeightedSet},
+	ExerciseTypeAssisted:   {load: LoadWeighted, assistedSign: true, formatSet: formatWeightedSet},
+	ExerciseTypeBodyweight: {load: LoadBodyweight, assistedSign: false, formatSet: formatBodyweightSet},
+	ExerciseTypeTime:       {load: LoadTimed, assistedSign: false, formatSet: formatTimedSet},
+}
+
+func formatWeightedSet(set Set) string {
+	if set.WeightKg == nil || set.CompletedValue == nil {
+		return ""
+	}
+	return fmt.Sprintf("%dx%.1fkg", *set.CompletedValue, *set.WeightKg)
+}
+
+func formatBodyweightSet(set Set) string {
+	if set.CompletedValue == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d reps", *set.CompletedValue)
+}
+
+func formatTimedSet(set Set) string {
+	if set.CompletedValue == nil {
+		return ""
+	}
+	return fmt.Sprintf("%ds", *set.CompletedValue)
+}
+
+// LoadModel reports how this exercise's sets are loaded and measured.
+func (e Exercise) LoadModel() LoadModel { return e.behavior().load }
+
 // IsValid reports whether et is one of the defined ExerciseType values.
 func (et ExerciseType) IsValid() bool {
-	switch et {
-	case ExerciseTypeWeighted, ExerciseTypeBodyweight, ExerciseTypeAssisted, ExerciseTypeTime:
-		return true
-	default:
-		return false
-	}
+	_, ok := exerciseBehaviors[et]
+	return ok
 }
 
 // Resource is a learning link associated with an exercise (video, article).
@@ -87,16 +139,14 @@ type Exercise struct {
 }
 
 // IsTimed returns true if this exercise uses duration targets instead of rep counts.
-func (e Exercise) IsTimed() bool { return e.ExerciseType == ExerciseTypeTime }
+func (e Exercise) IsTimed() bool { return e.behavior().load == LoadTimed }
 
 // HasWeight reports whether sets of this exercise carry a weight value.
 // True for weighted and assisted exercises; false for bodyweight and
 // time-based. Planning, set seeding, and the per-set form all branch on
 // this — keeping the rule on the type prevents drift when a new
 // ExerciseType is added.
-func (e Exercise) HasWeight() bool {
-	return e.ExerciseType == ExerciseTypeWeighted || e.ExerciseType == ExerciseTypeAssisted
-}
+func (e Exercise) HasWeight() bool { return e.behavior().load == LoadWeighted }
 
 // FormatSetValue returns the user-visible string for a set's target or
 // completed value. Reps render as "%d"; seconds render as "%ds". The unit
@@ -143,7 +193,7 @@ func (e Exercise) TargetRangeText() string {
 // "assisted" flag set, the stored value is the negative magnitude of the
 // input. All other types/flag combinations pass the input through unchanged.
 func (e Exercise) EncodeFormWeight(input float64, assisted bool) float64 {
-	if e.ExerciseType == ExerciseTypeAssisted && assisted {
+	if e.behavior().assistedSign && assisted {
 		return -math.Abs(input)
 	}
 	return input
@@ -154,25 +204,10 @@ func (e Exercise) EncodeFormWeight(input float64, assisted bool) float64 {
 // for time_based. Returns "" when the set is missing the values needed for
 // its exercise type, so callers can drop empty entries.
 func (e Exercise) FormatSetDescription(set Set) string {
-	switch e.ExerciseType {
-	case ExerciseTypeWeighted, ExerciseTypeAssisted:
-		if set.WeightKg == nil || set.CompletedValue == nil {
-			return ""
-		}
-		return fmt.Sprintf("%dx%.1fkg", *set.CompletedValue, *set.WeightKg)
-	case ExerciseTypeBodyweight:
-		if set.CompletedValue == nil {
-			return ""
-		}
-		return fmt.Sprintf("%d reps", *set.CompletedValue)
-	case ExerciseTypeTime:
-		if set.CompletedValue == nil {
-			return ""
-		}
-		return fmt.Sprintf("%ds", *set.CompletedValue)
-	default:
-		return ""
+	if fn := e.behavior().formatSet; fn != nil {
+		return fn(set)
 	}
+	return "" // Unregistered type degrades gracefully, matching the old default case.
 }
 
 // Validate reports whether the exercise's fields form a persistable record.
@@ -217,3 +252,8 @@ func (e Exercise) Validate() error {
 	}
 	return nil
 }
+
+// behavior returns the registered rules for this exercise's type, or the
+// zero exerciseBehavior (LoadUnknown, nil formatter) for an unregistered
+// type so callers degrade gracefully.
+func (e Exercise) behavior() exerciseBehavior { return exerciseBehaviors[e.ExerciseType] }

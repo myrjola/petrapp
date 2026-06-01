@@ -91,20 +91,20 @@ func (app *application) buildProgressionTargets(
 ) (domain.SetTarget, int, error) {
 	var currentSetTarget domain.SetTarget
 	var currentSetTimedTarget int
-	switch exercise.ExerciseType {
-	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
+	switch exercise.LoadModel() {
+	case domain.LoadWeighted:
 		progression, err := app.service.BuildProgression(r.Context(), date, exercise.ID)
 		if err != nil {
 			return domain.SetTarget{}, 0, fmt.Errorf("build progression: %w", err)
 		}
 		currentSetTarget = progression.CurrentSet()
-	case domain.ExerciseTypeTime:
+	case domain.LoadTimed:
 		progression, err := app.service.BuildTimedProgression(r.Context(), date, exercise.ID)
 		if err != nil {
 			return domain.SetTarget{}, 0, fmt.Errorf("build timed progression: %w", err)
 		}
 		currentSetTimedTarget = progression.CurrentSet().TargetSeconds
-	case domain.ExerciseTypeBodyweight:
+	case domain.LoadBodyweight, domain.LoadUnknown:
 		// No progression engine for bodyweight — uses the stored target as-is.
 	}
 	return currentSetTarget, currentSetTimedTarget, nil
@@ -393,19 +393,21 @@ func (app *application) exerciseSetUpdatePOST(w http.ResponseWriter, r *http.Req
 	exerciseSlot := session.Slots[params.Position]
 	exercise := exerciseSlot.Exercise
 
-	switch exercise.ExerciseType {
-	case domain.ExerciseTypeWeighted, domain.ExerciseTypeAssisted:
+	switch exercise.LoadModel() {
+	case domain.LoadWeighted:
 		if !app.recordSetCompletionWithWeight(w, r, params, exercise) {
 			return
 		}
-	case domain.ExerciseTypeTime:
+	case domain.LoadTimed:
 		if !app.recordTimedSetCompletion(w, r, params) {
 			return
 		}
-	case domain.ExerciseTypeBodyweight:
+	case domain.LoadBodyweight:
 		if !app.recordBodyweightSetCompletion(w, r, params) {
 			return
 		}
+	case domain.LoadUnknown:
+		// Unregistered type — record nothing, as the prior switch did.
 	}
 
 	redirect(w, r, fmt.Sprintf("/workouts/%s/exercises/%d",
