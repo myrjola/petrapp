@@ -57,6 +57,16 @@ func (s *Service) Repos() *repository.Repositories {
 	return s.repos
 }
 
+// HealthCheck reports whether the service's database is reachable. It is the
+// readiness probe behind the /api/healthy endpoint: a nil return means the
+// read pool can serve a query right now.
+func (s *Service) HealthCheck(ctx context.Context) error {
+	if err := s.db.HealthCheck(ctx); err != nil {
+		return fmt.Errorf("database health check: %w", err)
+	}
+	return nil
+}
+
 // WithScheduler returns a copy of the service wired to a push scheduler.
 // Called from main.go after the notification package is initialised. Tests
 // that need scheduling behaviour call this with a fake; tests that don't

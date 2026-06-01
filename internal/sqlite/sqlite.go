@@ -211,6 +211,18 @@ func connect(ctx context.Context, url string, logger *slog.Logger) (*Database, e
 	}, nil
 }
 
+// HealthCheck verifies the database is reachable by running a trivial query
+// against the read-only pool. It exercises the full query path (connection
+// checkout + statement execution), so unlike a bare PingContext it catches a
+// pool that hands out connections to a file that can no longer be read.
+func (db *Database) HealthCheck(ctx context.Context) error {
+	var one int
+	if err := db.ReadOnly.QueryRowContext(ctx, "SELECT 1").Scan(&one); err != nil {
+		return fmt.Errorf("health check query: %w", err)
+	}
+	return nil
+}
+
 // Close closes the database connections.
 //
 // If NewDatabase started the background optimizer goroutine, Close cancels it
