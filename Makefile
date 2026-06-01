@@ -58,6 +58,22 @@ lint: bin/golangci-lint
 	@echo "Running linter..."
 	@./bin/golangci-lint run
 
+# fuzz runs the seed corpus for every Fuzz* target as ordinary tests (no fuzzing
+# engine), so it is fast and fits into `make test`-style runs. To actually fuzz,
+# pass FUZZTIME and a single target, e.g.
+#   make fuzz FUZZ=FuzzConvertWeight FUZZTIME=30s
+FUZZ     ?= Fuzz
+FUZZTIME ?=
+.PHONY: fuzz
+fuzz:
+ifeq ($(strip $(FUZZTIME)),)
+	@echo "Running fuzz seed corpora..."
+	@go test --race -run '$(FUZZ)' ./...
+else
+	@echo "Fuzzing $(FUZZ) for $(FUZZTIME)..."
+	@go test -run '^$$' -fuzz '$(FUZZ)' -fuzztime '$(FUZZTIME)' ./internal/domain/
+endif
+
 .PHONY: lint-fix
 lint-fix: bin/golangci-lint
 	@echo "Running linter with auto-fix..."

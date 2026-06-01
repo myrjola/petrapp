@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/domain"
@@ -126,4 +127,74 @@ func TestConvertWeight(t *testing.T) {
 			}
 		})
 	}
+}
+
+// FuzzConvertWeight asserts the structural invariants ConvertWeight must hold
+// across its realistic input domain (finite loads up to 1e6 kg, rep counts
+// within ±100 so we exercise both the non-positive guard and the 1..50 working
+// range). Concrete numeric outputs are pinned by TestConvertWeight; the fuzzer
+// guards the properties that must hold for every input: the output is finite,
+// the passthrough cases return the input untouched, the sign is never flipped,
+// and converted loads always land on the 0.5 kg grid.
+func FuzzConvertWeight(f *testing.F) {
+	seeds := []struct {
+		weight   float64
+		fromReps int
+		toReps   int
+	}{
+		{100.0, 5, 5},  // Same reps (passthrough).
+		{100.0, 5, 8},  // Positive load, lightened.
+		{80.0, 8, 5},   // Positive load, made heavier.
+		{0.0, 5, 8},    // Zero weight (passthrough).
+		{-50.0, 5, 8},  // Assisted load, more assistance.
+		{-50.0, 8, 5},  // Assisted load, less assistance.
+		{0.3, 5, 8},    // Tiny positive load that snaps to zero.
+		{8.0, 8, 5},    // Dumbbell range, whole-kg snap.
+		{42.5, 5, 8},   // Above threshold, 0.5 kg snap.
+		{100.0, 0, 8},  // Zero fromReps (guard).
+		{100.0, 5, 0},  // Zero toReps (guard).
+		{100.0, -3, 8}, // Negative fromReps (guard).
+	}
+	for _, s := range seeds {
+		f.Add(s.weight, s.fromReps, s.toReps)
+	}
+
+	f.Fuzz(func(t *testing.T, weight float64, fromReps, toReps int) {
+		if math.IsNaN(weight) || math.IsInf(weight, 0) || math.Abs(weight) > 1e6 {
+			t.Skip()
+		}
+		if fromReps < -100 || fromReps > 100 || toReps < -100 || toReps > 100 {
+			t.Skip()
+		}
+
+		got := domain.ConvertWeight(weight, fromReps, toReps)
+
+		// Finite, bounded input must never produce NaN or ±Inf.
+		if math.IsNaN(got) || math.IsInf(got, 0) {
+			t.Fatalf("ConvertWeight(%v, %d, %d) = %v; want finite", weight, fromReps, toReps, got)
+		}
+
+		// Zero weight, non-positive reps, or equal reps return the input
+		// unchanged — no scaling reference exists.
+		passthrough := weight == 0 || fromReps <= 0 || toReps <= 0 || fromReps == toReps
+		if passthrough {
+			if got != weight {
+				t.Fatalf("ConvertWeight(%v, %d, %d) = %v; want passthrough %v",
+					weight, fromReps, toReps, got, weight)
+			}
+			return
+		}
+
+		// Sign is never flipped: a positive load stays >= 0, an assisted
+		// (negative) load stays <= 0. Tiny loads may legitimately snap to zero.
+		if (weight > 0 && got < 0) || (weight < 0 && got > 0) {
+			t.Fatalf("ConvertWeight(%v, %d, %d) = %v flipped sign", weight, fromReps, toReps, got)
+		}
+
+		// Converted loads always land on the 0.5 kg grid (whole-kg snapping in
+		// the dumbbell range is a subset of the 0.5 kg grid).
+		if got != math.Round(got*2)/2 {
+			t.Fatalf("ConvertWeight(%v, %d, %d) = %v; not on the 0.5 kg grid", weight, fromReps, toReps, got)
+		}
+	})
 }

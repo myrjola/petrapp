@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -248,20 +249,34 @@ func (app *application) parseExerciseSetURLParams(r *http.Request) (exerciseSetP
 	}, nil
 }
 
+// parseFormWeight parses a per-set weight from raw form input. It accepts both
+// '.' and ',' as the decimal separator — a comma is what European mobile
+// keyboards produce — and applies the exercise's assisted-sign convention via
+// EncodeFormWeight. It rejects values that are not finite numbers (the empty
+// string, non-numeric text, NaN/Inf literals, and magnitudes that overflow
+// float64), none of which is a storable weight.
+func parseFormWeight(raw string, assisted bool, exercise domain.Exercise) (float64, error) {
+	weight, err := strconv.ParseFloat(strings.Replace(raw, ",", ".", 1), 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse weight: %w", err)
+	}
+	if math.IsNaN(weight) || math.IsInf(weight, 0) {
+		return 0, fmt.Errorf("parse weight: %q is not a finite number", raw)
+	}
+	return exercise.EncodeFormWeight(weight, assisted), nil
+}
+
 // recordSetCompletionWithWeight handles parsing and persisting a weighted or assisted set completion from form data.
 func (app *application) recordSetCompletionWithWeight(
 	w http.ResponseWriter, r *http.Request,
 	params exerciseSetParams,
 	exercise domain.Exercise,
 ) bool {
-	weightStr := strings.Replace(r.PostForm.Get("weight"), ",", ".", 1)
-	weight, err := strconv.ParseFloat(weightStr, 64)
+	weight, err := parseFormWeight(r.PostForm.Get("weight"), r.PostForm.Get("assisted") != "", exercise)
 	if err != nil {
-		app.serverError(w, r, fmt.Errorf("parse weight: %w", err))
+		app.serverError(w, r, err)
 		return false
 	}
-
-	weight = exercise.EncodeFormWeight(weight, r.PostForm.Get("assisted") != "")
 
 	var signal *domain.Signal
 	if raw := r.PostForm.Get(signalFormField); raw != "" {
