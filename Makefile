@@ -187,3 +187,38 @@ fly-pprof-goroutine: fly-wake
 	  sleep 2 ; \
 	  curl -fsS -o $$OUT "http://localhost:6060/debug/pprof/goroutine" ; \
 	  echo "  saved $$OUT (open with: go tool pprof -top $$OUT)"
+
+# Load-test shape for fly-stresstest. Override on the command line, e.g.
+# make fly-stresstest FLY_APP=petra-staging STRESS_USERS=50 STRESS_DURATION=5m STRESS_THINK=0.
+STRESS_USERS    ?= 30
+STRESS_DURATION ?= 2m
+STRESS_THINK    ?= 1s
+
+# fly-stresstest drives sustained load against the selected app while capturing CPU + heap
+# profiles spanning the load window, then writes a JSON latency report — the way to profile a
+# bottleneck under load rather than on an idle machine. Spawns the pprof proxy, runs the load,
+# and tears the proxy down on exit. Captures land in pprof/ (cpu-<ts>.pb.gz, heap-<ts>.pb.gz,
+# report-<ts>.json).
+#
+# Refuses prod (petra) unless STRESS_FORCE=1: a run registers synthetic users and writes
+# workout data, so it must never hit prod by accident. Point it at petra-staging instead.
+# The guard is a prerequisite ordered before fly-wake so a misfire never even wakes prod.
+.PHONY: stress-guard
+stress-guard:
+	@if [ "$(FLY_APP)" = "petra" ] && [ -z "$(STRESS_FORCE)" ]; then \
+	  echo "refusing to stresstest prod (petra): it registers synthetic users and writes workout data." >&2 ; \
+	  echo "use FLY_APP=petra-staging, or pass STRESS_FORCE=1 to override." >&2 ; \
+	  exit 1 ; \
+	fi
+
+.PHONY: fly-stresstest
+fly-stresstest: stress-guard fly-wake build
+	@mkdir -p pprof
+	@echo "-> proxying 6060 -> $(FLY_APP)..." ; \
+	  fly proxy --app $(FLY_APP) 6060:6060 >/dev/null 2>&1 & PROXY_PID=$$! ; \
+	  trap "kill $$PROXY_PID 2>/dev/null" EXIT ; \
+	  sleep 2 ; \
+	  echo "-> stresstest ($(STRESS_USERS) users, $(STRESS_DURATION), think $(STRESS_THINK)) -> $(FLY_APP)..." ; \
+	  ./bin/stresstest --users $(STRESS_USERS) --duration $(STRESS_DURATION) --think $(STRESS_THINK) \
+	    --pprof-url http://localhost:6060 --out pprof $(FLY_APP).fly.dev ; \
+	  echo "  captures in pprof/ (open with: go tool pprof --http=: pprof/cpu-<timestamp>.pb.gz)"

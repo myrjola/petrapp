@@ -142,7 +142,41 @@ fly proxy --app $FLY_APP 6060:6060 &
 go tool pprof --http=: "http://localhost:6060/debug/pprof/profile?seconds=30"
 ```
 
-#### Flight Controller for automatic trace capture
+#### Profiling under load
+
+The `fly-pprof-*` targets above profile an **idle** machine. To find a bottleneck you usually want
+a profile captured *while the app is under load*. `make fly-stresstest` does both at once: it
+spawns the pprof proxy, drives sustained synthetic traffic with the `cmd/stresstest` tool, and
+captures CPU + heap profiles spanning the load window plus a JSON latency report.
+
+```sh
+make fly-stresstest FLY_APP=petra-staging
+```
+
+It refuses `FLY_APP=petra` (prod) unless you pass `STRESS_FORCE=1`, because a run registers
+synthetic users and writes workout data — point it at `petra-staging`. Tune the load shape with
+`make` variables:
+
+```sh
+make fly-stresstest FLY_APP=petra-staging \
+  STRESS_USERS=50 STRESS_DURATION=5m STRESS_THINK=0   # 50 users, 5 min, no think time
+```
+
+Captures land in `pprof/` alongside the other profiles:
+
+```sh
+go tool pprof --http=: pprof/cpu-<timestamp>.pb.gz    # CPU profile of the load window
+go tool pprof -top -sample_index=inuse_space pprof/heap-<timestamp>.pb.gz
+cat pprof/report-<timestamp>.json                     # per-route latency percentiles + 4xx/5xx
+```
+
+When reading the heap profile, expect `runtime/trace.readBatch` to dominate `inuse_space` — that
+is the flight recorder's ring buffer (see below), not a request-path leak.
+
+The same scenarios run in-process against a fresh test server every CI run (the smoke test in
+`cmd/web`), so selector or form-field drift fails a test rather than surfacing at profiling time.
+
+#### Flight recorder for automatic trace capture
 
 When a request times out, the app writes a [trace](https://pkg.go.dev/runtime/trace) to a file and logs something like
 the following line:
