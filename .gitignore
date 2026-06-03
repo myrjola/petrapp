@@ -64,6 +64,11 @@ node_modules
 .worktrees
 .claude/worktrees/
 
+# Decrypted secrets: commit only the *.env.age ciphertext, never the plaintext
+# or any age private key. (*.env.example templates are kept.)
+/secrets/*.env
+/secrets/*.key
+
 # Tailnet certs
 /*.crt
 /*.key

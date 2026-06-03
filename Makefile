@@ -14,6 +14,14 @@ FLY_APP ?= petra
 # Path of the production database on the Fly machine.
 FLY_DB_PATH ?= /data/petrapp.sqlite3
 
+# Secrets backup. App secrets (VAPID keypair, OPENAI_API_KEY, Tigris creds) are
+# write-only on Fly and live nowhere else, so we keep an age-encrypted copy in
+# secrets/<app>.env.age (committed) and push it back during recovery. The age
+# PRIVATE key lives outside the repo (default below) and in your password manager.
+AGE_KEY ?= $(HOME)/.config/petrapp/secrets-age.key
+SECRETS_DIR := secrets
+SECRETS_RECIPIENTS := $(SECRETS_DIR)/age-recipients.txt
+
 # Suppress linker warnings on macOS.
 ifeq ($(shell uname -s),Darwin)
 	export CGO_LDFLAGS := -w
@@ -238,3 +246,52 @@ fly-stresstest: stress-guard fly-wake build
 	  ./bin/stresstest --users $(STRESS_USERS) --duration $(STRESS_DURATION) --think $(STRESS_THINK) \
 	    --pprof-url http://localhost:6060 --out pprof $(FLY_APP).fly.dev ; \
 	  echo "  captures in pprof/ (open with: go tool pprof --http=: pprof/cpu-<timestamp>.pb.gz)"
+
+# ── Secrets backup (age-encrypted env files) ─────────────────────────
+# One-time setup:
+#   1. make secrets-keygen                  # creates the age key + prints the public key
+#   2. add the printed public key to secrets/age-recipients.txt
+#   3. cp secrets/petra.env.example secrets/petra.env  # fill in real values from `fly secrets`
+#   4. make secrets-encrypt FLY_APP=petra && rm secrets/petra.env
+#   5. commit secrets/petra.env.age
+# Recovery: make fly-secrets-push FLY_APP=petra  (decrypts and imports into Fly).
+# See secrets/README.md for the full workflow.
+
+.PHONY: secrets-keygen
+secrets-keygen:
+	@command -v age-keygen >/dev/null 2>&1 || { echo "age-keygen not found; install age: https://github.com/FiloSottile/age" >&2 ; exit 1 ; }
+	@if [ -f "$(AGE_KEY)" ]; then echo "age key already exists at $(AGE_KEY); refusing to overwrite" >&2 ; exit 1 ; fi
+	@mkdir -p "$(dir $(AGE_KEY))"
+	@age-keygen -o "$(AGE_KEY)"
+	@echo
+	@echo "Public key (add it to $(SECRETS_RECIPIENTS)):"
+	@age-keygen -y "$(AGE_KEY)"
+	@echo
+	@echo "BACK UP the PRIVATE key at $(AGE_KEY) in your password manager — without it the .age files cannot be decrypted."
+
+.PHONY: secrets-encrypt
+secrets-encrypt:
+	@command -v age >/dev/null 2>&1 || { echo "age not found; install age: https://github.com/FiloSottile/age" >&2 ; exit 1 ; }
+	@test -s "$(SECRETS_RECIPIENTS)" || { echo "no recipients in $(SECRETS_RECIPIENTS); run 'make secrets-keygen' and add the public key" >&2 ; exit 1 ; }
+	@test -f "$(SECRETS_DIR)/$(FLY_APP).env" || { echo "missing plaintext $(SECRETS_DIR)/$(FLY_APP).env (copy from $(SECRETS_DIR)/petra.env.example)" >&2 ; exit 1 ; }
+	@age -R "$(SECRETS_RECIPIENTS)" -o "$(SECRETS_DIR)/$(FLY_APP).env.age" "$(SECRETS_DIR)/$(FLY_APP).env"
+	@echo "encrypted -> $(SECRETS_DIR)/$(FLY_APP).env.age"
+	@echo "now delete the plaintext: rm $(SECRETS_DIR)/$(FLY_APP).env"
+
+.PHONY: secrets-decrypt
+secrets-decrypt:
+	@command -v age >/dev/null 2>&1 || { echo "age not found; install age: https://github.com/FiloSottile/age" >&2 ; exit 1 ; }
+	@test -f "$(AGE_KEY)" || { echo "no age key at $(AGE_KEY); restore it from your password manager" >&2 ; exit 1 ; }
+	@test -f "$(SECRETS_DIR)/$(FLY_APP).env.age" || { echo "missing $(SECRETS_DIR)/$(FLY_APP).env.age" >&2 ; exit 1 ; }
+	@age -d -i "$(AGE_KEY)" -o "$(SECRETS_DIR)/$(FLY_APP).env" "$(SECRETS_DIR)/$(FLY_APP).env.age"
+	@echo "decrypted -> $(SECRETS_DIR)/$(FLY_APP).env (gitignored; delete when done editing, then re-run secrets-encrypt)"
+
+# fly-secrets-push decrypts the committed ciphertext straight into `fly secrets import`
+# over a pipe, so the plaintext never touches disk. This triggers a Fly release.
+.PHONY: fly-secrets-push
+fly-secrets-push:
+	@command -v age >/dev/null 2>&1 || { echo "age not found; install age: https://github.com/FiloSottile/age" >&2 ; exit 1 ; }
+	@test -f "$(AGE_KEY)" || { echo "no age key at $(AGE_KEY); restore it from your password manager" >&2 ; exit 1 ; }
+	@test -f "$(SECRETS_DIR)/$(FLY_APP).env.age" || { echo "missing $(SECRETS_DIR)/$(FLY_APP).env.age" >&2 ; exit 1 ; }
+	@echo "-> importing secrets into $(FLY_APP) from $(SECRETS_DIR)/$(FLY_APP).env.age"
+	@age -d -i "$(AGE_KEY)" "$(SECRETS_DIR)/$(FLY_APP).env.age" | fly secrets import --app "$(FLY_APP)"

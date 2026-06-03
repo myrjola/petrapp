@@ -32,9 +32,10 @@ resource); the secrets do **not** unless stashed offline.
 
 ## Full rebuild procedure ("app deleted")
 
-Prerequisite: `fly auth whoami` works, and you have the **VAPID keypair**,
-**`OPENAI_API_KEY`**, and **Tigris credentials** from your offline stash (see
-Gap list — today these exist only inside Fly).
+Prerequisite: `fly auth whoami` works, and you have the **age private key**
+(`~/.config/petrapp/secrets-age.key`) from your password manager so you can
+decrypt `secrets/petra.env.age` (the **VAPID keypair**, **`OPENAI_API_KEY`**, and
+**Tigris credentials**). See `secrets/README.md` and gap-list item 2.
 
 ```sh
 # 1. Recreate the app.
@@ -48,12 +49,11 @@ fly apps create petra
 fly storage list                       # find the surviving bucket
 # ... obtain AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY for it ...
 
-# 3. Restore all non-data secrets from the offline stash.
-fly secrets set --app petra \
-  PETRAPP_VAPID_PUBLIC=…  PETRAPP_VAPID_PRIVATE=…  PETRAPP_VAPID_SUBJECT=… \
-  OPENAI_API_KEY=… \
-  AWS_ACCESS_KEY_ID=…  AWS_SECRET_ACCESS_KEY=…  BUCKET_NAME=…  \
-  AWS_ENDPOINT_URL_S3=…  AWS_REGION=…
+# 3. Restore all non-data secrets from the age-encrypted backup. Requires the
+#    age private key from your password manager at ~/.config/petrapp/secrets-age.key.
+#    Decrypts secrets/petra.env.age and pipes it into `fly secrets import`.
+make fly-secrets-push FLY_APP=petra
+#    (If you must do it by hand, the required keys are listed in secrets/petra.env.example.)
 
 # 4. Deploy. The entrypoint is `litestream replicate -exec ./petrapp`, which
 #    restores /data/petrapp.sqlite3 from the replica on first boot if absent.
@@ -82,12 +82,16 @@ fly ssh console --app petra --user petrapp \
    mint **new** keys for an existing bucket (so a deleted app doesn't lock you
    out of an intact backup). This is the single most important unknown — losing
    the keys while keeping the bucket is still a lockout.
-2. **⚠️ Stash the unrecoverable secrets offline.** Put the VAPID keypair
-   (`PETRAPP_VAPID_PUBLIC/PRIVATE/SUBJECT`), `OPENAI_API_KEY`, and the Tigris
-   creds in a password manager. They exist only inside Fly today; if the app is
-   deleted they are gone. Regenerating VAPID breaks all push subscriptions.
+2. **⚠️ Populate the encrypted secrets backup.** Tooling now exists
+   (`secrets/<app>.env.age` + `make fly-secrets-push`; see `secrets/README.md`).
+   Remaining one-time actions: run `make secrets-keygen`, **stash the age private
+   key in your password manager**, fill `secrets/petra.env` from the live values,
+   and `make secrets-encrypt` + commit `secrets/petra.env.age`. Until then the
+   VAPID keypair, `OPENAI_API_KEY`, and Tigris creds exist only inside Fly and are
+   lost if the app is deleted. Regenerating VAPID breaks all push subscriptions.
 3. **Record bucket name + endpoint outside Fly.** `BUCKET_NAME` and
-   `AWS_ENDPOINT_URL_S3` are needed to rebuild and aren't in git.
+   `AWS_ENDPOINT_URL_S3` are needed to rebuild and aren't in git — they are
+   captured in the encrypted `secrets/<app>.env.age` once item 2 is done.
 4. **(Informational — not a fault) Large WAL is expected.** Staging showed a
    244 MB `petrapp.sqlite3-wal` against a 5.3 MB DB. This is by design: the app
    disables SQLite autocheckpoint (`PRAGMA wal_autocheckpoint = 0`,

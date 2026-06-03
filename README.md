@@ -67,6 +67,10 @@ This project uses [Fly.io](https://fly.io/) for infrastructure and [Litestream](
 for [SQLite](https://www.sqlite.org/) database backups. It's a single instance Dockerized application with a persistent
 volume. Try `fly launch` to configure your own. You might also need to add some secrets with `fly secrets`.
 
+App secrets (VAPID keypair, `OPENAI_API_KEY`, Tigris creds) are write-only on Fly and not in git, so a
+backup copy is kept age-encrypted under [`secrets/`](secrets/README.md) and restored during recovery with
+`make fly-secrets-push`.
+
 ### Database access
 
 The container image contains the `sqlite3` binary so you can manipulate the live database. There are three flavours:
