@@ -114,6 +114,26 @@ linters:
           deny:
             - pkg: log$
               desc: Use log/slog instead, see https://go.dev/blog/slog
+        "platform-stays-product-agnostic":
+          files:
+            - "**/internal/platform/**"
+          deny:
+            - pkg: github.com/myrjola/petrapp/internal/petra
+              desc: platform/ must not depend on product code (internal/petra)
+            - pkg: github.com/myrjola/petrapp/cmd
+              desc: platform/ must not depend on any app (cmd/)
+        "example-app-isolation":
+          files:
+            - "**/cmd/example/**"
+          deny:
+            - pkg: github.com/myrjola/petrapp/internal/petra
+              desc: cmd/example must not import petra product code; share via internal/platform
+        "petra-app-isolation":
+          files:
+            - "**/cmd/petra/**"
+          deny:
+            - pkg: github.com/myrjola/petrapp/internal/example
+              desc: cmd/petra must not import another app's internal packages
     errcheck:
       check-type-assertions: true
     exhaustive:
