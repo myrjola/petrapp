@@ -1,24 +1,24 @@
 # Template & CSS Guidelines - UI Layer
 
-Guidelines for working with Go templates, CSS architecture, and design systems in `ui/templates/` and `ui/static/`.
+Guidelines for working with Go templates, CSS architecture, and design systems in `cmd/petra/ui/templates/` and `cmd/petra/ui/static/`.
 
 ## What lives here
 
 - **Page templates** (`pages/`) and **shared components** (`components/`) —
   Go `html/template` markup.
-- **CSS** — colocated scoped `<style>` blocks plus the global `ui/static/main.css`.
-- **Static assets** (`ui/static/`) — `main.js`, `webauthn.js`, icons.
+- **CSS** — colocated scoped `<style>` blocks plus the global `cmd/petra/ui/static/main.css`.
+- **Static assets** (`cmd/petra/ui/static/`) — `main.js`, `webauthn.js`, icons.
 
 ## What does NOT live here
 
-- Handler-side data preparation and per-template data structs — `cmd/web/`.
-- Business rules and display derivations on domain types — `internal/domain/`.
+- Handler-side data preparation and per-template data structs — `cmd/petra/`.
+- Business rules and display derivations on domain types — `internal/petra/domain/`.
 
 ## Design Language
 
 The visual identity is an *editorial training logbook* — warm, restrained,
 low-density. **Before any visual or CSS work, read
-[`docs/design-system.md`](../../docs/design-system.md)** — the full design
+[`docs/design-system.md`](../../../../docs/design-system.md)** — the full design
 language, the design-token catalogue, and the colour / motion / active-state
 conventions live there.
 
@@ -35,11 +35,11 @@ Non-negotiables that hold even for non-visual changes:
 
 ### Template Organization
 
-- Page templates are organized in `/ui/templates/pages/{pageName}/` folders
+- Page templates are organized in `cmd/petra/ui/templates/pages/{pageName}/` folders
 - Each page template defines a `{{ define "page" }}` block
 - All pages extend the base template which provides the HTML structure
-- Include gotype comments at the top: `{{- /*gotype: github.com/myrjola/petrapp/cmd/web.TemplateDataType*/ -}}`. This is read by the JetBrains Go Template plugin to give type-aware completion inside the template. Keep the fully-qualified struct path in sync when you rename the Go type — nothing will fail to compile if it drifts, but IDE hints will silently go stale
-- Reusable components live in `/ui/templates/components/` and are available to every page automatically — see "Shared Components" below
+- Include gotype comments at the top: `{{- /*gotype: github.com/myrjola/petrapp/cmd/petra.TemplateDataType*/ -}}`. This is read by the JetBrains Go Template plugin to give type-aware completion inside the template. Keep the fully-qualified struct path in sync when you rename the Go type — nothing will fail to compile if it drifts, but IDE hints will silently go stale
+- Reusable components live in `cmd/petra/ui/templates/components/` and are available to every page automatically — see "Shared Components" below
 
 ### JavaScript in Templates
 
@@ -47,7 +47,7 @@ Non-negotiables that hold even for non-visual changes:
 
 - Include JavaScript directly in template files using `<script {{ $.Nonce }}>` tags
 - Inline scripts provide better developer experience (no cache busting needed)
-- Static files in `/ui/static/` are cached with fingerprinted filenames for performance
+- Static files in `cmd/petra/ui/static/` are cached with fingerprinted filenames for performance
 - Changing static files requires renaming them to bust the cache
 - Inline scripts update immediately when templates are reloaded
 
@@ -73,7 +73,7 @@ Non-negotiables that hold even for non-visual changes:
 
 ### Where Components Live
 
-- Component templates live in `/ui/templates/components/*.gohtml`
+- Component templates live in `cmd/petra/ui/templates/components/*.gohtml`
 - Every file in this folder is parsed alongside every page, so any `{{ define "component-name" }}` block defined here is callable from any page via `{{ template "component-name" <data> }}`
 - One component per file; the filename should match the defined template name (e.g. `back-link.gohtml` defines `back-link`)
 - Keep the dot (`.`) passed to a component minimal — a string, a small struct — not the whole page data
@@ -91,7 +91,7 @@ A component's delivery mechanism is decided by what it must *guarantee*:
 - **Go partial** (`components/*.gohtml`, colocated `@scope` `<style>`) — for
   pieces that enforce accessibility or structure: `field`, `banner`,
   `page-header`, `back-link`. The caller passes a small dot and cannot forget
-  the a11y wiring. Dot structs live in `cmd/web/components.go`.
+  the a11y wiring. Dot structs live in `cmd/petra/components.go`.
 - **CSS class** (`main.css @layer components`) — for pure-paint pieces on a
   semantic element: `button`/`.btn`, `.badge`, `.card`. These compose freely
   and have zero per-render cost.
@@ -120,21 +120,21 @@ they're touched, so the bar to escape the primitives is highest there.
 **Partials** (call via `{{ template "name" <dot> }}`):
 
 - `back-link` — "← Back" anchor wired to the Navigation API. Dot:
-  `cmd/web.BackLinkData` (`Href`, `Nonce`); construct via the `backLink`
+  `cmd/petra.BackLinkData` (`Href`, `Nonce`); construct via the `backLink`
   template helper that builds it from the page's `$.Nonce`.
   ```gohtml
   {{ template "back-link" (backLink "/" $.Nonce) }}
   {{ template "back-link" (backLink (printf "/workouts/%s" (.Date.Format "2006-01-02")) $.Nonce) }}
   ```
 - `banner` — server-message display (flash errors, notices). Dot:
-  `cmd/web.BannerData` (`Variant` ∈ `error`/`success`/`info`, `Message`).
+  `cmd/petra.BannerData` (`Variant` ∈ `error`/`success`/`info`, `Message`).
   Renders nothing when `Message` is empty.
 - `page-header` — a page's single `<h1>` with optional subtitle. Dot:
-  `cmd/web.PageHeaderData` (`Title`, `Subtitle`). Render meta/badges as
+  `cmd/petra.PageHeaderData` (`Title`, `Subtitle`). Render meta/badges as
   siblings after it, not inside it.
 - `field` — a labelled single text input; guarantees the `<label for>` ↔
   `<input id>` binding and `aria-describedby` → hint wiring. Dot:
-  `cmd/web.FieldData`. Covers `<input>` only — `<select>`, `<textarea>` and
+  `cmd/petra.FieldData`. Covers `<input>` only — `<select>`, `<textarea>` and
   checkbox/radio groups stay as inline markup.
 
 **Class-components** (`main.css @layer components`):
@@ -157,7 +157,7 @@ they're touched, so the bar to escape the primitives is highest there.
 `.grid-auto`, `.center`.
 
 The `/dev/styleguide` page is the living catalog — add an entry there for any
-new component, and assert it in `cmd/web/handler-styleguide_test.go`.
+new component, and assert it in `cmd/petra/handler-styleguide_test.go`.
 
 ### Styling Components
 
@@ -183,7 +183,7 @@ Markdown rendering happens in the handler — pre-render to `template.HTML` and 
 
 - **All `<style>` and `<script>` tags must carry their `Nonce` (`{{ .Nonce }}` inside a component, `{{ $.Nonce }}` inside a page)** so the CSP nonce-allowlist accepts them.
 - **Never use inline `style="..."` attributes on elements.** The CSP `style-src` directive uses a nonce, and once a nonce is present in CSP Level 3 the `'unsafe-inline'` keyword is ignored even for style attributes — the browser silently drops the rule. Nonces apply to `<style>` elements, not to attributes; there is no way to "nonce" an inline attribute.
-  - **For dynamic CSS values driven by template data** (e.g. one rule per token, or a value that depends on a handler-prepared list): emit the rules from inside a nonce'd `<style>` block by ranging over the data, then reference them from the markup as plain class names. See `ui/templates/pages/styleguide/styleguide.gohtml` for a worked example — it generates `.bg-{token}`, `.w-{token}`, `.fs-{token}` etc. inside `<style {{ $.Nonce }}>` and the markup just uses the class.
+  - **For dynamic CSS values driven by template data** (e.g. one rule per token, or a value that depends on a handler-prepared list): emit the rules from inside a nonce'd `<style>` block by ranging over the data, then reference them from the markup as plain class names. See `cmd/petra/ui/templates/pages/styleguide/styleguide.gohtml` for a worked example — it generates `.bg-{token}`, `.w-{token}`, `.fs-{token}` etc. inside `<style {{ $.Nonce }}>` and the markup just uses the class.
   - **For one-off dynamic values** (e.g. a unique `view-transition-name` per row): same approach — emit a single rule inside a `<style {{ $.Nonce }}>` adjacent to the element, scoped via `@scope` or a unique class/data-attribute.
 
 Example:
@@ -200,7 +200,7 @@ Example:
 
 ## JavaScript & CSP (Trusted Types)
 
-The CSP set in `cmd/web/middleware.go` includes `require-trusted-types-for 'script'`. The browser then rejects raw strings passed to "script-loading sinks" — they must be a `TrustedHTML`, `TrustedScript`, or `TrustedScriptURL` value produced by a `TrustedTypePolicy`. Forget this and the call throws `TypeError: This assignment requires a TrustedScriptURL` (or `TrustedHTML` / `TrustedScript`).
+The CSP set in `cmd/petra/middleware.go` includes `require-trusted-types-for 'script'`. The browser then rejects raw strings passed to "script-loading sinks" — they must be a `TrustedHTML`, `TrustedScript`, or `TrustedScriptURL` value produced by a `TrustedTypePolicy`. Forget this and the call throws `TypeError: This assignment requires a TrustedScriptURL` (or `TrustedHTML` / `TrustedScript`).
 
 ### Sinks to avoid
 
@@ -214,7 +214,7 @@ The CSP set in `cmd/web/middleware.go` includes `require-trusted-types-for 'scri
 
 The CSP would block string-to-HTML conversion anyway, and there's no reason to assemble markup at runtime when the server already renders templates. Patterns to prefer:
 
-- **Text into an existing element** — set `textContent` (or `innerText`). Both are inert to markup. Existing examples: `errorEl.textContent = msg` in `ui/templates/pages/preferences/preferences.gohtml`, `timeEl.textContent = m + ':' + …` in `ui/templates/pages/exerciseset/sets-container.gohtml`.
+- **Text into an existing element** — set `textContent` (or `innerText`). Both are inert to markup. Existing examples: `errorEl.textContent = msg` in `cmd/petra/ui/templates/pages/preferences/preferences.gohtml`, `timeEl.textContent = m + ':' + …` in `cmd/petra/ui/templates/pages/exerciseset/sets-container.gohtml`.
 - **Build new nodes** — `document.createElement(tag)`, set properties via setters (`el.className`, `el.dataset.x`, `el.href`), append with `el.append(child, ' text ', otherChild)`. Plain strings passed to `append` become text nodes, not parsed HTML.
 - **Repeat server-rendered markup client-side** — declare an inert `<template id="…">` block in the page template (the `<template>` element is parsed but its contents aren't rendered), then `template.content.cloneNode(true)` in JS and fill in the clone with `textContent` / property setters. The markup still lives in the server template, which means it's still typechecked by gotype comments and styled by the page's `<style>` block.
 - **Show/hide** — toggle classes (`.classList.add('hidden')` / `.remove('hidden')`); don't swap in pre-built HTML strings.
@@ -223,9 +223,9 @@ The CSP would block string-to-HTML conversion anyway, and there's no reason to a
 
 When you genuinely have to load a script (a service worker, a Worker), define a `TrustedTypePolicy` whose `createScriptURL` callback whitelists the exact URLs and feed all URLs through it. The policy is the one chokepoint where the allowlist lives, so a code review only has to audit that callback.
 
-The service-worker URL already goes through one such policy. Don't call `navigator.serviceWorker.register('/sw.js')` directly — call `registerServiceWorker()` from `ui/static/main.js`, which routes through the `sw-loader` policy. If you need to load a new script URL, **add it to that policy's allowlist** rather than creating a second policy: a policy name can only be created once per realm, and the CSP has no `trusted-types … 'allow-duplicates'` directive, so `createPolicy('sw-loader', …)` a second time throws.
+The service-worker URL already goes through one such policy. Don't call `navigator.serviceWorker.register('/sw.js')` directly — call `registerServiceWorker()` from `cmd/petra/ui/static/main.js`, which routes through the `sw-loader` policy. If you need to load a new script URL, **add it to that policy's allowlist** rather than creating a second policy: a policy name can only be created once per realm, and the CSP has no `trusted-types … 'allow-duplicates'` directive, so `createPolicy('sw-loader', …)` a second time throws.
 
-Dynamic `import()` of bare specifiers resolved through the `<script type="importmap">` (e.g. `await import("webauthn")`) is the existing pattern for code-split modules; it works because import-map keys aren't treated as URL sinks. Stick with it for new modules — register them in the importmap in `ui/templates/base.gohtml`.
+Dynamic `import()` of bare specifiers resolved through the `<script type="importmap">` (e.g. `await import("webauthn")`) is the existing pattern for code-split modules; it works because import-map keys aren't treated as URL sinks. Stick with it for new modules — register them in the importmap in `cmd/petra/ui/templates/base.gohtml`.
 
 ### Inline scripts are still preferred
 
@@ -240,7 +240,7 @@ changes" pattern, announced by screen readers without focus moves. Use
 `textContent` only (CSP / Trusted Types blocks `innerHTML`). The skeleton is
 *not* for server-originating errors: those flow through `app.userError` →
 flash + redirect → server-rendered `banner` component on the next GET — see
-[`cmd/web/CLAUDE.md`](../../cmd/web/CLAUDE.md) "Error Handling". Keep the
+[`cmd/petra/CLAUDE.md`](../../CLAUDE.md) "Error Handling". Keep the
 client surface as a true last resort.
 
 ## CSS Architecture and Scoping
@@ -439,9 +439,9 @@ to its own line instead of bleeding past the card.
 Templates should range, format primitives, and conditionally render — nothing
 more. Anything that branches on multiple fields, builds a collection, or
 derives a value belongs in the handler. The full rule + worked examples live
-in [`cmd/web/CLAUDE.md`](../../cmd/web/CLAUDE.md) under "Data Transformation
+in [`cmd/petra/CLAUDE.md`](../../CLAUDE.md) under "Data Transformation
 Patterns"; the domain-rule escalation lives in
-[`internal/domain/CLAUDE.md`](../../internal/domain/CLAUDE.md) under "Display
+[`internal/petra/domain/CLAUDE.md`](../../../../internal/petra/domain/CLAUDE.md) under "Display
 derivations belong on domain types."
 
 Inline `printf` for one-off URL construction is idiomatic:
@@ -450,7 +450,7 @@ Pre-build URLs in the handler only when the same URL appears in several places
 on the page or the path depends on non-trivial logic.
 
 When a template fails to render: missing function ⇒ check `templateFuncs`
-in `cmd/web/handlers.go` and consider moving the logic to data preparation; nil
+in `cmd/petra/handlers.go` and consider moving the logic to data preparation; nil
 pointer ⇒ validate the data shape in the handler; unexpected-token ⇒ check
 scoped CSS blocks for unclosed braces.
 
@@ -472,7 +472,7 @@ scoped CSS blocks for unclosed braces.
 
 Templates are exercised through `e2etest`-driven handler tests that submit
 real HTML and assert against goquery selections — see
-[`cmd/web/CLAUDE.md`](../../cmd/web/CLAUDE.md) "Testing with e2etest" for the
+[`cmd/petra/CLAUDE.md`](../../CLAUDE.md) "Testing with e2etest" for the
 canonical patterns. When authoring markup: prefer semantic elements, give
 forms descriptive `action` attributes, and keep button/heading text stable so
 selectors stay resilient.

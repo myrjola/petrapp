@@ -1,6 +1,6 @@
 # Web Layer Guidelines - HTTP Handlers & Routing
 
-Guidelines for working with HTTP handlers, routing, middleware, and web server components in `cmd/web/`.
+Guidelines for working with HTTP handlers, routing, middleware, and web server components in `cmd/petra/`.
 
 ## What lives here
 
@@ -14,10 +14,10 @@ Guidelines for working with HTTP handlers, routing, middleware, and web server c
 
 ## What does NOT live here
 
-- Business rules and aggregate methods — `internal/domain/`.
-- Cross-aggregate orchestration and external integrations — `internal/service/`.
-- SQL queries and persistence — `internal/repository/`.
-- Template markup and CSS — `ui/templates/`.
+- Business rules and aggregate methods — `internal/petra/domain/`.
+- Cross-aggregate orchestration and external integrations — `internal/petra/service/`.
+- SQL queries and persistence — `internal/petra/repository/`.
+- Template markup and CSS — `cmd/petra/ui/templates/`.
 
 ## Handler Structure
 
@@ -67,7 +67,7 @@ type workoutTemplateData struct {
 - Transform enums to display-friendly structures with labels
 - Compute derived values and format data before template rendering
 - Create maps for lookups to avoid complex template logic
-- **Don't recompute domain rules.** Handlers may format primitives and shape data, but any value that depends on multiple domain fields must come from a method on the domain type. If you find yourself writing `if exercise.X && session.Y { ... }` in a handler, move it to `internal/domain/`.
+- **Don't recompute domain rules.** Handlers may format primitives and shape data, but any value that depends on multiple domain fields must come from a method on the domain type. If you find yourself writing `if exercise.X && session.Y { ... }` in a handler, move it to `internal/petra/domain/`.
 
 Example:
 
@@ -85,7 +85,7 @@ Difficulties: []difficultyOption{
 ### Using app.render()
 
 - Use `app.render(w, r, statusCode, "template-name", data)` for all template rendering
-- Template name corresponds to folder in `/ui/templates/pages/{template-name}/`
+- Template name corresponds to folder in `cmd/petra/ui/templates/pages/{template-name}/`
 - Always provide appropriate HTTP status code (200, 404, etc.)
 - Pass structured data, not maps or raw values
 
@@ -147,7 +147,7 @@ Every POST handler ends in exactly one of:
 
 #### `serverError` on POST navigates to `/error`
 
-The stack-navigator JS shim (`ui/static/main.js`) intercepts every form
+The stack-navigator JS shim (`cmd/petra/ui/static/main.js`) intercepts every form
 POST, replays it via `fetch`, and on any non-200 response calls
 `location.reload()` — CSP / Trusted Types block injecting the response
 body in place. Historically that meant `serverError` on a POST produced
@@ -230,7 +230,7 @@ produce a redirect loop.
 - Check for specific business errors using `errors.Is(err, domain.ErrNotFound)`.
 - For user-actionable business failures, return a `domain.ValidationError`
   from the service / domain layer so `userError` can surface the message
-  verbatim. Example: `internal/service/exercises.go:AddExercise` returns
+  verbatim. Example: `internal/petra/service/exercises.go:AddExercise` returns
   `domain.ValidationError{Message: "This day has no planned workout..."}`
   on the missing-session branch.
 - For system faults the user cannot fix, return the wrapped underlying
@@ -247,12 +247,12 @@ path. They now route through the shim-aware helpers:
   shim POSTs and render the 500 inline otherwise.
 - `mustAdmin` → `redirect(w, r, "/")`. Non-admins are bounced to home;
   the 401 status code has been retired.
-- `webauthnhandler.AuthenticateMiddleware` → injected
+- `auth.AuthenticateMiddleware` → injected
   `InternalErrorHandler` (wired to `app.serverError` in `main.go`).
   DB lookup failures land on `/error` instead of producing a silent
   500.
 
-The injection point on `webauthnhandler` keeps the package unaware of
+The injection point on `auth` keeps the package unaware of
 the stack-navigator wire protocol. If you add another middleware in
 that package, route its internal errors through `h.internalError` and
 they will inherit the same UX.
@@ -264,7 +264,7 @@ failures (offline / DNS / CORS) — **not** for server-originating messages.
 Any server response (2xx or not) drives navigation or reload through the wire
 protocol, so the `userError` → flash → redirect path stays canonical for
 server messages. Markup, accessibility, and Trusted-Types detail live in
-[`ui/templates/CLAUDE.md`](../../ui/templates/CLAUDE.md) under "Client-only
+[`cmd/petra/ui/templates/CLAUDE.md`](ui/templates/CLAUDE.md) under "Client-only
 error surface".
 
 ## Redirects and Navigation
@@ -297,7 +297,7 @@ The `e2etest` package (`internal/e2etest/`) provides a real HTTP server bound to
 ### End-to-End Testing Pattern
 
 ```go
-server, err := e2etest.StartServer(ctx, testhelpers.NewWriter(t), testLookupEnv, run)
+server, err := e2etest.StartServer(ctx, testkit.NewWriter(t), testLookupEnv, run)
 if err != nil {
   t.Fatalf("Failed to start server: %v", err)
 }
@@ -339,7 +339,7 @@ if doc.Find("h1:contains('Add Exercise')").Length() == 0 {
 
 ## End-to-end testing with Playwright
 
-`cmd/web/playwright_test.go` drives real Chromium against a live server to
+`cmd/petra/playwright_test.go` drives real Chromium against a live server to
 cover flows that exercise the JS shim — stack-navigator behavior, bfcache
 staleness, WebAuthn auth. The Go binding is
 `github.com/playwright-community/playwright-go`. Tests skip under
@@ -380,7 +380,7 @@ Reach for data attributes (`a[data-back-button]`, `a[data-workout-exercise-id]`)
 when a stable contract attribute exists *specifically* as a test/JS hook —
 those won't move under a styling refactor. Use bare CSS classes
 (`button.too-heavy-btn`, `a.add-exercise-link`) only as a last resort; a
-class rename in `ui/templates/` shouldn't break tests.
+class rename in `cmd/petra/ui/templates/` shouldn't break tests.
 
 ### Helpers for repeated flows
 
@@ -467,7 +467,7 @@ Playwright Inspector wired up; `page.Pause()` in a test will drop into
 the inspector at that point.
 
 ```
-PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/web/
+PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/petra/
 ```
 
 Run a single test for fast iteration. For URL-mismatch failures, prefer

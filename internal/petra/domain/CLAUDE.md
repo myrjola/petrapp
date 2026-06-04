@@ -1,6 +1,6 @@
 # Domain — Pure Entities & Business Rules
 
-The `internal/domain` package is the canonical home for the workout
+The `internal/petra/domain` package is the canonical home for the workout
 bounded context's pure logic. It depends on the Go standard library
 only — no SQL, no HTTP, no logger, no third-party clients.
 
@@ -29,15 +29,15 @@ only — no SQL, no HTTP, no logger, no third-party clients.
   source of truth for exercise-form validation and returns one. Unlike a
   sentinel (matched with `errors.Is`), callers detect it with `errors.As`
   and surface the message through the flash + banner flow — see
-  `cmd/web/CLAUDE.md`.
+  `cmd/petra/CLAUDE.md`.
 
 ## What does NOT live here
 
-- SQL, query strings, transactions — those live in `internal/repository`
-  (see `internal/repository/CLAUDE.md`).
-- HTTP handlers, template data shaping — `cmd/web`.
+- SQL, query strings, transactions — those live in `internal/petra/repository`
+  (see `internal/petra/repository/CLAUDE.md`).
+- HTTP handlers, template data shaping — `cmd/petra`.
 - Service orchestration that touches multiple aggregates or external systems
-  (OpenAI) — `internal/service` (see `internal/service/CLAUDE.md`).
+  (OpenAI) — `internal/petra/service` (see `internal/petra/service/CLAUDE.md`).
 - `sql.ErrNoRows` aliasing — `domain.ErrNotFound` is its own sentinel; the
   repository translates at the boundary.
 
@@ -52,7 +52,7 @@ into per-page template structs, but they may not branch on multiple
 domain fields to compute a value.
 
 **Test:** if changing the rule would force edits in two or more
-files outside `internal/domain/`, it is a domain method.
+files outside `internal/petra/domain/`, it is a domain method.
 
 ## Aggregate methods
 
@@ -61,4 +61,4 @@ method on the aggregate over a free function in service code. The
 method enforces invariants in one place and returns a sentinel error
 when violated; the service layer calls the method inside a repository
 Update closure (the closure pattern is what gives us atomicity — see
-`internal/repository/CLAUDE.md`).
+`internal/petra/repository/CLAUDE.md`).

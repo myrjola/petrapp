@@ -1,14 +1,14 @@
 # Service — Orchestration Layer
 
-The `internal/service` package coordinates work across `internal/domain`
-and `internal/repository`, exposes the API consumed by `cmd/web` HTTP
+The `internal/petra/service` package coordinates work across `internal/petra/domain`
+and `internal/petra/repository`, exposes the API consumed by `cmd/petra` HTTP
 handlers, and owns the small set of integrations that don't fit either
 of the lower layers (OpenAI exercise generation, GDPR export).
 
-It depends on `internal/domain`, `internal/repository`, `internal/sqlite`
-(only for the `*sqlite.Database` handle that GDPR export passes through),
-and `internal/contexthelpers`. It does NOT depend on `cmd/web` or
-`ui/templates`.
+It depends on `internal/petra/domain`, `internal/petra/repository`, `internal/platform/sqlitekit`
+(only for the `*sqlitekit.Database` handle that GDPR export passes through),
+and `internal/platform/contexthelpers`. It does NOT depend on `cmd/petra` or
+`cmd/petra/ui/templates`.
 
 ## What lives here
 
@@ -36,16 +36,17 @@ and `internal/contexthelpers`. It does NOT depend on `cmd/web` or
   tree, and the wrapping `GenerateExercise` service method that
   persists the result.
 - **GDPR export** (`export.go`): `ExportUserData` — the only method
-  that touches `*sqlite.Database` directly.
+  that touches `*sqlitekit.Database` directly.
 
 ## What does NOT live here
 
-- **Pure rules / value objects / aggregate methods:** `internal/domain/`.
-  See `internal/domain/CLAUDE.md`.
-- **SQL queries / repository implementations:** `internal/repository/`.
-  See `internal/repository/CLAUDE.md`.
-- **HTTP handlers, request/response shaping, CSRF, sessions:** `cmd/web/`.
-- **Schema and migrations:** `internal/sqlite/`.
+- **Pure rules / value objects / aggregate methods:** `internal/petra/domain/`.
+  See `internal/petra/domain/CLAUDE.md`.
+- **SQL queries / repository implementations:** `internal/petra/repository/`.
+  See `internal/petra/repository/CLAUDE.md`.
+- **HTTP handlers, request/response shaping, CSRF, sessions:** `cmd/petra/`.
+- **Schema and migrations:** `internal/petra/repository/` (`schema.sql`); the
+  SQLite driver lives in `internal/platform/sqlitekit/`.
 
 ## Update-closure pattern
 
@@ -70,15 +71,15 @@ mutation that touches workout data.
   set-level).
 - **New external integrations:** their own file (precedent:
   `exercise_generation.go`, `export.go`).
-- **New pure rules:** `internal/domain/`, then call the rule from a
+- **New pure rules:** `internal/petra/domain/`, then call the rule from a
   one-line service method here.
-- **New SQL:** `internal/repository/`, then a one-line service method
+- **New SQL:** `internal/petra/repository/`, then a one-line service method
   here that wraps the call with `fmt.Errorf` and returns.
 
 ## Testing
 
 Service tests live in `package service_test` (external) and exercise the
-real wiring — real `*sqlite.Database`, real repositories, real domain
+real wiring — real `*sqlitekit.Database`, real repositories, real domain
 methods. **Do not mock the repository layer.** The orchestration and the
 SQL contract are tested together because that's where bugs hide.
 

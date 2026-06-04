@@ -48,9 +48,9 @@ drives toward. See "Schema & migrations" at the bottom.
 - HTTP handlers, template shaping, response serialisation — `cmd/petra`.
 - Service orchestration, AI exercise generation, GDPR export, anything
   that combines multiple aggregates or external systems —
-  `internal/service`.
+  `internal/petra/service`.
 - Tests of business behaviour — those belong in `internal/petra/domain` (pure
-  unit) or `internal/service` (orchestration/e2e). Repository tests
+  unit) or `internal/petra/service` (orchestration/e2e). Repository tests
   cover repository-shape contracts: round-trip persistence, error
   translation, slot-position stability across `Update`.
 

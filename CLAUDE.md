@@ -4,24 +4,29 @@ A fitness tracking web application built with Go, SQLite, and server-side render
 
 ## Development Workflow
 
-When a feature spans multiple layers, work outwards from the data model:
+When a feature spans multiple layers, work outwards from the data model
+(shared infrastructure lives under `internal/platform/`, product code under
+`internal/petra/` and `cmd/petra/`):
 
-1. **Database First** - Start with schema changes in `internal/sqlite/` (
-   see [Database Guidelines](internal/sqlite/CLAUDE.md))
-2. **Domain Models** - Update pure domain logic in `internal/domain/` (
-   see [Domain Guidelines](internal/domain/CLAUDE.md))
+1. **Database First** - Start with the SQLite driver/helpers in
+   `internal/platform/sqlitekit/` (see
+   [Database Guidelines](internal/platform/sqlitekit/CLAUDE.md)); the workout
+   schema (`schema.sql`) now lives alongside the repository in
+   `internal/petra/repository/`.
+2. **Domain Models** - Update pure domain logic in `internal/petra/domain/` (
+   see [Domain Guidelines](internal/petra/domain/CLAUDE.md))
 3. **Repository Layer** - Add SQL persistence and query implementations in
-   `internal/repository/` (see [Repository Guidelines](internal/repository/CLAUDE.md))
-4. **Service Layer** - Add orchestration / cross-aggregate logic in `internal/service/` (
-   see [Service Guidelines](internal/service/CLAUDE.md))
-5. **HTTP Layer** - Add handlers and routing in `cmd/web/` (see [Web Guidelines](cmd/web/CLAUDE.md))
-6. **Templates & UI** - Build frontend in `ui/templates/` (see [Template Guidelines](ui/templates/CLAUDE.md))
+   `internal/petra/repository/` (see [Repository Guidelines](internal/petra/repository/CLAUDE.md))
+4. **Service Layer** - Add orchestration / cross-aggregate logic in `internal/petra/service/` (
+   see [Service Guidelines](internal/petra/service/CLAUDE.md))
+5. **HTTP Layer** - Add handlers and routing in `cmd/petra/` (see [Web Guidelines](cmd/petra/CLAUDE.md))
+6. **Templates & UI** - Build frontend in `cmd/petra/ui/templates/` (see [Template Guidelines](cmd/petra/ui/templates/CLAUDE.md))
 
 If a change is scoped to one or two layers (e.g. a UI-only tweak or a handler-only bug fix), start at the lowest relevant layer — you don't have to touch the ones above.
 
 ## Runtime Layout
 
-- Templates (`ui/templates/`) and static assets (`ui/static/`) are loaded from the filesystem at runtime (`os.DirFS`, not `//go:embed`). Editing a template and refreshing the browser is the whole dev loop — no rebuild needed.
+- Templates (`cmd/petra/ui/templates/`) and static assets (`cmd/petra/ui/static/`) are loaded from the filesystem at runtime (`os.DirFS`, not `//go:embed`). Editing a template and refreshing the browser is the whole dev loop — no rebuild needed.
 - In the Docker image, `main.css` and `main.js` are fingerprinted with an md5 hash at build time and `base.gohtml` is rewritten to reference the hashed names (see `Dockerfile`). Other static files (`webauthn.js`, icons) are served under their original names.
 
 ## One-shot scripts and post-mortems
@@ -66,5 +71,5 @@ Match the existing code: check `go.mod` and neighboring files before assuming a
 library is available, and mirror the patterns and imports of nearby code.
 
 Test-selector resilience (goquery patterns, `SubmitForm`, etc.) lives in
-[Web Guidelines](cmd/web/CLAUDE.md) under "Testing with e2etest" — consult it
+[Web Guidelines](cmd/petra/CLAUDE.md) under "Testing with e2etest" — consult it
 when UI changes break handler tests.
