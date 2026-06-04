@@ -1,9 +1,14 @@
 # Repository — SQLite Persistence
 
-The `internal/repository` package is the canonical persistence layer for
-the workout bounded context. It depends on `internal/domain`,
-`internal/sqlite`, and `internal/contexthelpers` only — no HTTP, no
-template logic, no business orchestration.
+The `internal/petra/repository` package is the canonical persistence layer
+for the workout bounded context. It depends on `internal/petra/domain`,
+`internal/platform/sqlitekit`, and `internal/platform/contexthelpers` only —
+no HTTP, no template logic, no business orchestration.
+
+It also **owns the Petra product schema**: `schema.sql`, `fixtures.sql`, and
+`embed.go` (which exports `SchemaSQL` / `FixturesSQL`). The generic migration
+engine lives in `internal/platform/sqlitekit`; this package supplies the DDL it
+drives toward. See "Schema & migrations" at the bottom.
 
 ## What lives here
 
@@ -16,7 +21,7 @@ template logic, no business orchestration.
   `WeekPlanRepository` owns workout writes at week scope; `SessionRepository`
   is read-only (see "Update closure contract" below).
 - **The `Repositories` composite struct** plus the single public
-  constructor `New(db *sqlite.Database) *Repositories` that wires every
+  constructor `New(db *sqlitekit.Database) *Repositories` that wires every
   repository together.
 - **Shared helpers** in `shared.go`:
   - Format primitives — `parseTimestamp`, `formatTimestamp`, `formatDate`,
@@ -40,11 +45,11 @@ template logic, no business orchestration.
 
 - Business rules — those live as aggregate methods on `domain.Session`
   (or as pure functions in the domain package).
-- HTTP handlers, template shaping, response serialisation — `cmd/web`.
+- HTTP handlers, template shaping, response serialisation — `cmd/petra`.
 - Service orchestration, AI exercise generation, GDPR export, anything
   that combines multiple aggregates or external systems —
   `internal/service`.
-- Tests of business behaviour — those belong in `internal/domain` (pure
+- Tests of business behaviour — those belong in `internal/petra/domain` (pure
   unit) or `internal/service` (orchestration/e2e). Repository tests
   cover repository-shape contracts: round-trip persistence, error
   translation, slot-position stability across `Update`.
@@ -104,7 +109,7 @@ sentinel has no SQL ancestry.
 
 ## Adding a new repository
 
-1. Declare the interface in `internal/repository/repository.go`.
+1. Declare the interface in `internal/petra/repository/repository.go`.
 2. Add the SQLite implementation in a new file (e.g. `widgets.go`) with
    an unexported struct `sqliteWidgetRepository` and an unexported
    constructor `newSQLiteWidgetRepository`.
@@ -133,8 +138,150 @@ SQL-shaped contract, not the business rule.
     `Session.Slots` survives the delete-and-reinsert cycle inside
     `WeekPlanRepository.Update`, including across `SwapExerciseInSlot`.
 - **What NOT to test here:** business rules and aggregate invariants
-  (those live in `internal/domain/`), and end-to-end orchestration
-  across multiple aggregates (that lives in `internal/service/`).
+  (those live in `internal/petra/domain/`), and end-to-end orchestration
+  across multiple aggregates (that lives in `internal/petra/service/`).
 
 See `exercises_test.go` for a tight worked example covering all four
 assertions above.
+
+## Schema & migrations
+
+This package owns the Petra product schema and seed data; the generic
+declarative migrator and `Config`-based `NewDatabase` live in
+`internal/platform/sqlitekit` (see that package's `CLAUDE.md`).
+
+- **`schema.sql`** — the declarative single source of truth for the Petra
+  schema. The migrator compares the live database to this file and applies the
+  diff; you never hand-write `ALTER TABLE` scripts.
+- **`fixtures.sql`** — seed data re-applied on every boot.
+- **`embed.go`** — `//go:embed`s both files and exports `SchemaSQL` /
+  `FixturesSQL`. Callers (`cmd/petra`, `cmd/migratetest`) concatenate
+  `auth.SchemaSQL` **ahead of** `repository.SchemaSQL` so product tables may
+  reference the shared auth tables (e.g. `users`) via foreign keys, then pass
+  the result as `sqlitekit.Config{Schema, Fixtures, ...}`.
+
+### Schema evolution process
+
+When a change spans layers, work outwards from `schema.sql`:
+
+1. **Update `schema.sql`** with your change (new columns, tables, constraints).
+2. **Update Go models** in both `internal/petra/domain/` and this repository
+   layer.
+3. **Update repository SQL queries** (SELECT/INSERT/UPDATE) to include new
+   fields.
+4. **Update service-layer** conversion functions between domain and repository
+   types in `internal/petra/service/`.
+5. **Test with `make test`** to confirm migrations and queries work.
+6. **Add fixtures** in `fixtures.sql` if new data needs seeding.
+
+### Premigration escape hatch
+
+The declarative migrator in `internal/platform/sqlitekit/migrate.go` is purely
+**structural**: it diffs the live schema against the schema string and rebuilds
+tables when needed, but it cannot infer how to populate new columns, re-key
+foreign keys, or otherwise transform existing rows. For changes the migrator
+cannot express, run a one-shot **premigration** that rewrites legacy data into
+the new shape *before* the declarative migrate, after which the migrator sees a
+database that already matches `schema.sql` and is a no-op.
+
+A premigration method must:
+
+- **Detect already-migrated state first** via `pragma_table_info` or
+  `sqlite_master` and return early. It must also short-circuit on a fresh
+  database (no legacy table) so test/in-memory startups skip it. Idempotent —
+  safe to run on every boot.
+- **Disable foreign keys** (`PRAGMA foreign_keys = OFF`) before the table swap;
+  the declarative migrator re-enables them in its own `defer`.
+- Run the rewrite inside a single transaction with rollback on error.
+- Use the `CREATE TABLE *_new` → `INSERT … SELECT` → `DROP TABLE` →
+  `ALTER TABLE … RENAME` pattern. When merging data sources (e.g. legacy rows +
+  rows synthesized from a child table), `UNION` them in the `INSERT … SELECT`.
+
+Test it by reproducing the pre-migration table shapes in a const (the live
+`schema.sql` no longer contains them), seeding realistic edge-case data, calling
+the premigration, asserting post-state, calling it again to prove idempotence,
+and finally confirming the declarative migrator accepts the rewritten schema
+without further changes. After a premigration has run in production, **delete it,
+its call site, its test, and the legacy-schema fixture in the same commit** —
+there is no version table, so the only signal it is no longer needed is that
+production has booted past it.
+
+### Table design patterns
+
+#### STRICT mode and constraints
+
+Always use these patterns for new tables:
+
+```sql
+CREATE TABLE table_name
+(
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL CHECK (LENGTH(name) < 256),
+    created_at  TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+        CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at),
+    is_active   INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+) STRICT;
+```
+
+- **Always use `STRICT` mode** for type safety.
+- **Use `WITHOUT ROWID`** for tables that do not have an integer primary key.
+- **Always include length constraints** for TEXT fields:
+  `CHECK (LENGTH(field) < N)`.
+- **Use CHECK constraints for enums**:
+  `CHECK (status IN ('pending', 'active', 'completed'))`.
+- **Use proper foreign-key constraints** with CASCADE behavior where
+  appropriate.
+
+#### Timestamp patterns
+
+Use ISO 8601 timestamps with automatic triggers for updates:
+
+```sql
+created_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+    CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at),
+updated_at TEXT NOT NULL DEFAULT (STRFTIME('%Y-%m-%dT%H:%M:%fZ'))
+    CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', updated_at) = updated_at)
+
+-- Include update trigger
+CREATE TRIGGER table_name_updated_timestamp
+    AFTER UPDATE ON table_name
+BEGIN
+    UPDATE table_name SET updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ') WHERE id = old.id;
+END;
+```
+
+#### Foreign-key patterns
+
+Match the FK column type to the referenced primary key. In this schema
+`users.id` is `INTEGER` and `credentials.id` is `BLOB` (the WebAuthn credential
+ID), so pick accordingly:
+
+```sql
+-- Standard foreign key with cascade (users.id is INTEGER)
+user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE
+
+-- BLOB foreign key when referencing credentials.id
+credential_id BLOB NOT NULL REFERENCES credentials (id) ON DELETE CASCADE
+
+-- Deferred foreign key (for complex relationships)
+FOREIGN KEY (exercise_id) REFERENCES exercises (id) DEFERRABLE INITIALLY DEFERRED
+
+-- Composite foreign key
+FOREIGN KEY (workout_user_id, workout_date) REFERENCES workout_sessions (user_id, workout_date) ON DELETE CASCADE
+```
+
+### Fixtures and conflict handling
+
+`fixtures.sql` is re-applied on every boot (a single `ExecContext` in
+`sqlitekit.NewDatabase`). Production may hold rows the fixture doesn't know
+about — manually backfilled data — and the seed must coexist with them. When
+changing fixtures, consider using the fly-ops skill to fetch a production
+snapshot and verify you won't destroy existing data.
+
+### Testing schema changes
+
+Engine-level migrator behavior (column add/drop, table rename, constraint
+change, index/trigger sync) is tested in
+`internal/platform/sqlitekit/migrate_internal_test.go::TestDatabase_migrate`.
+Petra schema round-trips are covered end-to-end by the repository tests in this
+package; you usually do not need both.

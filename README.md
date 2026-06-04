@@ -2,6 +2,40 @@
 
 Personal trainer app
 
+## Repository layout
+
+The module is organised as a small platform/product monorepo:
+
+```
+internal/platform/   shared infrastructure, reusable by any app in the module
+  sqlitekit/         declarative SQLite migrator + Config-based NewDatabase (RO/RW split, optimizer, healthcheck)
+  auth/              passkey/WebAuthn handler, Store interface, auth.SchemaSQL
+  obs/               observability: logging, errorrecorder, flightrecorder, pprofserver
+  envstruct/         struct-tag environment-variable config
+  contexthelpers/    request-scoped context helpers
+  testkit/           shared test helpers
+internal/petra/      the fitness product (domain / repository / service / notification)
+  repository/        owns schema.sql, fixtures.sql, and embed.go (SchemaSQL / FixturesSQL)
+cmd/petra/           the Petra web app (owns its ui/templates + ui/static)
+cmd/example/         a minimal todo CRUD app that proves the shared platform plumbing
+```
+
+`internal/platform/` is generic and must stay product-agnostic; `internal/petra/`
+is everything specific to the workout product. The split is enforced at lint time:
+[depguard](.golangci.yml) rules forbid `internal/platform/` from importing
+`internal/petra` or `cmd/`, and forbid `cmd/example/` from importing
+`internal/petra` (it may only build on the shared platform).
+
+`cmd/example/` deliberately **copies** the web middleware/render boilerplate
+rather than importing a shared web kit. Only `sqlitekit` and `auth` were
+genuinely decoupled and shared; the web layer was duplicated on the
+rule-of-three / "a little copying beats a little dependency" principle, and a
+web-`Kit` extraction was deliberately deferred until a third consumer justifies
+it. The rationale lives in the design doc
+[`docs/superpowers/specs/2026-06-02-internal-platform-reshuffle-design.md`](docs/superpowers/specs/2026-06-02-internal-platform-reshuffle-design.md)
+and the execution plan
+[`docs/superpowers/plans/2026-06-02-internal-platform-reshuffle.md`](docs/superpowers/plans/2026-06-02-internal-platform-reshuffle.md).
+
 ## Quickstart
 
 ### Install dependencies, configure linting, and optinally set up git hooks
