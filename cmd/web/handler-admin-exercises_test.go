@@ -7,7 +7,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 //nolint:paralleltest // Setup subtest registers + promotes an admin that later subtests rely on.
@@ -18,7 +18,7 @@ func Test_application_adminExercises(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

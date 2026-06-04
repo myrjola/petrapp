@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func Test_fileServer_servesExistingFile(t *testing.T) {
 	t.Parallel()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -35,7 +35,7 @@ func Test_fileServer_servesExistingFile(t *testing.T) {
 func Test_fileServer_missingFileReturnsCustom404(t *testing.T) {
 	t.Parallel()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -79,7 +79,7 @@ func Test_fileServer_devModeUsesNoStoreCacheControl(t *testing.T) {
 	// testLookupEnv does not set FLY_APP_NAME, so app.devMode is true.
 	// In dev the static file server must disable browser caching so that
 	// edits to ui/static/main.css and main.js are visible on refresh.
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

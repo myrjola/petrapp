@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // TestExerciseGenerator_PromptCoversSchema asserts the prompt instructs the AI
@@ -23,7 +23,7 @@ func TestExerciseGenerator_PromptCoversSchema(t *testing.T) {
 	t.Parallel()
 
 	muscleGroups := []string{"quadriceps"}
-	eg := newExerciseGenerator("dummy-key", muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg := newExerciseGenerator("dummy-key", muscleGroups, testkit.NewLogger(testkit.NewWriter(t)))
 	prompt := eg.baseExercisePrompt("Plank")
 
 	raw, err := exerciseJSONSchema{muscleGroups: muscleGroups}.MarshalJSON()
@@ -92,7 +92,7 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 	}
 
 	muscleGroups := []string{"quadriceps", "glutes", "hamstrings", "calves", "core"}
-	eg := newExerciseGenerator(openaiAPIKey, muscleGroups, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg := newExerciseGenerator(openaiAPIKey, muscleGroups, testkit.NewLogger(testkit.NewWriter(t)))
 
 	t.Run("Successful generation", func(t *testing.T) {
 		t.Parallel()
@@ -131,7 +131,7 @@ func TestExerciseGenerator_GenerateEmptyName(t *testing.T) {
 	t.Parallel()
 
 	eg := newExerciseGenerator("dummy-key", []string{"quadriceps"},
-		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+		testkit.NewLogger(testkit.NewWriter(t)))
 	if _, err := eg.Generate(t.Context(), ""); err == nil {
 		t.Fatal("Generate(\"\") returned nil error, want non-nil")
 	}
@@ -141,7 +141,7 @@ func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
 	t.Parallel()
 
 	eg := newExerciseGenerator("dummy-key", []string{"quadriceps", "glutes"},
-		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+		testkit.NewLogger(testkit.NewWriter(t)))
 	tests := []struct {
 		name    string
 		input   []string
@@ -167,7 +167,7 @@ func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
 func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
 	t.Parallel()
 
-	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg := newExerciseGenerator("dummy-key", nil, testkit.NewLogger(testkit.NewWriter(t)))
 	resources := []domain.Resource{
 		{Title: "Real video", URL: "https://youtube.com/real"},
 		{Title: "Real guide", URL: "https://exrx.net/real"},
@@ -235,7 +235,7 @@ func TestExerciseGenerator_PromptDataQualityRules(t *testing.T) {
 	t.Parallel()
 
 	eg := newExerciseGenerator("dummy-key", []string{"Chest"},
-		testhelpers.NewLogger(testhelpers.NewWriter(t)))
+		testkit.NewLogger(testkit.NewWriter(t)))
 	prompt := eg.baseExercisePrompt("Bench Press")
 
 	if strings.Contains(prompt, "example.com") {
@@ -285,7 +285,7 @@ func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg := newExerciseGenerator("dummy-key", nil, testkit.NewLogger(testkit.NewWriter(t)))
 	// Override the default client timeout so the slow handler trips it
 	// inside the test budget.
 	eg.httpClient = &http.Client{Timeout: 200 * time.Millisecond}
@@ -329,7 +329,7 @@ func TestExerciseGenerator_enhanceWithWebSearch_validatesURLs(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
-	eg := newExerciseGenerator("dummy-key", nil, testhelpers.NewLogger(testhelpers.NewWriter(t)))
+	eg := newExerciseGenerator("dummy-key", nil, testkit.NewLogger(testkit.NewWriter(t)))
 	eg.httpClient = &http.Client{Timeout: 200 * time.Millisecond}
 
 	parsed := []domain.Resource{

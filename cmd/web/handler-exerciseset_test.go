@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func Test_application_exerciseSet(t *testing.T) {
@@ -25,7 +25,7 @@ func Test_application_exerciseSet(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -280,7 +280,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -404,7 +404,7 @@ func Test_application_workoutSwapExercise_search_filters_by_name(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -539,7 +539,7 @@ func Test_application_exerciseSet_nonexistent_exercise_returns_custom_404(t *tes
 		doc *goquery.Document
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -629,7 +629,7 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -791,7 +791,7 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -958,7 +958,7 @@ func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -1063,7 +1063,7 @@ func Test_ExerciseSet_RestChipAfterWarmupComplete(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -1146,7 +1146,7 @@ func Test_ExerciseSet_RestChipPersistsAfterElapsed(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -1238,7 +1238,7 @@ func TestExerciseSetGET_DeloadHidesSignalButtons(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -1448,7 +1448,7 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -1564,7 +1564,7 @@ func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}
@@ -1665,7 +1665,7 @@ func Test_application_exerciseSet_overline_clamps_when_all_sets_complete(t *test
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}

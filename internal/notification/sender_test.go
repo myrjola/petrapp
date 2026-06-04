@@ -11,7 +11,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/notification"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // mintVAPIDKeys returns a fresh base64url-encoded VAPID keypair.
@@ -39,7 +39,7 @@ func TestSender_Send_SubjectIsBareEmail(t *testing.T) {
 		VAPIDSubject:    "vapid@example.com",
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
-		Logger:          testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:          testkit.NewLogger(testkit.NewWriter(t)),
 	})
 
 	sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt unused by the sender.
@@ -74,7 +74,7 @@ func TestSender_Send_410ReturnsErrSubscriptionGone(t *testing.T) {
 		VAPIDSubject:    "vapid@example.com",
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
-		Logger:          testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:          testkit.NewLogger(testkit.NewWriter(t)),
 	})
 	sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt unused by the sender.
 		Endpoint: srv.URL,
@@ -101,7 +101,7 @@ func TestSender_Send_5xxReturnsErrorButNotGone(t *testing.T) {
 		VAPIDSubject:    "vapid@example.com",
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
-		Logger:          testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:          testkit.NewLogger(testkit.NewWriter(t)),
 	})
 	sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt unused by the sender.
 		Endpoint: srv.URL,

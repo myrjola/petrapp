@@ -29,7 +29,7 @@ import (
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/loadtest"
 	"github.com/myrjola/petrapp/internal/platform/obs/logging"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -381,7 +381,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := testhelpers.NewLogger(os.Stdout)
+	logger := testkit.NewLogger(os.Stdout)
 	ctx := context.Background()
 	hostname := flag.Arg(0)
 	start := time.Now()

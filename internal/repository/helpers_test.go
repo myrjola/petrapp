@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 // setupTestRepos creates an in-memory database, inserts a test user, and
@@ -24,7 +24,7 @@ func setupTestRepos(t *testing.T) (context.Context, *repository.Repositories) {
 func setupTestReposWithDB(t *testing.T) (context.Context, *sqlite.Database, *repository.Repositories) {
 	t.Helper()
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)

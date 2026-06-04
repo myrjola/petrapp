@@ -9,7 +9,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func Test_application_addWorkout(t *testing.T) {
@@ -21,7 +21,7 @@ func Test_application_addWorkout(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -100,7 +100,7 @@ func Test_application_workoutExerciseLinksOpenClickedExercise(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -162,7 +162,7 @@ func Test_application_workoutNotFound(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -224,7 +224,7 @@ func Test_application_workoutAddExercise_search_filters_by_name(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -350,7 +350,7 @@ func Test_application_workoutAddExercisePOST_unplanned_day(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -451,7 +451,7 @@ func Test_application_startExtraWorkoutOnUnscheduledToday(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -493,7 +493,7 @@ func TestWorkoutFeedbackPOST_BadDifficultyParamReturns404(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -532,7 +532,7 @@ func Test_application_startNewlyScheduledMidWeekDay(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -612,7 +612,7 @@ func Test_application_workoutCompletePOST_unstartedSession_shimHeader_redirectsT
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -674,7 +674,7 @@ func Test_application_workoutCompletePOST_unstartedSession_noShimHeader_redirect
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -736,7 +736,7 @@ func Test_application_workoutOverview_restChipForInProgressSlot(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}

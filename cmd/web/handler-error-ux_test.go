@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // prodLookupEnv returns the same values as testLookupEnv but also sets
@@ -25,7 +25,7 @@ func Test_application_devErrorUX_render(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -71,7 +71,7 @@ func Test_application_devErrorUX_render(t *testing.T) {
 func Test_application_devErrorUX_gated_outside_dev_mode(t *testing.T) {
 	t.Parallel()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), prodLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), prodLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -96,7 +96,7 @@ func Test_application_devErrorUX_triggerValidation_surfacesMessage(t *testing.T)
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -126,7 +126,7 @@ func Test_application_devErrorUX_triggerSystem_navigatesToErrorPage(t *testing.T
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -173,7 +173,7 @@ func Test_application_devErrorUX_triggerSystem_navigatesToErrorPage(t *testing.T
 func Test_application_home_devLinks_devMode(t *testing.T) {
 	t.Parallel()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -193,7 +193,7 @@ func Test_application_home_devLinks_devMode(t *testing.T) {
 func Test_application_home_devLinks_hiddenOutsideDevMode(t *testing.T) {
 	t.Parallel()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), prodLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), prodLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -213,7 +213,7 @@ func Test_application_home_devLinks_hiddenOutsideDevMode(t *testing.T) {
 func Test_application_devErrorUX_triggerUnknownKind_returns404(t *testing.T) {
 	t.Parallel()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

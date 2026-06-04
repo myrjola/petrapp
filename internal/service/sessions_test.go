@@ -12,9 +12,9 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
@@ -216,7 +216,7 @@ func Test_CompleteSession_CancelsPendingPushes(t *testing.T) {
 
 	ctx, db, userID, _ := setupSessionForRecordSet(t)
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
@@ -399,7 +399,7 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
@@ -471,7 +471,7 @@ func Test_MarkWarmupComplete_SchedulesPushForFirstSet(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -500,7 +500,7 @@ func Test_MarkWarmupComplete_NoSubscriptions_DoesNotSchedule(t *testing.T) {
 
 	ctx, db, _, pos := setupSessionForRecordSet(t)
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -541,7 +541,7 @@ func Test_MarkWarmupComplete_AfterFirstSetComplete_SchedulesSet2(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -585,7 +585,7 @@ func Test_MarkWarmupComplete_AllSetsComplete_CancelsAndDoesNotSchedule(t *testin
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -634,7 +634,7 @@ func Test_MarkWarmupComplete_AlreadyDone_DoesNotReschedule(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)

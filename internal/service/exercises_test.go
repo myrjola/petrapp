@@ -9,16 +9,16 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
@@ -155,7 +155,7 @@ func Test_UpdateExercise_RejectsInvalidExercise(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
@@ -186,7 +186,7 @@ func Test_GenerateExercise_RejectsEmptyName(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
@@ -210,7 +210,7 @@ func Test_AddExercise(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
@@ -413,7 +413,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
@@ -515,7 +515,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
@@ -610,7 +610,7 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
@@ -747,7 +747,7 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 			t.Parallel()
 
 			ctx := t.Context()
-			logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+			logger := testkit.NewLogger(testkit.NewWriter(t))
 			db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 			if err != nil {
 				t.Fatalf("create db: %v", err)
@@ -827,7 +827,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)

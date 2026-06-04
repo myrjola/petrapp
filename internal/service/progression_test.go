@@ -7,16 +7,16 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_GetStartingWeight(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -187,7 +187,7 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -270,7 +270,7 @@ func Test_GetStartingSeconds(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -374,7 +374,7 @@ func Test_BuildTimedProgression(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -466,7 +466,7 @@ func Test_BuildProgression(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -563,7 +563,7 @@ func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -637,7 +637,7 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -735,7 +735,7 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -813,7 +813,7 @@ func Test_GetDeloadStartingWeight_FloorsFractionalResult(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -891,7 +891,7 @@ func Test_GetDeloadStartingWeight_Assisted(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -961,7 +961,7 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)

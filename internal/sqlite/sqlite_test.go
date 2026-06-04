@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 // TestNewDatabase_ReadOnlyHandleRejectsWrites locks the in-memory DSN shape:
@@ -21,7 +21,7 @@ func TestNewDatabase_ReadOnlyHandleRejectsWrites(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
@@ -109,7 +109,7 @@ func TestNewDatabase_ConcurrentReadsAndWritesDoNotLock(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)

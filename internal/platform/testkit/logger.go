@@ -1,4 +1,4 @@
-package testhelpers
+package testkit
 
 import (
 	"io"
@@ -7,7 +7,7 @@ import (
 	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
-// NewLogger creates a new logger with the given log sink such as testhelpers.Writer.
+// NewLogger creates a new logger with the given log sink such as testkit.Writer.
 func NewLogger(logSink io.Writer) *slog.Logger {
 	handler := logging.NewContextHandler(slog.NewTextHandler(logSink, &slog.HandlerOptions{
 		AddSource:   false,

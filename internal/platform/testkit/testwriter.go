@@ -1,4 +1,4 @@
-package testhelpers
+package testkit
 
 import (
 	"io"
@@ -15,7 +15,7 @@ type Writer struct {
 }
 
 // NewWriter creates a new Writer that writes to t.Log.
-// This is a drop-in replacement for testhelpers.NewWriter(t) in tests.
+// This is a drop-in replacement for testkit.NewWriter(t) in tests.
 func NewWriter(t *testing.T) io.Writer {
 	w := &Writer{
 		t:        t,

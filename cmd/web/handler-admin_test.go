@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 //nolint:paralleltest // subtests sequentially promote the same user to admin.
@@ -13,7 +13,7 @@ func Test_application_adminGET(t *testing.T) {
 	var (
 		ctx = t.Context()
 	)
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

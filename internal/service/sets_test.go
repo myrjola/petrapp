@@ -13,16 +13,16 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func Test_RecordSetCompletion(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)
@@ -195,7 +195,7 @@ func Test_RecordSet_SchedulesRestPush(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	weight := 100.0
@@ -229,7 +229,7 @@ func Test_RecordSet_LastSetDoesNotSchedule(t *testing.T) {
 		t.Fatalf("seed subscription: %v", err)
 	}
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	weight := 100.0
@@ -292,7 +292,7 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	// Complete the only set in the first slot (pos).
@@ -340,7 +340,7 @@ func Test_UpdateCompletedValue_DoesNotTouchScheduler(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -389,7 +389,7 @@ func Test_UpdateSetWeight_DoesNotTouchScheduler(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -436,7 +436,7 @@ func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 	}
 
 	fake := &fakeScheduler{} //nolint:exhaustruct // Slice fields zero-initialised by design.
-	svc := service.NewService(db, testhelpers.NewLogger(testhelpers.NewWriter(t)), "").
+	svc := service.NewService(db, testkit.NewLogger(testkit.NewWriter(t)), "").
 		WithScheduler(fake)
 
 	date := time.Now().UTC().Truncate(24 * time.Hour)
@@ -475,7 +475,7 @@ func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, int, int) {
 	t.Helper()
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create db: %v", err)

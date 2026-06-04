@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 }
 
 func run(w io.Writer) error {
-	logger := testhelpers.NewLogger(w)
+	logger := testkit.NewLogger(w)
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second) //nolint:mnd // 5 seconds
 	defer cancel()

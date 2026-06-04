@@ -17,7 +17,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func Test_application_preferences(t *testing.T) {
@@ -29,7 +29,7 @@ func Test_application_preferences(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -137,7 +137,7 @@ func Test_application_preferences(t *testing.T) {
 func Test_application_preferences_adminEntry(t *testing.T) {
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -187,7 +187,7 @@ func Test_application_preferencesPOST_preservesRestNotificationsEnabled(t *testi
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -241,7 +241,7 @@ func Test_application_exportUserData(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -390,7 +390,7 @@ func Test_application_deleteUser(t *testing.T) {
 		err error
 	)
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -474,7 +474,7 @@ func TestPreferencesPOST_RejectsEmptySchedule(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -567,7 +567,7 @@ func Test_application_preferencesStartDeloadNow(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -633,7 +633,7 @@ func Test_application_preferencesStartDeloadNow(t *testing.T) {
 func TestPreferencesScheduleSave_RedirectsHomeWithoutFlash(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("StartServer: %v", err)
 	}
@@ -657,7 +657,7 @@ func TestPreferencesScheduleSave_RedirectsHomeWithoutFlash(t *testing.T) {
 func TestPreferencesDeloadSave_RedirectsToDeloadAnchorWithSuccessFlash(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("StartServer: %v", err)
 	}
@@ -709,7 +709,7 @@ func TestPreferencesDeloadSave_RedirectsToDeloadAnchorWithSuccessFlash(t *testin
 func TestPreferencesRestNotificationsToggle_FlashAndAnchor(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("StartServer: %v", err)
 	}
@@ -760,7 +760,7 @@ func TestPreferencesRestNotificationsToggle_FlashAndAnchor(t *testing.T) {
 func TestPreferencesStartDeloadNow_FlashAndAnchor(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("StartServer: %v", err)
 	}
@@ -808,7 +808,7 @@ func TestPreferencesStartDeloadNow_FlashAndAnchor(t *testing.T) {
 func TestPreferencesRestartMesocycle_FlashAndAnchor(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("StartServer: %v", err)
 	}

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/playwright-community/playwright-go"
 )
 
@@ -48,7 +48,7 @@ func setupPlaywrightPage(t *testing.T, allowedConsoleErrors ...string) (playwrig
 		t.Fatalf("install playwright browsers: %v", err)
 	}
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}

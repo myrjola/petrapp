@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // BenchmarkRenderHome measures the cost of rendering the cached home
@@ -23,7 +23,7 @@ func BenchmarkRenderHome(b *testing.B) {
 	app := &application{ //nolint:exhaustruct // only the fields touched by pageTemplate matter here.
 		templateFS:      os.DirFS(templatePath),
 		parsedTemplates: newTemplateCache(),
-		logger:          testhelpers.NewLogger(io.Discard),
+		logger:          testkit.NewLogger(io.Discard),
 		devMode:         false,
 	}
 	// Prime the cache.

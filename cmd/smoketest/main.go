@@ -10,7 +10,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/platform/obs/logging"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func TestAuth(client *e2etest.Client) error {
@@ -32,7 +32,7 @@ func TestAuth(client *e2etest.Client) error {
 }
 
 func main() {
-	logger := testhelpers.NewLogger(os.Stdout)
+	logger := testkit.NewLogger(os.Stdout)
 	ctx := context.Background()
 
 	if len(os.Args) != 2 { //nolint:mnd // we expect only hostname to be passed as argument.

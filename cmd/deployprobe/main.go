@@ -24,7 +24,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 type outcome string
@@ -118,7 +118,7 @@ func main() {
 	path := flag.String("path", "/api/healthy", "URL path appended when target has no path")
 	flag.Parse()
 
-	logger := testhelpers.NewLogger(os.Stdout)
+	logger := testkit.NewLogger(os.Stdout)
 	ctx := context.Background()
 
 	if flag.NArg() != 1 {

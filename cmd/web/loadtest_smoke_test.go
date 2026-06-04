@@ -5,7 +5,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/loadtest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // Test_loadtest_scenarios_inProcess runs the stresstest scenarios against an in-process
@@ -16,9 +16,9 @@ func Test_loadtest_scenarios_inProcess(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("start server: %v", err)
 	}

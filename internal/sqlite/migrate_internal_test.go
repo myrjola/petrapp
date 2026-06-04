@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func TestDatabase_migrate(t *testing.T) {
@@ -120,7 +120,7 @@ func TestDatabase_migrate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
-			logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+			logger := testkit.NewLogger(testkit.NewWriter(t))
 			db, err := connect(ctx, ":memory:", logger)
 			if err != nil {
 				t.Fatalf("Failed to connect to database: %v", err)

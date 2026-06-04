@@ -9,9 +9,9 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/service"
 	"github.com/myrjola/petrapp/internal/sqlite"
-	"github.com/myrjola/petrapp/internal/testhelpers"
 )
 
 func setupTestService(t *testing.T) (context.Context, *service.Service) {
@@ -27,7 +27,7 @@ func setupTestService(t *testing.T) (context.Context, *service.Service) {
 func setupTestServiceWithDB(t *testing.T) (context.Context, *service.Service, *sqlite.Database) {
 	t.Helper()
 	ctx := t.Context()
-	logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
 	if err != nil {
 		t.Fatalf("create test database: %v", err)

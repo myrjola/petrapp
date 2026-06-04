@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/notification"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func TestIdleMonitor_TriggersWhenIdleAndNoPending(t *testing.T) {
@@ -27,7 +27,7 @@ func TestIdleMonitor_TriggersWhenIdleAndNoPending(t *testing.T) {
 		LastRequestAt: func() time.Time { return time.Unix(0, lastRequest.Load()) },
 		PendingCount:  func() int { return int(pending.Load()) },
 		Trigger:       func() { triggered.Store(true) },
-		Logger:        testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:        testkit.NewLogger(testkit.NewWriter(t)),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -64,7 +64,7 @@ func TestIdleMonitor_BlockedByPending(t *testing.T) {
 		LastRequestAt: func() time.Time { return time.Unix(0, lastRequest.Load()) },
 		PendingCount:  func() int { return int(pending.Load()) },
 		Trigger:       func() { triggered.Store(true) },
-		Logger:        testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:        testkit.NewLogger(testkit.NewWriter(t)),
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

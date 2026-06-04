@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func Test_sanitiseFromPath(t *testing.T) {
@@ -40,7 +40,7 @@ func Test_application_errorGET_noFromParam_rendersGoHomeOnly(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -68,7 +68,7 @@ func Test_application_errorGET_withSafeFromParam_rendersBackLink(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
@@ -110,7 +110,7 @@ func Test_application_errorGET_withUnsafeFromParam_omitsBackLink(t *testing.T) {
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}

@@ -36,7 +36,7 @@ const (
 
 // StartServer starts the test server, waits for it to be ready, and return the server URL for testing.
 //
-// logSink is the writer to which the server logs are written. You usually want to use testhelpers.NewWriter.
+// logSink is the writer to which the server logs are written. You usually want to use testkit.NewWriter.
 // lookupEnv is a function that returns the value of an environment variable. It has same signature as [os.LookupEnv].
 // run is the function that starts the server. We expect the server to log the address it's listening on to LogAddrKey.
 func StartServer(

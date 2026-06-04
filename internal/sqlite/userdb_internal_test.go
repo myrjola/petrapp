@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 func TestDatabase_CreateUserDB(t *testing.T) {
@@ -135,7 +135,7 @@ func TestDatabase_CreateUserDB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
-			logger := testhelpers.NewLogger(testhelpers.NewWriter(t))
+			logger := testkit.NewLogger(testkit.NewWriter(t))
 
 			// Create main database
 			db, err := connect(ctx, ":memory:", logger)

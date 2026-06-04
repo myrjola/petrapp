@@ -13,7 +13,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/notification"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // testDate is a fixed date all scheduler tests use for their slot keys.
@@ -59,7 +59,7 @@ func TestScheduler_ScheduleFires(t *testing.T) {
 	scheduler := notification.NewScheduler(notification.SchedulerConfig{
 		Repo:     repo,
 		Dispatch: fd.Dispatch,
-		Logger:   testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:   testkit.NewLogger(testkit.NewWriter(t)),
 		Now:      time.Now,
 	})
 
@@ -99,7 +99,7 @@ func TestScheduler_CancelStopsTimer(t *testing.T) {
 	scheduler := notification.NewScheduler(notification.SchedulerConfig{
 		Repo:     repo,
 		Dispatch: fd.Dispatch,
-		Logger:   testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:   testkit.NewLogger(testkit.NewWriter(t)),
 		Now:      time.Now,
 	})
 
@@ -131,7 +131,7 @@ func TestScheduler_ReplaceOnlyFiresLatest(t *testing.T) {
 	scheduler := notification.NewScheduler(notification.SchedulerConfig{
 		Repo:     repo,
 		Dispatch: fd.Dispatch,
-		Logger:   testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:   testkit.NewLogger(testkit.NewWriter(t)),
 		Now:      time.Now,
 	})
 
@@ -189,7 +189,7 @@ func TestScheduler_ReloadReconstitutesFutureTimers(t *testing.T) {
 	scheduler := notification.NewScheduler(notification.SchedulerConfig{
 		Repo:     repo,
 		Dispatch: fd.Dispatch,
-		Logger:   testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:   testkit.NewLogger(testkit.NewWriter(t)),
 		Now:      time.Now,
 	})
 
@@ -226,7 +226,7 @@ func TestScheduler_ReloadFiresPastDueImmediately(t *testing.T) {
 	scheduler := notification.NewScheduler(notification.SchedulerConfig{
 		Repo:     repo,
 		Dispatch: fd.Dispatch,
-		Logger:   testhelpers.NewLogger(testhelpers.NewWriter(t)),
+		Logger:   testkit.NewLogger(testkit.NewWriter(t)),
 		Now: func() time.Time {
 			v, _ := fakeNow.Load().(time.Time)
 			return v

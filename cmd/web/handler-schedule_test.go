@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/e2etest"
-	"github.com/myrjola/petrapp/internal/testhelpers"
+	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 
 // Regression test for the rest-timer hotfix: submitting the onboarding
@@ -17,7 +17,7 @@ func Test_application_schedulePOST_preservesRestNotificationsEnabled(t *testing.
 
 	ctx := t.Context()
 
-	server, err := e2etest.StartServer(t, testhelpers.NewWriter(t), testLookupEnv, run)
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
 	if err != nil {
 		t.Fatalf("Failed to start server: %v", err)
 	}
