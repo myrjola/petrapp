@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 // Repositories bundles the per-aggregate repository handles wired together by
@@ -30,7 +30,7 @@ type Repositories struct {
 // New constructs all seven SQLite-backed repositories. SessionRepository
 // hydrates ExerciseSlot.Exercise inline by joining `exercises` and batching
 // muscle-group lookups, so it no longer depends on ExerciseRepository.
-func New(db *sqlite.Database) *Repositories {
+func New(db *sqlitekit.Database) *Repositories {
 	prefs := newSQLitePreferencesRepository(db)
 	muscleTargets := newSQLiteMuscleGroupTargetRepository(db)
 	featureFlags := newSQLiteFeatureFlagRepository(db)

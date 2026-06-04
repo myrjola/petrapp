@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/repository"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // PushScheduler is the subset of notification.Scheduler the service depends on.
@@ -31,7 +31,7 @@ type PushScheduler interface {
 // concurrent use because each method opens its own DB transaction.
 type Service struct {
 	repos            *repository.Repositories
-	db               *sqlite.Database
+	db               *sqlitekit.Database
 	logger           *slog.Logger
 	openaiAPIKey     string
 	scheduler        PushScheduler // nil-safe; methods no-op when nil.
@@ -39,7 +39,7 @@ type Service struct {
 }
 
 // NewService creates a new workout service.
-func NewService(db *sqlite.Database, logger *slog.Logger, openaiAPIKey string) *Service {
+func NewService(db *sqlitekit.Database, logger *slog.Logger, openaiAPIKey string) *Service {
 	return &Service{
 		repos:            repository.New(db),
 		db:               db,

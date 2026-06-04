@@ -1,4 +1,4 @@
-package sqlite_test
+package sqlitekit_test
 
 import (
 	"context"
@@ -10,9 +10,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
+
+// usersSchema is a minimal inline schema for the connection-level tests in this
+// package. The package under test must not depend on internal/repository (that
+// would be an import cycle), so these tests provide their own DDL. The shape
+// mirrors the columns the tests exercise: an INTEGER primary key plus the
+// webauthn_user_id / display_name columns the read/write assertions insert.
+const usersSchema = `CREATE TABLE users (
+	id               INTEGER PRIMARY KEY,
+	webauthn_user_id BLOB NOT NULL,
+	display_name     TEXT NOT NULL
+) STRICT;`
 
 // TestNewDatabase_ReadOnlyHandleRejectsWrites locks the in-memory DSN shape:
 // the read-only *sql.DB must reject INSERT/UPDATE statements regardless of
@@ -22,7 +33,12 @@ func TestNewDatabase_ReadOnlyHandleRejectsWrites(t *testing.T) {
 
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   usersSchema,
+		Fixtures: "",
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
 	}
@@ -73,7 +89,12 @@ func TestNewDatabase_CloseWaitsForBackgroundOptimizer(t *testing.T) {
 		ReplaceAttr: nil,
 	}))
 
-	db, err := sqlite.NewDatabase(context.Background(), ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(context.Background(), sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   usersSchema,
+		Fixtures: "",
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
 	}
@@ -110,7 +131,12 @@ func TestNewDatabase_ConcurrentReadsAndWritesDoNotLock(t *testing.T) {
 
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   usersSchema,
+		Fixtures: "",
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
 	}
@@ -159,5 +185,29 @@ func TestNewDatabase_ConcurrentReadsAndWritesDoNotLock(t *testing.T) {
 		if err != nil && !errors.Is(err, context.Canceled) {
 			t.Errorf("unexpected concurrent r/w error: %v", err)
 		}
+	}
+}
+
+func TestNewDatabase_AppliesProvidedSchema(t *testing.T) {
+	t.Parallel()
+	logger := testkit.NewLogger(testkit.NewWriter(t))
+	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL);",
+		Fixtures: "INSERT INTO widgets (name) VALUES ('seed');",
+		Logger:   logger,
+	})
+	if err != nil {
+		t.Fatalf("NewDatabase: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	var n int
+	if err = db.ReadOnly.QueryRowContext(t.Context(),
+		"SELECT COUNT(*) FROM widgets").Scan(&n); err != nil {
+		t.Fatalf("query widgets: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("want 1 seeded widget, got %d", n)
 	}
 }

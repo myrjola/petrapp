@@ -8,14 +8,14 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqlitePushSubscriptionRepository struct {
 	baseRepository
 }
 
-func newSQLitePushSubscriptionRepository(db *sqlite.Database) *sqlitePushSubscriptionRepository {
+func newSQLitePushSubscriptionRepository(db *sqlitekit.Database) *sqlitePushSubscriptionRepository {
 	return &sqlitePushSubscriptionRepository{baseRepository: newBaseRepository(db)}
 }
 

@@ -8,18 +8,24 @@ import (
 	"os"
 	"testing"
 
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // newHealthTestApp builds a minimal application whose only wired dependencies
 // are the logger and a service backed by a fresh in-memory database. Returns
 // the app and the underlying database so the test can close it to simulate an
 // unreachable database.
-func newHealthTestApp(t *testing.T) (*application, *sqlite.Database) {
+func newHealthTestApp(t *testing.T) (*application, *sqlitekit.Database) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	db, err := sqlite.NewDatabase(t.Context(), ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
 	}

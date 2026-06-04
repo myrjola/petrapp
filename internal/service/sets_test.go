@@ -13,9 +13,10 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 func Test_RecordSetCompletion(t *testing.T) {
@@ -23,7 +24,12 @@ func Test_RecordSetCompletion(t *testing.T) {
 
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}
@@ -472,11 +478,16 @@ func Test_RecordSet_RerecordCompletedSet_DoesNotReschedule(t *testing.T) {
 // setupSessionForRecordSet builds a workout session with one weighted exercise
 // and one planned set, returning everything the scheduling tests need. The
 // returned int is the slot's position (always 0 here — single-slot setup).
-func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlite.Database, int, int) {
+func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlitekit.Database, int, int) {
 	t.Helper()
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("create db: %v", err)
 	}

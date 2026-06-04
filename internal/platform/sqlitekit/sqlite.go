@@ -1,4 +1,4 @@
-package sqlite
+package sqlitekit
 
 import (
 	"context"
@@ -12,15 +12,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-sqlite3"
-
-	_ "embed"
 )
-
-//go:embed schema.sql
-var schemaDefinition string
-
-//go:embed fixtures.sql
-var fixtures string
 
 type Database struct {
 	ReadWrite *sql.DB
@@ -36,29 +28,38 @@ type Database struct {
 	optimizerDone   chan struct{}
 }
 
-// NewDatabase connects to a database, migrates the schema, and applies fixtures.
+// Config configures a Database. Schema is the required DDL applied via the
+// declarative migrator; Fixtures is optional idempotent seed SQL.
+type Config struct {
+	URL      string
+	Schema   string
+	Fixtures string
+	Logger   *slog.Logger
+}
+
+// NewDatabase connects to a database, migrates it to cfg.Schema, and applies
+// cfg.Fixtures. cfg.URL is a file path or ":memory:".
 //
 // It establishes two database connections, one for read/write operations and one for read-only operations.
 // This is the best practice mentioned in https://github.com/mattn/go-sqlite3/issues/1179#issuecomment-1638083995
-//
-// The url parameter is the path to the SQLite database file or ":memory:" for an in-memory database.
-func NewDatabase(ctx context.Context, url string, logger *slog.Logger) (*Database, error) {
+func NewDatabase(ctx context.Context, cfg Config) (*Database, error) {
 	var (
 		err error
 		db  *Database
 	)
 
-	if db, err = connect(ctx, url, logger); err != nil {
+	if db, err = connect(ctx, cfg.URL, cfg.Logger); err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
-	if err = db.migrateTo(ctx, schemaDefinition); err != nil {
+	if err = db.migrateTo(ctx, cfg.Schema); err != nil {
 		return nil, fmt.Errorf("migrateTo: %w", err)
 	}
 
-	// Apply fixtures.
-	if _, err = db.ReadWrite.ExecContext(ctx, fixtures); err != nil {
-		return nil, fmt.Errorf("apply fixtures: %w", err)
+	if cfg.Fixtures != "" {
+		if _, err = db.ReadWrite.ExecContext(ctx, cfg.Fixtures); err != nil {
+			return nil, fmt.Errorf("apply fixtures: %w", err)
+		}
 	}
 
 	optimizerCtx, cancel := context.WithCancel(ctx)

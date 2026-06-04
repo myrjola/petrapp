@@ -10,14 +10,14 @@ import (
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqliteWeekPlanRepository struct {
 	baseRepository
 }
 
-func newSQLiteWeekPlanRepository(db *sqlite.Database) *sqliteWeekPlanRepository {
+func newSQLiteWeekPlanRepository(db *sqlitekit.Database) *sqliteWeekPlanRepository {
 	return &sqliteWeekPlanRepository{baseRepository: newBaseRepository(db)}
 }
 

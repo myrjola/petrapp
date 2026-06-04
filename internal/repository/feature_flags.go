@@ -7,14 +7,14 @@ import (
 	"fmt"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqliteFeatureFlagRepository struct {
 	baseRepository
 }
 
-func newSQLiteFeatureFlagRepository(db *sqlite.Database) *sqliteFeatureFlagRepository {
+func newSQLiteFeatureFlagRepository(db *sqlitekit.Database) *sqliteFeatureFlagRepository {
 	return &sqliteFeatureFlagRepository{baseRepository: newBaseRepository(db)}
 }
 

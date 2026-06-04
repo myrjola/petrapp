@@ -8,14 +8,14 @@ import (
 	"strings"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqliteExerciseRepository struct {
 	baseRepository
 }
 
-func newSQLiteExerciseRepository(db *sqlite.Database) *sqliteExerciseRepository {
+func newSQLiteExerciseRepository(db *sqlitekit.Database) *sqliteExerciseRepository {
 	return &sqliteExerciseRepository{baseRepository: newBaseRepository(db)}
 }
 

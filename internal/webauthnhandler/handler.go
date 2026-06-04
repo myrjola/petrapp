@@ -14,7 +14,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 // UnknownCredentialError is returned when a credential ID is not found in the database.
@@ -36,7 +36,7 @@ type WebAuthnHandler struct {
 	logger         *slog.Logger
 	webAuthn       *webauthn.WebAuthn
 	sessionManager *scs.SessionManager
-	database       *sqlite.Database
+	database       *sqlitekit.Database
 
 	// InternalErrorHandler, when set, owns the response on any internal
 	// failure inside this package (DB lookup errors, etc.). Wired by the
@@ -52,7 +52,7 @@ func New(
 	tlsEnabled bool,
 	logger *slog.Logger,
 	sessionManager *scs.SessionManager,
-	dbs *sqlite.Database,
+	dbs *sqlitekit.Database,
 ) (*WebAuthnHandler, error) {
 	var (
 		err     error

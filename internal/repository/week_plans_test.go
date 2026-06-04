@@ -8,15 +8,15 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/repository"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // seedScheduledSession inserts a workout_sessions row + one workout_exercises
 // row at position 0 (the Deadlift seed exercise) for the authenticated user
 // on date, plus one exercise_sets row. Used by WeekPlan tests to populate a
 // scheduled day.
-func seedScheduledSession(ctx context.Context, t *testing.T, db *sqlite.Database, date time.Time) {
+func seedScheduledSession(ctx context.Context, t *testing.T, db *sqlitekit.Database, date time.Time) {
 	t.Helper()
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	dateStr := date.Format("2006-01-02")

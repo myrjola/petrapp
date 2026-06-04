@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqliteScheduledPushRepository struct {
 	baseRepository
 }
 
-func newSQLiteScheduledPushRepository(db *sqlite.Database) *sqliteScheduledPushRepository {
+func newSQLiteScheduledPushRepository(db *sqlitekit.Database) *sqliteScheduledPushRepository {
 	return &sqliteScheduledPushRepository{baseRepository: newBaseRepository(db)}
 }
 

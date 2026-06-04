@@ -6,14 +6,14 @@ import (
 	"fmt"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqliteMuscleGroupTargetRepository struct {
 	baseRepository
 }
 
-func newSQLiteMuscleGroupTargetRepository(db *sqlite.Database) *sqliteMuscleGroupTargetRepository {
+func newSQLiteMuscleGroupTargetRepository(db *sqlitekit.Database) *sqliteMuscleGroupTargetRepository {
 	return &sqliteMuscleGroupTargetRepository{baseRepository: newBaseRepository(db)}
 }
 

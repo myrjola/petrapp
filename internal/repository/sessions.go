@@ -9,14 +9,14 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 type sqliteSessionRepository struct {
 	baseRepository
 }
 
-func newSQLiteSessionRepository(db *sqlite.Database) *sqliteSessionRepository {
+func newSQLiteSessionRepository(db *sqlitekit.Database) *sqliteSessionRepository {
 	return &sqliteSessionRepository{
 		baseRepository: newBaseRepository(db),
 	}

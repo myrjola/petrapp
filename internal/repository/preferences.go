@@ -9,7 +9,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 // defaultMesocycleLengthWeeks is the default mesocycle length in weeks, matching the SQL column default.
@@ -19,7 +19,7 @@ type sqlitePreferencesRepository struct {
 	baseRepository
 }
 
-func newSQLitePreferencesRepository(db *sqlite.Database) *sqlitePreferencesRepository {
+func newSQLitePreferencesRepository(db *sqlitekit.Database) *sqlitePreferencesRepository {
 	return &sqlitePreferencesRepository{baseRepository: newBaseRepository(db)}
 }
 

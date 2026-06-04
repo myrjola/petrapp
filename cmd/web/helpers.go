@@ -81,7 +81,7 @@ const defaultMaxFormSize = 1024
 
 // largeMaxFormSize is a larger maximum size for form data when there's more
 // content to be expected. Sized to accommodate the schema's 20KB exercise
-// description cap (internal/sqlite/schema.sql) plus headroom for other form
+// description cap (internal/repository/schema.sql) plus headroom for other form
 // fields and form encoding overhead. Schema check stays as defense-in-depth.
 const largeMaxFormSize = 1024 * 32
 

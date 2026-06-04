@@ -12,9 +12,10 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 func Test_ResolveWeeklySchedule_GeneratesFullWeekOnFirstLoad(t *testing.T) {
@@ -400,7 +401,12 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}

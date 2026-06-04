@@ -1026,7 +1026,7 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	}
 }
 
-// seedExercises mirrors the 39 exercises in internal/sqlite/fixtures.sql
+// seedExercises mirrors the 39 exercises in internal/repository/fixtures.sql
 // verbatim (IDs, categories, types, rep windows, and primary/secondary
 // muscle groups all match). It keeps the regression test pure-domain while
 // exercising the algorithm against the actual seed users start with.

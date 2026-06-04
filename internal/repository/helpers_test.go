@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/repository"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // setupTestRepos creates an in-memory database, inserts a test user, and
@@ -19,13 +19,18 @@ func setupTestRepos(t *testing.T) (context.Context, *repository.Repositories) {
 	return ctx, repos
 }
 
-// setupTestReposWithDB is like setupTestRepos but also returns the *sqlite.Database
+// setupTestReposWithDB is like setupTestRepos but also returns the *sqlitekit.Database
 // so callers can seed fixtures directly. Use only in tests that need it.
-func setupTestReposWithDB(t *testing.T) (context.Context, *sqlite.Database, *repository.Repositories) {
+func setupTestReposWithDB(t *testing.T) (context.Context, *sqlitekit.Database, *repository.Repositories) {
 	t.Helper()
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
@@ -48,7 +53,7 @@ func setupTestReposWithDB(t *testing.T) (context.Context, *sqlite.Database, *rep
 // slot position (always 0). Callers that need additional slots can insert
 // further rows at incrementing positions.
 func seedWorkoutExerciseSlot(
-	ctx context.Context, t *testing.T, db *sqlite.Database,
+	ctx context.Context, t *testing.T, db *sqlitekit.Database,
 ) (time.Time, int) {
 	t.Helper()
 	userID := contexthelpers.AuthenticatedUserID(ctx)

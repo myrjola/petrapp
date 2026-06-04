@@ -9,9 +9,10 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 func setupTestService(t *testing.T) (context.Context, *service.Service) {
@@ -21,14 +22,19 @@ func setupTestService(t *testing.T) (context.Context, *service.Service) {
 }
 
 // setupTestServiceWithDB is like setupTestService but additionally returns the
-// *sqlite.Database handle so tests that need to seed prior workout history
+// *sqlitekit.Database handle so tests that need to seed prior workout history
 // (e.g. completed hypertrophy sessions to satisfy GetDeloadStartingWeight) can
 // run direct SQL against the same in-memory database the service uses.
-func setupTestServiceWithDB(t *testing.T) (context.Context, *service.Service, *sqlite.Database) {
+func setupTestServiceWithDB(t *testing.T) (context.Context, *service.Service, *sqlitekit.Database) {
 	t.Helper()
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
@@ -67,7 +73,7 @@ func extractExerciseIDs(session domain.Session) []int {
 }
 
 // Helper function to count exercise sets for a given exercise.
-func countExerciseSets(t *testing.T, db *sqlite.Database, exerciseID int) (int, error) {
+func countExerciseSets(t *testing.T, db *sqlitekit.Database, exerciseID int) (int, error) {
 	t.Helper()
 	var count int
 	err := db.ReadOnly.QueryRow(
@@ -83,7 +89,7 @@ func countExerciseSets(t *testing.T, db *sqlite.Database, exerciseID int) (int, 
 }
 
 // Try to insert a muscle group, ignoring if it already exists.
-func tryInsertMuscleGroup(ctx context.Context, t *testing.T, db *sqlite.Database, name string) error {
+func tryInsertMuscleGroup(ctx context.Context, t *testing.T, db *sqlitekit.Database, name string) error {
 	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx, "INSERT INTO muscle_groups (name) VALUES (?)", name)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
@@ -94,7 +100,7 @@ func tryInsertMuscleGroup(ctx context.Context, t *testing.T, db *sqlite.Database
 }
 
 // Helper function to create a test exercise.
-func createTestExercise(ctx context.Context, t *testing.T, db *sqlite.Database, name, category string) (int, error) {
+func createTestExercise(ctx context.Context, t *testing.T, db *sqlitekit.Database, name, category string) (int, error) {
 	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx,
 		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",

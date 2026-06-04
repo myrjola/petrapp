@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
 // newCachedFeatureFlagService returns a Service backed by a fresh in-memory
@@ -18,11 +19,16 @@ import (
 func newCachedFeatureFlagService(
 	t *testing.T,
 	ttl time.Duration,
-) (context.Context, *sqlite.Database, *service.Service) {
+) (context.Context, *sqlitekit.Database, *service.Service) {
 	t.Helper()
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
-	db, err := sqlite.NewDatabase(ctx, ":memory:", logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      ":memory:",
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		t.Fatalf("create test database: %v", err)
 	}

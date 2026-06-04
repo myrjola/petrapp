@@ -10,7 +10,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 const (
@@ -92,10 +92,10 @@ func fetchMuscleGroupsByExerciseID(
 
 // baseRepository contains common functionality for all SQLite repositories.
 type baseRepository struct {
-	db *sqlite.Database
+	db *sqlitekit.Database
 }
 
-func newBaseRepository(db *sqlite.Database) baseRepository {
+func newBaseRepository(db *sqlitekit.Database) baseRepository {
 	return baseRepository{db: db}
 }
 

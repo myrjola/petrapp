@@ -26,8 +26,9 @@ import (
 	"github.com/myrjola/petrapp/internal/platform/obs/flightrecorder"
 	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 	"github.com/myrjola/petrapp/internal/platform/obs/pprofserver"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
+	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/sqlite"
 	"github.com/myrjola/petrapp/internal/webauthnhandler"
 )
 
@@ -121,7 +122,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("resolve template path: %w", err)
 	}
 
-	db, err := sqlite.NewDatabase(ctx, cfg.SqliteURL, logger)
+	db, err := openDatabase(ctx, cfg.SqliteURL, logger)
 	if err != nil {
 		return fmt.Errorf("open db (url: %s): %w", cfg.SqliteURL, err)
 	}
@@ -207,6 +208,21 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	return app.configureAndStartServer(ctx, listener, actualAddr, cfg.TLSCert, cfg.TLSKey, routes)
 }
 
+// openDatabase opens petra's SQLite database, applying the product schema and
+// fixtures from internal/repository via sqlitekit's caller-provided Config.
+func openDatabase(ctx context.Context, url string, logger *slog.Logger) (*sqlitekit.Database, error) {
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      url,
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new database: %w", err)
+	}
+	return db, nil
+}
+
 // newApplication builds the *application and wires webauthnhandler's
 // InternalErrorHandler to the shim-aware serverError so DB / lookup failures
 // inside that middleware navigate to /error instead of producing a silent 500.
@@ -289,7 +305,7 @@ type notificationStack struct {
 func buildNotificationStack(
 	ctx context.Context,
 	cfg *config,
-	db *sqlite.Database,
+	db *sqlitekit.Database,
 	logger *slog.Logger,
 ) (*notificationStack, error) {
 	idleSeconds, err := strconv.Atoi(cfg.NotificationIdleTimeoutSec)
@@ -359,7 +375,7 @@ func buildNotificationStack(
 	}, nil
 }
 
-func initializeSessionManager(dbs *sqlite.Database) *scs.SessionManager {
+func initializeSessionManager(dbs *sqlitekit.Database) *scs.SessionManager {
 	// gob.Register is idempotent, so calling it per initializeSessionManager is safe.
 	gob.Register(flashEntry{}) //nolint:exhaustruct // gob.Register only needs the type, value fields are unused.
 	sessionManager := scs.New()

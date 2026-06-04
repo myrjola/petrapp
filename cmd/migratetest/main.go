@@ -9,8 +9,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
-	"github.com/myrjola/petrapp/internal/sqlite"
+	"github.com/myrjola/petrapp/internal/repository"
 )
 
 func main() {
@@ -34,7 +35,12 @@ func run(w io.Writer) error {
 		return errors.New("PETRAPP_SQLITE_URL not set")
 	}
 
-	db, err := sqlite.NewDatabase(ctx, sqliteURL, logger)
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:      sqliteURL,
+		Schema:   repository.SchemaSQL,
+		Fixtures: repository.FixturesSQL,
+		Logger:   logger,
+	})
 	if err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "error creating database",
 			slog.String("url", sqliteURL), slog.Any("error", err))
