@@ -51,7 +51,7 @@ bin/golangci-lint:
 .PHONY: build
 build:
 	@echo "Building..."
-	@go build -o bin/petrapp github.com/myrjola/petrapp/cmd/web
+	@go build -o bin/petrapp github.com/myrjola/petrapp/cmd/petra
 	@go build -o bin/smoketest github.com/myrjola/petrapp/cmd/smoketest
 	@go build -o bin/migratetest github.com/myrjola/petrapp/cmd/migratetest
 	@go build -o bin/stresstest github.com/myrjola/petrapp/cmd/stresstest
@@ -102,7 +102,7 @@ clean:
 .PHONY: dev
 dev:
 	@echo "Running dev server with debug build..."
-	@go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/web
+	@go build -gcflags="all=-N -l" -o bin/petrapp github.com/myrjola/petrapp/cmd/petra
 	@bash scripts/dev.sh
 
 .PHONY: dev-tailnet

@@ -7,7 +7,7 @@
 !go.sum
 !**/*.go
 !**/*.sql
-!ui
+!cmd/petra/ui
 !bin/petrapp.linux_amd64
 
 # Ignore temporary or OS-generated files

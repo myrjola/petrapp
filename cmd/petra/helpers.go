@@ -56,7 +56,7 @@ func (app *application) serverError(w http.ResponseWriter, r *http.Request, err 
 //
 // safeURL is only used on the validation branch. It must point at a GET
 // handler known to render successfully AND that pops + renders the flash.
-// See cmd/web/CLAUDE.md "userError semantics" for the rationale and the
+// See cmd/petra/CLAUDE.md "userError semantics" for the rationale and the
 // list of currently-supported safe URLs.
 func (app *application) userError(
 	w http.ResponseWriter, r *http.Request, err error, safeURL string,

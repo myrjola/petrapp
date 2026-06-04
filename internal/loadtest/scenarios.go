@@ -1,7 +1,7 @@
 // Package loadtest provides reusable HTTP scenarios that exercise the petrapp
 // app the way a real user would: register, set preferences, start a workout,
 // complete sets. The scenarios are imported by cmd/stresstest (which runs them
-// against a deployed app) and by an in-process smoke test in cmd/web (which
+// against a deployed app) and by an in-process smoke test in cmd/petra (which
 // runs them against a freshly-started test server every CI run so selector or
 // form-field drift fails the test instead of an ops-time perf run).
 package loadtest

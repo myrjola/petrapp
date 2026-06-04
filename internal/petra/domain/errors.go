@@ -28,7 +28,7 @@ var (
 // ValidationError is a domain validation failure carrying a message that is
 // safe to surface directly to the end user. Handlers detect it with
 // errors.As and surface it via putFlashError + redirect-to-form; see
-// cmd/web/CLAUDE.md for the full flow.
+// cmd/petra/CLAUDE.md for the full flow.
 type ValidationError struct {
 	Message string
 }

@@ -62,7 +62,7 @@ func (app *application) fileServerHandler() (http.Handler, error) {
 		if findErr != nil {
 			return nil, fmt.Errorf("findModuleDir: %w", findErr)
 		}
-		fileRoot = path.Join(dir, "ui", "static")
+		fileRoot = path.Join(dir, "cmd", "petra", "ui", "static")
 	}
 	stat, err := os.Stat(fileRoot)
 	if err != nil || !stat.IsDir() {

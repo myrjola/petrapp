@@ -28,9 +28,9 @@ const LogAddrKey = "addr"
 const LogDsnKey = "sqlDsn"
 
 const (
-	// errorRecorderWindow mirrors cmd/web/main.go: ten-minute lookback buffer.
+	// errorRecorderWindow mirrors cmd/petra/main.go: ten-minute lookback buffer.
 	errorRecorderWindow = 10 * time.Minute
-	// errorRecorderRateLimit mirrors cmd/web/main.go: 60 dumps per rolling hour.
+	// errorRecorderRateLimit mirrors cmd/petra/main.go: 60 dumps per rolling hour.
 	errorRecorderRateLimit = 60
 )
 

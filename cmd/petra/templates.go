@@ -68,7 +68,7 @@ func resolveAndVerifyTemplatePath(templatePath string) (string, error) {
 		if modulePath, err = findModuleDir(); err != nil {
 			return "", fmt.Errorf("find module dir: %w", err)
 		}
-		templatePath = filepath.Join(modulePath, "ui", "templates")
+		templatePath = filepath.Join(modulePath, "cmd", "petra", "ui", "templates")
 	}
 	var stat os.FileInfo
 	if stat, err = os.Stat(templatePath); err != nil {

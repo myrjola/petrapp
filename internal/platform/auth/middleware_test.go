@@ -17,7 +17,7 @@ import (
 // Because getUserRole reads from sqlite and the unit-test fixture cannot
 // easily inject a faulty DB, this test asserts the *callback path* by
 // driving internalError directly. The real-DB scenario is covered by an
-// integration test in cmd/web (Task 3) where we can fault the session
+// integration test in cmd/petra (Task 3) where we can fault the session
 // store to provoke the branch.
 func Test_AuthenticateMiddleware_internalErrorPath_DelegatesToCallback(t *testing.T) {
 	t.Parallel()

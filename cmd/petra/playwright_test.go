@@ -168,7 +168,7 @@ func setupPlaywrightPage(t *testing.T, allowedConsoleErrors ...string) (playwrig
 // smoke test using playwright. To debug, set PWDEBUG=1 environment variable.
 // Place a `page.Pause()` in the place you want to debug.
 //
-// `PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/web/`.
+// `PWDEBUG=1 go test -count 1 -v -run Test_playwright_smoketest ./cmd/petra/`.
 func Test_playwright_smoketest(t *testing.T) {
 	t.Parallel()
 

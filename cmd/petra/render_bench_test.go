@@ -16,7 +16,7 @@ import (
 // homeTemplateData payload. Used as a regression guard for the
 // template clone-removal work.
 func BenchmarkRenderHome(b *testing.B) {
-	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
+	templatePath, err := filepath.Abs(filepath.Join("ui", "templates"))
 	if err != nil {
 		b.Fatalf("resolve template path: %v", err)
 	}

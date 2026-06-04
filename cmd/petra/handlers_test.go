@@ -16,7 +16,7 @@ import (
 func Test_pageTemplate_cachesAndReturnsSameInstanceInProdMode(t *testing.T) {
 	t.Parallel()
 
-	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
+	templatePath, err := filepath.Abs(filepath.Join("ui", "templates"))
 	if err != nil {
 		t.Fatalf("resolve template path: %v", err)
 	}
@@ -61,7 +61,7 @@ func Test_pageTemplate_cachesAndReturnsSameInstanceInProdMode(t *testing.T) {
 func Test_pageTemplate_coldStartRaceFreeInProdMode(t *testing.T) {
 	t.Parallel()
 
-	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
+	templatePath, err := filepath.Abs(filepath.Join("ui", "templates"))
 	if err != nil {
 		t.Fatalf("resolve template path: %v", err)
 	}
@@ -109,7 +109,7 @@ func Test_pageTemplate_coldStartRaceFreeInProdMode(t *testing.T) {
 func Test_pageTemplate_skipsCacheInDevMode(t *testing.T) {
 	t.Parallel()
 
-	templatePath, err := filepath.Abs(filepath.Join("..", "..", "ui", "templates"))
+	templatePath, err := filepath.Abs(filepath.Join("ui", "templates"))
 	if err != nil {
 		t.Fatalf("resolve template path: %v", err)
 	}

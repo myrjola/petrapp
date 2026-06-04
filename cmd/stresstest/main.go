@@ -1,7 +1,7 @@
 // Command stresstest drives concurrent workout scenarios against a deployed
 // petrapp instance to produce load for performance profiling. Scenario logic
 // lives in internal/loadtest so it is also exercised by the in-process smoke
-// test in cmd/web.
+// test in cmd/petra.
 //
 // Usage:
 //
