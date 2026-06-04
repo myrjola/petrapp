@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 type workoutTemplateData struct {

@@ -5,7 +5,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 const devErrorUXPath = "/dev/error-ux"

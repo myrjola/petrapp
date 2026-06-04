@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 func TestDetermineWorkoutStatus(t *testing.T) {

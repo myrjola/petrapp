@@ -12,7 +12,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/alexedwards/scs/v2/memstore"
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 // newTestSessionManager builds an in-memory scs session manager for tests

@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 // featureFlagsAdminTemplateData contains data for the feature flags admin template.

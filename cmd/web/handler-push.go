@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 const pushBodyMaxBytes = 4096 // tiny JSON body; subscriptions are ~1 KB max.

@@ -20,7 +20,9 @@ import (
 	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
-	"github.com/myrjola/petrapp/internal/notification"
+	"github.com/myrjola/petrapp/internal/petra/notification"
+	"github.com/myrjola/petrapp/internal/petra/repository"
+	"github.com/myrjola/petrapp/internal/petra/service"
 	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/envstruct"
 	"github.com/myrjola/petrapp/internal/platform/obs/errorrecorder"
@@ -28,8 +30,6 @@ import (
 	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 	"github.com/myrjola/petrapp/internal/platform/obs/pprofserver"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
-	"github.com/myrjola/petrapp/internal/repository"
-	"github.com/myrjola/petrapp/internal/service"
 )
 
 type application struct {

@@ -9,10 +9,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/petra/repository"
 	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
-	"github.com/myrjola/petrapp/internal/repository"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 // adminExerciseRow is one row of the exercise admin table, with display

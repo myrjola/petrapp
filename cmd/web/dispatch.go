@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/notification"
+	"github.com/myrjola/petrapp/internal/petra/domain"
+	"github.com/myrjola/petrapp/internal/petra/notification"
+	"github.com/myrjola/petrapp/internal/petra/service"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/myrjola/petrapp/internal/service"
 )
 
 // makeDispatchFunc returns the dispatcher closure passed to notification.Scheduler.

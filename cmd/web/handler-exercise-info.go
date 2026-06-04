@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 	"github.com/yuin/goldmark"
 )

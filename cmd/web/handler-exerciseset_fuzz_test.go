@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 // FuzzParseFormWeight asserts the structural contract of parseFormWeight over

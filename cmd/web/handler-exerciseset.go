@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
 // signalFormField is both the POST form field name and the slog attribute key

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/myrjola/petrapp/internal/domain"
 	"github.com/myrjola/petrapp/internal/e2etest"
+	"github.com/myrjola/petrapp/internal/petra/domain"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
 )
 

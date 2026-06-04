@@ -8,10 +8,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/myrjola/petrapp/internal/petra/repository"
+	"github.com/myrjola/petrapp/internal/petra/service"
 	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
-	"github.com/myrjola/petrapp/internal/repository"
-	"github.com/myrjola/petrapp/internal/service"
 )
 
 // newHealthTestApp builds a minimal application whose only wired dependencies
