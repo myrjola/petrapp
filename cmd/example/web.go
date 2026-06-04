@@ -40,9 +40,7 @@ func newRenderer() (*renderer, error) {
 }
 
 // render writes a parsed template to the response. It is consumed by the todo
-// CRUD and /account handlers mounted in Task 11.
-//
-//nolint:unused // wired into handlers in Task 11.
+// CRUD and /account handlers.
 func (rnd *renderer) render(w http.ResponseWriter, status int, name string, data any) error {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
@@ -79,8 +77,22 @@ func (app *application) routes() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	// CRUD routes, the thin auth (passkey) routes, and the gated /account
-	// route are mounted in Task 11 once their handlers exist.
+	mux.HandleFunc("GET /", app.handleList)
+	mux.HandleFunc("GET /todos/{id}", app.handleDetail)
+	mux.HandleFunc("POST /todos", app.handleCreate)
+	mux.HandleFunc("POST /todos/{id}/toggle", app.handleToggle)
+	mux.HandleFunc("POST /todos/{id}/delete", app.handleDelete)
+
+	// Shared passkey auth wrappers (thin handlers around the auth handler).
+	mux.HandleFunc("POST /api/registration/begin", app.beginRegistration)
+	mux.HandleFunc("POST /api/registration/finish", app.finishRegistration)
+	mux.HandleFunc("POST /api/login/begin", app.beginLogin)
+	mux.HandleFunc("POST /api/login/finish", app.finishLogin)
+	mux.HandleFunc("POST /api/logout", app.logout)
+	// Demonstrate the shared gate without forcing a passkey ceremony on the
+	// CRUD pages (kept open so handler tests need no auth). /account is gated.
+	mux.Handle("GET /account", app.auth.AuthenticateMiddleware(
+		http.HandlerFunc(app.handleAccount)))
 
 	var handler http.Handler = mux
 	handler = app.recoverPanic(handler)
