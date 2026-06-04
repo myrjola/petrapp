@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 )
 
 type timeoutResponseWriter struct {

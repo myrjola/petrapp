@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 )
 
 type BaseTemplateData struct {

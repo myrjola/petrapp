@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 )
 
 // ListExercises returns all available exercises.

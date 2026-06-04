@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 )
 
 func TestScheduledPushes_ReplaceUpsertsBySlot(t *testing.T) {

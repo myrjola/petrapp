@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/myrjola/petrapp/internal/envstruct"
+	"github.com/myrjola/petrapp/internal/platform/envstruct"
 )
 
 func TestPopulate(t *testing.T) {

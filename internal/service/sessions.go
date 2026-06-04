@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 )
 
 // RegenerateWeeklyPlanIfUnstarted replaces the current week's plan when no

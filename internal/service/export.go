@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 )
 
 // ExportUserData creates an SQLite database export containing all data for the authenticated user.

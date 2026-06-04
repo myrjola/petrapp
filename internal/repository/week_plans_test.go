@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )

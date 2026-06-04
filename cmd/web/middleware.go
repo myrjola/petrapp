@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/contexthelpers"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 

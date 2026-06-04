@@ -8,8 +8,8 @@ import (
 	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
-	"github.com/myrjola/petrapp/internal/contexthelpers"
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 	"github.com/myrjola/petrapp/internal/sqlite"
 )
 
