@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/errorrecorder"
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/errorrecorder"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
 // TestRecorderProducesDumpFileOnError verifies the end-to-end wiring:

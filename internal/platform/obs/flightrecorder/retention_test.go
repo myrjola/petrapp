@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/flightrecorder"
+	"github.com/myrjola/petrapp/internal/platform/obs/flightrecorder"
 )
 
 // TestService_CapturePrunesOldTraces verifies that a capture caps the trace

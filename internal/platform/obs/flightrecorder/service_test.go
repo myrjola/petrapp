@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/flightrecorder"
+	"github.com/myrjola/petrapp/internal/platform/obs/flightrecorder"
 )
 
 // Flight recorder tests cannot run in parallel: runtime/trace.NewFlightRecorder

@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
 func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler {

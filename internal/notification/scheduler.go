@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
 // DispatchFunc is called when a scheduled push fires. Implementations should

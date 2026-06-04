@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/contexthelpers"
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
 // slowRequestThreshold is the duration above which a non-admin request is

@@ -28,7 +28,7 @@ import (
 
 	"github.com/myrjola/petrapp/internal/e2etest"
 	"github.com/myrjola/petrapp/internal/loadtest"
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 	"github.com/myrjola/petrapp/internal/testhelpers"
 	"golang.org/x/sync/errgroup"
 )

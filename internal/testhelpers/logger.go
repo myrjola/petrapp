@@ -4,7 +4,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
 // NewLogger creates a new logger with the given log sink such as testhelpers.Writer.

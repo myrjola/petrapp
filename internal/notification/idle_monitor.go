@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/myrjola/petrapp/internal/logging"
+	"github.com/myrjola/petrapp/internal/platform/obs/logging"
 )
 
 // IdleMonitorConfig configures an IdleMonitor.
