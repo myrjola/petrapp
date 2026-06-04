@@ -1,0 +1,16 @@
+{{define "list"}}{{template "base" .}}{{end}}
+{{define "title"}}Todos{{end}}
+{{define "main"}}
+<h1>Todos</h1>
+<form method="post" action="/todos">
+  <input name="title" placeholder="title" required>
+  <button type="submit">Add</button>
+</form>
+<ul>
+{{range .Todos}}
+  <li>
+    <a href="/todos/{{.ID}}">{{.Title}}</a>{{if .Done}} &check;{{end}}
+  </li>
+{{end}}
+</ul>
+{{end}}

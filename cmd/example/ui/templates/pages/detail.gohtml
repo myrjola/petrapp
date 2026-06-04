@@ -1,0 +1,10 @@
+{{define "detail"}}{{template "base" .}}{{end}}
+{{define "title"}}{{.Todo.Title}}{{end}}
+{{define "main"}}
+<h1>{{.Todo.Title}}</h1>
+<p>{{.Todo.Notes}}</p>
+<p>Done: {{.Todo.Done}}</p>
+<form method="post" action="/todos/{{.Todo.ID}}/toggle"><button>Toggle</button></form>
+<form method="post" action="/todos/{{.Todo.ID}}/delete"><button>Delete</button></form>
+<a href="/">Back</a>
+{{end}}
