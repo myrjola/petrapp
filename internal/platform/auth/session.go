@@ -1,4 +1,4 @@
-package webauthnhandler
+package auth
 
 type sessionKey string
 

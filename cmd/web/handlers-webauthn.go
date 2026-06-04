@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/myrjola/petrapp/internal/webauthnhandler"
+	"github.com/myrjola/petrapp/internal/platform/auth"
 )
 
 func (app *application) beginRegistration(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,7 @@ func (app *application) beginLogin(w http.ResponseWriter, r *http.Request) {
 func (app *application) finishLogin(w http.ResponseWriter, r *http.Request) {
 	if err := app.webAuthnHandler.FinishLogin(r); err != nil {
 		// Check if the error is due to an unknown credential.
-		var unknownCredErr *webauthnhandler.UnknownCredentialError
+		var unknownCredErr *auth.UnknownCredentialError
 		if errors.As(err, &unknownCredErr) {
 			// Return JSON error response with credential ID for the client to signal removal.
 			w.Header().Set("Content-Type", "application/json")

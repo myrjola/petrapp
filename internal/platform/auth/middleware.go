@@ -1,4 +1,4 @@
-package webauthnhandler
+package auth
 
 import (
 	"crypto/sha256"
@@ -24,7 +24,7 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 			return
 		}
 
-		role, err := h.getUserRole(ctx, webauthnUserID)
+		role, err := h.store.getUserRole(ctx, webauthnUserID)
 		var intUserID int
 		switch {
 		case errors.Is(err, sql.ErrNoRows): // Do not authenticate if user does not exist.
@@ -33,7 +33,7 @@ func (h *WebAuthnHandler) AuthenticateMiddleware(next http.Handler) http.Handler
 			return
 		default:
 			// Get the integer user ID for context
-			intUserID, err = h.getUserIntegerID(ctx, webauthnUserID)
+			intUserID, err = h.store.getUserIntegerID(ctx, webauthnUserID)
 			if err != nil {
 				h.internalError(w, r, fmt.Errorf("fetch user integer ID: %w", err))
 				return

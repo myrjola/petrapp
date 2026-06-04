@@ -21,6 +21,7 @@ import (
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 	"github.com/myrjola/petrapp/internal/notification"
+	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/envstruct"
 	"github.com/myrjola/petrapp/internal/platform/obs/errorrecorder"
 	"github.com/myrjola/petrapp/internal/platform/obs/flightrecorder"
@@ -29,12 +30,11 @@ import (
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
-	"github.com/myrjola/petrapp/internal/webauthnhandler"
 )
 
 type application struct {
 	logger          *slog.Logger
-	webAuthnHandler *webauthnhandler.WebAuthnHandler
+	webAuthnHandler *auth.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
 	// parsedTemplates memoizes page templates so renders skip filesystem reads
@@ -148,15 +148,16 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	if cfg.FlyAppName != "" {
 		fqdn = cfg.FlyAppName + ".fly.dev"
 	}
-	var webAuthnHandler *webauthnhandler.WebAuthnHandler
+	var webAuthnHandler *auth.WebAuthnHandler
 	tlsEnabled := cfg.TLSCert != ""
-	if webAuthnHandler, err = webauthnhandler.New(
+	authStore := auth.NewSQLiteStore(db)
+	if webAuthnHandler, err = auth.New(
 		actualAddr,
 		fqdn,
 		tlsEnabled,
 		logger,
 		sessionManager,
-		db,
+		authStore,
 	); err != nil {
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
@@ -213,7 +214,7 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 func openDatabase(ctx context.Context, url string, logger *slog.Logger) (*sqlitekit.Database, error) {
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      url,
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -223,12 +224,12 @@ func openDatabase(ctx context.Context, url string, logger *slog.Logger) (*sqlite
 	return db, nil
 }
 
-// newApplication builds the *application and wires webauthnhandler's
+// newApplication builds the *application and wires auth's
 // InternalErrorHandler to the shim-aware serverError so DB / lookup failures
 // inside that middleware navigate to /error instead of producing a silent 500.
 func newApplication(
 	logger *slog.Logger,
-	webAuthnHandler *webauthnhandler.WebAuthnHandler,
+	webAuthnHandler *auth.WebAuthnHandler,
 	sessionManager *scs.SessionManager,
 	htmlTemplatePath string,
 	svc *service.Service,

@@ -1,4 +1,4 @@
-package webauthnhandler
+package auth
 
 import (
 	"crypto/rand"

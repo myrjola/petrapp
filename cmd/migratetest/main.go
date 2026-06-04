@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
 	"github.com/myrjola/petrapp/internal/repository"
@@ -37,7 +38,7 @@ func run(w io.Writer) error {
 
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      sqliteURL,
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})

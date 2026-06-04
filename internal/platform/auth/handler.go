@@ -1,4 +1,4 @@
-package webauthnhandler
+package auth
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 // UnknownCredentialError is returned when a credential ID is not found in the database.
@@ -36,7 +35,7 @@ type WebAuthnHandler struct {
 	logger         *slog.Logger
 	webAuthn       *webauthn.WebAuthn
 	sessionManager *scs.SessionManager
-	database       *sqlitekit.Database
+	store          Store
 
 	// InternalErrorHandler, when set, owns the response on any internal
 	// failure inside this package (DB lookup errors, etc.). Wired by the
@@ -52,7 +51,7 @@ func New(
 	tlsEnabled bool,
 	logger *slog.Logger,
 	sessionManager *scs.SessionManager,
-	dbs *sqlitekit.Database,
+	store Store,
 ) (*WebAuthnHandler, error) {
 	var (
 		err     error
@@ -124,7 +123,7 @@ func New(
 		logger:         logger,
 		webAuthn:       webAuthn,
 		sessionManager: sessionManager,
-		database:       dbs,
+		store:          store,
 	}, nil
 }
 
@@ -153,7 +152,7 @@ func (h *WebAuthnHandler) BeginRegistration(ctx context.Context) ([]byte, error)
 	}
 
 	h.sessionManager.Put(ctx, string(webAuthnSessionKey), *session)
-	if err = h.upsertUser(ctx, user); err != nil {
+	if err = h.store.upsertUser(ctx, user); err != nil {
 		return nil, fmt.Errorf("upsert user: %w", err)
 	}
 
@@ -176,7 +175,7 @@ func (h *WebAuthnHandler) FinishRegistration(r *http.Request) error {
 	}
 
 	var user webauthn.User
-	if user, err = h.getUser(ctx, session.UserID); err != nil {
+	if user, err = h.store.getUser(ctx, session.UserID); err != nil {
 		return fmt.Errorf("get user: %w", err)
 	}
 
@@ -185,7 +184,7 @@ func (h *WebAuthnHandler) FinishRegistration(r *http.Request) error {
 		return fmt.Errorf("finish webauthn registration: %w", err)
 	}
 
-	if err = h.upsertCredential(ctx, user.WebAuthnID(), credential); err != nil {
+	if err = h.store.upsertCredential(ctx, user.WebAuthnID(), credential); err != nil {
 		return fmt.Errorf("upsert webauthn credential: %w", err)
 	}
 
@@ -244,7 +243,7 @@ func (h *WebAuthnHandler) FinishLogin(r *http.Request) error {
 		return fmt.Errorf("validate Passkey login: %w", err)
 	}
 
-	if err = h.upsertCredential(ctx, usr.WebAuthnID(), credential); err != nil {
+	if err = h.store.upsertCredential(ctx, usr.WebAuthnID(), credential); err != nil {
 		return fmt.Errorf("upsert webauthn credential: %w", err)
 	}
 
@@ -276,7 +275,7 @@ func (h *WebAuthnHandler) DeleteUser(ctx context.Context) error {
 		return errors.New("invalid user ID type in session")
 	}
 
-	if err := h.deleteUser(ctx, userIDBytes); err != nil {
+	if err := h.store.deleteUser(ctx, userIDBytes); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 
@@ -298,7 +297,7 @@ func (h *WebAuthnHandler) parseWebAuthnSession(ctx context.Context) (webauthn.Se
 
 func (h *WebAuthnHandler) findUserHandler(ctx context.Context) webauthn.DiscoverableUserHandler {
 	return func(_, userID []byte) (webauthn.User, error) {
-		return h.getUser(ctx, userID)
+		return h.store.getUser(ctx, userID)
 	}
 }
 

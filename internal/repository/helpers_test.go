@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
@@ -27,7 +28,7 @@ func setupTestReposWithDB(t *testing.T) (context.Context, *sqlitekit.Database, *
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})

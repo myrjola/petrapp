@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/myrjola/petrapp/internal/domain"
+	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/platform/testkit"
@@ -22,7 +23,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -164,7 +165,7 @@ func Test_UpdateExercise_RejectsInvalidExercise(t *testing.T) {
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -200,7 +201,7 @@ func Test_GenerateExercise_RejectsEmptyName(t *testing.T) {
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -229,7 +230,7 @@ func Test_AddExercise(t *testing.T) {
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -437,7 +438,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -544,7 +545,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -644,7 +645,7 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})
@@ -786,7 +787,7 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 			logger := testkit.NewLogger(testkit.NewWriter(t))
 			db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 				URL:      ":memory:",
-				Schema:   repository.SchemaSQL,
+				Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 				Fixtures: repository.FixturesSQL,
 				Logger:   logger,
 			})
@@ -871,7 +872,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})

@@ -1,4 +1,4 @@
-package webauthnhandler
+package auth
 
 import (
 	"context"
@@ -9,18 +9,42 @@ import (
 	"fmt"
 
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
 const selectUserStmt = `SELECT id FROM users WHERE webauthn_user_id = ?`
 
 var ErrUserNotFound = errors.New("user not found")
 
-func (h *WebAuthnHandler) upsertUser(ctx context.Context, user webauthn.User) error {
+// Store is the persistence the auth handler needs. SQLiteStore is the default
+// sqlitekit-backed implementation; the interface removes the handler's hard
+// dependency on a concrete DB and gives tests a seam. user/role stay package
+// types, so implementations live in package auth (both apps use SQLiteStore).
+type Store interface {
+	upsertUser(ctx context.Context, u webauthn.User) error
+	getUser(ctx context.Context, webAuthnID []byte) (*user, error)
+	upsertCredential(ctx context.Context, webAuthnID []byte, credential *webauthn.Credential) error
+	getUserRole(ctx context.Context, webAuthnID []byte) (role, error)
+	getUserIntegerID(ctx context.Context, webAuthnID []byte) (int, error)
+	deleteUser(ctx context.Context, webAuthnID []byte) error
+}
+
+// SQLiteStore is the sqlitekit-backed implementation of Store.
+type SQLiteStore struct {
+	db *sqlitekit.Database
+}
+
+// NewSQLiteStore builds a Store backed by the given sqlitekit database.
+func NewSQLiteStore(db *sqlitekit.Database) *SQLiteStore {
+	return &SQLiteStore{db: db}
+}
+
+func (s *SQLiteStore) upsertUser(ctx context.Context, user webauthn.User) error {
 	var err error
 	stmt := `INSERT INTO users (webauthn_user_id, display_name)
 VALUES (:webauthn_user_id, :display_name)
 ON CONFLICT (webauthn_user_id) DO UPDATE SET display_name = :display_name`
-	if _, err = h.database.ReadWrite.ExecContext(ctx, stmt, user.WebAuthnID(), user.WebAuthnDisplayName()); err != nil {
+	if _, err = s.db.ReadWrite.ExecContext(ctx, stmt, user.WebAuthnID(), user.WebAuthnDisplayName()); err != nil {
 		return fmt.Errorf("db upsert user %s (webauthn_user_id: %s): %w",
 			user.WebAuthnDisplayName(),
 			hex.EncodeToString(user.WebAuthnID()),
@@ -29,7 +53,7 @@ ON CONFLICT (webauthn_user_id) DO UPDATE SET display_name = :display_name`
 	return nil
 }
 
-func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user, error) {
+func (s *SQLiteStore) getUser(ctx context.Context, webauthnID []byte) (*user, error) {
 	var (
 		err  error
 		rows *sql.Rows
@@ -37,7 +61,7 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user
 
 	stmt := `SELECT id, webauthn_user_id, display_name FROM users WHERE webauthn_user_id = ?`
 	var user user
-	if err = h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(
+	if err = s.db.ReadOnly.QueryRowContext(ctx, stmt, webauthnID).Scan(
 		&user.id, &user.webauthnUserID, &user.displayName); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound
@@ -60,13 +84,12 @@ func (h *WebAuthnHandler) getUser(ctx context.Context, webauthnID []byte) (*user
        authenticator_attachment
 FROM credentials
 WHERE user_id = ?`
-	if rows, err = h.database.ReadOnly.QueryContext(ctx, stmt, user.id); err != nil {
+	if rows, err = s.db.ReadOnly.QueryContext(ctx, stmt, user.id); err != nil {
 		return nil, fmt.Errorf("query credentials: %w", err)
 	}
 	defer func() {
-		err = rows.Close()
-		if err != nil {
-			h.logger.ErrorContext(ctx, "could not close rows", "err", fmt.Errorf("close rows: %w", err))
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close rows: %w", closeErr)
 		}
 	}()
 
@@ -104,14 +127,14 @@ WHERE user_id = ?`
 	return &user, nil
 }
 
-func (h *WebAuthnHandler) upsertCredential(
+func (s *SQLiteStore) upsertCredential(
 	ctx context.Context,
 	webauthnUserID []byte,
 	credential *webauthn.Credential,
 ) error {
 	// First get the integer user ID
 	var intUserID int
-	if err := h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
+	if err := s.db.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
 		return fmt.Errorf("get user integer ID: %w", err)
 	}
 
@@ -145,7 +168,7 @@ ON CONFLICT (id) DO UPDATE SET attestation_type            = EXCLUDED.attestatio
 	if err != nil {
 		return fmt.Errorf("JSON encode transport: %w", err)
 	}
-	_, err = h.database.ReadWrite.ExecContext(
+	_, err = s.db.ReadWrite.ExecContext(
 		ctx,
 		stmt,
 		credential.ID,
@@ -179,10 +202,10 @@ const (
 )
 
 // getUserRole returns the role of the user or sql.ErrNoRows if the user does not exist.
-func (h *WebAuthnHandler) getUserRole(ctx context.Context, webauthnUserID []byte) (role, error) {
+func (s *SQLiteStore) getUserRole(ctx context.Context, webauthnUserID []byte) (role, error) {
 	stmt := `SELECT is_admin FROM users WHERE webauthn_user_id = ?`
 	var isAdmin bool
-	if err := h.database.ReadOnly.QueryRowContext(ctx, stmt, webauthnUserID).Scan(&isAdmin); err != nil {
+	if err := s.db.ReadOnly.QueryRowContext(ctx, stmt, webauthnUserID).Scan(&isAdmin); err != nil {
 		return roleUser, fmt.Errorf("query user role: %w", err)
 	}
 	if isAdmin {
@@ -192,9 +215,9 @@ func (h *WebAuthnHandler) getUserRole(ctx context.Context, webauthnUserID []byte
 }
 
 // getUserIntegerID returns the integer user ID for a given webauthn user ID.
-func (h *WebAuthnHandler) getUserIntegerID(ctx context.Context, webauthnUserID []byte) (int, error) {
+func (s *SQLiteStore) getUserIntegerID(ctx context.Context, webauthnUserID []byte) (int, error) {
 	var intUserID int
-	if err := h.database.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
+	if err := s.db.ReadOnly.QueryRowContext(ctx, selectUserStmt, webauthnUserID).Scan(&intUserID); err != nil {
 		return 0, fmt.Errorf("query user integer ID: %w", err)
 	}
 	return intUserID, nil
@@ -203,9 +226,9 @@ func (h *WebAuthnHandler) getUserIntegerID(ctx context.Context, webauthnUserID [
 // deleteUser permanently removes a user and all associated data from the database.
 // Due to CASCADE DELETE constraints in the schema, this will automatically clean up
 // anything that refers to the user.
-func (h *WebAuthnHandler) deleteUser(ctx context.Context, webauthnUserID []byte) error {
+func (s *SQLiteStore) deleteUser(ctx context.Context, webauthnUserID []byte) error {
 	stmt := `DELETE FROM users WHERE webauthn_user_id = ?`
-	_, err := h.database.ReadWrite.ExecContext(ctx, stmt, webauthnUserID)
+	_, err := s.db.ReadWrite.ExecContext(ctx, stmt, webauthnUserID)
 	if err != nil {
 		return fmt.Errorf("delete user from database: %w", err)
 	}

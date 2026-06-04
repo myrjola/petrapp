@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/myrjola/petrapp/internal/platform/auth"
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 	"github.com/myrjola/petrapp/internal/repository"
 	"github.com/myrjola/petrapp/internal/service"
@@ -22,7 +23,7 @@ func newHealthTestApp(t *testing.T) (*application, *sqlitekit.Database) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
 		URL:      ":memory:",
-		Schema:   repository.SchemaSQL,
+		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures: repository.FixturesSQL,
 		Logger:   logger,
 	})

@@ -1,5 +1,5 @@
 //nolint:testpackage // exercises the unexported internalError helper; lives in-package by design.
-package webauthnhandler
+package auth
 
 import (
 	"errors"
