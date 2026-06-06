@@ -509,6 +509,39 @@ function initRestChips() {
         chimed: false,
     }))
 
+    // Screen Wake Lock — hold the screen on while a rest is counting down so the
+    // in-page countdown stays visible and the chime can fire. The platform
+    // auto-releases the lock whenever the page is hidden, so we re-acquire on
+    // visibilitychange while a rest is still active. Degrades silently where
+    // unsupported (pre-iOS 18.4 installed PWAs, older browsers); the countdown
+    // and the server push both still work without it.
+    let wakeLock = null
+    let wakeLockBusy = false
+    const restActive = () => states.some((st) => st.endAt - Date.now() > 0)
+    const acquireWakeLock = async () => {
+        if (!('wakeLock' in navigator) || wakeLock || wakeLockBusy) return
+        if (document.visibilityState !== 'visible') return
+        wakeLockBusy = true
+        try {
+            wakeLock = await navigator.wakeLock.request('screen')
+            wakeLock.addEventListener('release', () => { wakeLock = null }, {once: true})
+        } catch (_) {
+            // Rejected (not visible, blocked by policy, unsupported): leave it.
+            wakeLock = null
+        } finally {
+            wakeLockBusy = false
+        }
+    }
+    const releaseWakeLock = () => {
+        if (!wakeLock) return
+        const held = wakeLock
+        wakeLock = null
+        held.release().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && restActive()) acquireWakeLock()
+    })
+
     let intervalId = null
     const tick = () => {
         const now = Date.now()
@@ -532,9 +565,14 @@ function initRestChips() {
                 if (st.timeEl) st.timeEl.textContent = m + ':' + String(s).padStart(2, '0')
             }
         }
-        if (allReady && intervalId !== null) {
-            clearInterval(intervalId)
-            intervalId = null
+        if (allReady) {
+            releaseWakeLock()
+            if (intervalId !== null) {
+                clearInterval(intervalId)
+                intervalId = null
+            }
+        } else {
+            acquireWakeLock()
         }
     }
     tick()
