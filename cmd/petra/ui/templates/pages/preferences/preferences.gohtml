@@ -517,7 +517,21 @@
                         try {
                             const reg = await navigator.serviceWorker.getRegistration();
                             const sub = reg ? await reg.pushManager.getSubscription() : null;
-                            if (sub) showSubscribed(); else showUnsubscribed();
+                            if (sub) {
+                                showSubscribed();
+                                // Re-register the (possibly rotated) subscription so the
+                                // server's stored endpoint can't silently drift from the
+                                // device's — covers a missed pushsubscriptionchange or a row
+                                // already pruned by a 410. Idempotent upsert; fire-and-forget
+                                // so a failed sync never blocks the UI.
+                                fetch('/api/push/subscribe', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+                                    body: JSON.stringify(sub),
+                                }).catch((err) => console.error('rest-notifications resync failed', err));
+                            } else {
+                                showUnsubscribed();
+                            }
                         } catch (err) {
                             // Leave the default (unsubscribed) UI in place; the user can
                             // still attempt Enable and we'll surface any error from there.

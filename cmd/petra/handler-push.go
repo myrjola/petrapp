@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/myrjola/petrapp/internal/petra/domain"
@@ -44,6 +45,19 @@ func (app *application) pushSubscribePOST(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// pushVAPIDPublicKeyGET serves the VAPID public key as plain text so the
+// service worker can re-subscribe on a pushsubscriptionchange event — when it
+// runs there is no page to read the key from. The key is public (it's the
+// applicationServerKey handed to every browser at subscribe time), so this
+// endpoint needs no authentication.
+func (app *application) pushVAPIDPublicKeyGET(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if _, err := io.WriteString(w, app.vapidPublicKey); err != nil {
+		app.serverError(w, r, fmt.Errorf("write vapid public key: %w", err))
+		return
+	}
 }
 
 func (app *application) pushUnsubscribePOST(w http.ResponseWriter, r *http.Request) {

@@ -101,6 +101,10 @@ func (app *application) registerAPIRoutes(mux *http.ServeMux) {
 		app.mustSessionStack(http.HandlerFunc(app.pushSubscribePOST)))
 	mux.Handle("POST /api/push/unsubscribe",
 		app.mustSessionStack(http.HandlerFunc(app.pushUnsubscribePOST)))
+	// Public: the VAPID public key is non-secret and the service worker fetches
+	// it from a context (pushsubscriptionchange) where no session may be loaded.
+	mux.Handle("GET /api/push/vapid-public-key",
+		app.sessionStack(http.HandlerFunc(app.pushVAPIDPublicKeyGET)))
 
 	mux.Handle("POST /api/registration/start", app.noStoreSessionStack(http.HandlerFunc(app.beginRegistration)))
 	mux.Handle("POST /api/registration/finish", app.noStoreSessionStack(http.HandlerFunc(app.finishRegistration)))
