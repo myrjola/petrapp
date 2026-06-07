@@ -123,8 +123,8 @@ func Test_application_home(t *testing.T) {
 				schedulePos, balancePos)
 		}
 
-		// One row per known muscle group (17 from fixtures.sql).
-		const wantMuscleGroups = 17
+		// One row per known muscle group (18 from fixtures.sql).
+		const wantMuscleGroups = 18
 		if rows := section.Find(".row").Length(); rows != wantMuscleGroups {
 			t.Errorf("want %d muscle group rows, got %d", wantMuscleGroups, rows)
 		}
