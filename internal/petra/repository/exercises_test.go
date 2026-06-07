@@ -129,10 +129,6 @@ func TestExerciseRepository_UpdateRollsBackOnError(t *testing.T) {
 	}
 }
 
-func contains(s []string, want string) bool {
-	return slices.Contains(s, want)
-}
-
 func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
 	t.Parallel()
 
@@ -142,10 +138,10 @@ func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListMuscleGroups: %v", err)
 	}
-	if !contains(groups, "Side Delts") || !contains(groups, "Rear Delts") {
+	if !slices.Contains(groups, "Side Delts") || !slices.Contains(groups, "Rear Delts") {
 		t.Errorf("muscle groups missing delt heads: %v", groups)
 	}
-	if contains(groups, "Hip Flexors") {
+	if slices.Contains(groups, "Hip Flexors") {
 		t.Errorf("Hip Flexors should be removed: %v", groups)
 	}
 
@@ -154,8 +150,8 @@ func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(5): %v", err)
 	}
-	if !contains(lateralRaise.PrimaryMuscleGroups, "Side Delts") ||
-		contains(lateralRaise.PrimaryMuscleGroups, "Shoulders") {
+	if !slices.Contains(lateralRaise.PrimaryMuscleGroups, "Side Delts") ||
+		slices.Contains(lateralRaise.PrimaryMuscleGroups, "Shoulders") {
 		t.Errorf("Lateral Raise primaries = %v, want Side Delts and no Shoulders",
 			lateralRaise.PrimaryMuscleGroups)
 	}
@@ -165,8 +161,8 @@ func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(34): %v", err)
 	}
-	if !contains(facePull.PrimaryMuscleGroups, "Rear Delts") ||
-		contains(facePull.PrimaryMuscleGroups, "Shoulders") {
+	if !slices.Contains(facePull.PrimaryMuscleGroups, "Rear Delts") ||
+		slices.Contains(facePull.PrimaryMuscleGroups, "Shoulders") {
 		t.Errorf("Face Pull primaries = %v, want Rear Delts and no Shoulders",
 			facePull.PrimaryMuscleGroups)
 	}
@@ -176,7 +172,7 @@ func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(11): %v", err)
 	}
-	if !contains(row.SecondaryMuscleGroups, "Rear Delts") {
+	if !slices.Contains(row.SecondaryMuscleGroups, "Rear Delts") {
 		t.Errorf("Seated Cable Row secondaries = %v, want Rear Delts",
 			row.SecondaryMuscleGroups)
 	}
@@ -186,12 +182,12 @@ func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get(39): %v", err)
 	}
-	if contains(hlr.PrimaryMuscleGroups, "Hip Flexors") ||
-		contains(hlr.SecondaryMuscleGroups, "Hip Flexors") {
+	if slices.Contains(hlr.PrimaryMuscleGroups, "Hip Flexors") ||
+		slices.Contains(hlr.SecondaryMuscleGroups, "Hip Flexors") {
 		t.Errorf("Hanging Leg Raise still references Hip Flexors: P=%v S=%v",
 			hlr.PrimaryMuscleGroups, hlr.SecondaryMuscleGroups)
 	}
-	if !contains(hlr.PrimaryMuscleGroups, "Abs") {
+	if !slices.Contains(hlr.PrimaryMuscleGroups, "Abs") {
 		t.Errorf("Hanging Leg Raise primaries = %v, want Abs", hlr.PrimaryMuscleGroups)
 	}
 }
