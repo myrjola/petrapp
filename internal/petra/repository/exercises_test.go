@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/petra/domain"
@@ -125,5 +126,72 @@ func TestExerciseRepository_UpdateRollsBackOnError(t *testing.T) {
 	}
 	if got.Name != "Test_Repo_Bench" {
 		t.Errorf("expected rollback to preserve original name %q, got %q", "Test_Repo_Bench", got.Name)
+	}
+}
+
+func contains(s []string, want string) bool {
+	return slices.Contains(s, want)
+}
+
+func TestExerciseRepository_DeltTaxonomySeed(t *testing.T) {
+	t.Parallel()
+
+	ctx, repos := setupTestRepos(t)
+
+	groups, err := repos.Exercises.ListMuscleGroups(ctx)
+	if err != nil {
+		t.Fatalf("ListMuscleGroups: %v", err)
+	}
+	if !contains(groups, "Side Delts") || !contains(groups, "Rear Delts") {
+		t.Errorf("muscle groups missing delt heads: %v", groups)
+	}
+	if contains(groups, "Hip Flexors") {
+		t.Errorf("Hip Flexors should be removed: %v", groups)
+	}
+
+	// Lateral Raise (5): side-delt prime mover, no longer generic Shoulders.
+	lateralRaise, err := repos.Exercises.Get(ctx, 5)
+	if err != nil {
+		t.Fatalf("Get(5): %v", err)
+	}
+	if !contains(lateralRaise.PrimaryMuscleGroups, "Side Delts") ||
+		contains(lateralRaise.PrimaryMuscleGroups, "Shoulders") {
+		t.Errorf("Lateral Raise primaries = %v, want Side Delts and no Shoulders",
+			lateralRaise.PrimaryMuscleGroups)
+	}
+
+	// Face Pull (34): rear-delt prime mover.
+	facePull, err := repos.Exercises.Get(ctx, 34)
+	if err != nil {
+		t.Fatalf("Get(34): %v", err)
+	}
+	if !contains(facePull.PrimaryMuscleGroups, "Rear Delts") ||
+		contains(facePull.PrimaryMuscleGroups, "Shoulders") {
+		t.Errorf("Face Pull primaries = %v, want Rear Delts and no Shoulders",
+			facePull.PrimaryMuscleGroups)
+	}
+
+	// Seated Cable Row (11): rear delts as a synergist.
+	row, err := repos.Exercises.Get(ctx, 11)
+	if err != nil {
+		t.Fatalf("Get(11): %v", err)
+	}
+	if !contains(row.SecondaryMuscleGroups, "Rear Delts") {
+		t.Errorf("Seated Cable Row secondaries = %v, want Rear Delts",
+			row.SecondaryMuscleGroups)
+	}
+
+	// Hanging Leg Raise (39): Hip Flexors gone, Abs still prime mover.
+	hlr, err := repos.Exercises.Get(ctx, 39)
+	if err != nil {
+		t.Fatalf("Get(39): %v", err)
+	}
+	if contains(hlr.PrimaryMuscleGroups, "Hip Flexors") ||
+		contains(hlr.SecondaryMuscleGroups, "Hip Flexors") {
+		t.Errorf("Hanging Leg Raise still references Hip Flexors: P=%v S=%v",
+			hlr.PrimaryMuscleGroups, hlr.SecondaryMuscleGroups)
+	}
+	if !contains(hlr.PrimaryMuscleGroups, "Abs") {
+		t.Errorf("Hanging Leg Raise primaries = %v, want Abs", hlr.PrimaryMuscleGroups)
 	}
 }
