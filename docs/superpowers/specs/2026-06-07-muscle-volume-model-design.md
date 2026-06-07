@@ -242,3 +242,11 @@ deload week is excluded from the ramp). The deload week targets well below
 
 This ordering lets each phase ship and be verified independently while sharing
 the data-model groundwork laid in A and B.
+
+### Plan status
+
+- **Phase A (Taxonomy):** plan written —
+  `docs/superpowers/plans/2026-06-07-muscle-volume-phase-a-taxonomy.md`.
+- **Phases B, D, C:** plans intentionally deferred. Write them only after the
+  preceding phase is implemented and merged, so each is grounded in the
+  then-current code (see the Follow-up section of the Phase A plan).
