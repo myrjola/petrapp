@@ -228,12 +228,20 @@
                     gap: var(--size-4);
                 }
 
+                /*
+                 * The numeral hangs in a fixed gutter via absolute
+                 * positioning rather than a grid column. A grid here would
+                 * auto-place each inline child of the <li> (e.g. the bold
+                 * lead-in and the trailing text of "**Adjust the machine**:
+                 * Set the lever…") into a separate cell, spilling the text
+                 * into the narrow 2.75rem column one word per line. Keeping
+                 * the content in normal flow lets it wrap across the full
+                 * width.
+                 */
                 .prose ol li {
                     counter-increment: step;
-                    display: grid;
-                    grid-template-columns: 2.75rem 1fr;
-                    column-gap: var(--size-4);
-                    align-items: baseline;
+                    position: relative;
+                    padding-inline-start: calc(2.75rem + var(--size-4));
                     font-size: var(--font-size-2);
                     line-height: 1.55;
                     color: var(--color-text-primary);
@@ -241,11 +249,15 @@
 
                 .prose ol li::before {
                     content: counter(step, decimal-leading-zero);
+                    position: absolute;
+                    inset-inline-start: 0;
+                    top: 0;
+                    width: 2.75rem;
                     font-family: ui-serif, serif;
                     font-size: var(--font-size-5);
                     font-weight: var(--font-weight-5);
                     color: var(--clay-3);
-                    line-height: 0.9;
+                    line-height: 1.2;
                     font-feature-settings: "lnum" 1, "tnum" 1;
                     text-align: right;
                     font-style: italic;
