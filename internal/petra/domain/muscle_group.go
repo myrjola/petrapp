@@ -37,6 +37,8 @@ const (
 const (
 	MuscleGroupChest      = "Chest"
 	MuscleGroupShoulders  = "Shoulders"
+	MuscleGroupSideDelts  = "Side Delts"
+	MuscleGroupRearDelts  = "Rear Delts"
 	MuscleGroupTriceps    = "Triceps"
 	MuscleGroupUpperBack  = "Upper Back"
 	MuscleGroupLats       = "Lats"
@@ -47,7 +49,6 @@ const (
 	MuscleGroupHamstrings = "Hamstrings"
 	MuscleGroupGlutes     = "Glutes"
 	MuscleGroupCalves     = "Calves"
-	MuscleGroupHipFlexors = "Hip Flexors"
 	MuscleGroupAdductors  = "Adductors"
 	MuscleGroupAbs        = "Abs"
 	MuscleGroupObliques   = "Obliques"
@@ -59,12 +60,13 @@ const (
 // render even before this map is updated.
 func RegionFor(muscleGroupName string) MuscleGroupRegion {
 	switch muscleGroupName {
-	case MuscleGroupChest, MuscleGroupShoulders, MuscleGroupTriceps:
+	case MuscleGroupChest, MuscleGroupShoulders, MuscleGroupSideDelts, MuscleGroupTriceps:
 		return RegionUpperPush
-	case MuscleGroupUpperBack, MuscleGroupLats, MuscleGroupBiceps, MuscleGroupTraps, MuscleGroupForearms:
+	case MuscleGroupUpperBack, MuscleGroupLats, MuscleGroupBiceps, MuscleGroupTraps,
+		MuscleGroupForearms, MuscleGroupRearDelts:
 		return RegionUpperPull
 	case MuscleGroupQuads, MuscleGroupHamstrings, MuscleGroupGlutes,
-		MuscleGroupCalves, MuscleGroupHipFlexors, MuscleGroupAdductors:
+		MuscleGroupCalves, MuscleGroupAdductors:
 		return RegionLegs
 	case MuscleGroupAbs, MuscleGroupObliques, MuscleGroupLowerBack:
 		return RegionCore

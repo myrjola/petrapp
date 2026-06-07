@@ -106,6 +106,25 @@ func TestWeeklyPlannedLoad(t *testing.T) {
 	}
 }
 
+func Test_RegionFor_DeltHeads(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]domain.MuscleGroupRegion{
+		domain.MuscleGroupSideDelts: domain.RegionUpperPush,
+		domain.MuscleGroupRearDelts: domain.RegionUpperPull,
+		domain.MuscleGroupShoulders: domain.RegionUpperPush,
+		domain.MuscleGroupChest:     domain.RegionUpperPush,
+		domain.MuscleGroupLats:      domain.RegionUpperPull,
+		domain.MuscleGroupQuads:     domain.RegionLegs,
+		"Unknown Muscle":            domain.RegionOther,
+	}
+	for name, want := range cases {
+		if got := domain.RegionFor(name); got != want {
+			t.Errorf("RegionFor(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
 func diffKeys(got map[string]float64, want map[string]float64) []string {
 	var extra []string
 	for k := range got {
