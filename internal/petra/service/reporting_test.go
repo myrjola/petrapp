@@ -83,16 +83,19 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 	}
 
 	// Untouched group must appear with zero load (UI shows it as a flat bar).
-	if v, ok := byName["Calves"]; !ok || v.PlannedLoad != 0 || v.CompletedLoad != 0 {
-		t.Errorf("Calves: want zero-load entry, got %#v (present=%v)", v, ok)
+	if v, ok := byName["Traps"]; !ok || v.PlannedLoad != 0 || v.CompletedLoad != 0 {
+		t.Errorf("Traps: want zero-load entry, got %#v (present=%v)", v, ok)
 	}
 
-	// Targets are joined from muscle_group_weekly_targets seed (Chest=10, Calves not seeded).
+	// Targets are joined from muscle_group_weekly_targets seed (Chest floor=10, Calves floor=8).
 	if v := byName["Chest"]; v.TargetSets != 10 {
 		t.Errorf("Chest target: want 10, got %d", v.TargetSets)
 	}
-	if v := byName["Calves"]; v.TargetSets != 0 {
-		t.Errorf("Calves target: want 0 (no seed), got %d", v.TargetSets)
+	if v := byName["Calves"]; v.TargetSets != 8 {
+		t.Errorf("Calves target: want 8 (now seeded), got %d", v.TargetSets)
+	}
+	if v := byName["Traps"]; v.TargetSets != 0 {
+		t.Errorf("Traps target: want 0 (tag-only, not seeded), got %d", v.TargetSets)
 	}
 
 	// Result must list every muscle group exactly once, in alphabetical order.

@@ -17,11 +17,11 @@ func newSQLiteMuscleGroupTargetRepository(db *sqlitekit.Database) *sqliteMuscleG
 	return &sqliteMuscleGroupTargetRepository{baseRepository: newBaseRepository(db)}
 }
 
-// List returns all configured weekly volume targets, ordered by muscle-group
+// List returns all configured weekly volume range targets, ordered by muscle-group
 // name. The targets table is seeded by migrations and is not user-editable.
 func (r *sqliteMuscleGroupTargetRepository) List(ctx context.Context) (_ []domain.MuscleGroupTarget, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT muscle_group_name, weekly_sets_target
+		SELECT muscle_group_name, min_sets, max_sets
 		FROM muscle_group_weekly_targets
 		ORDER BY muscle_group_name`)
 	if err != nil {
@@ -36,7 +36,7 @@ func (r *sqliteMuscleGroupTargetRepository) List(ctx context.Context) (_ []domai
 	var targets []domain.MuscleGroupTarget
 	for rows.Next() {
 		var t domain.MuscleGroupTarget
-		if err = rows.Scan(&t.MuscleGroupName, &t.WeeklySetTarget); err != nil {
+		if err = rows.Scan(&t.MuscleGroupName, &t.MinSets, &t.MaxSets); err != nil {
 			return nil, fmt.Errorf("scan muscle group target: %w", err)
 		}
 		targets = append(targets, t)

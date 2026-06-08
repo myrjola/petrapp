@@ -288,9 +288,9 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	weekUsedExercises map[int]bool,
 	load map[string]float64,
 ) []ExerciseSlot {
-	targets := make(map[string]int, len(wp.Targets))
+	targets := make(map[string]MuscleGroupTarget, len(wp.Targets))
 	for _, t := range wp.Targets {
-		targets[t.MuscleGroupName] = t.WeeklySetTarget
+		targets[t.MuscleGroupName] = t
 	}
 
 	selectedPrimaryMGs := make(map[string]bool)
@@ -325,7 +325,7 @@ func (wp *Planner) pickBestExerciseIdx(
 	selectedPrimaryMGs map[string]bool,
 	weekUsedExercises map[int]bool,
 	load map[string]float64,
-	targets map[string]int,
+	targets map[string]MuscleGroupTarget,
 ) int {
 	bestIdx := -1
 	bestScore := 0.0
@@ -410,7 +410,7 @@ func scoreCandidate(
 	pt PeriodizationType,
 	isDeload bool,
 	load map[string]float64,
-	targets map[string]int,
+	targets map[string]MuscleGroupTarget,
 ) float64 {
 	_, nSets := deriveSchemeForExercise(ex, pt, isDeload)
 	n := float64(nSets)
@@ -422,8 +422,8 @@ func scoreCandidate(
 		contrib[mg] += n * SecondarySetWeight
 	}
 	var delta float64
-	for mg, target := range targets {
-		before := float64(target) - load[mg]
+	for mg, t := range targets {
+		before := float64(t.MinSets) - load[mg]
 		after := before - contrib[mg]
 		delta += before*before - after*after
 	}

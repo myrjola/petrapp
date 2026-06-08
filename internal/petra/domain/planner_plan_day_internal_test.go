@@ -233,8 +233,8 @@ func TestPlanner_PlanDay_AvoidsAlreadyLoadedMuscleGroup(t *testing.T) {
 		},
 	}
 	targets := []MuscleGroupTarget{
-		{MuscleGroupName: "Shoulders", WeeklySetTarget: 10},
-		{MuscleGroupName: "Chest", WeeklySetTarget: 10},
+		{MuscleGroupName: "Shoulders", MinSets: 10, MaxSets: 20},
+		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 	}
 	// Tuesday scheduled so category=FullBody (isolated day).
 	p := Preferences{} //nolint:exhaustruct // Other prefs irrelevant.

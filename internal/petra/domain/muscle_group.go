@@ -1,9 +1,13 @@
 package domain
 
-// MuscleGroupTarget stores the minimum weekly set target for a tracked muscle group.
+// MuscleGroupTarget stores the weekly hard-set range for a tracked muscle
+// group: MinSets is the floor (≈ MEV, minimum effective volume) the planner
+// drives toward, MaxSets the ceiling (≈ MRV, maximum recoverable volume)
+// beyond which extra volume is penalised.
 type MuscleGroupTarget struct {
 	MuscleGroupName string
-	WeeklySetTarget int
+	MinSets         int
+	MaxSets         int
 }
 
 // MuscleGroupVolume captures the weekly weighted set load for a single muscle group.
@@ -96,7 +100,7 @@ func WeeklyMuscleGroupVolume(
 ) []MuscleGroupVolume {
 	targetByName := make(map[string]int, len(targets))
 	for _, t := range targets {
-		targetByName[t.MuscleGroupName] = t.WeeklySetTarget
+		targetByName[t.MuscleGroupName] = t.MinSets
 	}
 
 	known := make(map[string]struct{}, len(groupNames))

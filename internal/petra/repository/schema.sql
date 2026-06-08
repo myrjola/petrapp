@@ -108,7 +108,8 @@ CREATE TABLE exercise_muscle_groups
 CREATE TABLE muscle_group_weekly_targets
 (
     muscle_group_name   TEXT    PRIMARY KEY REFERENCES muscle_groups (name) ON DELETE CASCADE,
-    weekly_sets_target  INTEGER NOT NULL CHECK (weekly_sets_target > 0)
+    min_sets            INTEGER NOT NULL CHECK (min_sets > 0),
+    max_sets            INTEGER NOT NULL CHECK (max_sets >= min_sets)
 ) WITHOUT ROWID, STRICT;
 
 -------------------

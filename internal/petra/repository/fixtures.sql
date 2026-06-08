@@ -790,14 +790,19 @@ INSERT INTO feature_flags (name, enabled)
 VALUES ('maintenance_mode', 0) ON CONFLICT(name) DO
 UPDATE SET enabled = excluded.enabled;
 
-INSERT INTO muscle_group_weekly_targets (muscle_group_name, weekly_sets_target)
-VALUES ('Biceps', 8),
-       ('Chest', 10),
-       ('Glutes', 8),
-       ('Hamstrings', 8),
-       ('Lats', 10),
-       ('Quads', 10),
-       ('Shoulders', 10),
-       ('Triceps', 8),
-       ('Upper Back', 10) ON CONFLICT (muscle_group_name) DO
-UPDATE SET weekly_sets_target = excluded.weekly_sets_target;
+INSERT INTO muscle_group_weekly_targets (muscle_group_name, min_sets, max_sets)
+VALUES ('Abs', 6, 16),
+       ('Biceps', 8, 16),
+       ('Calves', 8, 16),
+       ('Chest', 10, 20),
+       ('Glutes', 8, 16),
+       ('Hamstrings', 8, 18),
+       ('Lats', 10, 20),
+       ('Lower Back', 4, 8),
+       ('Quads', 10, 20),
+       ('Rear Delts', 8, 18),
+       ('Shoulders', 6, 12),
+       ('Side Delts', 8, 18),
+       ('Triceps', 8, 16),
+       ('Upper Back', 10, 20) ON CONFLICT (muscle_group_name) DO
+UPDATE SET min_sets = excluded.min_sets, max_sets = excluded.max_sets;
