@@ -922,27 +922,28 @@ func Test_scoreCandidate(t *testing.T) {
 		// Empty load: every targeted MG at full deficit.
 		load := map[string]float64{}
 		// Strength + 5-10 window: reps=5, sets=4 (DeriveScheme low band).
+		// contrib: Chest=4, Triceps=4, Shoulders=2 (secondary).
 		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
-		// Chest: before=10, after=10-4=6; contribution 100-36=64.
-		// Triceps: before=8, after=8-4=4; contribution 64-16=48.
-		// Shoulders: before=10, after=10-2=8; contribution 100-64=36.
-		// Total = 64 + 48 + 36 = 148.
-		if score != 148 {
-			t.Errorf("score = %v, want 148", score)
+		// Chest:    segmentReward(0, 4, 10, 20) = 4*below(3)         = 12.
+		// Triceps:  segmentReward(0, 4, 8, 16)  = 4*below(3)         = 12.
+		// Shoulders:segmentReward(0, 2, 10, 20) = 2*below(3)         =  6.
+		// Total = 12 + 12 + 6 = 30.
+		if score != 30 {
+			t.Errorf("score = %v, want 30", score)
 		}
 	})
 
-	t.Run("negative when pushing on-target MG further over", func(t *testing.T) {
+	t.Run("positive but lower when MGs are at floor", func(t *testing.T) {
 		t.Parallel()
-		// Shoulders already at 12 (2 over target 10); other MGs at target.
-		load := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 12}
+		// MGs already at their floor: adding more sets earns aboveGoalSetReward.
+		load := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 10}
 		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
-		// Chest: before=0, after=-4; 0-16=-16.
-		// Triceps: before=0, after=-4; 0-16=-16.
-		// Shoulders: before=-2, after=-4; 4-16=-12.
-		// Total = -16 + -16 + -12 = -44.
-		if score != -44 {
-			t.Errorf("score = %v, want -44", score)
+		// Chest:    segmentReward(10, 4, 10, 20) = 4*above(1)  =  4.
+		// Triceps:  segmentReward(8, 4, 8, 16)   = 4*above(1)  =  4.
+		// Shoulders:segmentReward(10, 2, 10, 20)  = 2*above(1) =  2.
+		// Total = 4 + 4 + 2 = 10.
+		if score != 10 {
+			t.Errorf("score = %v, want 10", score)
 		}
 	})
 
@@ -968,13 +969,14 @@ func Test_scoreCandidate(t *testing.T) {
 		load := map[string]float64{}
 		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
 		// base sets = 3 (mid band, 6 <= reps <= 10), deload drops to 2.
+		// contrib: Chest=2, Triceps=2, Shoulders=1 (secondary).
 		score := scoreCandidate(bench, PeriodizationStrength, true, load, targets)
-		// Chest: 100 - (10-2)^2 = 100 - 64 = 36.
-		// Triceps: 64 - (8-2)^2 = 64 - 36 = 28.
-		// Shoulders: 100 - (10-1)^2 = 100 - 81 = 19.
-		// Total = 36 + 28 + 19 = 83.
-		if score != 83 {
-			t.Errorf("score = %v, want 83", score)
+		// Chest:    segmentReward(0, 2, 10, 20) = 2*below(3) = 6.
+		// Triceps:  segmentReward(0, 2, 8, 16)  = 2*below(3) = 6.
+		// Shoulders:segmentReward(0, 1, 10, 20) = 1*below(3) = 3.
+		// Total = 6 + 6 + 3 = 15.
+		if score != 15 {
+			t.Errorf("score = %v, want 15", score)
 		}
 	})
 }
@@ -1334,6 +1336,65 @@ func TestPlan_TargetAwareBalanceUnderSeedExercises(t *testing.T) {
 			t.Errorf("%s planned %.1f exceeds ceiling %d + slack %v",
 				target.MuscleGroupName, l, target.MaxSets, ceilingSlack)
 		}
+	}
+}
+
+func Test_segmentReward_OrdersBelowAboveOverMax(t *testing.T) {
+	t.Parallel()
+
+	const goal, maxSets = 10.0, 20.0
+	below := segmentReward(0, 1, goal, maxSets)  // one set entirely below the floor
+	above := segmentReward(10, 1, goal, maxSets) // one set between floor and ceiling
+	over := segmentReward(20, 1, goal, maxSets)  // one set entirely past the ceiling
+
+	if !(below > above && above > 0 && 0 > over) {
+		t.Errorf("want below > above > 0 > over; got below=%v above=%v over=%v", below, above, over)
+	}
+}
+
+func Test_scoreCandidate_TagOnlyGroupContributesNothing(t *testing.T) {
+	t.Parallel()
+
+	repMin, repMax := 8, 12
+	// Exercise whose only primary MG ("Traps") has no target row.
+	tagOnly := Exercise{ //nolint:exhaustruct // test exercise omits display fields.
+		ID: 1, Name: "Shrug", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Traps"}, RepMin: &repMin, RepMax: &repMax,
+	}
+	targets := map[string]MuscleGroupTarget{"Chest": {MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20}}
+
+	got := scoreCandidate(tagOnly, PeriodizationHypertrophy, false, map[string]float64{}, targets)
+	if got != 0 {
+		t.Errorf("tag-only exercise scored %v, want 0", got)
+	}
+}
+
+func Test_scoreCandidate_OverMaxPickLosesToFreshMuscle(t *testing.T) {
+	t.Parallel()
+
+	repMin, repMax := 8, 12
+	fresh := Exercise{ //nolint:exhaustruct // test exercise omits display fields.
+		ID: 1, Name: "Fresh", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Chest"}, RepMin: &repMin, RepMax: &repMax,
+	}
+	saturated := Exercise{ //nolint:exhaustruct // test exercise omits display fields.
+		ID: 2, Name: "Saturated", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Biceps"}, RepMin: &repMin, RepMax: &repMax,
+	}
+	targets := map[string]MuscleGroupTarget{
+		"Chest":  {MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
+		"Biceps": {MuscleGroupName: "Biceps", MinSets: 8, MaxSets: 16},
+	}
+	// Biceps already well past its ceiling; Chest at zero.
+	load := map[string]float64{"Biceps": 30}
+
+	freshScore := scoreCandidate(fresh, PeriodizationHypertrophy, false, load, targets)
+	satScore := scoreCandidate(saturated, PeriodizationHypertrophy, false, load, targets)
+	if !(freshScore > satScore) {
+		t.Errorf("fresh-muscle pick (%v) should beat over-ceiling pick (%v)", freshScore, satScore)
+	}
+	if satScore >= 0 {
+		t.Errorf("over-ceiling pick should score negative, got %v", satScore)
 	}
 }
 

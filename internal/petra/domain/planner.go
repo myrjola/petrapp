@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"time"
 )
 
@@ -394,17 +395,52 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 	return PeriodizationStrength
 }
 
-// scoreCandidate returns the gain in target-balance from adding ex to a
-// session: positive when the exercise pulls the running per-MG load
-// closer to its target, negative when it pushes an MG further from
-// target. An MG that is already over target contributes negatively
-// proportional to how far it would overshoot — picks that re-load an
-// already-saturated MG score lower than picks that touch fresh ground.
-// The metric is the change in the sum of squared distances over
-// targeted muscle groups; untargeted MGs are ignored. Set count
-// comes from the same deriveSchemeForExercise the planner uses to
-// persist sets, so deload set reduction and periodization-driven set-count
-// shifts are reflected automatically.
+// Piecewise per-set marginal reward for weekly volume. Below a muscle's floor
+// (MinSets) each added set is worth belowGoalSetReward; from the floor up to
+// the ceiling (MaxSets) the dose-response still pays but less
+// (aboveGoalSetReward); past the ceiling each set is penalised
+// (overMaxSetPenalty) so volume spreads to muscles with remaining headroom.
+// The invariant the planner relies on is the ordering
+// belowGoalSetReward > aboveGoalSetReward > 0 > overMaxSetPenalty; the exact
+// magnitudes are tuning knobs. All three are multiples of 0.5 so scores stay
+// exact in IEEE-754 (the tie-break in pickBestExerciseIdx depends on this).
+const (
+	belowGoalSetReward = 3.0
+	aboveGoalSetReward = 1.0
+	overMaxSetPenalty  = -2.0
+)
+
+// segmentReward returns the marginal balance reward for adding `added` weighted
+// sets to a muscle currently at `load`, given its floor `goal` (MinSets) and
+// ceiling `maxSets`. It integrates the piecewise per-set rate over
+// [load, load+added], so a pick that straddles segments is credited
+// proportionally to how much of it lands in each.
+func segmentReward(load, added, goal, maxSets float64) float64 {
+	end := load + added
+	below := overlapLength(load, end, 0, goal)
+	within := overlapLength(load, end, goal, maxSets)
+	over := math.Max(0, end-math.Max(load, maxSets))
+	return below*belowGoalSetReward + within*aboveGoalSetReward + over*overMaxSetPenalty
+}
+
+// overlapLength returns the length of the intersection of [lo, hi] and
+// [segLo, segHi], clamped at 0.
+func overlapLength(lo, hi, segLo, segHi float64) float64 {
+	return math.Max(0, math.Min(hi, segHi)-math.Max(lo, segLo))
+}
+
+// scoreCandidate returns the weekly-volume balance reward from adding ex to a
+// session: the sum, over the exercise's targeted muscle groups, of the
+// piecewise per-set reward (see segmentReward) for the load it would add.
+// Sets below a muscle's floor earn the steepest reward, sets between floor and
+// ceiling a smaller positive reward, and sets past the ceiling a penalty, so
+// the planner drives every muscle toward its floor and then keeps paying with
+// diminishing returns up to its ceiling. Tag-only muscle groups (no target
+// row) contribute nothing. Set count comes from the same
+// deriveSchemeForExercise the planner uses to persist sets, so deload set
+// reduction and periodization-driven set-count shifts are reflected
+// automatically. The goal used here is the static floor (MinSets); the
+// week-indexed ramping goal is Phase D.
 func scoreCandidate(
 	ex Exercise,
 	pt PeriodizationType,
@@ -421,13 +457,15 @@ func scoreCandidate(
 	for _, mg := range ex.SecondaryMuscleGroups {
 		contrib[mg] += n * SecondarySetWeight
 	}
-	var delta float64
-	for mg, t := range targets {
-		before := float64(t.MinSets) - load[mg]
-		after := before - contrib[mg]
-		delta += before*before - after*after
+	var score float64
+	for mg, added := range contrib {
+		t, ok := targets[mg]
+		if !ok {
+			continue // tag-only group: no target row, contributes nothing.
+		}
+		score += segmentReward(load[mg], added, float64(t.MinSets), float64(t.MaxSets))
 	}
-	return delta
+	return score
 }
 
 // MondayOf returns the Monday of the week containing date, at 00:00 UTC.
