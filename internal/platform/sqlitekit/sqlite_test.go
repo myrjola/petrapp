@@ -34,10 +34,11 @@ func TestNewDatabase_ReadOnlyHandleRejectsWrites(t *testing.T) {
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   usersSchema,
-		Fixtures: "",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       usersSchema,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
@@ -90,10 +91,11 @@ func TestNewDatabase_CloseWaitsForBackgroundOptimizer(t *testing.T) {
 	}))
 
 	db, err := sqlitekit.NewDatabase(context.Background(), sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   usersSchema,
-		Fixtures: "",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       usersSchema,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
@@ -132,10 +134,11 @@ func TestNewDatabase_ConcurrentReadsAndWritesDoNotLock(t *testing.T) {
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   usersSchema,
-		Fixtures: "",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       usersSchema,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)
@@ -192,10 +195,11 @@ func TestNewDatabase_AppliesProvidedSchema(t *testing.T) {
 	t.Parallel()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL);",
-		Fixtures: "INSERT INTO widgets (name) VALUES ('seed');",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL);",
+		Fixtures:     "INSERT INTO widgets (name) VALUES ('seed');",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)

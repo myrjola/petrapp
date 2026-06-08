@@ -13,10 +13,11 @@ func newTestRepo(t *testing.T) *todo.Repository {
 	t.Helper()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   auth.SchemaSQL + "\n" + todo.SchemaSQL,
-		Fixtures: "",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       auth.SchemaSQL + "\n" + todo.SchemaSQL,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)

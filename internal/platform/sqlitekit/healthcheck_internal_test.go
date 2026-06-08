@@ -13,10 +13,11 @@ func TestDatabase_HealthCheck(t *testing.T) {
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	db, err := NewDatabase(ctx, Config{
-		URL:      ":memory:",
-		Schema:   "CREATE TABLE t (id INTEGER PRIMARY KEY);",
-		Fixtures: "",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       "CREATE TABLE t (id INTEGER PRIMARY KEY);",
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)

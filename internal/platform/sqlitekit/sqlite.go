@@ -35,6 +35,13 @@ type Config struct {
 	Schema   string
 	Fixtures string
 	Logger   *slog.Logger
+
+	// Premigration, if non-nil, runs after connecting but BEFORE the
+	// declarative migrate. It is the seam for rewriting legacy data into the
+	// new shape so the structural migrator (which only reconciles structure,
+	// never data) sees a database that already matches Schema. It must be
+	// idempotent and short-circuit on already-migrated and fresh databases.
+	Premigration func(context.Context, *Database) error
 }
 
 // NewDatabase connects to a database, migrates it to cfg.Schema, and applies
@@ -50,6 +57,12 @@ func NewDatabase(ctx context.Context, cfg Config) (*Database, error) {
 
 	if db, err = connect(ctx, cfg.URL, cfg.Logger); err != nil {
 		return nil, fmt.Errorf("connect: %w", err)
+	}
+
+	if cfg.Premigration != nil {
+		if err = cfg.Premigration(ctx, db); err != nil {
+			return nil, fmt.Errorf("premigration: %w", err)
+		}
 	}
 
 	if err = db.migrateTo(ctx, cfg.Schema); err != nil {

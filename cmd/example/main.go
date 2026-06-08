@@ -80,10 +80,11 @@ func newApplication(
 	ctx context.Context, logger *slog.Logger, cfg config,
 ) (*application, func(), error) {
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
-		URL:      cfg.SqliteURL,
-		Schema:   auth.SchemaSQL + "\n" + schemaSQL,
-		Fixtures: "",
-		Logger:   logger,
+		URL:          cfg.SqliteURL,
+		Schema:       auth.SchemaSQL + "\n" + schemaSQL,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("new database: %w", err)

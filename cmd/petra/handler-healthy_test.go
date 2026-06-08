@@ -22,10 +22,11 @@ func newHealthTestApp(t *testing.T) (*application, *sqlitekit.Database) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
-		Fixtures: repository.FixturesSQL,
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)

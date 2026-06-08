@@ -18,10 +18,11 @@ func TestSQLiteStore_SatisfiesStore(t *testing.T) {
 	// alone, and the returned store gives the compile-time _ = auth.Store
 	// assertion above a live value to exercise.
 	db, err := sqlitekit.NewDatabase(t.Context(), sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   auth.SchemaSQL,
-		Fixtures: "",
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       auth.SchemaSQL,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("NewDatabase: %v", err)

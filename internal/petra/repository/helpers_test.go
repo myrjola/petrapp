@@ -27,10 +27,11 @@ func setupTestReposWithDB(t *testing.T) (context.Context, *sqlitekit.Database, *
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
-		URL:      ":memory:",
-		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
-		Fixtures: repository.FixturesSQL,
-		Logger:   logger,
+		URL:          ":memory:",
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       logger,
+		Premigration: nil,
 	})
 	if err != nil {
 		t.Fatalf("create test database: %v", err)

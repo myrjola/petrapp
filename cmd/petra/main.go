@@ -213,10 +213,11 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 // fixtures from internal/repository via sqlitekit's caller-provided Config.
 func openDatabase(ctx context.Context, url string, logger *slog.Logger) (*sqlitekit.Database, error) {
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
-		URL:      url,
-		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
-		Fixtures: repository.FixturesSQL,
-		Logger:   logger,
+		URL:          url,
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       logger,
+		Premigration: repository.PreMigrateMuscleTargets,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new database: %w", err)

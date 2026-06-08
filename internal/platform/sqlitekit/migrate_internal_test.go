@@ -1,6 +1,8 @@
 package sqlitekit
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"testing"
 
@@ -151,5 +153,59 @@ func TestDatabase_migrate(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNewDatabase_PremigrationRunsBeforeMigrate(t *testing.T) {
+	t.Parallel()
+
+	var called, ranBeforeMigrate bool
+	cfg := Config{
+		URL:      ":memory:",
+		Schema:   "CREATE TABLE widgets (id INTEGER PRIMARY KEY) STRICT;",
+		Fixtures: "",
+		Logger:   slog.New(slog.DiscardHandler),
+		Premigration: func(ctx context.Context, db *Database) error {
+			called = true
+			// At premigration time the declarative migrate has not run yet,
+			// so the schema table must not exist.
+			var n int
+			if err := db.ReadWrite.QueryRowContext(ctx,
+				"SELECT count(*) FROM sqlite_master WHERE type='table' AND name='widgets'").Scan(&n); err != nil {
+				return err
+			}
+			ranBeforeMigrate = n == 0
+			return nil
+		},
+	}
+
+	db, err := NewDatabase(t.Context(), cfg)
+	if err != nil {
+		t.Fatalf("NewDatabase: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	if !called {
+		t.Error("Premigration was not called")
+	}
+	if !ranBeforeMigrate {
+		t.Error("Premigration ran after migrate (widgets table already existed)")
+	}
+}
+
+func TestNewDatabase_PremigrationErrorPropagates(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		URL:      ":memory:",
+		Schema:   "CREATE TABLE widgets (id INTEGER PRIMARY KEY) STRICT;",
+		Fixtures: "",
+		Logger:   slog.New(slog.DiscardHandler),
+		Premigration: func(context.Context, *Database) error {
+			return errors.New("boom")
+		},
+	}
+	if _, err := NewDatabase(t.Context(), cfg); err == nil {
+		t.Fatal("expected NewDatabase to fail when premigration errors")
 	}
 }

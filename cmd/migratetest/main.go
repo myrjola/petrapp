@@ -37,10 +37,11 @@ func run(w io.Writer) error {
 	}
 
 	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
-		URL:      sqliteURL,
-		Schema:   auth.SchemaSQL + "\n" + repository.SchemaSQL,
-		Fixtures: repository.FixturesSQL,
-		Logger:   logger,
+		URL:          sqliteURL,
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       logger,
+		Premigration: repository.PreMigrateMuscleTargets,
 	})
 	if err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "error creating database",
