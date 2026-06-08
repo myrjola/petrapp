@@ -184,7 +184,15 @@ cannot express, run a one-shot **premigration** that rewrites legacy data into
 the new shape *before* the declarative migrate, after which the migrator sees a
 database that already matches `schema.sql` and is a no-op.
 
-A premigration method must:
+Wire it as an exported function in **this** package (e.g.
+`PreMigrateMuscleTargets`) and pass it to `sqlitekit.Config.Premigration` from
+`cmd/petra/main.go` — and from `cmd/migratetest/main.go`, so the
+deploy-migration test (`make migratetest`) exercises it against a prod snapshot.
+sqlitekit invokes it between connecting and `migrateTo`; it must not live in
+sqlitekit itself, which is product-agnostic. The "call site" you delete once
+prod has booted past it is that `Premigration:` wiring in both `main.go`s.
+
+A premigration function must:
 
 - **Detect already-migrated state first** via `pragma_table_info` or
   `sqlite_master` and return early. It must also short-circuit on a fresh

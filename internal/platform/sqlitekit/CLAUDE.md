@@ -36,8 +36,9 @@ caller-provided via `Config` (see "Caller-provided schema" below).
 
 ## Caller-provided schema: `Config` and `NewDatabase`
 
-`NewDatabase(ctx, Config{URL, Schema, Fixtures, Logger})` connects, migrates the
-database to `Schema`, then applies `Fixtures` (if non-empty):
+`NewDatabase(ctx, Config{URL, Schema, Fixtures, Logger, Premigration})` connects,
+runs `Premigration` (if set), migrates the database to `Schema`, then applies
+`Fixtures` (if non-empty):
 
 - **`URL`** — a file path, or `:memory:` for tests (in-memory databases use
   `cache=shared` so the RO and RW handles see the same data).
@@ -62,6 +63,13 @@ database to `Schema`, then applies `Fixtures` (if non-empty):
   `ExecContext` **on every boot**. Must coexist with rows production already
   holds; design seeds to be upsert-safe.
 - **`Logger`** — a `*slog.Logger`; no global logger.
+- **`Premigration`** — optional `func(context.Context, *Database) error` run
+  **after connecting but before the structural migrate**. It is the seam for
+  data-shape transforms the declarative migrator cannot express — it reconciles
+  *structure* only, never data, so it cannot rename a column or populate a new
+  `NOT NULL` column on an existing table. Must be idempotent and short-circuit
+  on already-migrated and fresh databases. The product owns the SQL; see the
+  premigration escape hatch in `internal/petra/repository/CLAUDE.md`.
 
 ## RO / RW connection split
 
