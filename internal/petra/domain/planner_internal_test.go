@@ -1479,3 +1479,57 @@ func sliceEqInt(a, b []int) bool {
 	}
 	return true
 }
+
+func Test_goalForWeek(t *testing.T) {
+	t.Parallel()
+
+	chest := MuscleGroupTarget{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20}
+
+	tests := []struct {
+		name     string
+		progress float64
+		want     float64
+	}{
+		{"progress 0 → MinSets exactly", 0.0, 10.0},
+		{"progress 1 → MaxSets exactly", 1.0, 20.0},
+		{"progress 0.5 → midpoint", 0.5, 15.0},
+		{"fractional lerp quantised to nearest 0.5", 1.0 / 3.0, 13.5}, // raw 13.333 → 13.5.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := goalForWeek(chest, tt.progress)
+			if got != tt.want {
+				t.Errorf("goalForWeek(progress=%v) = %v, want %v", tt.progress, got, tt.want)
+			}
+			// Tie-break invariant: the goal must always be a multiple of 0.5.
+			// (No math import needed — int64 truncation suffices for the check.)
+			if twice := got * 2; twice != float64(int64(twice)) {
+				t.Errorf("goalForWeek(progress=%v) = %v is not a multiple of 0.5", tt.progress, got)
+			}
+		})
+	}
+}
+
+func Test_scoreCandidate_GoalRampsWithProgress(t *testing.T) {
+	t.Parallel()
+
+	// A muscle sitting above its floor but below its ceiling: at progress 0 the
+	// goal is the floor (sets earn the smaller above-goal reward); at progress 1
+	// the goal has risen past the current load (sets earn the steeper below-goal
+	// reward). So the same pick scores strictly higher later in the block.
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Chest"}, RepMin: new(8), RepMax: new(12),
+	}
+	targets := map[string]MuscleGroupTarget{
+		"Chest": {MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
+	}
+	load := map[string]float64{"Chest": 12} // above floor (10), below ceiling (20).
+
+	early := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 0}, load, targets)
+	late := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 1}, load, targets)
+	if !(late > early) {
+		t.Errorf("ramped goal should score higher late in block: early=%v late=%v", early, late)
+	}
+}

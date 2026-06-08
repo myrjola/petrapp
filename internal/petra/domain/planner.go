@@ -418,6 +418,20 @@ type weekVolume struct {
 	progress float64
 }
 
+// goalQuantisationFactor is the denominator used to snap goalForWeek output to
+// the nearest 0.5: multiply by this factor, round, then divide back.
+const goalQuantisationFactor = 2.0
+
+// goalForWeek lerps a muscle's weekly scoring goal from its floor (MinSets)
+// toward its ceiling (MaxSets) by the mesocycle ramp progress, quantised to the
+// nearest 0.5. Quantisation keeps every segmentReward term on multiples of 0.5
+// so scores stay exact in IEEE-754 and pickBestExerciseIdx's tie-break holds.
+// progress 0 → MinSets (the Phase B static floor); progress 1 → MaxSets.
+func goalForWeek(t MuscleGroupTarget, progress float64) float64 {
+	raw := float64(t.MinSets) + (float64(t.MaxSets)-float64(t.MinSets))*progress
+	return math.Round(raw*goalQuantisationFactor) / goalQuantisationFactor
+}
+
 // weekVolumeFor resolves the week's volume context from the session date and the
 // user's mesocycle preferences. A zero anchor / disabled deload yields progress 0
 // and the base set count — the Phase B behaviour.
@@ -472,8 +486,8 @@ func overlapLength(lo, hi, segLo, segHi float64) float64 {
 // row) contribute nothing. Set count comes from the same
 // deriveSchemeForExercise the planner uses to persist sets (the mesocycle
 // week's count, wv.sets), so deload set reduction and the week-driven set-count
-// ramp are reflected automatically. The goal used here is still the static
-// floor (MinSets); the week-indexed ramping goal is a later task.
+// ramp are reflected automatically. The goal ramps from MinSets toward MaxSets
+// across the block via goalForWeek(t, wv.progress).
 func scoreCandidate(
 	ex Exercise,
 	pt PeriodizationType,
@@ -497,7 +511,7 @@ func scoreCandidate(
 		if !ok {
 			continue // tag-only group: no target row, contributes nothing.
 		}
-		score += segmentReward(load[mg], added, float64(t.MinSets), float64(t.MaxSets))
+		score += segmentReward(load[mg], added, goalForWeek(t, wv.progress), float64(t.MaxSets))
 	}
 	return score
 }
