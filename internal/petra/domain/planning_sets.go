@@ -67,9 +67,11 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDelo
 }
 
 // BuildSetsForAdd produces the Set slice for an exercise being added to or
-// swapping into an existing session. The session's periodization always
-// dictates TargetValue and TargetSets — a Deadlift added in a Strength week
-// gets 3 reps × 4 sets, not whatever the historical session had.
+// swapping into an existing session. The session's periodization dictates the
+// rep/seconds TargetValue while the set count comes from the mesocycle week
+// (weekSets, deload-reduced) — a Deadlift added in a Strength week gets the
+// strength rep target and the week's set count, not whatever the historical
+// session had.
 //
 // HasWeight exercises always get an allocated WeightKg pointer so the per-set
 // form has a non-nil binding target. When historicalSets contains a non-nil
