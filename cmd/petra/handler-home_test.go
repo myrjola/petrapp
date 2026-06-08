@@ -137,12 +137,21 @@ func Test_application_home(t *testing.T) {
 		if !strings.Contains(chestRow.Text(), "target 10") {
 			t.Errorf("chest row must show seeded target of 10, got: %q", chestRow.Text())
 		}
+		// Calves is newly targeted in Phase B (floor 8); it must show its target.
 		calvesRow := section.Find(`.row[data-slug="calves"]`).First()
 		if calvesRow.Length() == 0 {
 			t.Fatal("calves row missing")
 		}
-		if calvesRow.Find(".target-mark").Length() != 0 {
-			t.Error("calves has no seeded target; must not render a target mark")
+		if !strings.Contains(calvesRow.Text(), "target 8") {
+			t.Errorf("calves row must show seeded target of 8, got: %q", calvesRow.Text())
+		}
+		// Traps is tag-only (no target row); it must not render a target mark.
+		trapsRow := section.Find(`.row[data-slug="traps"]`).First()
+		if trapsRow.Length() == 0 {
+			t.Fatal("traps row missing")
+		}
+		if trapsRow.Find(".target-mark").Length() != 0 {
+			t.Error("traps has no seeded target; must not render a target mark")
 		}
 	})
 }
