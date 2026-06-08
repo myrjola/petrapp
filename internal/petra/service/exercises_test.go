@@ -1126,3 +1126,121 @@ func Test_ListSwapCandidates_FiltersByQuery(t *testing.T) {
 		}
 	}
 }
+
+// peakSetsExpected is the per-exercise working-set count in the last training
+// week of a length-4 mesocycle (the ramp's peak).
+const peakSetsExpected = 4
+
+func Test_AddExercise_UsesMesocycleWeekSetCount(t *testing.T) {
+	t.Parallel()
+
+	// --- scaffold mirrors Test_AddExercise: ctx, db, userID, svc, muscle
+	//     groups, exercise1ID + exercise2ID, a workout_sessions row + one
+	//     workout_exercises slot for `today`, and the authenticated-user
+	//     context. ---
+	ctx := t.Context()
+	logger := testkit.NewLogger(testkit.NewWriter(t))
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:          ":memory:",
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       logger,
+		Premigration: nil,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+
+	webauthnUserID := []byte("test-user-id")
+	var userID int
+	err = db.ReadWrite.QueryRowContext(ctx,
+		"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
+		webauthnUserID, "Test User").Scan(&userID)
+	if err != nil {
+		t.Fatalf("Failed to insert test user: %v", err)
+	}
+
+	svc := service.NewService(db, logger, "")
+
+	for _, group := range []string{"Quads", "Glutes", "Hamstrings", "Core"} {
+		if err = tryInsertMuscleGroup(ctx, t, db, group); err != nil {
+			t.Fatalf("Failed to insert muscle group: %v", err)
+		}
+	}
+
+	exercise1ID, err := createTestExercise(ctx, t, db, "Test Exercise 1", "lower")
+	if err != nil {
+		t.Fatalf("Failed to create test exercise 1: %v", err)
+	}
+	exercise2ID, err := createTestExercise(ctx, t, db, "Test Exercise 2", "upper")
+	if err != nil {
+		t.Fatalf("Failed to create test exercise 2: %v", err)
+	}
+
+	today := time.Now()
+	dateStr := today.Format("2006-01-02")
+
+	_, err = db.ReadWrite.ExecContext(ctx,
+		"INSERT INTO workout_sessions (user_id, workout_date) VALUES (?, ?)",
+		userID, dateStr)
+	if err != nil {
+		t.Fatalf("Failed to insert workout session: %v", err)
+	}
+
+	const pos1 = 0
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		userID, dateStr, pos1, exercise1ID)
+	if err != nil {
+		t.Fatalf("Failed to insert workout_exercises: %v", err)
+	}
+	_, err = db.ReadWrite.ExecContext(ctx,
+		`INSERT INTO exercise_sets
+		(workout_user_id, workout_date, position, set_number, weight_kg, target_value)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, dateStr, pos1, 1, 50.0, 12)
+	if err != nil {
+		t.Fatalf("Failed to insert exercise set: %v", err)
+	}
+
+	ctx = context.WithValue(ctx, contexthelpers.AuthenticatedUserIDContextKey, userID)
+	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
+
+	// --- anchor a length-4 mesocycle so today's week is the last training week
+	//     (peak). MondayOf(today) - 14d → block-week index 2 of 4 → peak. ---
+	monday := domain.MondayOf(today)
+	prefs, errPrefs := svc.GetUserPreferences(ctx)
+	if errPrefs != nil {
+		t.Fatalf("GetUserPreferences: %v", errPrefs)
+	}
+	prefs.DeloadEnabled = true
+	prefs.MesocycleLength = 4
+	prefs.MesocycleAnchor = monday.AddDate(0, 0, -14)
+	if errPrefs = svc.SaveUserPreferences(ctx, prefs); errPrefs != nil {
+		t.Fatalf("SaveUserPreferences: %v", errPrefs)
+	}
+
+	// Add exercise 2 mid-session; it must get the peak-week set count.
+	pos, errAdd := svc.AddExercise(ctx, today, exercise2ID)
+	if errAdd != nil {
+		t.Fatalf("AddExercise: %v", errAdd)
+	}
+
+	sess, errGet := svc.GetSession(ctx, today)
+	if errGet != nil {
+		t.Fatalf("GetSession: %v", errGet)
+	}
+	want := domain.SetsForWeek(monday, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled)
+	if want != peakSetsExpected {
+		t.Fatalf("precondition: SetsForWeek at peak = %d, want %d", want, peakSetsExpected)
+	}
+	if pos < 0 || pos >= len(sess.Slots) {
+		t.Fatalf("added slot position %d out of range (session has %d slots)", pos, len(sess.Slots))
+	}
+	if got := len(sess.Slots[pos].Sets); got != want {
+		t.Errorf("added exercise set count = %d, want peak-week count %d", got, want)
+	}
+}

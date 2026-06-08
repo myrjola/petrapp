@@ -1533,3 +1533,87 @@ func Test_scoreCandidate_GoalRampsWithProgress(t *testing.T) {
 		t.Errorf("ramped goal should score higher late in block: early=%v late=%v", early, late)
 	}
 }
+
+func Test_Plan_SetCountRampsAcrossBlockAndDropsOnDeload(t *testing.T) {
+	t.Parallel()
+
+	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC) // Monday, week 0.
+	mkPrefs := func() Preferences {
+		p := prefs(time.Monday, time.Wednesday, time.Friday)
+		p.DeloadEnabled = true
+		p.MesocycleLength = 4
+		p.MesocycleAnchor = anchor
+		return p
+	}
+	// A single rep-based exercise pool so every planned slot is week-driven.
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID: 1, Name: "Bench", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Chest"}, RepMin: new(8), RepMax: new(12),
+	}
+	wp := NewPlanner(mkPrefs(), []Exercise{bench}, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
+	})
+
+	setsOnMonday := func(weekOffset int) int {
+		plan, err := wp.Plan(anchor.AddDate(0, 0, 7*weekOffset))
+		if err != nil {
+			t.Fatalf("Plan week %d: %v", weekOffset, err)
+		}
+		sess := plan.Sessions[0] // Monday slot (Sessions is indexed by day offset from Monday).
+		if len(sess.Slots) == 0 {
+			t.Fatalf("week %d Monday has no slots", weekOffset)
+		}
+		return len(sess.Slots[0].Sets)
+	}
+
+	week0 := setsOnMonday(0) // base.
+	week2 := setsOnMonday(2) // last training week (peak).
+	week3 := setsOnMonday(3) // deload.
+
+	if week0 != baseWeeklySets {
+		t.Errorf("week 0 set count = %d, want base %d", week0, baseWeeklySets)
+	}
+	if week2 != peakWeeklySets {
+		t.Errorf("week 2 (peak) set count = %d, want peak %d", week2, peakWeeklySets)
+	}
+	if week3 >= week2 {
+		t.Errorf("deload week set count (%d) should drop below peak (%d)", week3, week2)
+	}
+}
+
+func Test_Plan_ScoringMatchesPersistedSetCount(t *testing.T) {
+	t.Parallel()
+
+	// The consistency invariant: the set count scoreCandidate uses equals
+	// the set count the planner persists, for the same week. We verify it via the
+	// shared seam — deriveSchemeForExercise must return the slot's persisted
+	// count when called with the same weekVolume.sets the planner used.
+	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
+	prefsV := prefs(time.Monday, time.Wednesday, time.Friday)
+	prefsV.DeloadEnabled = true
+	prefsV.MesocycleLength = 4
+	prefsV.MesocycleAnchor = anchor
+
+	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
+		ID: 1, Name: "Bench", Category: CategoryFullBody, ExerciseType: ExerciseTypeWeighted,
+		PrimaryMuscleGroups: []string{"Chest"}, RepMin: new(8), RepMax: new(12),
+	}
+	wp := NewPlanner(prefsV, []Exercise{bench}, []MuscleGroupTarget{
+		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
+	})
+
+	weekStart := anchor.AddDate(0, 0, 7*1) // week 1 (mid-ramp).
+	plan, err := wp.Plan(weekStart)
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	persisted := len(plan.Sessions[0].Slots[0].Sets)
+
+	wv := weekVolumeFor(weekStart, prefsV)
+	_, scored := deriveSchemeForExercise(
+		bench, plan.Sessions[0].PeriodizationType, plan.Sessions[0].IsDeload, wv.sets,
+	)
+	if persisted != scored {
+		t.Errorf("persisted set count (%d) != scored set count (%d) — invariant broken", persisted, scored)
+	}
+}
