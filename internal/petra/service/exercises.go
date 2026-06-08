@@ -77,12 +77,22 @@ func (s *Service) SwapExercise(
 		return fmt.Errorf("find historical sets: %w", err)
 	}
 
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+	weekSets := domain.SetsForWeek(
+		domain.MondayOf(date), prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled,
+	)
+
 	err = s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
 		sess := wp.SessionOn(date)
 		if sess == nil {
 			return domain.ErrNotFound
 		}
-		newSets := domain.BuildSetsForAdd(newExercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
+		newSets := domain.BuildSetsForAdd(
+			newExercise, sess.PeriodizationType, sess.IsDeload, weekSets, historicalSets,
+		)
 		return sess.SwapExerciseInSlot(pos, newExercise, newSets)
 	})
 	if err != nil {
@@ -215,6 +225,11 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	}
 
 	monday := domain.MondayOf(date)
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("get preferences: %w", err)
+	}
+	weekSets := domain.SetsForWeek(monday, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled)
 	plan, getErr := s.repos.WeekPlans.Get(ctx, monday)
 	if getErr != nil && !errors.Is(getErr, domain.ErrNotFound) {
 		return 0, fmt.Errorf("check session existence: %w", getErr)
@@ -239,7 +254,9 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 		if sess == nil {
 			return domain.ErrNotFound
 		}
-		newSets := domain.BuildSetsForAdd(exercise, sess.PeriodizationType, sess.IsDeload, historicalSets)
+		newSets := domain.BuildSetsForAdd(
+			exercise, sess.PeriodizationType, sess.IsDeload, weekSets, historicalSets,
+		)
 		return sess.AddExercise(exercise, newSets)
 	})
 	if err != nil {

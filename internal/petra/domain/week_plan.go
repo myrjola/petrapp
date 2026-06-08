@@ -77,7 +77,7 @@ func (wp *WeekPlan) Replace(newPlan WeekPlan) {
 // FlipDeloadFromToday sets IsDeload=true on every non-completed scheduled
 // session whose Date is on or after today. Past sessions, completed sessions,
 // and rest-day placeholders (no slots) are left untouched. Idempotent.
-func (wp *WeekPlan) FlipDeloadFromToday(today time.Time) error {
+func (wp *WeekPlan) FlipDeloadFromToday(today time.Time, weekSets int) error {
 	t := StartOfDay(today)
 	for i := range wp.Sessions {
 		s := &wp.Sessions[i]
@@ -90,7 +90,7 @@ func (wp *WeekPlan) FlipDeloadFromToday(today time.Time) error {
 		if s.Status() == SessionCompleted {
 			continue
 		}
-		if err := s.SwitchToDeload(); err != nil {
+		if err := s.SwitchToDeload(weekSets); err != nil {
 			return err
 		}
 	}
@@ -100,7 +100,7 @@ func (wp *WeekPlan) FlipDeloadFromToday(today time.Time) error {
 // ClearDeloadFromToday sets IsDeload=false on every non-completed scheduled
 // session whose Date is on or after today. Counterpart to FlipDeloadFromToday;
 // rest-day placeholders (no slots) are left untouched. Idempotent.
-func (wp *WeekPlan) ClearDeloadFromToday(today time.Time) error {
+func (wp *WeekPlan) ClearDeloadFromToday(today time.Time, weekSets int) error {
 	t := StartOfDay(today)
 	for i := range wp.Sessions {
 		s := &wp.Sessions[i]
@@ -113,7 +113,7 @@ func (wp *WeekPlan) ClearDeloadFromToday(today time.Time) error {
 		if s.Status() == SessionCompleted {
 			continue
 		}
-		if err := s.ClearDeload(); err != nil {
+		if err := s.ClearDeload(weekSets); err != nil {
 			return err
 		}
 	}

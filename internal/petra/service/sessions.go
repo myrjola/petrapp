@@ -375,17 +375,19 @@ func (s *Service) StartDeloadNow(ctx context.Context) error {
 	monday := domain.MondayOf(time.Now())
 	today := domain.StartOfDay(time.Now())
 
-	err := s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
-		return wp.FlipDeloadFromToday(today)
+	prefs, err := s.repos.Preferences.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("get preferences: %w", err)
+	}
+	weekSets := domain.SetsForWeek(monday, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled)
+
+	err = s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
+		return wp.FlipDeloadFromToday(today, weekSets)
 	})
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return fmt.Errorf("flip deload for week %s: %w", monday.Format(time.DateOnly), err)
 	}
 
-	prefs, err := s.repos.Preferences.Get(ctx)
-	if err != nil {
-		return fmt.Errorf("get preferences: %w", err)
-	}
 	prefs.MesocycleAnchor = nextMonday(time.Now().UTC())
 	if err = s.repos.Preferences.Set(ctx, prefs); err != nil {
 		return fmt.Errorf("save preferences: %w", err)

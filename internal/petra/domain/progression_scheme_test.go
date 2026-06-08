@@ -15,38 +15,37 @@ func TestDeriveScheme(t *testing.T) {
 		repMax        int
 		periodization domain.PeriodizationType
 		wantReps      int
-		wantSets      int
 		wantRest      int
 	}{
 		// Heavy spinal-load compound (3-6 window).
-		{"deadlift strength", 3, 6, domain.PeriodizationStrength, 3, 4, 180},
-		{"deadlift hypertrophy", 3, 6, domain.PeriodizationHypertrophy, 6, 3, 150},
+		{"deadlift strength", 3, 6, domain.PeriodizationStrength, 3, 180},
+		{"deadlift hypertrophy", 3, 6, domain.PeriodizationHypertrophy, 6, 150},
 
 		// Non-spinal compound (5-10 window).
-		{"bench strength", 5, 10, domain.PeriodizationStrength, 5, 4, 180},
-		{"bench hypertrophy", 5, 10, domain.PeriodizationHypertrophy, 10, 3, 150},
+		{"bench strength", 5, 10, domain.PeriodizationStrength, 5, 180},
+		{"bench hypertrophy", 5, 10, domain.PeriodizationHypertrophy, 10, 150},
 
 		// Lumbar-stress accessory (8-20 window).
-		{"back ext strength", 8, 20, domain.PeriodizationStrength, 8, 3, 150},
-		{"back ext hypertrophy", 8, 20, domain.PeriodizationHypertrophy, 20, 3, 90},
+		{"back ext strength", 8, 20, domain.PeriodizationStrength, 8, 150},
+		{"back ext hypertrophy", 8, 20, domain.PeriodizationHypertrophy, 20, 90},
 
 		// Isolation, large muscle (8-12 window).
-		{"bicep curl strength", 8, 12, domain.PeriodizationStrength, 8, 3, 150},
-		{"bicep curl hypertrophy", 8, 12, domain.PeriodizationHypertrophy, 12, 3, 90},
+		{"bicep curl strength", 8, 12, domain.PeriodizationStrength, 8, 150},
+		{"bicep curl hypertrophy", 8, 12, domain.PeriodizationHypertrophy, 12, 90},
 
 		// Isolation, small/slow muscle (10-20 window).
-		{"calf strength", 10, 20, domain.PeriodizationStrength, 10, 3, 150},
-		{"calf hypertrophy", 10, 20, domain.PeriodizationHypertrophy, 20, 3, 90},
+		{"calf strength", 10, 20, domain.PeriodizationStrength, 10, 150},
+		{"calf hypertrophy", 10, 20, domain.PeriodizationHypertrophy, 20, 90},
 
 		// Bucket boundaries.
-		{"reps=5 (top of low bucket)", 5, 5, domain.PeriodizationStrength, 5, 4, 180},
-		{"reps=6 (start of mid bucket)", 6, 6, domain.PeriodizationStrength, 6, 3, 150},
-		{"reps=10 (top of mid bucket)", 10, 10, domain.PeriodizationStrength, 10, 3, 150},
-		{"reps=11 (start of high bucket)", 11, 11, domain.PeriodizationStrength, 11, 3, 90},
+		{"reps=5 (top of low bucket)", 5, 5, domain.PeriodizationStrength, 5, 180},
+		{"reps=6 (start of mid bucket)", 6, 6, domain.PeriodizationStrength, 6, 150},
+		{"reps=10 (top of mid bucket)", 10, 10, domain.PeriodizationStrength, 10, 150},
+		{"reps=11 (start of high bucket)", 11, 11, domain.PeriodizationStrength, 11, 90},
 
 		// Single-value window: same output regardless of periodization.
-		{"single 5 strength", 5, 5, domain.PeriodizationStrength, 5, 4, 180},
-		{"single 5 hypertrophy", 5, 5, domain.PeriodizationHypertrophy, 5, 4, 180},
+		{"single 5 strength", 5, 5, domain.PeriodizationStrength, 5, 180},
+		{"single 5 hypertrophy", 5, 5, domain.PeriodizationHypertrophy, 5, 180},
 	}
 
 	for _, tt := range tests {
@@ -55,9 +54,6 @@ func TestDeriveScheme(t *testing.T) {
 			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, false)
 			if got.TargetReps != tt.wantReps {
 				t.Errorf("TargetReps: want %d, got %d", tt.wantReps, got.TargetReps)
-			}
-			if got.TargetSets != tt.wantSets {
-				t.Errorf("TargetSets: want %d, got %d", tt.wantSets, got.TargetSets)
 			}
 			if got.RestSeconds != tt.wantRest {
 				t.Errorf("RestSeconds: want %d, got %d", tt.wantRest, got.RestSeconds)
@@ -156,12 +152,11 @@ func TestDeriveScheme_Deload(t *testing.T) {
 		repMin, repMax  int
 		periodization   domain.PeriodizationType
 		wantTargetReps  int
-		wantTargetSets  int
 		wantRestSeconds int
 	}{
-		{"low rep window, deload drops 4 sets to 3", 3, 5, domain.PeriodizationStrength, 5, 3, 180},
-		{"mid rep window, deload drops 3 sets to 2 (floor)", 6, 10, domain.PeriodizationStrength, 10, 2, 150},
-		{"high rep window, deload drops 3 sets to 2 (floor)", 12, 15, domain.PeriodizationHypertrophy, 15, 2, 90},
+		{"low rep window, deload still targets repMax", 3, 5, domain.PeriodizationStrength, 5, 180},
+		{"mid rep window, deload still targets repMax", 6, 10, domain.PeriodizationStrength, 10, 150},
+		{"high rep window, deload still targets repMax", 12, 15, domain.PeriodizationHypertrophy, 15, 90},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,9 +164,6 @@ func TestDeriveScheme_Deload(t *testing.T) {
 			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, true)
 			if got.TargetReps != tt.wantTargetReps {
 				t.Errorf("TargetReps = %d, want %d (deload always uses repMax)", got.TargetReps, tt.wantTargetReps)
-			}
-			if got.TargetSets != tt.wantTargetSets {
-				t.Errorf("TargetSets = %d, want %d (drop one, floor at 2)", got.TargetSets, tt.wantTargetSets)
 			}
 			if got.RestSeconds != tt.wantRestSeconds {
 				t.Errorf(
@@ -200,28 +192,29 @@ func TestRestSecondsFor_Deload(t *testing.T) {
 func Test_deloadSets(t *testing.T) {
 	t.Parallel()
 
-	// Internal helper — we exercise it through DeriveScheme rather than calling
-	// directly. The table covers each rep band's normal set count (4, 3) plus
-	// degenerate inputs that hit the floor.
+	// deloadSets is internal; exercise it through BuildPlannedSets, which now
+	// reduces the week's base set count by one (floored at deloadSetFloor=2) on
+	// a deload. Periodization no longer affects the count.
+	ex := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       new(6),
+		RepMax:       new(10),
+	}
 	tests := []struct {
-		name           string
-		repMin, repMax int
-		periodization  domain.PeriodizationType
-		// Deload always forces hypertrophy targets (repMax), so the resulting
-		// rep band depends on repMax.
-		wantSets int
+		name     string
+		weekSets int
+		want     int
 	}{
-		{"low band (repMax=5) drops 4 to 3", 3, 5, domain.PeriodizationStrength, 3},
-		{"mid band (repMax=10) drops 3 to 2 (floor)", 6, 10, domain.PeriodizationStrength, 2},
-		{"high band (repMax=15) drops 3 to 2 (floor)", 12, 15, domain.PeriodizationHypertrophy, 2},
-		{"already-at-floor band stays at 2", 6, 10, domain.PeriodizationHypertrophy, 2},
+		{"base 3 drops to 2", 3, 2},
+		{"peak 4 drops to 3", 4, 3},
+		{"already at floor stays 2", 2, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := domain.DeriveScheme(tt.repMin, tt.repMax, tt.periodization, true)
-			if got.TargetSets != tt.wantSets {
-				t.Errorf("TargetSets = %d, want %d", got.TargetSets, tt.wantSets)
+			got := domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true, tt.weekSets)
+			if len(got) != tt.want {
+				t.Errorf("deload set count = %d, want %d", len(got), tt.want)
 			}
 		})
 	}

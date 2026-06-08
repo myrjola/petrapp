@@ -89,6 +89,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 	isDeload := IsDeloadWeek(
 		startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
 	)
+	wv := weekVolumeFor(startingDate, wp.Prefs)
 
 	weekUsedExercises := map[int]bool{}
 	load := map[string]float64{}
@@ -99,7 +100,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		}
 		n := exercisesPerSession(wp.Prefs, day.Weekday(), pt, isDeload)
 		slots := wp.selectExercisesForDayWithPeriodization(
-			wp.determineCategory(day), n, pt, isDeload, weekUsedExercises, load,
+			wp.determineCategory(day), n, pt, isDeload, wv, weekUsedExercises, load,
 		)
 		dayOffset := int(day.Sub(startingDate).Hours() / hoursPerDay)
 		result.Sessions[dayOffset] = Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
@@ -169,6 +170,7 @@ func (wp *Planner) PlanDay(
 	if isDeload {
 		pt = PeriodizationHypertrophy
 	}
+	wv := weekVolumeFor(monday, wp.Prefs)
 
 	n := exercisesPerSession(wp.Prefs, date.Weekday(), pt, isDeload)
 	if n == 0 {
@@ -184,7 +186,7 @@ func (wp *Planner) PlanDay(
 	}
 	load := make(map[string]float64, len(weekLoad))
 	maps.Copy(load, weekLoad)
-	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, used, load)
+	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, wv, used, load)
 
 	return Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
 		Date:              date,
@@ -286,6 +288,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	n int,
 	pt PeriodizationType,
 	isDeload bool,
+	wv weekVolume,
 	weekUsedExercises map[int]bool,
 	load map[string]float64,
 ) []ExerciseSlot {
@@ -298,12 +301,21 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	selected := make([]ExerciseSlot, 0, n)
 
 	for len(selected) < n {
-		bestIdx := wp.pickBestExerciseIdx(category, pt, isDeload, selectedPrimaryMGs, weekUsedExercises, load, targets)
+		bestIdx := wp.pickBestExerciseIdx(
+			category,
+			pt,
+			isDeload,
+			wv,
+			selectedPrimaryMGs,
+			weekUsedExercises,
+			load,
+			targets,
+		)
 		if bestIdx < 0 {
 			break
 		}
 		ex := wp.Exercises[bestIdx]
-		slot := buildPlannedExerciseSlot(ex, pt, isDeload)
+		slot := buildPlannedExerciseSlot(ex, pt, isDeload, wv.sets)
 		selected = append(selected, slot)
 		for _, mg := range ex.PrimaryMuscleGroups {
 			selectedPrimaryMGs[mg] = true
@@ -323,6 +335,7 @@ func (wp *Planner) pickBestExerciseIdx(
 	category Category,
 	pt PeriodizationType,
 	isDeload bool,
+	wv weekVolume,
 	selectedPrimaryMGs map[string]bool,
 	weekUsedExercises map[int]bool,
 	load map[string]float64,
@@ -337,7 +350,7 @@ func (wp *Planner) pickBestExerciseIdx(
 			primaryMuscleGroupsOverlap(ex, selectedPrimaryMGs) {
 			continue
 		}
-		score := scoreCandidate(ex, pt, isDeload, load, targets)
+		score := scoreCandidate(ex, pt, isDeload, wv, load, targets)
 		// Exact float equality is safe here: scores are derived from
 		// integer targets, integer set counts, and fixed half-integer
 		// weights (PrimarySetWeight, SecondarySetWeight), so ties round-trip
@@ -365,10 +378,10 @@ func applyLoad(load map[string]float64, ex Exercise, nSets float64) {
 
 // buildPlannedExerciseSlot creates an ExerciseSlot for one exercise using
 // BuildPlannedSets as the single source of truth for set prescription.
-func buildPlannedExerciseSlot(ex Exercise, pt PeriodizationType, isDeload bool) ExerciseSlot {
+func buildPlannedExerciseSlot(ex Exercise, pt PeriodizationType, isDeload bool, weekSets int) ExerciseSlot {
 	return ExerciseSlot{ //nolint:exhaustruct // WarmupCompletedAt nil.
 		Exercise: ex,
-		Sets:     BuildPlannedSets(ex, pt, isDeload),
+		Sets:     BuildPlannedSets(ex, pt, isDeload, weekSets),
 	}
 }
 
@@ -393,6 +406,26 @@ func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
 		return PeriodizationHypertrophy
 	}
 	return PeriodizationStrength
+}
+
+// weekVolume captures the mesocycle-week-derived inputs to one planned session:
+// sets is the base per-exercise working-set count for the week (pre-deload),
+// progress is the ramp position in [0,1] used to lerp each muscle's scoring goal
+// from MinSets toward MaxSets. Both are constant across the days of a calendar
+// week, so the planner resolves them once per Plan/PlanDay call.
+type weekVolume struct {
+	sets     int
+	progress float64
+}
+
+// weekVolumeFor resolves the week's volume context from the session date and the
+// user's mesocycle preferences. A zero anchor / disabled deload yields progress 0
+// and the base set count — the Phase B behaviour.
+func weekVolumeFor(date time.Time, prefs Preferences) weekVolume {
+	return weekVolume{
+		sets:     SetsForWeek(date, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled),
+		progress: MesocycleRampProgress(date, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled),
+	}
 }
 
 // Piecewise per-set marginal reward for weekly volume. Below a muscle's floor
@@ -437,18 +470,19 @@ func overlapLength(lo, hi, segLo, segHi float64) float64 {
 // the planner drives every muscle toward its floor and then keeps paying with
 // diminishing returns up to its ceiling. Tag-only muscle groups (no target
 // row) contribute nothing. Set count comes from the same
-// deriveSchemeForExercise the planner uses to persist sets, so deload set
-// reduction and periodization-driven set-count shifts are reflected
-// automatically. The goal used here is the static floor (MinSets); the
-// week-indexed ramping goal is Phase D.
+// deriveSchemeForExercise the planner uses to persist sets (the mesocycle
+// week's count, wv.sets), so deload set reduction and the week-driven set-count
+// ramp are reflected automatically. The goal used here is still the static
+// floor (MinSets); the week-indexed ramping goal is a later task.
 func scoreCandidate(
 	ex Exercise,
 	pt PeriodizationType,
 	isDeload bool,
+	wv weekVolume,
 	load map[string]float64,
 	targets map[string]MuscleGroupTarget,
 ) float64 {
-	_, nSets := deriveSchemeForExercise(ex, pt, isDeload)
+	_, nSets := deriveSchemeForExercise(ex, pt, isDeload, wv.sets)
 	n := float64(nSets)
 	contrib := make(map[string]float64, len(ex.PrimaryMuscleGroups)+len(ex.SecondaryMuscleGroups))
 	for _, mg := range ex.PrimaryMuscleGroups {

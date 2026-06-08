@@ -668,7 +668,7 @@ func Test_Session_SwitchToDeload_SetsFlag(t *testing.T) {
 		Date: time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
 	}
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload: %v", err)
 	}
 	if !sess.IsDeload {
@@ -692,18 +692,18 @@ func Test_Session_SwitchToDeload_Idempotent(t *testing.T) {
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
 			},
 		},
 	}
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload first call: %v", err)
 	}
 	firstLen := len(sess.Slots[0].Sets)
 	firstTarget := sess.Slots[0].Sets[0].TargetValue
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload second call: %v", err)
 	}
 	if !sess.IsDeload {
@@ -725,7 +725,7 @@ func Test_Session_ClearDeload_ClearsFlag(t *testing.T) {
 		IsDeload: true,
 	}
 
-	if err := sess.ClearDeload(); err != nil {
+	if err := sess.ClearDeload(4); err != nil {
 		t.Fatalf("ClearDeload: %v", err)
 	}
 	if sess.IsDeload {
@@ -749,17 +749,17 @@ func Test_Session_ClearDeload_Idempotent(t *testing.T) {
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
 			},
 		},
 	}
 
-	if err := sess.ClearDeload(); err != nil {
+	if err := sess.ClearDeload(4); err != nil {
 		t.Fatalf("ClearDeload first call: %v", err)
 	}
 	firstLen := len(sess.Slots[0].Sets)
 
-	if err := sess.ClearDeload(); err != nil {
+	if err := sess.ClearDeload(4); err != nil {
 		t.Fatalf("ClearDeload second call: %v", err)
 	}
 	if sess.IsDeload {
@@ -787,7 +787,7 @@ func Test_Session_SwitchToDeload_RebuildsUncompletedSets(t *testing.T) {
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
 			},
 		},
 	}
@@ -795,7 +795,7 @@ func Test_Session_SwitchToDeload_RebuildsUncompletedSets(t *testing.T) {
 		t.Fatalf("precondition: want 4 sets, got %d", got)
 	}
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload: %v", err)
 	}
 
@@ -864,7 +864,7 @@ func Test_Session_SwitchToDeload_PreservesCompletedSets(t *testing.T) {
 		},
 	}
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload: %v", err)
 	}
 
@@ -953,7 +953,7 @@ func Test_Session_SwitchToDeload_OverQuotaCompletedSetsKept(t *testing.T) {
 		},
 	}
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload: %v", err)
 	}
 
@@ -987,7 +987,7 @@ func Test_Session_ClearDeload_ExpandsUncompletedSets(t *testing.T) {
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true),
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true, 4),
 			},
 		},
 	}
@@ -995,7 +995,7 @@ func Test_Session_ClearDeload_ExpandsUncompletedSets(t *testing.T) {
 		t.Fatalf("precondition: want 3 deload sets, got %d", got)
 	}
 
-	if err := sess.ClearDeload(); err != nil {
+	if err := sess.ClearDeload(4); err != nil {
 		t.Fatalf("ClearDeload: %v", err)
 	}
 
@@ -1003,9 +1003,9 @@ func Test_Session_ClearDeload_ExpandsUncompletedSets(t *testing.T) {
 		t.Fatal("ClearDeload did not unset IsDeload")
 	}
 	got := sess.Slots[0].Sets
-	// Non-deload Strength: 4 sets, TargetValue=repMin=3.
+	// Non-deload, weekSets=4: 4 sets, TargetValue=repMin=3.
 	if len(got) != 4 {
-		t.Fatalf("len(Sets) = %d, want 4 (ClearDeload restores Strength count)", len(got))
+		t.Fatalf("len(Sets) = %d, want 4 (ClearDeload restores week-driven count)", len(got))
 	}
 	for i, s := range got {
 		if s.TargetValue != 3 {
@@ -1032,7 +1032,7 @@ func Test_Session_SwitchToDeload_TimeBasedExercise(t *testing.T) {
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false),
+				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
 			},
 		},
 	}
@@ -1040,7 +1040,7 @@ func Test_Session_SwitchToDeload_TimeBasedExercise(t *testing.T) {
 		t.Fatalf("precondition: want 3 time-based sets, got %d", got)
 	}
 
-	if err := sess.SwitchToDeload(); err != nil {
+	if err := sess.SwitchToDeload(4); err != nil {
 		t.Fatalf("SwitchToDeload: %v", err)
 	}
 

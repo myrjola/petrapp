@@ -91,7 +91,7 @@ func TestWeekPlan_FlipDeloadFromToday(t *testing.T) {
 	wp.Sessions[4] = sessionOn(4, false, false, false) // Fri: not started.
 
 	today := monday().AddDate(0, 0, 2) // Wednesday.
-	if err := wp.FlipDeloadFromToday(today); err != nil {
+	if err := wp.FlipDeloadFromToday(today, 4); err != nil {
 		t.Fatalf("FlipDeloadFromToday: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func TestWeekPlan_ClearDeloadFromToday(t *testing.T) {
 	wp.Sessions[2] = sessionOn(2, false, false, true)
 	wp.Sessions[4] = sessionOn(4, false, false, true)
 
-	if err := wp.ClearDeloadFromToday(monday().AddDate(0, 0, 2)); err != nil {
+	if err := wp.ClearDeloadFromToday(monday().AddDate(0, 0, 2), 4); err != nil {
 		t.Fatalf("ClearDeloadFromToday: %v", err)
 	}
 	if !wp.Sessions[0].IsDeload {
@@ -135,7 +135,7 @@ func TestWeekPlan_FlipAndClearDeloadFromToday_SkipRestDayPlaceholders(t *testing
 	// Tuesday: pure rest-day placeholder, no slots, no lifecycle.
 	wp.Sessions[1] = domain.Session{Date: monday().AddDate(0, 0, 1)} //nolint:exhaustruct // placeholder.
 
-	if err := wp.FlipDeloadFromToday(monday()); err != nil {
+	if err := wp.FlipDeloadFromToday(monday(), 4); err != nil {
 		t.Fatalf("FlipDeloadFromToday: %v", err)
 	}
 	if wp.Sessions[1].IsDeload {
@@ -145,7 +145,7 @@ func TestWeekPlan_FlipAndClearDeloadFromToday_SkipRestDayPlaceholders(t *testing
 	// Even with IsDeload pre-set (shouldn't happen in practice), Clear must
 	// leave a slot-less session untouched too — it has no exercises to deload.
 	wp.Sessions[1].IsDeload = true
-	if err := wp.ClearDeloadFromToday(monday()); err != nil {
+	if err := wp.ClearDeloadFromToday(monday(), 4); err != nil {
 		t.Fatalf("ClearDeloadFromToday: %v", err)
 	}
 	if !wp.Sessions[1].IsDeload {

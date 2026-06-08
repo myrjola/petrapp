@@ -10,6 +10,11 @@ import (
 // callers should treat both as "feature off".
 const minDeloadCadence = 2
 
+// deloadAndZeroIndexOffset converts a 1-based block length to the 0-based index
+// of the last training week: one step back for zero-indexing and one for the
+// trailing deload week (block-week indices 0..length-2 train, length-1 deloads).
+const deloadAndZeroIndexOffset = 2
+
 const (
 	// baseWeeklySets is the per-exercise working-set count in the first
 	// training week of a mesocycle (and the floor the deload reduction works
@@ -65,14 +70,11 @@ func MesocycleRampProgress(date, anchor time.Time, length int, deloadEnabled boo
 	if IsDeloadWeek(date, anchor, length, deloadEnabled) {
 		return 0
 	}
-	lastTrainingIdx := length - 2 // 0..length-2 train; length-1 deloads.
+	lastTrainingIdx := length - deloadAndZeroIndexOffset // 0..length-2 train; length-1 deloads.
 	if lastTrainingIdx <= 0 {
 		return 0 // single training week: no room to ramp.
 	}
-	week := WeekInBlock(date, anchor, length)
-	if week > lastTrainingIdx {
-		week = lastTrainingIdx
-	}
+	week := min(WeekInBlock(date, anchor, length), lastTrainingIdx)
 	return float64(week) / float64(lastTrainingIdx)
 }
 

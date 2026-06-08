@@ -197,7 +197,7 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 		load := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryLower, 2, PeriodizationStrength, false, used, load,
+			CategoryLower, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 		)
 		if len(slots) != 2 {
 			t.Fatalf("want 2 slots, got %d", len(slots))
@@ -215,7 +215,7 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 		load := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper, 2, PeriodizationStrength, false, used, load,
+			CategoryUpper, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 		)
 		for _, s := range slots {
 			ex := findExercise(wp.Exercises, s.Exercise.ID)
@@ -230,7 +230,7 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 		load := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryFullBody, 3, PeriodizationStrength, false, used, load,
+			CategoryFullBody, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 		)
 		seen := map[Category]bool{}
 		for _, s := range slots {
@@ -275,7 +275,7 @@ func TestSelectExercises_SessionDiversity(t *testing.T) {
 		load := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper, 3, PeriodizationStrength, false, used, load,
+			CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 		)
 
 		seenPrimary := map[string]bool{}
@@ -314,7 +314,7 @@ func TestSelectExercises_WeekUsedExclusion(t *testing.T) {
 	used := map[int]bool{1: true} // Exercise 1 was used earlier in the week.
 
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -347,7 +347,7 @@ func TestSelectExercises_TargetAwarePrefersUnderloadedMG(t *testing.T) {
 	load := map[string]float64{"Shoulders": 10}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -377,7 +377,7 @@ func TestSelectExercises_FallsBackToLowestIDWhenScoresEqual(t *testing.T) {
 	load := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -400,7 +400,7 @@ func TestSelectExercises_TimeBasedExerciseGetsThreeSets(t *testing.T) {
 	load := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -431,12 +431,12 @@ func TestSelectExercises_WeightedExerciseSetCountMatchesDeriveScheme(t *testing.
 	load := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, used, load,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
 	}
-	wantReps, wantSets := deriveSchemeForExercise(bench, PeriodizationStrength, false)
+	wantReps, wantSets := deriveSchemeForExercise(bench, PeriodizationStrength, false, 4)
 	if len(slots[0].Sets) != wantSets {
 		t.Errorf("set count = %d, want %d", len(slots[0].Sets), wantSets)
 	}
@@ -476,7 +476,7 @@ func TestSelectExercises_GracefulDegradationWhenAllSharePrimaryMG(t *testing.T) 
 	load := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 3, PeriodizationStrength, false, used, load,
+		CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, load,
 	)
 	if len(slots) != 1 {
 		t.Errorf("want 1 slot (graceful degradation under primary-overlap exhaustion), got %d", len(slots))
@@ -923,7 +923,7 @@ func Test_scoreCandidate(t *testing.T) {
 		load := map[string]float64{}
 		// Strength + 5-10 window: reps=5, sets=4 (DeriveScheme low band).
 		// contrib: Chest=4, Triceps=4, Shoulders=2 (secondary).
-		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
+		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, load, targets)
 		// Chest:    segmentReward(0, 4, 10, 20) = 4*below(3)         = 12.
 		// Triceps:  segmentReward(0, 4, 8, 16)  = 4*below(3)         = 12.
 		// Shoulders:segmentReward(0, 2, 10, 20) = 2*below(3)         =  6.
@@ -937,7 +937,7 @@ func Test_scoreCandidate(t *testing.T) {
 		t.Parallel()
 		// MGs already at their floor: adding more sets earns aboveGoalSetReward.
 		load := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 10}
-		score := scoreCandidate(bench, PeriodizationStrength, false, load, targets)
+		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, load, targets)
 		// Chest:    segmentReward(10, 4, 10, 20) = 4*above(1)  =  4.
 		// Triceps:  segmentReward(8, 4, 8, 16)   = 4*above(1)  =  4.
 		// Shoulders:segmentReward(10, 2, 10, 20)  = 2*above(1) =  2.
@@ -958,7 +958,14 @@ func Test_scoreCandidate(t *testing.T) {
 			RepMin:                new(10), RepMax: new(20),
 		}
 		load := map[string]float64{}
-		score := scoreCandidate(calfRaise, PeriodizationStrength, false, load, targets)
+		score := scoreCandidate(
+			calfRaise,
+			PeriodizationStrength,
+			false,
+			weekVolume{sets: 4, progress: 0},
+			load,
+			targets,
+		)
 		if score != 0 {
 			t.Errorf("score = %v, want 0", score)
 		}
@@ -970,7 +977,7 @@ func Test_scoreCandidate(t *testing.T) {
 		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
 		// base sets = 3 (mid band, 6 <= reps <= 10), deload drops to 2.
 		// contrib: Chest=2, Triceps=2, Shoulders=1 (secondary).
-		score := scoreCandidate(bench, PeriodizationStrength, true, load, targets)
+		score := scoreCandidate(bench, PeriodizationStrength, true, weekVolume{sets: 3, progress: 0}, load, targets)
 		// Chest:    segmentReward(0, 2, 10, 20) = 2*below(3) = 6.
 		// Triceps:  segmentReward(0, 2, 8, 16)  = 2*below(3) = 6.
 		// Shoulders:segmentReward(0, 1, 10, 20) = 1*below(3) = 3.
@@ -1363,7 +1370,14 @@ func Test_scoreCandidate_TagOnlyGroupContributesNothing(t *testing.T) {
 	}
 	targets := map[string]MuscleGroupTarget{"Chest": {MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20}}
 
-	got := scoreCandidate(tagOnly, PeriodizationHypertrophy, false, map[string]float64{}, targets)
+	got := scoreCandidate(
+		tagOnly,
+		PeriodizationHypertrophy,
+		false,
+		weekVolume{sets: 4, progress: 0},
+		map[string]float64{},
+		targets,
+	)
 	if got != 0 {
 		t.Errorf("tag-only exercise scored %v, want 0", got)
 	}
@@ -1388,8 +1402,22 @@ func Test_scoreCandidate_OverMaxPickLosesToFreshMuscle(t *testing.T) {
 	// Biceps already well past its ceiling; Chest at zero.
 	load := map[string]float64{"Biceps": 30}
 
-	freshScore := scoreCandidate(fresh, PeriodizationHypertrophy, false, load, targets)
-	satScore := scoreCandidate(saturated, PeriodizationHypertrophy, false, load, targets)
+	freshScore := scoreCandidate(
+		fresh,
+		PeriodizationHypertrophy,
+		false,
+		weekVolume{sets: 4, progress: 0},
+		load,
+		targets,
+	)
+	satScore := scoreCandidate(
+		saturated,
+		PeriodizationHypertrophy,
+		false,
+		weekVolume{sets: 4, progress: 0},
+		load,
+		targets,
+	)
 	if !(freshScore > satScore) {
 		t.Errorf("fresh-muscle pick (%v) should beat over-ceiling pick (%v)", freshScore, satScore)
 	}

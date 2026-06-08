@@ -8,12 +8,9 @@ const (
 	repBoundaryMidToHigh = 10
 
 	// Set and rest values for each rep range.
-	setsLow  = 4
 	restLow  = 180 // seconds
-	setsMid  = 3
 	restMid  = 150 // seconds
-	setsHigh = 3
-	restHigh = 90 // seconds
+	restHigh = 90  // seconds
 
 	// deloadSetFloor is the minimum set count a deload prescription will return.
 	// Preserves at least two working sets per exercise so deload still functions
@@ -21,18 +18,21 @@ const (
 	deloadSetFloor = 2
 )
 
-// Scheme is the per-exercise prescription for one planned session: the rep
-// target, set count, and inter-set rest. Computed from a per-exercise rep
-// window (repMin, repMax) and the session's PeriodizationType.
+// Scheme is the per-exercise rep + rest prescription for one planned session,
+// computed from a per-exercise rep window (repMin, repMax) and the session's
+// PeriodizationType. Set count is no longer part of Scheme — since Phase D the
+// mesocycle week drives set count (see SetsForWeek / BuildPlannedSets), not the
+// periodization-derived rep band.
 type Scheme struct {
 	TargetReps  int
-	TargetSets  int
 	RestSeconds int
 }
 
-// DeriveScheme returns the prescription for one exercise given its rep window,
-// the session periodization, and whether the session is a deload. Pure: same
-// inputs → same output, no DB, no clock.
+// DeriveScheme returns the rep target and inter-set rest for one exercise given
+// its rep window, the session periodization, and whether the session is a
+// deload. Pure: same inputs → same output, no DB, no clock. Set count is NOT
+// returned — since Phase D it is a function of the mesocycle week, not the rep
+// band (see SetsForWeek / deriveSchemeForExercise).
 //
 // Reps:
 //
@@ -40,19 +40,14 @@ type Scheme struct {
 //	Hypertrophy → repMax (high end of the window)
 //	Deload      → repMax always (forces hypertrophy target regardless of p)
 //
-// Sets and rest are derived from the resulting rep target:
+// Rest is derived from the resulting rep target:
 //
-//	reps ≤ 5  → 4 sets, 180s rest  (heavy work, more sets, full ATP-PCr recovery)
-//	reps 6-10 → 3 sets, 150s rest  (moderate; longer rest improves hypertrophy in trained lifters per Schoenfeld 2016)
-//	reps ≥ 11 → 3 sets, 90s rest   (lighter; volume kept up, rest shortens)
-//
-// During deload the set count drops one set (floored at 2); rest stays at the hypertrophy
-// mapping for the resulting rep band.
+//	reps ≤ 5  → 180s rest  (heavy work, full ATP-PCr recovery)
+//	reps 6-10 → 150s rest  (moderate; longer rest improves hypertrophy in trained lifters per Schoenfeld 2016)
+//	reps ≥ 11 → 90s rest   (lighter; rest shortens)
 func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme {
 	if isDeload {
-		// Deload forces hypertrophy targets regardless of incoming p, then
-		// drops one set (floored at 2). Rest stays at the hypertrophy
-		// mapping for the resulting rep band.
+		// Deload forces hypertrophy targets (repMax) regardless of incoming p.
 		p = PeriodizationHypertrophy
 	}
 
@@ -66,26 +61,21 @@ func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme
 		panic(fmt.Sprintf("domain: unknown PeriodizationType %q", p))
 	}
 
-	var sets, rest int
+	var rest int
 	switch {
 	case reps <= repBoundaryLowToMid:
-		sets, rest = setsLow, restLow
+		rest = restLow
 	case reps <= repBoundaryMidToHigh:
-		sets, rest = setsMid, restMid
+		rest = restMid
 	default:
-		sets, rest = setsHigh, restHigh
+		rest = restHigh
 	}
 
-	if isDeload {
-		sets = deloadSets(sets)
-	}
-
-	return Scheme{TargetReps: reps, TargetSets: sets, RestSeconds: rest}
+	return Scheme{TargetReps: reps, RestSeconds: rest}
 }
 
-// deloadSets reduces the normal set count by one, floored at deloadSetFloor.
-// Targets ~25-33% volume reduction while preserving the Strength-vs-Hypertrophy
-// set-count distinction (Strength 4 → 3, Hypertrophy 3 → 2).
+// deloadSets reduces the week's base set count by one, floored at deloadSetFloor,
+// for ~25-33% volume reduction on a deload week.
 func deloadSets(normalSets int) int {
 	reduced := normalSets - 1
 	if reduced < deloadSetFloor {

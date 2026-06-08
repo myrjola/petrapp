@@ -780,8 +780,12 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 		wantTargetValue int
 		wantSetCount    int
 	}{
+		// Set count is now driven by the mesocycle week, not periodization. With
+		// no anchor (DB default NULL) and deload off, SetsForWeek returns the base
+		// 3 for both. TargetValue (reps) stays periodization-driven: strength=repMin=3,
+		// hypertrophy=repMax=6.
 		{"hypertrophy", "hypertrophy", 6, 3},
-		{"strength", "strength", 3, 4},
+		{"strength", "strength", 3, 3},
 	}
 
 	for _, tt := range tests {
@@ -991,7 +995,8 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	}
 	sets := slot.Sets
 
-	// Hypertrophy: DeriveScheme(3, 6, Hypertrophy) → 6 reps, 3 sets.
+	// Hypertrophy: reps=repMax=6. Set count comes from the mesocycle week; with
+	// no anchor and deload off, SetsForWeek returns the base 3.
 	const wantTargetValue = 6
 	const wantSetCount = 3
 	if len(sets) != wantSetCount {

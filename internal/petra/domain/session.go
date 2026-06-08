@@ -178,9 +178,9 @@ func (s *Session) SetDifficulty(rating int) error {
 // slot's uncompleted sets to match the deload prescription. Completed sets
 // (CompletedAt != nil) are preserved verbatim — work already done is never
 // erased. Idempotent: applying twice produces the same Sets slice.
-func (s *Session) SwitchToDeload() error {
+func (s *Session) SwitchToDeload(weekSets int) error {
 	s.IsDeload = true
-	s.rebuildUncompletedSetsForCurrentPrescription()
+	s.rebuildUncompletedSetsForCurrentPrescription(weekSets)
 	return nil
 }
 
@@ -188,9 +188,9 @@ func (s *Session) SwitchToDeload() error {
 // slot's uncompleted sets to match the non-deload prescription. Counterpart
 // to SwitchToDeload; used by RestartMesocycleAnchor to undo an ad-hoc early
 // deload. Completed sets are preserved verbatim. Idempotent.
-func (s *Session) ClearDeload() error {
+func (s *Session) ClearDeload(weekSets int) error {
 	s.IsDeload = false
-	s.rebuildUncompletedSetsForCurrentPrescription()
+	s.rebuildUncompletedSetsForCurrentPrescription(weekSets)
 	return nil
 }
 
@@ -393,10 +393,10 @@ func (s *Session) HasIncompleteSets() bool {
 // The new length is max(len(completed), planner-prescribed n). Work already
 // done is never erased, but a shrinking prescription only truncates the
 // uncompleted tail.
-func (s *Session) rebuildUncompletedSetsForCurrentPrescription() {
+func (s *Session) rebuildUncompletedSetsForCurrentPrescription(weekSets int) {
 	for i := range s.Slots {
 		slot := &s.Slots[i]
-		fresh := BuildPlannedSets(slot.Exercise, s.PeriodizationType, s.IsDeload)
+		fresh := BuildPlannedSets(slot.Exercise, s.PeriodizationType, s.IsDeload, weekSets)
 		n := len(fresh)
 
 		var completed []Set

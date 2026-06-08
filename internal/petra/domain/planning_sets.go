@@ -10,12 +10,14 @@ const defaultTargetValue = 8
 // the planner's timeBasedSets constant.
 const defaultTimedSets = 3
 
-// deriveSchemeForExercise returns the per-set target reps and total set
-// count for an exercise within a session of the given periodization. For
-// time-based exercises, uses DefaultStartingSeconds and a fixed set count of
-// defaultTimedSets. For rep-based exercises, returns DeriveScheme values.
-// isDeload drops one set (floored at 2) and targets repMax (see DeriveScheme).
-func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool) (int, int) {
+// deriveSchemeForExercise returns the per-set target value and total set count
+// for an exercise in a session of the given periodization. Reps/seconds come
+// from the periodization (DeriveScheme / DefaultStartingSeconds); the set count
+// is weekSets (the mesocycle week's count, see SetsForWeek), reduced by one on a
+// deload (floored at deloadSetFloor). Timed exercises keep a fixed set count
+// (defaultTimedSets) and ignore weekSets — their per-session volume does not
+// ramp.
+func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool, weekSets int) (int, int) {
 	if ex.IsTimed() {
 		sets := defaultTimedSets
 		if isDeload {
@@ -28,13 +30,18 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool) (
 		// schema CHECK, but fall back gracefully rather than panicking.
 		return defaultTargetValue, sets
 	}
+
+	sets := weekSets
+	if isDeload {
+		sets = deloadSets(weekSets)
+	}
 	if ex.RepMin == nil || ex.RepMax == nil {
 		// Defensive: non-time_based exercises must have rep_min/rep_max per the
-		// schema CHECK; fall back to old defaults if a fixture invariant is violated.
-		return defaultTargetValue, defaultTimedSets
+		// schema CHECK; fall back to a sane target value if a fixture invariant
+		// is violated, but still honour the week-driven set count.
+		return defaultTargetValue, sets
 	}
-	scheme := DeriveScheme(*ex.RepMin, *ex.RepMax, pt, isDeload)
-	return scheme.TargetReps, scheme.TargetSets
+	return DeriveScheme(*ex.RepMin, *ex.RepMax, pt, isDeload).TargetReps, sets
 }
 
 // BuildPlannedSets returns the persisted set slice for an exercise prescribed
@@ -47,9 +54,9 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool) (
 // downstream code (notably BuildSetsForAdd's seed-weight lookup) relies on
 // `WeightKg == nil` meaning "never recorded".
 //
-// isDeload drops one set (floored at 2) and targets repMax (lighter load, fewer sets).
-func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDeload bool) []Set {
-	targetValue, n := deriveSchemeForExercise(exercise, periodization, isDeload)
+// isDeload drops one set from weekSets (floored at 2) and targets repMax.
+func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDeload bool, weekSets int) []Set {
+	targetValue, n := deriveSchemeForExercise(exercise, periodization, isDeload, weekSets)
 	sets := make([]Set, n)
 	for i := range sets {
 		sets[i] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
@@ -71,8 +78,14 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDelo
 // Bodyweight and time-based exercises stay nil.
 //
 // isDeload drops one set (floored at 2) and targets repMax (see BuildPlannedSets).
-func BuildSetsForAdd(exercise Exercise, periodization PeriodizationType, isDeload bool, historicalSets []Set) []Set {
-	sets := BuildPlannedSets(exercise, periodization, isDeload)
+func BuildSetsForAdd(
+	exercise Exercise,
+	periodization PeriodizationType,
+	isDeload bool,
+	weekSets int,
+	historicalSets []Set,
+) []Set {
+	sets := BuildPlannedSets(exercise, periodization, isDeload, weekSets)
 	if !exercise.HasWeight() {
 		return sets
 	}
