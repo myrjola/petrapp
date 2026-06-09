@@ -274,7 +274,7 @@ func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]b
 
 // selectExercisesForDayWithPeriodization picks up to n category-compatible
 // exercises for a session, mutating load with each pick's primary
-// (PrimarySetWeight) and secondary (SecondarySetWeight) contributions
+// (PrimarySetCredit) and secondary (SecondarySetCredit) contributions
 // and marking each picked exercise's ID in weekUsedExercises so later
 // days in the same week skip it. The chosen exercise on every slot is
 // the one that maximises scoreCandidate against the current load and
@@ -353,7 +353,7 @@ func (wp *Planner) pickBestExerciseIdx(
 		score := scoreCandidate(ex, pt, isDeload, wv, load, targets)
 		// Exact float equality is safe here: scores are derived from
 		// integer targets, integer set counts, and fixed half-integer
-		// weights (PrimarySetWeight, SecondarySetWeight), so ties round-trip
+		// weights (PrimarySetCredit, SecondarySetCredit), so ties round-trip
 		// cleanly through IEEE 754.
 		if bestIdx < 0 || score > bestScore ||
 			(score == bestScore && ex.ID < wp.Exercises[bestIdx].ID) {
@@ -365,14 +365,14 @@ func (wp *Planner) pickBestExerciseIdx(
 }
 
 // applyLoad accumulates the per-set MG contribution from ex into load:
-// PrimarySetWeight per primary MG, SecondarySetWeight per secondary, scaled
+// PrimarySetCredit per primary MG, SecondarySetCredit per secondary, scaled
 // by nSets. Mutates load in place.
 func applyLoad(load map[string]float64, ex Exercise, nSets float64) {
 	for _, mg := range ex.PrimaryMuscleGroups {
-		load[mg] += nSets * PrimarySetWeight
+		load[mg] += nSets * PrimarySetCredit
 	}
 	for _, mg := range ex.SecondaryMuscleGroups {
-		load[mg] += nSets * SecondarySetWeight
+		load[mg] += nSets * SecondarySetCredit
 	}
 }
 
@@ -500,10 +500,10 @@ func scoreCandidate(
 	n := float64(nSets)
 	contrib := make(map[string]float64, len(ex.PrimaryMuscleGroups)+len(ex.SecondaryMuscleGroups))
 	for _, mg := range ex.PrimaryMuscleGroups {
-		contrib[mg] += n * PrimarySetWeight
+		contrib[mg] += n * PrimarySetCredit
 	}
 	for _, mg := range ex.SecondaryMuscleGroups {
-		contrib[mg] += n * SecondarySetWeight
+		contrib[mg] += n * SecondarySetCredit
 	}
 	var score float64
 	for mg, added := range contrib {

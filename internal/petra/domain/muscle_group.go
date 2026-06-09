@@ -10,9 +10,9 @@ type MuscleGroupTarget struct {
 	MaxSets         int
 }
 
-// MuscleGroupVolume captures the weekly weighted set load for a single muscle group.
-// Each set in the plan contributes to every muscle group it touches: PrimarySetWeight
-// for primaries and SecondarySetWeight for secondaries. Completed counts only sets
+// MuscleGroupVolume captures the weekly weighted set credit for a single muscle group.
+// Each set in the plan contributes to every muscle group it touches: PrimarySetCredit
+// for primaries and SecondarySetCredit for secondaries. Completed counts only sets
 // that have a CompletedAt timestamp; Planned counts every set in the weekly plan and
 // is therefore always >= Completed. TargetSets is 0 for muscle groups that don't
 // have a row in muscle_group_weekly_targets.
@@ -79,12 +79,12 @@ func RegionFor(muscleGroupName string) MuscleGroupRegion {
 	}
 }
 
-// PrimarySetWeight and SecondarySetWeight are the per-set contributions to a
-// muscle group's weekly load. The split reflects that secondary engagement
+// PrimarySetCredit and SecondarySetCredit are the per-set credit toward a
+// muscle group's weekly volume. The split reflects that secondary engagement
 // receives meaningfully less stimulus than primary engagement.
 const (
-	PrimarySetWeight   = 1.0
-	SecondarySetWeight = 0.5
+	PrimarySetCredit   = 1.0
+	SecondarySetCredit = 0.5
 )
 
 // WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly load per
@@ -126,8 +126,8 @@ func WeeklyMuscleGroupVolume(
 
 // WeeklyPlannedLoad returns the running planned weighted load per
 // muscle group across the supplied sessions. Each set in the plan
-// contributes PrimarySetWeight to every primary muscle group on its
-// exercise and SecondarySetWeight to every secondary. Muscle groups
+// contributes PrimarySetCredit to every primary muscle group on its
+// exercise and SecondarySetCredit to every secondary. Muscle groups
 // with zero contributions do not appear in the map. The result is the
 // running tally the target-aware planner uses to score subsequent
 // picks against the configured weekly targets.
@@ -137,10 +137,10 @@ func WeeklyPlannedLoad(sessions []Session) map[string]float64 {
 		for _, ex := range sess.Slots {
 			n := float64(len(ex.Sets))
 			for _, mg := range ex.Exercise.PrimaryMuscleGroups {
-				load[mg] += n * PrimarySetWeight
+				load[mg] += n * PrimarySetCredit
 			}
 			for _, mg := range ex.Exercise.SecondaryMuscleGroups {
-				load[mg] += n * SecondarySetWeight
+				load[mg] += n * SecondarySetCredit
 			}
 		}
 	}
@@ -149,8 +149,8 @@ func WeeklyPlannedLoad(sessions []Session) map[string]float64 {
 
 // aggregateMuscleGroupLoad walks every set in the supplied sessions and totals the
 // weighted load for each muscle group, accumulating into the planned and completed
-// maps. Primary contributions count as PrimarySetWeight, secondary as
-// SecondarySetWeight. Muscle group names not present in known are silently skipped
+// maps. Primary contributions count as PrimarySetCredit, secondary as
+// SecondarySetCredit. Muscle group names not present in known are silently skipped
 // — they cannot occur in production due to FK constraints, but the guard keeps
 // tests safe when synthetic exercises reference unknown groups.
 func aggregateMuscleGroupLoad(
@@ -162,10 +162,10 @@ func aggregateMuscleGroupLoad(
 		for _, ex := range sess.Slots {
 			for _, set := range ex.Sets {
 				done := set.CompletedAt != nil
-				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetWeight, done, known, planned, completed)
+				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetCredit, done, known, planned, completed)
 				creditMuscleGroups(
 					ex.Exercise.SecondaryMuscleGroups,
-					SecondarySetWeight,
+					SecondarySetCredit,
 					done,
 					known,
 					planned,

@@ -19,10 +19,10 @@ const (
 	// baseWeeklySets is the per-exercise working-set count in the first
 	// training week of a mesocycle (and the floor the deload reduction works
 	// from); peakWeeklySets is the count in the last training week before the
-	// deload. The volume ramp interpolates between them across the block. The
+	// deload. The set-count ramp interpolates between them across the block. The
 	// gap is deliberately small (+1): session length already bounds the number
 	// of exercises, so one extra set per exercise is a meaningful week-over-week
-	// volume increase. Decoupled from PeriodizationType — the mesocycle week,
+	// set-count increase. Decoupled from PeriodizationType — the mesocycle week,
 	// not Strength/Hypertrophy, drives set count (Phase D).
 	baseWeeklySets = 3
 	peakWeeklySets = 4
