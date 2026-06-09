@@ -175,6 +175,9 @@ fly-backup: fly-wake
 # fly-sql-write runs a SQL script that may mutate the database. Always takes a backup first.
 # The script is piped via SSH stdin (same pattern as fly-sql-readonly), so nothing is written
 # to disk on the remote and there's no cleanup to fail. Pass SCRIPT=path/to/migration.sql.
+# foreign_keys is forced ON (sqlite3's per-connection default is OFF) so ON DELETE CASCADE
+# fires for ad-hoc deletes the way the app expects — otherwise deleting a parent row (e.g. a
+# workout_sessions row) silently orphans its children (workout_exercises/exercise_sets).
 .PHONY: fly-sql-write
 fly-sql-write: fly-wake fly-backup
 ifndef SCRIPT
@@ -182,7 +185,7 @@ ifndef SCRIPT
 endif
 	@echo "-> executing $(SCRIPT) on $(FLY_APP)..."
 	@cat "$(SCRIPT)" | fly ssh console --app $(FLY_APP) --user petrapp \
-	    -C "/usr/bin/sqlite3 $(FLY_DB_PATH)"
+	    -C "/usr/bin/sqlite3 -cmd \"PRAGMA foreign_keys = ON;\" $(FLY_DB_PATH)"
 
 .PHONY: fly-logs
 fly-logs: fly-wake

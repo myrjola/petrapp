@@ -115,6 +115,14 @@ make fly-sql-write SCRIPT=/tmp/migration.sql FLY_APP=petra
 
 The user's SQL files live in `/tmp/` by convention — they're transient. Do not commit them.
 
+`fly-sql-write` runs `sqlite3` with `PRAGMA foreign_keys = ON`, so `ON DELETE CASCADE` fires the
+way the app expects. This matters for deletes: removing a parent row (e.g. a `workout_sessions`
+row) cascades to its children (`workout_exercises`, `exercise_sets`). Without the pragma — sqlite3's
+per-connection default is OFF — the parent vanishes but the children are silently orphaned, and the
+next insert that reuses the same key fails with a `UNIQUE constraint failed`. If you must scope a
+delete to children only, target the child tables explicitly; don't rely on a parent delete that
+can't cascade.
+
 ### 2. Troubleshoot issues by reading logs
 
 ```bash
