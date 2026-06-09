@@ -2,6 +2,13 @@
 
 A fitness tracking web application built with Go, SQLite, and server-side rendered templates.
 
+## Domain Language
+
+The workout domain's ubiquitous language — canonical terms, their definitions,
+and the aliases to avoid — lives in [CONTEXT.md](CONTEXT.md). Use those names in
+code, comments, and discussion; when code and CONTEXT.md disagree, reconcile the
+two rather than letting them drift.
+
 ## Development Workflow
 
 When a feature spans multiple layers, work outwards from the data model
