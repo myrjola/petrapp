@@ -19,7 +19,7 @@ only — no SQL, no HTTP, no logger, no third-party clients.
 - **Domain services:** `Planner` (weekly plan generation),
   `Progression` / `TimedProgression` (set-to-set weight/seconds
   progression), `SwapSimilarityScore` (exercise-similarity score for
-  swap UI), `WeeklyMuscleGroupVolume` (set-load aggregation),
+  swap UI), `WeeklyMuscleGroupVolume` (set-credit aggregation),
   `BuildPlannedSets`, `DeriveScheme`, `ConvertWeight` (Epley).
 - **Sentinel errors:** `ErrNotFound`, `ErrAlreadyStarted`,
   `ErrNotStarted`, `ErrSlotNotFound`, `ErrSetIndexOutOfBounds`,

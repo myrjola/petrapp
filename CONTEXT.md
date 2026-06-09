@@ -61,7 +61,7 @@ them and reconcile.
 | ------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------- |
 | **Muscle group**    | A canonical trained-muscle identifier (Chest, Lats, Quads…); an exercise has primary and secondary ones         | Muscle, body part           |
 | **Muscle-group region** | A coarse anatomical grouping for UI layout: Upper Push / Upper Pull / Legs / Core / Other                  | Section, area               |
-| **Muscle-group target** | A muscle group's weekly **hard-set** range (a hard set = a performed Set near failure): **MinSets** (≈ MEV, the floor the planner drives toward) and **MaxSets** (≈ MRV, the ceiling that penalizes excess) | Goal, quota |
+| **Muscle-group target** | A muscle group's weekly **hard-set** range (a hard set = a performed Set near failure): **MinSets** (≈ MEV, the floor the planner drives toward) and **MaxSets** (≈ MRV, the ceiling that penalizes excess). Authored in whole sets but compared against accumulated **set credit** — a secondary set counts ½ toward it | Goal, quota |
 | **Set credit**      | A single set's weighted contribution to a muscle group's stimulus: full credit to each **primary** muscle, half credit to each **secondary** | Set load, set weight, score |
 | **Muscle-group volume** | The weekly planned-vs-completed **set credit** aggregated for one muscle group                              | Volume (unqualified)        |
 
@@ -84,6 +84,7 @@ them and reconcile.
 - An **Exercise** has one **exercise type**, which maps to one **load model**, and one or more **muscle groups** (primary/secondary).
 - A **Set** **credits** every muscle group its exercise touches (full to primaries, half to secondaries) — its **set credit** — aggregated into **muscle-group volume**.
 - **Set count** comes from the **week in block** (the **set-count ramp**); **reps + rest** come from **periodization** via the **scheme** — the two are independent prescriptions.
+- **Set credit** is the unit of **muscle-group volume**; a **muscle-group target** is authored in whole sets but compared against accumulated credit (a secondary set counts ½). In code the unit is named `…Credit` (e.g. `PlannedCredit`); "load" is reserved for kilograms.
 
 ## Example dialogue
 

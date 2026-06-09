@@ -45,15 +45,15 @@ func Test_WeeklyMuscleGroupVolume_PlannedAndCompleted(t *testing.T) {
 	if got[0].Name != "Chest" {
 		t.Errorf("Name = %q, want Chest", got[0].Name)
 	}
-	if got[0].PlannedLoad != 2*domain.PrimarySetCredit {
-		t.Errorf("PlannedLoad = %v, want %v", got[0].PlannedLoad, 2*domain.PrimarySetCredit)
+	if got[0].PlannedCredit != 2*domain.PrimarySetCredit {
+		t.Errorf("PlannedCredit = %v, want %v", got[0].PlannedCredit, 2*domain.PrimarySetCredit)
 	}
-	if got[0].CompletedLoad != domain.PrimarySetCredit {
-		t.Errorf("CompletedLoad = %v, want %v", got[0].CompletedLoad, domain.PrimarySetCredit)
+	if got[0].CompletedCredit != domain.PrimarySetCredit {
+		t.Errorf("CompletedCredit = %v, want %v", got[0].CompletedCredit, domain.PrimarySetCredit)
 	}
 }
 
-func TestWeeklyPlannedLoad(t *testing.T) {
+func TestWeeklyPlannedCredit(t *testing.T) {
 	t.Parallel()
 
 	bench := domain.Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
@@ -87,7 +87,7 @@ func TestWeeklyPlannedLoad(t *testing.T) {
 		},
 	}
 
-	got := domain.WeeklyPlannedLoad([]domain.Session{session})
+	got := domain.WeeklyPlannedCredit([]domain.Session{session})
 
 	want := map[string]float64{
 		"Chest":     4.0,       // 4 × 1.0 primary

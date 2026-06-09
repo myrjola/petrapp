@@ -3,7 +3,9 @@ package domain
 // MuscleGroupTarget stores the weekly hard-set range for a tracked muscle
 // group: MinSets is the floor (≈ MEV, minimum effective volume) the planner
 // drives toward, MaxSets the ceiling (≈ MRV, maximum recoverable volume)
-// beyond which extra volume is penalised.
+// beyond which extra volume is penalised. The bounds are authored in whole
+// sets but compared against accumulated set credit, so a primary set counts 1
+// toward the target and a secondary ½ (see PrimarySetCredit/SecondarySetCredit).
 type MuscleGroupTarget struct {
 	MuscleGroupName string
 	MinSets         int
@@ -17,10 +19,10 @@ type MuscleGroupTarget struct {
 // is therefore always >= Completed. TargetSets is 0 for muscle groups that don't
 // have a row in muscle_group_weekly_targets.
 type MuscleGroupVolume struct {
-	Name          string
-	CompletedLoad float64
-	PlannedLoad   float64
-	TargetSets    int
+	Name            string
+	CompletedCredit float64
+	PlannedCredit   float64
+	TargetSets      int
 }
 
 // MuscleGroupRegion is a coarse anatomical grouping used by UI layers to arrange
@@ -87,10 +89,10 @@ const (
 	SecondarySetCredit = 0.5
 )
 
-// WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly load per
+// WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly credit per
 // muscle group across the supplied sessions. One entry is returned for
 // every muscle group in groupNames, sorted to match groupNames' order.
-// Groups with no contributions appear as zero-load rows so callers can
+// Groups with no contributions appear as zero-credit rows so callers can
 // render them without a separate query. Targets are joined from the targets
 // slice; muscle groups missing from targets carry TargetSets = 0.
 func WeeklyMuscleGroupVolume(
@@ -110,50 +112,50 @@ func WeeklyMuscleGroupVolume(
 
 	planned := make(map[string]float64, len(groupNames))
 	completed := make(map[string]float64, len(groupNames))
-	aggregateMuscleGroupLoad(sessions, known, planned, completed)
+	aggregateMuscleGroupCredit(sessions, known, planned, completed)
 
 	result := make([]MuscleGroupVolume, 0, len(groupNames))
 	for _, name := range groupNames {
 		result = append(result, MuscleGroupVolume{
-			Name:          name,
-			CompletedLoad: completed[name],
-			PlannedLoad:   planned[name],
-			TargetSets:    targetByName[name],
+			Name:            name,
+			CompletedCredit: completed[name],
+			PlannedCredit:   planned[name],
+			TargetSets:      targetByName[name],
 		})
 	}
 	return result
 }
 
-// WeeklyPlannedLoad returns the running planned weighted load per
+// WeeklyPlannedCredit returns the running planned credit per
 // muscle group across the supplied sessions. Each set in the plan
 // contributes PrimarySetCredit to every primary muscle group on its
 // exercise and SecondarySetCredit to every secondary. Muscle groups
 // with zero contributions do not appear in the map. The result is the
 // running tally the target-aware planner uses to score subsequent
 // picks against the configured weekly targets.
-func WeeklyPlannedLoad(sessions []Session) map[string]float64 {
-	load := make(map[string]float64)
+func WeeklyPlannedCredit(sessions []Session) map[string]float64 {
+	credit := make(map[string]float64)
 	for _, sess := range sessions {
 		for _, ex := range sess.Slots {
 			n := float64(len(ex.Sets))
 			for _, mg := range ex.Exercise.PrimaryMuscleGroups {
-				load[mg] += n * PrimarySetCredit
+				credit[mg] += n * PrimarySetCredit
 			}
 			for _, mg := range ex.Exercise.SecondaryMuscleGroups {
-				load[mg] += n * SecondarySetCredit
+				credit[mg] += n * SecondarySetCredit
 			}
 		}
 	}
-	return load
+	return credit
 }
 
-// aggregateMuscleGroupLoad walks every set in the supplied sessions and totals the
-// weighted load for each muscle group, accumulating into the planned and completed
+// aggregateMuscleGroupCredit walks every set in the supplied sessions and totals the
+// credit for each muscle group, accumulating into the planned and completed
 // maps. Primary contributions count as PrimarySetCredit, secondary as
 // SecondarySetCredit. Muscle group names not present in known are silently skipped
 // — they cannot occur in production due to FK constraints, but the guard keeps
 // tests safe when synthetic exercises reference unknown groups.
-func aggregateMuscleGroupLoad(
+func aggregateMuscleGroupCredit(
 	sessions []Session,
 	known map[string]struct{},
 	planned, completed map[string]float64,

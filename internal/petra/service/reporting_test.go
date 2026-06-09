@@ -64,26 +64,30 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 	// Bench: 3 planned (2 completed) primary  → planned 3.0, completed 2.0.
 	// Dip: 2 planned secondary on chest      → planned 1.0, completed 0.0.
 	// Total chest: planned 4.0, completed 2.0.
-	if v := byName["Chest"]; v.PlannedLoad != 4.0 || v.CompletedLoad != 2.0 {
-		t.Errorf("Chest: want planned=4.0 completed=2.0, got planned=%v completed=%v", v.PlannedLoad, v.CompletedLoad)
+	if v := byName["Chest"]; v.PlannedCredit != 4.0 || v.CompletedCredit != 2.0 {
+		t.Errorf(
+			"Chest: want planned=4.0 completed=2.0, got planned=%v completed=%v",
+			v.PlannedCredit,
+			v.CompletedCredit,
+		)
 	}
 
 	// Triceps: secondary on bench (3 sets * 0.5 = 1.5 planned, 2*0.5 = 1.0 completed)
 	//          + primary on dip (2 sets planned, 0 completed).
 	// Total: planned 3.5, completed 1.0.
-	if v := byName["Triceps"]; v.PlannedLoad != 3.5 || v.CompletedLoad != 1.0 {
+	if v := byName["Triceps"]; v.PlannedCredit != 3.5 || v.CompletedCredit != 1.0 {
 		t.Errorf("Triceps: want planned=3.5 completed=1.0, got planned=%v completed=%v",
-			v.PlannedLoad, v.CompletedLoad)
+			v.PlannedCredit, v.CompletedCredit)
 	}
 
 	// Shoulders: secondary on bench only (3 sets * 0.5 = 1.5 planned, 2 * 0.5 = 1.0 completed).
-	if v := byName["Shoulders"]; v.PlannedLoad != 1.5 || v.CompletedLoad != 1.0 {
+	if v := byName["Shoulders"]; v.PlannedCredit != 1.5 || v.CompletedCredit != 1.0 {
 		t.Errorf("Shoulders: want planned=1.5 completed=1.0, got planned=%v completed=%v",
-			v.PlannedLoad, v.CompletedLoad)
+			v.PlannedCredit, v.CompletedCredit)
 	}
 
 	// Untouched group must appear with zero load (UI shows it as a flat bar).
-	if v, ok := byName["Traps"]; !ok || v.PlannedLoad != 0 || v.CompletedLoad != 0 {
+	if v, ok := byName["Traps"]; !ok || v.PlannedCredit != 0 || v.CompletedCredit != 0 {
 		t.Errorf("Traps: want zero-load entry, got %#v (present=%v)", v, ok)
 	}
 
@@ -126,9 +130,9 @@ func Test_WeeklyMuscleGroupVolume_EmptyWeek(t *testing.T) {
 		t.Fatal("want one entry per muscle group even when sessions are empty, got 0")
 	}
 	for _, v := range got {
-		if v.PlannedLoad != 0 || v.CompletedLoad != 0 {
+		if v.PlannedCredit != 0 || v.CompletedCredit != 0 {
 			t.Errorf("%s: want zero load on empty week, got planned=%v completed=%v",
-				v.Name, v.PlannedLoad, v.CompletedLoad)
+				v.Name, v.PlannedCredit, v.CompletedCredit)
 		}
 	}
 }
