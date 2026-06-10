@@ -77,7 +77,7 @@ transactional boundary at week scope.
 
 `WeekPlanRepository.Update` persists by deleting every
 `workout_sessions` row in `[monday, monday+6]` inside the tx (CASCADE
-clears `workout_exercises` and `exercise_sets`) and re-inserting the
+clears `exercise_slots` and `exercise_sets`) and re-inserting the
 sessions in a single pass. Slot identity is the array index in
 `Session.Slots`, written into the row's `position` column —
 there is no autoincrement, so the order in which slots are inserted
@@ -89,7 +89,7 @@ session) the cost is negligible and the simplicity is worth the trade.
 
 `SessionRepository.Get` and `List` always populate `ExerciseSlot.Exercise`
 inline: the base exercise columns are joined in via
-`workout_exercises.exercise_id → exercises.id`, and primary/secondary
+`exercise_slots.exercise_id → exercises.id`, and primary/secondary
 muscle groups are fetched in a single follow-up query keyed by the
 deduped exercise IDs. `Get` costs two read queries on top of the session
 row (the sets+exercise join plus the batched muscle-group fetch).
@@ -124,7 +124,7 @@ against a real in-memory SQLite database — no mocks. They verify the
 SQL-shaped contract, not the business rule.
 
 - **Use `setupTestRepos`** (in `helpers_test.go`) to get a fresh
-  database and the wired `*Repositories`. `seedWorkoutExercise` is a
+  database and the wired `*Repositories`. `seedExerciseSlot` is a
   reusable fixture for tests that need a session + exercise row.
 - **What to assert:**
   - Round-trip persistence — write a domain value, read it back,
@@ -204,6 +204,24 @@ A premigration function must:
 - Use the `CREATE TABLE *_new` → `INSERT … SELECT` → `DROP TABLE` →
   `ALTER TABLE … RENAME` pattern. When merging data sources (e.g. legacy rows +
   rows synthesized from a child table), `UNION` them in the `INSERT … SELECT`.
+
+#### Pure renames: prefer native `ALTER TABLE … RENAME`
+
+For a *pure rename* — a table (`ALTER TABLE old RENAME TO new`) or a column
+(`ALTER TABLE t RENAME COLUMN a TO b`) with no data reshaping — skip the
+`CREATE *_new → INSERT … SELECT → DROP → RENAME` dance. A single `RENAME` is
+enough: modern SQLite (with `legacy_alter_table` off, the default) automatically
+rewrites the foreign-key references in child tables to the new name, and the
+declarative migrator then reconciles any renamed index for free (indexes carry
+no data). `RENAME` does not revalidate foreign keys, so the
+`PRAGMA foreign_keys = OFF` step is unnecessary too.
+
+Two things still apply: wrap the check and the `RENAME` in a single
+transaction (`db.ReadWrite.BeginTx`) so they share one pooled connection and
+roll back together, and keep the idempotency guard — query `sqlite_master` for
+the old name and return early when it is gone (this also short-circuits a fresh
+database). See `PreMigrateExerciseSlots` for a worked example. Reserve the copy
+pattern above for genuine data *reshaping* (re-keying, column splits, merges).
 
 Test it by reproducing the pre-migration table shapes in a const (the live
 `schema.sql` no longer contains them), seeding realistic edge-case data, calling
