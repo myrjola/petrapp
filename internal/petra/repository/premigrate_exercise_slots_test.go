@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/myrjola/petrapp/internal/petra/repository"
@@ -185,10 +186,10 @@ func seedLegacySlot(ctx context.Context, t *testing.T, db *sqlitekit.Database) {
 	t.Helper()
 	stmts := []string{
 		`INSERT INTO users (webauthn_user_id, display_name) VALUES (X'01', 'Test User')`,
-		`INSERT INTO exercises (id, name, category, rep_min, rep_max) VALUES (1, 'Squat', 'lower', 5, 10)`,
+		`INSERT INTO exercises (id, name, category, rep_min, rep_max) VALUES (9999, 'Test Lift', 'lower', 5, 10)`,
 		`INSERT INTO workout_sessions (user_id, workout_date) VALUES (1, '2026-06-10')`,
 		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
-		 VALUES (1, '2026-06-10', 0, 1)`,
+		 VALUES (1, '2026-06-10', 0, 9999)`,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, target_value)
 		 VALUES (1, '2026-06-10', 0, 1, 8)`,
 		`INSERT INTO scheduled_pushes (workout_user_id, workout_date, position, fire_at, payload)
@@ -255,5 +256,123 @@ func TestPreMigrateExerciseSlots_renamesAndPreservesData(t *testing.T) {
 	// Idempotent: a second run is a no-op (the guard short-circuits).
 	if err := repository.PreMigrateExerciseSlots(ctx, db); err != nil {
 		t.Fatalf("second premigration run: %v", err)
+	}
+}
+
+func TestPreMigrateExerciseSlots_fullMigratePathPreservesData(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	dbPath := filepath.Join(t.TempDir(), "petra.db")
+	logger := testkit.NewLogger(testkit.NewWriter(t))
+
+	// Build the database in the legacy shape and seed a slot with children.
+	legacy, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:          dbPath,
+		Schema:       auth.SchemaSQL + "\n" + legacyProductSchemaSQL,
+		Fixtures:     "",
+		Logger:       logger,
+		Premigration: nil,
+	})
+	if err != nil {
+		t.Fatalf("create legacy file database: %v", err)
+	}
+	t.Cleanup(func() { _ = legacy.Close() })
+	seedLegacySlot(ctx, t, legacy)
+	if err = legacy.Close(); err != nil {
+		t.Fatalf("close legacy database: %v", err)
+	}
+
+	// Reopen with the real schema + premigration: the production boot path.
+	migrated, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:          dbPath,
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       logger,
+		Premigration: repository.PreMigrateExerciseSlots,
+	})
+	if err != nil {
+		t.Fatalf("reopen with real schema + premigration: %v", err)
+	}
+	t.Cleanup(func() { _ = migrated.Close() })
+
+	// The seeded slot and its child set survived the rename + migrate.
+	var joined int
+	if err = migrated.ReadOnly.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM exercise_slots s
+		   JOIN exercise_sets es
+		     ON es.workout_user_id = s.workout_user_id
+		    AND es.workout_date = s.workout_date
+		    AND es.position = s.position`,
+	).Scan(&joined); err != nil {
+		t.Fatalf("join exercise_slots/exercise_sets: %v", err)
+	}
+	if joined != 1 {
+		t.Errorf("joined slot+set rows = %d, want 1", joined)
+	}
+
+	// The third child table's row survived the rename + migrate too.
+	var pushCount int
+	if err = migrated.ReadOnly.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM scheduled_pushes`,
+	).Scan(&pushCount); err != nil {
+		t.Fatalf("count scheduled_pushes: %v", err)
+	}
+	if pushCount != 1 {
+		t.Errorf("scheduled_pushes row count = %d, want 1", pushCount)
+	}
+
+	// The index was reconciled to the new name by the declarative migrator.
+	var idxCount int
+	if err = migrated.ReadOnly.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master
+		  WHERE type = 'index' AND name = 'exercise_slots_user_exercise_date_idx'`,
+	).Scan(&idxCount); err != nil {
+		t.Fatalf("count renamed index: %v", err)
+	}
+	if idxCount != 1 {
+		t.Errorf("renamed index present = %d, want 1", idxCount)
+	}
+}
+
+func TestPreMigrateExerciseSlots_freshDatabaseIsNoOp(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	// A database already on the real schema has exercise_slots and no
+	// workout_exercises; the premigration must be a clean no-op.
+	db, err := sqlitekit.NewDatabase(ctx, sqlitekit.Config{
+		URL:          ":memory:",
+		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
+		Fixtures:     repository.FixturesSQL,
+		Logger:       testkit.NewLogger(testkit.NewWriter(t)),
+		Premigration: nil,
+	})
+	if err != nil {
+		t.Fatalf("create fresh database: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	if err = repository.PreMigrateExerciseSlots(ctx, db); err != nil {
+		t.Fatalf("premigration on fresh database: %v", err)
+	}
+
+	var slotTableCount int
+	if err = db.ReadOnly.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'exercise_slots'`,
+	).Scan(&slotTableCount); err != nil {
+		t.Fatalf("count exercise_slots table: %v", err)
+	}
+	if slotTableCount != 1 {
+		t.Errorf("exercise_slots table present = %d, want 1", slotTableCount)
+	}
+
+	// The no-op leaves the table empty — it writes no spurious rows.
+	var slotRowCount int
+	if err = db.ReadOnly.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM exercise_slots`,
+	).Scan(&slotRowCount); err != nil {
+		t.Fatalf("count exercise_slots rows: %v", err)
+	}
+	if slotRowCount != 0 {
+		t.Errorf("exercise_slots row count = %d, want 0", slotRowCount)
 	}
 }
