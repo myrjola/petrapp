@@ -56,9 +56,20 @@ build:
 	@go build -o bin/migratetest github.com/myrjola/petrapp/cmd/migratetest
 	@go build -o bin/stresstest github.com/myrjola/petrapp/cmd/stresstest
 
+# test keeps Go's per-package result cache hot (no shuffle), so re-running
+# after a change only pays for the packages it touched. Order-dependence is
+# still covered: server CI runs test-shuffle via ci-full.
 .PHONY: test
 test:
 	@echo "Running tests..."
+	@go test --race ./...
+
+# test-shuffle randomizes test order to catch inter-test dependencies. Shuffle
+# defeats the test cache (every run pays the full ~30s), so it belongs in
+# server CI, not the local iteration loop.
+.PHONY: test-shuffle
+test-shuffle:
+	@echo "Running tests with shuffled order..."
 	@go test --race --shuffle=on ./...
 
 .PHONY: lint
@@ -91,8 +102,17 @@ lint-fix: bin/golangci-lint
 sec:
 	@go tool govulncheck ./...
 
+# ci is the local pre-push gate: fast because lint and test are cache-backed,
+# so it only re-validates what changed since the last run.
 .PHONY: ci
-ci: init build lint-fix test sec
+ci: init build lint-fix test
+
+# ci-full is what server CI runs (.github/workflows/pull-request.yml): a strict
+# superset of ci, adding shuffled tests and govulncheck. Shuffle results don't
+# cache and the vuln DB changes independently of the code, so both run where
+# the wall-clock is free. Prod deploys gate on this passing.
+.PHONY: ci-full
+ci-full: ci test-shuffle sec
 
 .PHONY: clean
 clean:

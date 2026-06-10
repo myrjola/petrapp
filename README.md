@@ -256,7 +256,7 @@ should not run `fly deploy` by hand for routine changes** — the workflows belo
 
 `.github/workflows/main.yml` runs on every push to `main`:
 
-1. **Test** — runs `make ci` (build, lint, test, govulncheck) plus `make migratetest`. The
+1. **Test** — runs `make ci-full` (build, lint, shuffled tests, govulncheck) plus `make migratetest`. The
    migration test restores the latest **production** Litestream backup from S3 and runs the app's
    `NewDatabase` (pre-migrations + declarative migrate) against it. Risky schema changes are
    validated against real prod data here, before they ever reach a live machine.
@@ -288,7 +288,7 @@ way, and it's very good at catching regressions before they reach prod.
 
 ```sh
 # Option A — push straight to main:
-# Fine for most routine changes. CI runs make ci + make migratetest against prod data,
+# Fine for most routine changes. CI runs make ci-full + make migratetest against prod data,
 # then deploys to staging, smoke-tests, and promotes to prod only if staging is healthy.
 git commit -am "my change"
 git push origin main

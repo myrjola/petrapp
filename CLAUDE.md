@@ -56,7 +56,19 @@ worktree, not in the primary checkout.
 ## Shipping
 
 Petrapp is trunk-based: work ships by pushing the worktree branch straight to
-main once `make ci` passes.
+main once `make ci` passes. Validation runs in three tiers, each cheap because
+of the one below it:
+
+1. **Inner loop** — focused tests on the package you're touching
+   (`go test ./internal/petra/domain -run TestX`); templates hot-reload, no
+   rebuild needed.
+2. **Before push** — `make ci`. Lint and test results are cache-backed, so it
+   only re-validates what changed since the last run (seconds when the inner
+   loop already passed).
+3. **Server (the real wall)** — pushing to main runs `make ci-full` (adds
+   shuffled tests + govulncheck) plus `make migratetest` in GitHub Actions;
+   prod only deploys when that passes. Staging deploys without waiting for
+   tests, and an occasionally broken staging is accepted.
 
 ```bash
 make ci                      # must pass — fix failures, never push around them
@@ -66,7 +78,8 @@ git push origin HEAD:main
 - The tracked `.githooks/pre-push` hook (armed by `git config core.hooksPath
   .githooks`, which `make claude-worktree-remote` runs) enforces a clean tree
   and `make -j2 lint test` before any push — a gate of last resort, not a
-  substitute for running `make ci` yourself.
+  substitute for running `make ci` yourself. It hits the same caches, so it's
+  near-free when you already ran the checks.
 - If the push is rejected because main moved: `git fetch origin && git rebase
   origin/main`, re-run `make ci`, push again. Never force-push.
 - Afterwards, end the session (or ExitWorktree with remove) and let the native
@@ -91,9 +104,10 @@ path, not from `docs/`. Examples: `docs/2026-05-02-code-review-cleanup.md`,
 
 ```bash
 make init         # One-time setup after cloning
-make test         # `go test --race --shuffle=on ./...`
+make test         # `go test --race ./...` — cached, only re-runs changed packages
 make lint-fix     # golangci-lint with --fix; run before committing
-make ci           # init + build + lint-fix + test + sec; full validation
+make ci           # init + build + lint-fix + test; the local pre-push gate
+make ci-full      # ci + test-shuffle + sec; what server CI runs before prod deploys
 make claude-worktree-remote  # serve remote-control sessions, one fresh worktree each
 ```
 

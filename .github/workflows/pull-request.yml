@@ -38,7 +38,7 @@ jobs:
             golangci-lint-${{ runner.os }}-
 
       - name: Build
-        run: make ci
+        run: make ci-full
 
       - name: Install Litestream
         run: |

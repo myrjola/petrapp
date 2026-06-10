@@ -15,7 +15,7 @@ This document provides specific information for developers working on the PetrAp
 make ci
 ```
 
-This builds the application and runs all tests, linters, and security checks.
+This builds the application and runs tests and linters (the local pre-push gate). `make ci-full` adds shuffled tests and security checks — it is what server CI runs.
 
 ### Environment Configuration
 
@@ -29,7 +29,7 @@ The application uses environment variables for configuration but the defaults sh
    ```bash
    make test
    ```
-   This runs all tests with race detection and test shuffling enabled.
+   This runs all tests with race detection; results are cached, so only changed packages re-run. Use `make test-shuffle` for a shuffled-order run.
 
 2. **Run specific tests**:
    ```bash

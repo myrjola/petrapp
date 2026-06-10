@@ -51,7 +51,7 @@ target is visible in the transcript. Review-app names are derived from the GitHu
 
 Deployment is automated by GitHub Actions:
 
-- **Push to `main`** → tests run (`make ci` + `make migratetest` against the latest prod backup),
+- **Push to `main`** → tests run (`make ci-full` + `make migratetest` against the latest prod backup),
   then Docker image is built and pushed, then staging is deployed, then prod is deployed if
   staging passes.
 - **Open/sync a PR** → a review app at `pr-<N>-myrjola-petrapp.fly.dev` is provisioned. It tears
