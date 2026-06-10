@@ -54,7 +54,7 @@ CREATE TABLE workout_sessions
     PRIMARY KEY (user_id, workout_date)
 ) WITHOUT ROWID, STRICT;
 
-CREATE TABLE workout_exercises
+CREATE TABLE exercise_slots
 (
     workout_user_id     INTEGER NOT NULL,
     workout_date        TEXT    NOT NULL CHECK (STRFTIME('%Y-%m-%d', workout_date) = workout_date),
@@ -70,8 +70,8 @@ CREATE TABLE workout_exercises
 ) WITHOUT ROWID, STRICT;
 
 -- Supports lookups of an exercise's history across workouts, e.g. latest starting weight.
-CREATE INDEX workout_exercises_user_exercise_date_idx
-    ON workout_exercises (workout_user_id, exercise_id, workout_date);
+CREATE INDEX exercise_slots_user_exercise_date_idx
+    ON exercise_slots (workout_user_id, exercise_id, workout_date);
 
 CREATE TABLE exercise_sets
 (
@@ -88,7 +88,7 @@ CREATE TABLE exercise_sets
 
     PRIMARY KEY (workout_user_id, workout_date, position, set_number),
     FOREIGN KEY (workout_user_id, workout_date, position)
-        REFERENCES workout_exercises (workout_user_id, workout_date, position) ON DELETE CASCADE
+        REFERENCES exercise_slots (workout_user_id, workout_date, position) ON DELETE CASCADE
 ) WITHOUT ROWID, STRICT;
 
 CREATE TABLE muscle_groups
@@ -151,7 +151,7 @@ CREATE TABLE scheduled_pushes
         CHECK (STRFTIME('%Y-%m-%dT%H:%M:%fZ', created_at) = created_at),
 
     FOREIGN KEY (workout_user_id, workout_date, position)
-        REFERENCES workout_exercises (workout_user_id, workout_date, position) ON DELETE CASCADE
+        REFERENCES exercise_slots (workout_user_id, workout_date, position) ON DELETE CASCADE
 ) STRICT;
 
 CREATE UNIQUE INDEX scheduled_pushes_slot_uidx

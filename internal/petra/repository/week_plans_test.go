@@ -12,7 +12,7 @@ import (
 	"github.com/myrjola/petrapp/internal/platform/sqlitekit"
 )
 
-// seedScheduledSession inserts a workout_sessions row + one workout_exercises
+// seedScheduledSession inserts a workout_sessions row + one exercise_slots
 // row at position 0 (the Deadlift seed exercise) for the authenticated user
 // on date, plus one exercise_sets row. Used by WeekPlan tests to populate a
 // scheduled day.
@@ -32,10 +32,10 @@ func seedScheduledSession(ctx context.Context, t *testing.T, db *sqlitekit.Datab
 		t.Fatalf("fetch Deadlift: %v", err)
 	}
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		 VALUES (?, ?, 0, ?)`,
 		userID, dateStr, exerciseID); err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, target_value, weight_kg)

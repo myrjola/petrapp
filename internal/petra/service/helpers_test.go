@@ -80,7 +80,7 @@ func countExerciseSets(t *testing.T, db *sqlitekit.Database, exerciseID int) (in
 	var count int
 	err := db.ReadOnly.QueryRow(
 		`SELECT COUNT(*) FROM exercise_sets es
-		 JOIN workout_exercises we
+		 JOIN exercise_slots we
 		    ON we.workout_user_id = es.workout_user_id
 		   AND we.workout_date    = es.workout_date
 		   AND we.position        = es.position

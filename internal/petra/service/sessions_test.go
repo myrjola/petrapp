@@ -1103,10 +1103,10 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	}
 	const priorPos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
 		userID, priorStr, priorPos, exerciseID)
 	if err != nil {
-		t.Fatalf("insert prior workout_exercises: %v", err)
+		t.Fatalf("insert prior exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,

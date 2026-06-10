@@ -140,7 +140,7 @@ func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerci
 // substring and sorted by similarity to the current exercise (descending),
 // then by name (ascending). Excludes the current exercise and any exercise
 // already used in the same session — those would collide with the UNIQUE
-// constraint on workout_exercises.
+// constraint on exercise_slots.
 //
 // Returns domain.ErrSlotNotFound when pos is out of range for the session.
 func (s *Service) ListSwapCandidates(

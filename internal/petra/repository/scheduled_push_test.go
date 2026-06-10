@@ -14,7 +14,7 @@ func TestScheduledPushes_ReplaceUpsertsBySlot(t *testing.T) {
 	ctx, db, repos := setupTestReposWithDB(t)
 
 	userID := contexthelpers.AuthenticatedUserID(ctx)
-	date, pos := seedWorkoutExerciseSlot(ctx, t, db)
+	date, pos := seedExerciseSlot(ctx, t, db)
 
 	fireAt1 := time.Now().Add(90 * time.Second).UTC().Truncate(time.Millisecond)
 	first := domain.ScheduledPush{ //nolint:exhaustruct // ID/CreatedAt populated by Replace.

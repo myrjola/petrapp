@@ -121,7 +121,7 @@ func formatTimestamp(t time.Time) string {
 	return t.UTC().Format(timestampFormat)
 }
 
-// insertSessionInTx inserts a workout_sessions row and its child workout_exercises
+// insertSessionInTx inserts a workout_sessions row and its child exercise_slots
 // + exercise_sets rows for the authenticated user. Shared by SessionRepository
 // and WeekPlanRepository so both repos persist with identical SQL shape.
 func (r baseRepository) insertSessionInTx(ctx context.Context, tx *sql.Tx, sess domain.Session) error {
@@ -135,7 +135,7 @@ func (r baseRepository) insertSessionInTx(ctx context.Context, tx *sql.Tx, sess 
 }
 
 // insertSessionRowInTx inserts only the workout_sessions row for sess, without
-// touching workout_exercises or exercise_sets. Used by WeekPlanRepository.Update
+// touching exercise_slots or exercise_sets. Used by WeekPlanRepository.Update
 // to stage every session row before any slot is inserted.
 func (r baseRepository) insertSessionRowInTx(ctx context.Context, tx *sql.Tx, sess domain.Session) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
@@ -152,7 +152,7 @@ func (r baseRepository) insertSessionRowInTx(ctx context.Context, tx *sql.Tx, se
 	return nil
 }
 
-// saveExerciseSetsInTx writes the workout_exercises rows and their child
+// saveExerciseSetsInTx writes the exercise_slots rows and their child
 // exercise_sets for sess in a single pass. The slot's position in
 // sess.Slots is persisted as the row's position column — no
 // autoincrement, no rowid collisions to worry about.
@@ -169,7 +169,7 @@ func (r baseRepository) saveExerciseSetsInTx(
 	return nil
 }
 
-// saveOneSlotInTx inserts a single workout_exercises row at the given
+// saveOneSlotInTx inserts a single exercise_slots row at the given
 // position and its child exercise_sets rows. The set_number sequence is
 // per-slot and starts at 1; reordering slots at the caller does not affect
 // that numbering.
@@ -188,7 +188,7 @@ func (r baseRepository) saveOneSlotInTx(
 		warmupArg = formatTimestamp(*slot.WarmupCompletedAt)
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO workout_exercises (
+		INSERT INTO exercise_slots (
 			workout_user_id, workout_date, position, exercise_id, warmup_completed_at
 		) VALUES (?, ?, ?, ?, ?)`,
 		userID, dateStr, pos, slot.Exercise.ID, warmupArg); err != nil {
@@ -217,7 +217,7 @@ func (r baseRepository) saveOneSlotInTx(
 }
 
 // deleteWeekInTx removes all workout_sessions for the user between [monday,
-// monday+6] inside tx. CASCADE clears child workout_exercises and
+// monday+6] inside tx. CASCADE clears child exercise_slots and
 // exercise_sets rows. Called from WeekPlanRepository.Update before the
 // single-pass reinsert.
 func (r baseRepository) deleteWeekInTx(

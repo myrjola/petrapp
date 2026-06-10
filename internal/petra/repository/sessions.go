@@ -83,7 +83,7 @@ func parseSessionRow(
 	return session, nil
 }
 
-// loadExerciseSetsRow holds one scanned row of the workout_exercises /
+// loadExerciseSetsRow holds one scanned row of the exercise_slots /
 // exercise_sets / exercises join consumed by scanExerciseSetRows. Exercise
 // columns join from `exercises` so we don't issue a per-slot follow-up
 // query for the base exercise.
@@ -106,7 +106,7 @@ type loadExerciseSetsRow struct {
 	repMax                 sql.NullInt64
 }
 
-// scanExerciseSetRows consumes the workout_exercises / exercise_sets /
+// scanExerciseSetRows consumes the exercise_slots / exercise_sets /
 // exercises join (with we.workout_date as the first selected column) into
 // exercise slots. It returns the slots and a parallel slice of their
 // workout-date strings; consecutive rows sharing the same (workout_date,
@@ -152,7 +152,7 @@ func scanExerciseSetRows(rows *sql.Rows) ([]domain.ExerciseSlot, []string, error
 			currentPos = row.position
 		}
 
-		// LEFT JOIN can yield a workout_exercises row with no sets (set_number IS NULL).
+		// LEFT JOIN can yield an exercise_slots row with no sets (set_number IS NULL).
 		if !row.setNumber.Valid {
 			continue
 		}
@@ -295,7 +295,7 @@ func (r *sqliteSessionRepository) ListSetsForExerciseSince(
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
 		SELECT we.workout_date, es.weight_kg, es.target_value,
 		       es.completed_value, es.completed_at, es.signal
-		FROM workout_exercises we
+		FROM exercise_slots we
 		JOIN exercise_sets es
 		    ON  es.workout_user_id = we.workout_user_id
 		    AND es.workout_date    = we.workout_date
@@ -382,7 +382,7 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT es.weight_kg, ws.periodization_type
 		FROM exercise_sets es
-		JOIN workout_exercises we
+		JOIN exercise_slots we
 		    ON  we.workout_user_id = es.workout_user_id
 		    AND we.workout_date    = es.workout_date
 		    AND we.position        = es.position
@@ -421,7 +421,7 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
 		SELECT es.completed_value
 		FROM exercise_sets es
-		JOIN workout_exercises we
+		JOIN exercise_slots we
 		    ON  we.workout_user_id = es.workout_user_id
 		    AND we.workout_date    = es.workout_date
 		    AND we.position        = es.position
@@ -609,7 +609,7 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 
 // loadExerciseSets fetches all exercise slots for a single session, including
 // ones with no sets yet (e.g. just-swapped exercises). The driving table is
-// workout_exercises so empty slots still appear; sets are LEFT-JOINed in and
+// exercise_slots so empty slots still appear; sets are LEFT-JOINed in and
 // the base exercise definition is JOINed from `exercises`. Muscle groups are
 // hydrated in one follow-up query. Used by Get, including inside the Update
 // transaction, where a single-date point read is what we want.
@@ -625,7 +625,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		       es.completed_value, es.completed_at, es.signal,
 		       e.name, e.category, e.exercise_type, e.description_markdown,
 		       e.default_starting_seconds, e.rep_min, e.rep_max
-		FROM workout_exercises we
+		FROM exercise_slots we
 		LEFT JOIN exercise_sets es
 		    ON  es.workout_user_id = we.workout_user_id
 		    AND es.workout_date    = we.workout_date
@@ -671,7 +671,7 @@ func (r baseRepository) loadExerciseSetsSince(
 		       es.completed_value, es.completed_at, es.signal,
 		       e.name, e.category, e.exercise_type, e.description_markdown,
 		       e.default_starting_seconds, e.rep_min, e.rep_max
-		FROM workout_exercises we
+		FROM exercise_slots we
 		LEFT JOIN exercise_sets es
 		    ON  es.workout_user_id = we.workout_user_id
 		    AND es.workout_date    = we.workout_date

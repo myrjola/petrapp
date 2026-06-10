@@ -96,13 +96,13 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		t.Fatalf("Failed to insert workout session: %v", err)
 	}
 
-	// Insert workout_exercises slot and one set hanging off it.
+	// Insert exercise_slots slot and one set hanging off it.
 	const pos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
 		userID, dateStr, pos, exerciseID)
 	if err != nil {
-		t.Fatalf("Failed to insert workout_exercises: %v", err)
+		t.Fatalf("Failed to insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets
@@ -290,13 +290,13 @@ func Test_AddExercise(t *testing.T) {
 		t.Fatalf("Failed to insert workout session: %v", err)
 	}
 
-	// Insert workout_exercises slot for exercise 1 with one set.
+	// Insert exercise_slots slot for exercise 1 with one set.
 	const pos1 = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
 		userID, dateStr, pos1, exercise1ID)
 	if err != nil {
-		t.Fatalf("Failed to insert workout_exercises: %v", err)
+		t.Fatalf("Failed to insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets
@@ -485,10 +485,10 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 		}
 		const pos = 0
 		if _, err = db.ReadWrite.ExecContext(ctx,
-			`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+			`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 			 VALUES (?, ?, ?, ?)`,
 			userID, dateStr, pos, exerciseID); err != nil {
-			t.Fatalf("insert workout_exercises %d days ago: %v", daysAgo, err)
+			t.Fatalf("insert exercise_slots %d days ago: %v", daysAgo, err)
 		}
 		if _, err = db.ReadWrite.ExecContext(ctx,
 			`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
@@ -539,7 +539,7 @@ func Test_AddExercise_UsesMostRecentHistoricalWeight(t *testing.T) {
 // the rep-based defaultTargetValue or zero sets.
 //
 // Regression: the time_based premigration in PR #87 dropped historical
-// exercise_sets rows for plank but kept the workout_exercises slots. The
+// exercise_sets rows for plank but kept the exercise_slots slots. The
 // resulting empty (but non-nil) history slice slipped past the
 // `historicalSets != nil` check and persisted zero sets, so the user saw
 // a blank exercise page when adding or swapping to plank.
@@ -589,7 +589,7 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	today := time.Now()
 	dateStr := today.Format("2006-01-02")
 
-	// Simulate the post-premigration state: a historical workout_exercises slot
+	// Simulate the post-premigration state: a historical exercise_slots slot
 	// for plank exists but its exercise_sets rows were dropped.
 	historicalDate := today.AddDate(0, 0, -7).Format("2006-01-02")
 	if _, err = db.ReadWrite.ExecContext(ctx,
@@ -598,9 +598,9 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 		t.Fatalf("insert historical session: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, historicalDate, plankID); err != nil {
-		t.Fatalf("insert orphaned workout_exercises: %v", err)
+		t.Fatalf("insert orphaned exercise_slots: %v", err)
 	}
 
 	// Today's empty session.
@@ -705,9 +705,9 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 		t.Fatalf("insert historical session: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, historicalDate, plankID); err != nil {
-		t.Fatalf("insert orphaned workout_exercises: %v", err)
+		t.Fatalf("insert orphaned exercise_slots: %v", err)
 	}
 
 	// Today's session with squat occupying a slot.
@@ -718,7 +718,7 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 	}
 	const squatPos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		 VALUES (?, ?, ?, ?)`,
 		userID, dateStr, squatPos, squatID)
 	if err != nil {
@@ -940,10 +940,10 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	}
 	const histPos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
 		userID, histDateStr, histPos, deadliftID)
 	if err != nil {
-		t.Fatalf("insert hist workout_exercises: %v", err)
+		t.Fatalf("insert hist exercise_slots: %v", err)
 	}
 	for i := 1; i <= 4; i++ {
 		if _, err = db.ReadWrite.ExecContext(ctx,
@@ -962,7 +962,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	}
 	const squatPos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
 		userID, dateStr, squatPos, squatID)
 	if err != nil {
 		t.Fatalf("insert squat slot: %v", err)
@@ -1136,7 +1136,7 @@ func Test_AddExercise_UsesMesocycleWeekSetCount(t *testing.T) {
 
 	// --- scaffold mirrors Test_AddExercise: ctx, db, userID, svc, muscle
 	//     groups, exercise1ID + exercise2ID, a workout_sessions row + one
-	//     workout_exercises slot for `today`, and the authenticated-user
+	//     exercise_slots slot for `today`, and the authenticated-user
 	//     context. ---
 	ctx := t.Context()
 	logger := testkit.NewLogger(testkit.NewWriter(t))
@@ -1192,10 +1192,10 @@ func Test_AddExercise_UsesMesocycleWeekSetCount(t *testing.T) {
 
 	const pos1 = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)`,
 		userID, dateStr, pos1, exercise1ID)
 	if err != nil {
-		t.Fatalf("Failed to insert workout_exercises: %v", err)
+		t.Fatalf("Failed to insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets

@@ -194,7 +194,7 @@ func (s *Service) planSingleDay(
 //
 // The closure overwrites the rest-day placeholder at the right offset; the
 // single-pass reinsert in WeekPlanRepository.Update writes each slot's
-// array index into the workout_exercises.position column, so other
+// array index into the exercise_slots.position column, so other
 // sessions' slot positions survive untouched.
 // Callers must ensure the week row exists first (StartSession does so via
 // WeekPlans.Create) — Update returns domain.ErrNotFound otherwise.

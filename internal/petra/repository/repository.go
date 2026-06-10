@@ -86,7 +86,7 @@ type WeekPlanRepository interface {
 	// against the hydrated *domain.WeekPlan, and persists the result via
 	// delete-then-reinsert across the week's date range. Returning nil from fn
 	// commits; returning an error rolls back. Slot identity is the array index
-	// in Session.Slots, persisted as the workout_exercises.position
+	// in Session.Slots, persisted as the exercise_slots.position
 	// column, so the reinsert is a single pass and no autoincrement collisions
 	// are possible. Sentinel errors from domain (e.g. ErrAlreadyStarted)
 	// propagate so callers can detect no-op cases via errors.Is.

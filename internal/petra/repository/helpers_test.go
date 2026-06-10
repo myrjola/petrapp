@@ -50,11 +50,11 @@ func setupTestReposWithDB(t *testing.T) (context.Context, *sqlitekit.Database, *
 	return ctx, db, repository.New(db)
 }
 
-// seedWorkoutExerciseSlot inserts a workout_session and workout_exercises row at
+// seedExerciseSlot inserts a workout_session and exercise_slots row at
 // position 0 for the authenticated user and returns the workout date and the
 // slot position (always 0). Callers that need additional slots can insert
 // further rows at incrementing positions.
-func seedWorkoutExerciseSlot(
+func seedExerciseSlot(
 	ctx context.Context, t *testing.T, db *sqlitekit.Database,
 ) (time.Time, int) {
 	t.Helper()
@@ -75,11 +75,11 @@ func seedWorkoutExerciseSlot(
 		t.Fatalf("fetch deadlift: %v", err)
 	}
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		 VALUES (?, ?, 0, ?)`,
 		userID, todayStr, exerciseID,
 	); err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	return today, 0
 }

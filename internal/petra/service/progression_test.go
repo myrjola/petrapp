@@ -78,10 +78,10 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, dateStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -127,10 +127,10 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert today's session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, todayStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert today's workout_exercises: %v", err)
+		t.Fatalf("insert today's exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -162,10 +162,10 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert fail session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, failDateStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert fail workout_exercises: %v", err)
+		t.Fatalf("insert fail exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -245,10 +245,10 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 		t.Fatalf("insert session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, dateStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -339,10 +339,10 @@ func Test_GetStartingSeconds(t *testing.T) {
 		t.Fatalf("insert session 1: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		VALUES (?, ?, 0, ?)`,
 		userID, twoDaysAgo, exerciseID); err != nil {
-		t.Fatalf("insert workout_exercises 1: %v", err)
+		t.Fatalf("insert exercise_slots 1: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO exercise_sets
@@ -368,10 +368,10 @@ func Test_GetStartingSeconds(t *testing.T) {
 		t.Fatalf("insert session 2: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		VALUES (?, ?, 0, ?)`,
 		userID, oneDayAgo, exerciseID); err != nil {
-		t.Fatalf("insert workout_exercises 2: %v", err)
+		t.Fatalf("insert exercise_slots 2: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx, `
 		INSERT INTO exercise_sets
@@ -441,10 +441,10 @@ func Test_BuildTimedProgression(t *testing.T) {
 	}
 	const pos = 0
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		VALUES (?, ?, ?, ?)`,
 		userID, today, pos, exerciseID); err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	// Seed three planned sets with target_value=30, no completion yet.
 	for i := 1; i <= 3; i++ {
@@ -538,10 +538,10 @@ func Test_BuildProgression(t *testing.T) {
 	}
 	const pos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
 		userID, today, pos, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
@@ -637,10 +637,10 @@ func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
 	}
 	const pos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
 		userID, today, pos, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	// Seed three sets at 61 kg (the original deload seed for this session).
 	_, err = db.ReadWrite.ExecContext(ctx,
@@ -720,10 +720,10 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 		t.Fatalf("insert prev session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
 		userID, prevStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert prev workout_exercises: %v", err)
+		t.Fatalf("insert prev exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -744,10 +744,10 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 		t.Fatalf("insert today session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
 		userID, todayStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 
 	svc := service.NewService(db, logger, "")
@@ -830,10 +830,10 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 		t.Fatalf("insert hypertrophy session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, mondayStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -910,11 +910,11 @@ func Test_GetDeloadStartingWeight_FloorsFractionalResult(t *testing.T) {
 		t.Fatalf("insert session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		 VALUES (?, ?, 0, ?)`,
 		userID, mondayStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	// 75 kg on_target → deload seed = floor(75 * 0.9) = floor(67.5) = 67.
 	_, err = db.ReadWrite.ExecContext(ctx,
@@ -995,10 +995,10 @@ func Test_GetDeloadStartingWeight_Assisted(t *testing.T) {
 		t.Fatalf("insert hypertrophy session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)`,
 		userID, mondayStr, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -1069,10 +1069,10 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 		t.Fatalf("insert hypertrophy session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
 		userID, today, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 
 	date, _ := time.Parse("2006-01-02", today)
@@ -1097,10 +1097,10 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 		t.Fatalf("insert strength session: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, 0, ?)",
 		userID, strengthDay, exerciseID)
 	if err != nil {
-		t.Fatalf("insert strength workout_exercises: %v", err)
+		t.Fatalf("insert strength exercise_slots: %v", err)
 	}
 
 	strengthDate, _ := time.Parse("2006-01-02", strengthDay)

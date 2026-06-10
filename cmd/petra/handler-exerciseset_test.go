@@ -823,7 +823,7 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		t.Fatalf("get Assisted Pull-Up id: %v", err)
 	}
 
-	// Insert a workout_exercises row pointing at Assisted Pull-Up, attached to
+	// Insert an exercise_slots row pointing at Assisted Pull-Up, attached to
 	// the just-started session for the test user. This avoids depending on
 	// the swap UI's offered-alternatives logic. The slot's identity is its
 	// natural-key tuple (user_id, workout_date, position); we pick the next
@@ -833,10 +833,10 @@ func Test_application_exerciseSet_assisted_storage(t *testing.T) {
 		slotPos    int
 	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
          SELECT user_id, workout_date,
-                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                COALESCE((SELECT MAX(position)+1 FROM exercise_slots
                           WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
                 ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
          FROM workout_sessions ws WHERE workout_date = ?
@@ -1200,7 +1200,7 @@ func Test_ExerciseSet_RestChipPersistsAfterElapsed(t *testing.T) {
 	// detour through other exercises during a power-set rotation.
 	old := time.Now().UTC().Add(-1 * time.Hour).Format("2006-01-02T15:04:05.000Z")
 	if _, err = server.DB().ExecContext(ctx,
-		`UPDATE workout_exercises SET warmup_completed_at = ?
+		`UPDATE exercise_slots SET warmup_completed_at = ?
 			WHERE workout_date = ? AND position = 0`,
 		old, today); err != nil {
 		t.Fatalf("patch warmup_completed_at: %v", err)
@@ -1472,7 +1472,7 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 	}
 
 	// Look up the seeded "Plank" id (set to ExerciseTypeTime by fixtures.sql)
-	// and attach a workout_exercises slot for it on today's session with the
+	// and attach an exercise_slots row for it on today's session with the
 	// warmup already complete, so the active oversized row renders.
 	db := server.DB()
 	var plankID int
@@ -1486,10 +1486,10 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 		slotPos    int
 	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
          SELECT user_id, workout_date,
-                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                COALESCE((SELECT MAX(position)+1 FROM exercise_slots
                           WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
                 ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
          FROM workout_sessions ws WHERE workout_date = ?
@@ -1598,10 +1598,10 @@ func Test_application_exerciseSet_time_based_active_timer_markup(t *testing.T) {
 		slotPos    int
 	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
          SELECT user_id, workout_date,
-                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                COALESCE((SELECT MAX(position)+1 FROM exercise_slots
                           WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
                 ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
          FROM workout_sessions ws WHERE workout_date = ?
@@ -1699,10 +1699,10 @@ func Test_application_exerciseSet_overline_clamps_when_all_sets_complete(t *test
 		slotPos    int
 	)
 	if err = db.QueryRowContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id,
             warmup_completed_at)
          SELECT user_id, workout_date,
-                COALESCE((SELECT MAX(position)+1 FROM workout_exercises
+                COALESCE((SELECT MAX(position)+1 FROM exercise_slots
                           WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
                 ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
          FROM workout_sessions ws WHERE workout_date = ?

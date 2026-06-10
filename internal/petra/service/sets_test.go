@@ -66,10 +66,10 @@ func Test_RecordSetCompletion(t *testing.T) {
 	}
 	const pos = 0
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
+		"INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id) VALUES (?, ?, ?, ?)",
 		userID, today, pos, exerciseID)
 	if err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	_, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
@@ -274,11 +274,11 @@ func Test_RecordSet_LastSetOfSlotWhileOtherSlotsIncomplete_Cancels(t *testing.T)
 	today := time.Now().Format("2006-01-02")
 	const otherPos = 1
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		 VALUES (?, ?, ?, ?)`,
 		userID, today, otherPos, otherExerciseID,
 	); err != nil {
-		t.Fatalf("insert second workout_exercises: %v", err)
+		t.Fatalf("insert second exercise_slots: %v", err)
 	}
 	if _, err := db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
@@ -523,11 +523,11 @@ func setupSessionForRecordSet(t *testing.T) (context.Context, *sqlitekit.Databas
 	}
 	const pos = 0
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_exercises (workout_user_id, workout_date, position, exercise_id)
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id)
 		 VALUES (?, ?, ?, ?)`,
 		userID, today, pos, exerciseID,
 	); err != nil {
-		t.Fatalf("insert workout_exercises: %v", err)
+		t.Fatalf("insert exercise_slots: %v", err)
 	}
 	if _, err = db.ReadWrite.ExecContext(ctx,
 		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number, weight_kg, target_value)
