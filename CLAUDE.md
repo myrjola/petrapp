@@ -31,6 +31,49 @@ When a feature spans multiple layers, work outwards from the data model
 
 If a change is scoped to one or two layers (e.g. a UI-only tweak or a handler-only bug fix), start at the lowest relevant layer — you don't have to touch the ones above.
 
+## Worktree-first for design & implementation
+
+Any multi-step design or implementation task — a brainstorming session,
+writing-plans, or an executing-plans run — happens in an isolated git
+worktree, not in the primary checkout.
+
+- **Remote sessions** started via `make claude-worktree-remote`
+  (`claude remote-control --spawn worktree`) already run in a fresh worktree
+  under `.claude/worktrees/` — no setup needed.
+- **Local sessions** isolate with the native mechanism before the first
+  written artifact: the EnterWorktree tool mid-session, or `claude --worktree
+  <name>` at startup. Read-only exploration may happen in the primary
+  checkout, but the moment you start writing — a design spec counts — switch
+  into the worktree. The spec, the plan, and the implementation all ship
+  together from that branch.
+- `.worktreeinclude` copies gitignored local files (currently
+  `.claude/settings.local.json`, the local permission grants) into each new
+  worktree. Files inside gitignored directories can't be copied, so
+  `make ci`/`make init` installs `bin/golangci-lint` per worktree instead.
+- Truly throwaway exploration that won't produce a committed artifact stays in
+  the primary checkout.
+
+## Shipping
+
+Petrapp is trunk-based: work ships by pushing the worktree branch straight to
+main once `make ci` passes.
+
+```bash
+make ci                      # must pass — fix failures, never push around them
+git push origin HEAD:main
+```
+
+- The tracked `.githooks/pre-push` hook (armed by `git config core.hooksPath
+  .githooks`, which `make claude-worktree-remote` runs) enforces a clean tree
+  and `make -j2 lint test` before any push — a gate of last resort, not a
+  substitute for running `make ci` yourself.
+- If the push is rejected because main moved: `git fetch origin && git rebase
+  origin/main`, re-run `make ci`, push again. Never force-push.
+- Afterwards, end the session (or ExitWorktree with remove) and let the native
+  cleanup delete the worktree and branch — the commits are already on
+  origin/main. The primary checkout picks them up with `git pull --ff-only`
+  next time you work there.
+
 ## Runtime Layout
 
 - Templates (`cmd/petra/ui/templates/`) and static assets (`cmd/petra/ui/static/`) are loaded from the filesystem at runtime (`os.DirFS`, not `//go:embed`). Editing a template and refreshing the browser is the whole dev loop — no rebuild needed.
@@ -51,6 +94,7 @@ make init         # One-time setup after cloning
 make test         # `go test --race --shuffle=on ./...`
 make lint-fix     # golangci-lint with --fix; run before committing
 make ci           # init + build + lint-fix + test + sec; full validation
+make claude-worktree-remote  # serve remote-control sessions, one fresh worktree each
 ```
 
 Run a single test: `go test -v ./path/to/package -run TestName`.

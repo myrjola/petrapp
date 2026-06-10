@@ -57,11 +57,9 @@ node_modules
 /dockerdata
 /repomix-output.txt
 /.cache/
-.githooks
 .air
 /web
 .superpowers
-.worktrees
 .claude/worktrees/
 
 # Decrypted secrets: commit only the *.env.age ciphertext, never the plaintext

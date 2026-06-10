@@ -1,0 +1,6 @@
+# Gitignored local files Claude Code copies into every new worktree
+# (gitignore syntax; only files that are both matched and gitignored copy).
+# Files inside ignored directories are unreachable — the traversal prunes
+# them — so bin/golangci-lint can't be listed here; `make ci`/`make init`
+# installs it per worktree instead.
+.claude/settings.local.json

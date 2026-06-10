@@ -109,6 +109,19 @@ dev:
 dev-tailnet: build  ## Build and run with Tailscale HTTPS (for iOS WebAuthn).
 	@bash scripts/dev-tailscale-https.sh
 
+# claude-worktree-remote serves Claude Code remote-control sessions: each session started
+# from claude.ai or the mobile app gets its own fresh worktree under .claude/worktrees/,
+# branched from origin/HEAD (fetched here at server start; a long-running server drifts from
+# the remote, and the pre-push rebase flow absorbs that). Arms the tracked git hooks first so
+# every push to main is gated by .githooks/pre-push, in worktrees and the primary checkout
+# alike.
+.PHONY: claude-worktree-remote
+claude-worktree-remote:
+	@git config core.hooksPath .githooks
+	@echo "Fetching origin so spawned worktrees branch from a fresh origin/HEAD..."
+	@git fetch origin
+	@claude remote-control --spawn worktree --name petrapp
+
 .PHONY: build-docker
 build-docker:
 	@echo "Building Docker image..."
