@@ -41,7 +41,7 @@ func run(w io.Writer) error {
 		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures:     repository.FixturesSQL,
 		Logger:       logger,
-		Premigration: repository.PreMigrateExerciseSlots,
+		Premigration: nil,
 	})
 	if err != nil {
 		logger.LogAttrs(ctx, slog.LevelError, "error creating database",
