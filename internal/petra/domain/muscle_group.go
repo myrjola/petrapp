@@ -4,24 +4,25 @@ package domain
 // group: MinSets is the floor (≈ MEV, minimum effective volume) the planner
 // drives toward, MaxSets the ceiling (≈ MRV, maximum recoverable volume)
 // beyond which extra volume is penalised. The bounds are authored in whole
-// sets but compared against accumulated set credit, so a primary set counts 1
-// toward the target and a secondary ½ (see PrimarySetCredit/SecondarySetCredit).
+// sets but compared against accumulated volume, so a primary set counts as a
+// full set toward the target and a secondary as a fractional ½ set (see
+// PrimarySetFraction/SecondarySetFraction).
 type MuscleGroupTarget struct {
 	MuscleGroupName string
 	MinSets         int
 	MaxSets         int
 }
 
-// MuscleGroupVolume captures the weekly weighted set credit for a single muscle group.
-// Each set in the plan contributes to every muscle group it touches: PrimarySetCredit
-// for primaries and SecondarySetCredit for secondaries. Completed counts only sets
+// MuscleGroupVolume captures a muscle group's weekly volume, summed in fractional sets.
+// Each set in the plan contributes to every muscle group it touches: PrimarySetFraction
+// for primaries and SecondarySetFraction for secondaries. Completed counts only sets
 // that have a CompletedAt timestamp; Planned counts every set in the weekly plan and
 // is therefore always >= Completed. TargetSets is 0 for muscle groups that don't
 // have a row in muscle_group_weekly_targets.
 type MuscleGroupVolume struct {
 	Name            string
-	CompletedCredit float64
-	PlannedCredit   float64
+	CompletedVolume float64
+	PlannedVolume   float64
 	TargetSets      int
 }
 
@@ -81,18 +82,19 @@ func RegionFor(muscleGroupName string) MuscleGroupRegion {
 	}
 }
 
-// PrimarySetCredit and SecondarySetCredit are the per-set credit toward a
-// muscle group's weekly volume. The split reflects that secondary engagement
+// PrimarySetFraction and SecondarySetFraction are the fraction of a set credited
+// toward a muscle group's weekly volume: a primary muscle gets a full set, a
+// secondary a fractional (½) set. The split reflects that secondary engagement
 // receives meaningfully less stimulus than primary engagement.
 const (
-	PrimarySetCredit   = 1.0
-	SecondarySetCredit = 0.5
+	PrimarySetFraction   = 1.0
+	SecondarySetFraction = 0.5
 )
 
-// WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly credit per
+// WeeklyMuscleGroupVolume aggregates planned-vs-completed weekly volume per
 // muscle group across the supplied sessions. One entry is returned for
 // every muscle group in groupNames, sorted to match groupNames' order.
-// Groups with no contributions appear as zero-credit rows so callers can
+// Groups with no contributions appear as zero-volume rows so callers can
 // render them without a separate query. Targets are joined from the targets
 // slice; muscle groups missing from targets carry TargetSets = 0.
 func WeeklyMuscleGroupVolume(
@@ -112,50 +114,50 @@ func WeeklyMuscleGroupVolume(
 
 	planned := make(map[string]float64, len(groupNames))
 	completed := make(map[string]float64, len(groupNames))
-	aggregateMuscleGroupCredit(sessions, known, planned, completed)
+	aggregateMuscleGroupVolume(sessions, known, planned, completed)
 
 	result := make([]MuscleGroupVolume, 0, len(groupNames))
 	for _, name := range groupNames {
 		result = append(result, MuscleGroupVolume{
 			Name:            name,
-			CompletedCredit: completed[name],
-			PlannedCredit:   planned[name],
+			CompletedVolume: completed[name],
+			PlannedVolume:   planned[name],
 			TargetSets:      targetByName[name],
 		})
 	}
 	return result
 }
 
-// WeeklyPlannedCredit returns the running planned credit per
+// WeeklyPlannedVolume returns the running planned volume per
 // muscle group across the supplied sessions. Each set in the plan
-// contributes PrimarySetCredit to every primary muscle group on its
-// exercise and SecondarySetCredit to every secondary. Muscle groups
+// contributes PrimarySetFraction to every primary muscle group on its
+// exercise and SecondarySetFraction to every secondary. Muscle groups
 // with zero contributions do not appear in the map. The result is the
 // running tally the target-aware planner uses to score subsequent
 // picks against the configured weekly targets.
-func WeeklyPlannedCredit(sessions []Session) map[string]float64 {
-	credit := make(map[string]float64)
+func WeeklyPlannedVolume(sessions []Session) map[string]float64 {
+	volume := make(map[string]float64)
 	for _, sess := range sessions {
 		for _, ex := range sess.Slots {
 			n := float64(len(ex.Sets))
 			for _, mg := range ex.Exercise.PrimaryMuscleGroups {
-				credit[mg] += n * PrimarySetCredit
+				volume[mg] += n * PrimarySetFraction
 			}
 			for _, mg := range ex.Exercise.SecondaryMuscleGroups {
-				credit[mg] += n * SecondarySetCredit
+				volume[mg] += n * SecondarySetFraction
 			}
 		}
 	}
-	return credit
+	return volume
 }
 
-// aggregateMuscleGroupCredit walks every set in the supplied sessions and totals the
-// credit for each muscle group, accumulating into the planned and completed
-// maps. Primary contributions count as PrimarySetCredit, secondary as
-// SecondarySetCredit. Muscle group names not present in known are silently skipped
+// aggregateMuscleGroupVolume walks every set in the supplied sessions and totals the
+// volume for each muscle group, accumulating into the planned and completed
+// maps. Primary contributions count as PrimarySetFraction, secondary as
+// SecondarySetFraction. Muscle group names not present in known are silently skipped
 // — they cannot occur in production due to FK constraints, but the guard keeps
 // tests safe when synthetic exercises reference unknown groups.
-func aggregateMuscleGroupCredit(
+func aggregateMuscleGroupVolume(
 	sessions []Session,
 	known map[string]struct{},
 	planned, completed map[string]float64,
@@ -164,10 +166,10 @@ func aggregateMuscleGroupCredit(
 		for _, ex := range sess.Slots {
 			for _, set := range ex.Sets {
 				done := set.CompletedAt != nil
-				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetCredit, done, known, planned, completed)
+				creditMuscleGroups(ex.Exercise.PrimaryMuscleGroups, PrimarySetFraction, done, known, planned, completed)
 				creditMuscleGroups(
 					ex.Exercise.SecondaryMuscleGroups,
-					SecondarySetCredit,
+					SecondarySetFraction,
 					done,
 					known,
 					planned,
@@ -178,11 +180,11 @@ func aggregateMuscleGroupCredit(
 	}
 }
 
-// creditMuscleGroups credits weight to each muscle group in names, both to planned
+// creditMuscleGroups credits volume to each muscle group in names, both to planned
 // and (when done) to completed. Groups missing from known are ignored.
 func creditMuscleGroups(
 	names []string,
-	weight float64,
+	fraction float64,
 	done bool,
 	known map[string]struct{},
 	planned, completed map[string]float64,
@@ -191,9 +193,9 @@ func creditMuscleGroups(
 		if _, ok := known[mg]; !ok {
 			continue
 		}
-		planned[mg] += weight
+		planned[mg] += fraction
 		if done {
-			completed[mg] += weight
+			completed[mg] += fraction
 		}
 	}
 }

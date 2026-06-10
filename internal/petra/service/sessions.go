@@ -147,7 +147,7 @@ func usedExerciseIDs(plan domain.WeekPlan) map[int]bool {
 // weights if needed. Pure in-memory; no DB writes. Returns the session ready
 // to be placed into a WeekPlan at the right offset. The supplied plan is
 // the current week's persisted state: planSingleDay derives the no-repeat
-// used-set and the per-MG credit seed from it so PlanDay's
+// used-set and the per-MG volume seed from it so PlanDay's
 // target-aware selection sees what the rest of the week already covers.
 func (s *Service) planSingleDay(
 	ctx context.Context, date time.Time, plan domain.WeekPlan,
@@ -171,7 +171,7 @@ func (s *Service) planSingleDay(
 			sessions = append(sessions, plan.Sessions[i])
 		}
 	}
-	weekLoad := domain.WeeklyPlannedCredit(sessions)
+	weekLoad := domain.WeeklyPlannedVolume(sessions)
 	planner := domain.NewPlanner(prefs, exercises, targets)
 	sess, err := planner.PlanDay(date, used, weekLoad)
 	if err != nil {
@@ -190,7 +190,7 @@ func (s *Service) planSingleDay(
 // starts an unscheduled day (extra workout) or a day added to the schedule
 // mid-week after another in-week session was already started. plan is the
 // current week's persisted state; planSingleDay derives both the no-repeat
-// used-set and the per-MG credit seed from it.
+// used-set and the per-MG volume seed from it.
 //
 // The closure overwrites the rest-day placeholder at the right offset; the
 // single-pass reinsert in WeekPlanRepository.Update writes each slot's

@@ -194,10 +194,10 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 
 	t.Run("lower day only selects lower exercises", func(t *testing.T) {
 		t.Parallel()
-		credit := map[string]float64{}
+		volume := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryLower, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+			CategoryLower, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 		if len(slots) != 2 {
 			t.Fatalf("want 2 slots, got %d", len(slots))
@@ -212,10 +212,10 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 
 	t.Run("upper day only selects upper exercises", func(t *testing.T) {
 		t.Parallel()
-		credit := map[string]float64{}
+		volume := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+			CategoryUpper, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 		for _, s := range slots {
 			ex := findExercise(wp.Exercises, s.Exercise.ID)
@@ -227,10 +227,10 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 
 	t.Run("full body day can select any category", func(t *testing.T) {
 		t.Parallel()
-		credit := map[string]float64{}
+		volume := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryFullBody, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+			CategoryFullBody, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 		seen := map[Category]bool{}
 		for _, s := range slots {
@@ -272,10 +272,10 @@ func TestSelectExercises_SessionDiversity(t *testing.T) {
 			{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 			{MuscleGroupName: "Triceps", MinSets: 8, MaxSets: 16},
 		})
-		credit := map[string]float64{}
+		volume := map[string]float64{}
 		used := map[int]bool{}
 		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+			CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 
 		seenPrimary := map[string]bool{}
@@ -310,11 +310,11 @@ func TestSelectExercises_WeekUsedExclusion(t *testing.T) {
 		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 		{MuscleGroupName: "Shoulders", MinSets: 10, MaxSets: 20},
 	})
-	credit := map[string]float64{}
+	volume := map[string]float64{}
 	used := map[int]bool{1: true} // Exercise 1 was used earlier in the week.
 
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -326,7 +326,7 @@ func TestSelectExercises_WeekUsedExclusion(t *testing.T) {
 
 func TestSelectExercises_TargetAwarePrefersUnderloadedMG(t *testing.T) {
 	t.Parallel()
-	// Pool has two equally-eligible exercises. Chest is at zero credit,
+	// Pool has two equally-eligible exercises. Chest is at zero volume,
 	// Shoulders already at target. The Chest exercise must win.
 	exercises := []Exercise{
 		{ //nolint:exhaustruct // Test exercises omit display fields.
@@ -344,10 +344,10 @@ func TestSelectExercises_TargetAwarePrefersUnderloadedMG(t *testing.T) {
 		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 		{MuscleGroupName: "Shoulders", MinSets: 10, MaxSets: 20},
 	})
-	credit := map[string]float64{"Shoulders": 10}
+	volume := map[string]float64{"Shoulders": 10}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -374,10 +374,10 @@ func TestSelectExercises_FallsBackToLowestIDWhenScoresEqual(t *testing.T) {
 		},
 	}
 	wp := NewPlanner(prefs(time.Tuesday), exercises, nil)
-	credit := map[string]float64{}
+	volume := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -397,10 +397,10 @@ func TestSelectExercises_TimeBasedExerciseGetsThreeSets(t *testing.T) {
 	wp := NewPlanner(prefs(time.Tuesday), []Exercise{plank}, []MuscleGroupTarget{
 		{MuscleGroupName: "Abs", MinSets: 4, MaxSets: 8},
 	})
-	credit := map[string]float64{}
+	volume := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -428,10 +428,10 @@ func TestSelectExercises_WeightedExerciseSetCountMatchesDeriveScheme(t *testing.
 	wp := NewPlanner(prefs(time.Tuesday), []Exercise{bench}, []MuscleGroupTarget{
 		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 	})
-	credit := map[string]float64{}
+	volume := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -473,10 +473,10 @@ func TestSelectExercises_GracefulDegradationWhenAllSharePrimaryMG(t *testing.T) 
 	wp := NewPlanner(prefs(time.Tuesday), exercises, []MuscleGroupTarget{
 		{MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 	})
-	credit := map[string]float64{}
+	volume := map[string]float64{}
 	used := map[int]bool{}
 	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, credit,
+		CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Errorf("want 1 slot (graceful degradation under primary-overlap exhaustion), got %d", len(slots))
@@ -919,11 +919,11 @@ func Test_scoreCandidate(t *testing.T) {
 
 	t.Run("positive when pulling under-target MGs up", func(t *testing.T) {
 		t.Parallel()
-		// Empty credit: every targeted MG at full deficit.
-		credit := map[string]float64{}
+		// Empty volume: every targeted MG at full deficit.
+		volume := map[string]float64{}
 		// Strength + 5-10 window: reps=5, sets=4 (DeriveScheme low band).
 		// contrib: Chest=4, Triceps=4, Shoulders=2 (secondary).
-		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, credit, targets)
+		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, volume, targets)
 		// Chest:    segmentReward(0, 4, 10, 20) = 4*below(3)         = 12.
 		// Triceps:  segmentReward(0, 4, 8, 16)  = 4*below(3)         = 12.
 		// Shoulders:segmentReward(0, 2, 10, 20) = 2*below(3)         =  6.
@@ -936,8 +936,8 @@ func Test_scoreCandidate(t *testing.T) {
 	t.Run("positive but lower when MGs are at floor", func(t *testing.T) {
 		t.Parallel()
 		// MGs already at their floor: adding more sets earns aboveGoalSetReward.
-		credit := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 10}
-		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, credit, targets)
+		volume := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 10}
+		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, volume, targets)
 		// Chest:    segmentReward(10, 4, 10, 20) = 4*above(1)  =  4.
 		// Triceps:  segmentReward(8, 4, 8, 16)   = 4*above(1)  =  4.
 		// Shoulders:segmentReward(10, 2, 10, 20)  = 2*above(1) =  2.
@@ -957,13 +957,13 @@ func Test_scoreCandidate(t *testing.T) {
 			SecondaryMuscleGroups: nil,
 			RepMin:                new(10), RepMax: new(20),
 		}
-		credit := map[string]float64{}
+		volume := map[string]float64{}
 		score := scoreCandidate(
 			calfRaise,
 			PeriodizationStrength,
 			false,
 			weekVolume{sets: 4, progress: 0},
-			credit,
+			volume,
 			targets,
 		)
 		if score != 0 {
@@ -973,11 +973,11 @@ func Test_scoreCandidate(t *testing.T) {
 
 	t.Run("deload reduces set count", func(t *testing.T) {
 		t.Parallel()
-		credit := map[string]float64{}
+		volume := map[string]float64{}
 		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
 		// base sets = 3 (mid band, 6 <= reps <= 10), deload drops to 2.
 		// contrib: Chest=2, Triceps=2, Shoulders=1 (secondary).
-		score := scoreCandidate(bench, PeriodizationStrength, true, weekVolume{sets: 3, progress: 0}, credit, targets)
+		score := scoreCandidate(bench, PeriodizationStrength, true, weekVolume{sets: 3, progress: 0}, volume, targets)
 		// Chest:    segmentReward(0, 2, 10, 20) = 2*below(3) = 6.
 		// Triceps:  segmentReward(0, 2, 8, 16)  = 2*below(3) = 6.
 		// Shoulders:segmentReward(0, 1, 10, 20) = 1*below(3) = 3.
@@ -1321,9 +1321,9 @@ func TestPlan_TargetAwareBalanceUnderSeedExercises(t *testing.T) {
 		t.Fatalf("Plan failed: %v", err)
 	}
 
-	credit := WeeklyPlannedCredit(planSessions(plan))
+	volume := WeeklyPlannedVolume(planSessions(plan))
 	for _, target := range seedTargets() {
-		l := credit[target.MuscleGroupName]
+		l := volume[target.MuscleGroupName]
 		t.Logf("%s planned %.1f / floor %d ceiling %d", target.MuscleGroupName, l, target.MinSets, target.MaxSets)
 	}
 
@@ -1334,7 +1334,7 @@ func TestPlan_TargetAwareBalanceUnderSeedExercises(t *testing.T) {
 	// final placement before the over-MaxSets penalty steers the next pick).
 	const ceilingSlack = 4.0
 	for _, target := range seedTargets() {
-		l := credit[target.MuscleGroupName]
+		l := volume[target.MuscleGroupName]
 		lower := 0.7 * float64(target.MinSets)
 		if l < lower {
 			t.Errorf("%s planned %.1f is below 0.7x floor (%v)", target.MuscleGroupName, l, lower)
@@ -1400,14 +1400,14 @@ func Test_scoreCandidate_OverMaxPickLosesToFreshMuscle(t *testing.T) {
 		"Biceps": {MuscleGroupName: "Biceps", MinSets: 8, MaxSets: 16},
 	}
 	// Biceps already well past its ceiling; Chest at zero.
-	credit := map[string]float64{"Biceps": 30}
+	volume := map[string]float64{"Biceps": 30}
 
 	freshScore := scoreCandidate(
 		fresh,
 		PeriodizationHypertrophy,
 		false,
 		weekVolume{sets: 4, progress: 0},
-		credit,
+		volume,
 		targets,
 	)
 	satScore := scoreCandidate(
@@ -1415,7 +1415,7 @@ func Test_scoreCandidate_OverMaxPickLosesToFreshMuscle(t *testing.T) {
 		PeriodizationHypertrophy,
 		false,
 		weekVolume{sets: 4, progress: 0},
-		credit,
+		volume,
 		targets,
 	)
 	if !(freshScore > satScore) {
@@ -1516,7 +1516,7 @@ func Test_scoreCandidate_GoalRampsWithProgress(t *testing.T) {
 
 	// A muscle sitting above its floor but below its ceiling: at progress 0 the
 	// goal is the floor (sets earn the smaller above-goal reward); at progress 1
-	// the goal has risen past the current credit (sets earn the steeper below-goal
+	// the goal has risen past the current volume (sets earn the steeper below-goal
 	// reward). So the same pick scores strictly higher later in the block.
 	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
 		ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
@@ -1525,10 +1525,10 @@ func Test_scoreCandidate_GoalRampsWithProgress(t *testing.T) {
 	targets := map[string]MuscleGroupTarget{
 		"Chest": {MuscleGroupName: "Chest", MinSets: 10, MaxSets: 20},
 	}
-	credit := map[string]float64{"Chest": 12} // above floor (10), below ceiling (20).
+	volume := map[string]float64{"Chest": 12} // above floor (10), below ceiling (20).
 
-	early := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 0}, credit, targets)
-	late := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 1}, credit, targets)
+	early := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 0}, volume, targets)
+	late := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 1}, volume, targets)
 	if !(late > early) {
 		t.Errorf("ramped goal should score higher late in block: early=%v late=%v", early, late)
 	}

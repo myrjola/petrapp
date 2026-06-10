@@ -92,7 +92,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 	wv := weekVolumeFor(startingDate, wp.Prefs)
 
 	weekUsedExercises := map[int]bool{}
-	credit := map[string]float64{}
+	volume := map[string]float64{}
 	for i, day := range workoutDays {
 		pt := nextPeriodizationType(firstPT, i)
 		if isDeload {
@@ -100,7 +100,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		}
 		n := exercisesPerSession(wp.Prefs, day.Weekday(), pt, isDeload)
 		slots := wp.selectExercisesForDayWithPeriodization(
-			wp.determineCategory(day), n, pt, isDeload, wv, weekUsedExercises, credit,
+			wp.determineCategory(day), n, pt, isDeload, wv, weekUsedExercises, volume,
 		)
 		dayOffset := int(day.Sub(startingDate).Hours() / hoursPerDay)
 		result.Sessions[dayOffset] = Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
@@ -118,8 +118,8 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 // days outside the weekly plan (extra workouts, or days added mid-week
 // after Plan(monday) already ran). weekUsedExerciseIDs is the set of
 // exercise IDs already used in other sessions this week; weekLoad is
-// the running per-MG credit from those sessions (built by the
-// caller via WeeklyPlannedCredit).
+// the running per-MG volume from those sessions (built by the
+// caller via WeeklyPlannedVolume).
 //
 // weekLoad is copied internally before scoring this day's picks, so
 // the caller's map is not mutated. weekUsedExerciseIDs is NOT copied —
@@ -184,9 +184,9 @@ func (wp *Planner) PlanDay(
 	if used == nil {
 		used = map[int]bool{}
 	}
-	credit := make(map[string]float64, len(weekLoad))
-	maps.Copy(credit, weekLoad)
-	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, wv, used, credit)
+	volume := make(map[string]float64, len(weekLoad))
+	maps.Copy(volume, weekLoad)
+	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, wv, used, volume)
 
 	return Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
 		Date:              date,
@@ -273,11 +273,11 @@ func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]b
 }
 
 // selectExercisesForDayWithPeriodization picks up to n category-compatible
-// exercises for a session, mutating credit with each pick's primary
-// (PrimarySetCredit) and secondary (SecondarySetCredit) contributions
+// exercises for a session, mutating volume with each pick's primary
+// (PrimarySetFraction) and secondary (SecondarySetFraction) contributions
 // and marking each picked exercise's ID in weekUsedExercises so later
 // days in the same week skip it. The chosen exercise on every slot is
-// the one that maximises scoreCandidate against the current credit and
+// the one that maximises scoreCandidate against the current volume and
 // the planner's Targets, with the lowest exercise ID winning ties.
 // Within a session, exercises whose primary MGs overlap with already
 // selected primaries are skipped (no two chest-primary picks in one
@@ -290,7 +290,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 	isDeload bool,
 	wv weekVolume,
 	weekUsedExercises map[int]bool,
-	credit map[string]float64,
+	volume map[string]float64,
 ) []ExerciseSlot {
 	targets := make(map[string]MuscleGroupTarget, len(wp.Targets))
 	for _, t := range wp.Targets {
@@ -308,7 +308,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 			wv,
 			selectedPrimaryMGs,
 			weekUsedExercises,
-			credit,
+			volume,
 			targets,
 		)
 		if bestIdx < 0 {
@@ -321,7 +321,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 			selectedPrimaryMGs[mg] = true
 		}
 		weekUsedExercises[ex.ID] = true
-		applyCredit(credit, ex, float64(len(slot.Sets)))
+		applyVolume(volume, ex, float64(len(slot.Sets)))
 	}
 
 	return selected
@@ -338,7 +338,7 @@ func (wp *Planner) pickBestExerciseIdx(
 	wv weekVolume,
 	selectedPrimaryMGs map[string]bool,
 	weekUsedExercises map[int]bool,
-	credit map[string]float64,
+	volume map[string]float64,
 	targets map[string]MuscleGroupTarget,
 ) int {
 	bestIdx := -1
@@ -350,10 +350,10 @@ func (wp *Planner) pickBestExerciseIdx(
 			primaryMuscleGroupsOverlap(ex, selectedPrimaryMGs) {
 			continue
 		}
-		score := scoreCandidate(ex, pt, isDeload, wv, credit, targets)
+		score := scoreCandidate(ex, pt, isDeload, wv, volume, targets)
 		// Exact float equality is safe here: scores are derived from
 		// integer targets, integer set counts, and fixed half-integer
-		// weights (PrimarySetCredit, SecondarySetCredit), so ties round-trip
+		// weights (PrimarySetFraction, SecondarySetFraction), so ties round-trip
 		// cleanly through IEEE 754.
 		if bestIdx < 0 || score > bestScore ||
 			(score == bestScore && ex.ID < wp.Exercises[bestIdx].ID) {
@@ -364,15 +364,15 @@ func (wp *Planner) pickBestExerciseIdx(
 	return bestIdx
 }
 
-// applyCredit accumulates the per-set MG contribution from ex into credit:
-// PrimarySetCredit per primary MG, SecondarySetCredit per secondary, scaled
-// by nSets. Mutates credit in place.
-func applyCredit(credit map[string]float64, ex Exercise, nSets float64) {
+// applyVolume accumulates the per-set MG contribution from ex into volume:
+// PrimarySetFraction per primary MG, SecondarySetFraction per secondary, scaled
+// by nSets. Mutates volume in place.
+func applyVolume(volume map[string]float64, ex Exercise, nSets float64) {
 	for _, mg := range ex.PrimaryMuscleGroups {
-		credit[mg] += nSets * PrimarySetCredit
+		volume[mg] += nSets * PrimarySetFraction
 	}
 	for _, mg := range ex.SecondaryMuscleGroups {
-		credit[mg] += nSets * SecondarySetCredit
+		volume[mg] += nSets * SecondarySetFraction
 	}
 }
 
@@ -458,15 +458,15 @@ const (
 )
 
 // segmentReward returns the marginal balance reward for adding `added` weighted
-// sets to a muscle currently at `credit`, given its floor `goal` (MinSets) and
+// sets to a muscle currently at `volume`, given its floor `goal` (MinSets) and
 // ceiling `maxSets`. It integrates the piecewise per-set rate over
-// [credit, credit+added], so a pick that straddles segments is credited
+// [volume, volume+added], so a pick that straddles segments is credited
 // proportionally to how much of it lands in each.
-func segmentReward(credit, added, goal, maxSets float64) float64 {
-	end := credit + added
-	below := overlapLength(credit, end, 0, goal)
-	within := overlapLength(credit, end, goal, maxSets)
-	over := math.Max(0, end-math.Max(credit, maxSets))
+func segmentReward(volume, added, goal, maxSets float64) float64 {
+	end := volume + added
+	below := overlapLength(volume, end, 0, goal)
+	within := overlapLength(volume, end, goal, maxSets)
+	over := math.Max(0, end-math.Max(volume, maxSets))
 	return below*belowGoalSetReward + within*aboveGoalSetReward + over*overMaxSetPenalty
 }
 
@@ -478,7 +478,7 @@ func overlapLength(lo, hi, segLo, segHi float64) float64 {
 
 // scoreCandidate returns the weekly-volume balance reward from adding ex to a
 // session: the sum, over the exercise's targeted muscle groups, of the
-// piecewise per-set reward (see segmentReward) for the credit it would add.
+// piecewise per-set reward (see segmentReward) for the volume it would add.
 // Sets below a muscle's floor earn the steepest reward, sets between floor and
 // ceiling a smaller positive reward, and sets past the ceiling a penalty, so
 // the planner drives every muscle toward its floor and then keeps paying with
@@ -493,17 +493,17 @@ func scoreCandidate(
 	pt PeriodizationType,
 	isDeload bool,
 	wv weekVolume,
-	credit map[string]float64,
+	volume map[string]float64,
 	targets map[string]MuscleGroupTarget,
 ) float64 {
 	_, nSets := deriveSchemeForExercise(ex, pt, isDeload, wv.sets)
 	n := float64(nSets)
 	contrib := make(map[string]float64, len(ex.PrimaryMuscleGroups)+len(ex.SecondaryMuscleGroups))
 	for _, mg := range ex.PrimaryMuscleGroups {
-		contrib[mg] += n * PrimarySetCredit
+		contrib[mg] += n * PrimarySetFraction
 	}
 	for _, mg := range ex.SecondaryMuscleGroups {
-		contrib[mg] += n * SecondarySetCredit
+		contrib[mg] += n * SecondarySetFraction
 	}
 	var score float64
 	for mg, added := range contrib {
@@ -511,7 +511,7 @@ func scoreCandidate(
 		if !ok {
 			continue // tag-only group: no target row, contributes nothing.
 		}
-		score += segmentReward(credit[mg], added, goalForWeek(t, wv.progress), float64(t.MaxSets))
+		score += segmentReward(volume[mg], added, goalForWeek(t, wv.progress), float64(t.MaxSets))
 	}
 	return score
 }

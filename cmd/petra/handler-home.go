@@ -64,8 +64,8 @@ type muscleRegionView struct {
 type muscleGroupBarView struct {
 	Name            string
 	Slug            string
-	CompletedCredit float64
-	PlannedCredit   float64
+	CompletedVolume float64
+	PlannedVolume   float64
 	TargetSets      int
 	HasTarget       bool
 	FillPercent     int
@@ -328,7 +328,7 @@ func toDays(sessions []domain.Session, preferences domain.Preferences) []dayView
 
 // toMuscleBalance turns the workout service's flat volume list into a regional
 // view-model with pre-computed bar percentages. All bars share one scale so the
-// visualization is meaningful at a glance: the largest of (max planned credit, max
+// visualization is meaningful at a glance: the largest of (max planned volume, max
 // target) sets the right edge, plus 10% headroom. Regions with no bars are omitted.
 func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 	if len(volumes) == 0 {
@@ -337,8 +337,8 @@ func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 
 	scale := minScale
 	for _, v := range volumes {
-		if v.PlannedCredit > scale {
-			scale = v.PlannedCredit
+		if v.PlannedVolume > scale {
+			scale = v.PlannedVolume
 		}
 		if t := float64(v.TargetSets); t > scale {
 			scale = t
@@ -352,14 +352,14 @@ func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 		byRegion[region] = append(byRegion[region], muscleGroupBarView{
 			Name:            v.Name,
 			Slug:            muscleGroupSlug(v.Name),
-			CompletedCredit: v.CompletedCredit,
-			PlannedCredit:   v.PlannedCredit,
+			CompletedVolume: v.CompletedVolume,
+			PlannedVolume:   v.PlannedVolume,
 			TargetSets:      v.TargetSets,
 			HasTarget:       v.TargetSets > 0,
-			FillPercent:     int(v.CompletedCredit / scale * percentMultiplier),
-			PlannedPercent:  int(v.PlannedCredit / scale * percentMultiplier),
+			FillPercent:     int(v.CompletedVolume / scale * percentMultiplier),
+			PlannedPercent:  int(v.PlannedVolume / scale * percentMultiplier),
 			TargetPercent:   int(float64(v.TargetSets) / scale * percentMultiplier),
-			Status:          muscleStatus(v.PlannedCredit, v.TargetSets),
+			Status:          muscleStatus(v.PlannedVolume, v.TargetSets),
 		})
 	}
 
@@ -384,7 +384,7 @@ func muscleGroupSlug(name string) string {
 	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
 }
 
-// muscleStatus classifies a muscle group's planned weekly credit against its target.
+// muscleStatus classifies a muscle group's planned weekly volume against its target.
 // Groups without a seeded target are reported as "no-target" so the UI can render
 // them informationally without making a value judgment.
 func muscleStatus(planned float64, target int) string {

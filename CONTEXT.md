@@ -61,9 +61,9 @@ them and reconcile.
 | ------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------- |
 | **Muscle group**    | A canonical trained-muscle identifier (Chest, Lats, Quads…); an exercise has primary and secondary ones         | Muscle, body part           |
 | **Muscle-group region** | A coarse anatomical grouping for UI layout: Upper Push / Upper Pull / Legs / Core / Other                  | Section, area               |
-| **Muscle-group target** | A muscle group's weekly **hard-set** range (a hard set = a performed Set near failure): **MinSets** (≈ MEV, the floor the planner drives toward) and **MaxSets** (≈ MRV, the ceiling that penalizes excess). Authored in whole sets but compared against accumulated **set credit** — a secondary set counts ½ toward it | Goal, quota |
-| **Set credit**      | A single set's weighted contribution to a muscle group's stimulus: full credit to each **primary** muscle, half credit to each **secondary** | Set load, set weight, score |
-| **Muscle-group volume** | The weekly planned-vs-completed **set credit** aggregated for one muscle group                              | Volume (unqualified)        |
+| **Muscle-group target** | A muscle group's weekly **hard-set** range (a hard set = a performed Set near failure): **MinSets** (≈ MEV, the floor the planner drives toward) and **MaxSets** (≈ MRV, the ceiling that penalizes excess). Authored in whole sets but compared against accumulated **volume** — a secondary set counts as a **fractional set** (½) toward it | Goal, quota |
+| **Fractional set**  | A performed Set's contribution to one muscle group's weekly **volume**: a **primary** muscle gets a full set, a **secondary** a fractional (½) set. The term is the training literature's (Renaissance Periodization) | Set credit, set load, set weight, score |
+| **Muscle-group volume** | A muscle group's weekly training stimulus for one muscle group, summed in **fractional sets** (planned vs completed) | Load, training load (it is sets, not kg) |
 
 ## Weight progression
 
@@ -82,9 +82,9 @@ them and reconcile.
 - A **Session** carries one **periodization** and one deload flag, and holds ordered **exercise slots**.
 - An **Exercise slot** binds one **exercise** to its **sets**; the slot's identity is its position.
 - An **Exercise** has one **exercise type**, which maps to one **load model**, and one or more **muscle groups** (primary/secondary).
-- A **Set** **credits** every muscle group its exercise touches (full to primaries, half to secondaries) — its **set credit** — aggregated into **muscle-group volume**.
+- A **Set** contributes to every muscle group its exercise touches — a full set to each primary, a **fractional set** (½) to each secondary — summed into **muscle-group volume**.
 - **Set count** comes from the **week in block** (the **set-count ramp**); **reps + rest** come from **periodization** via the **scheme** — the two are independent prescriptions.
-- **Set credit** is the unit of **muscle-group volume**; a **muscle-group target** is authored in whole sets but compared against accumulated credit (a secondary set counts ½). In code the unit is named `…Credit` (e.g. `PlannedCredit`); "load" is reserved for kilograms.
+- The unit of **muscle-group volume** is the **fractional set**; a **muscle-group target** is authored in whole sets but compared against accumulated volume (a secondary set counts ½). "Load" means kilograms only — never muscle-group volume.
 
 ## Example dialogue
 
@@ -102,8 +102,8 @@ them and reconcile.
 
 ## Flagged ambiguities
 
-- **"Volume"** — bare **volume** means training stimulus per muscle: aggregated **set credit**, i.e. **muscle-group volume**. The week-over-week growth in per-exercise **set count** is the **set-count ramp** — never "volume ramp." Keep the word "volume" out of the set-count cluster.
-- **"Weight" and "load"** always mean kilograms lifted (`WeightKg`). A set's contribution to a muscle group's weekly stimulus (full to primaries, half to secondaries) is its **set credit** — never a "weight" or a "load." The two are unrelated quantities that once shared the word.
+- **"Volume"** — bare **volume** means training stimulus per muscle, summed in **fractional sets**, i.e. **muscle-group volume**. The week-over-week growth in per-exercise **set count** is the **set-count ramp** — never "volume ramp." Keep the word "volume" out of the set-count cluster.
+- **"Weight" and "load"** always mean kilograms lifted (`WeightKg`). A set's contribution to a muscle group's weekly volume (a full set for a primary, a **fractional set** for a secondary) is *never* a "weight" or a "load" — those are kilograms; volume is sets. ("Credit" was a retired in-house name for the fractional set.)
 - **"Set"** is both the entity (one bout, with reps/weight/signal) and a count. When you mean the number per exercise, say **set count**; when you mean a muscle group's weekly MinSets/MaxSets, say **muscle-group target** (its unit is the **hard set**). "Working set" is fine in prose for a performed Set, but it is not a separate counted thing.
 - **"Target"** appears three ways: **muscle-group target** (weekly hard-set range, MEV/MRV), **set target** (next-set weight + reps recommendation), and **target reps / target value** (the per-set rep-or-seconds goal — computed in a scheme/recommendation, stored as `TargetValue` once on a Set). Qualify which.
 - **"Category" vs "Workout type"**: **Category** is the stored focus of an exercise or session; **workout type** is the category *derived* from a session's actual slots. They can differ — keep "workout type" for the derived value only.
