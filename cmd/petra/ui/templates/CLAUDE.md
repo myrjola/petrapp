@@ -31,6 +31,16 @@ Non-negotiables that hold even for non-visual changes:
 - **No `:hover` / `cursor: pointer`** — the app is mobile-first; style
   `:active` and `:focus-visible` instead.
 
+## Copy register
+
+All user-facing copy targets the **average gym user** — someone who has
+never read training literature. The canonical term-to-label mapping (and the
+terms that must never appear in copy: MEV/MRV, session goal, hypertrophy,
+fractional set) lives in the root [CONTEXT.md](../../../../CONTEXT.md) under
+"UI register". When a template needs a new label for a domain concept, check
+that table first; if the concept isn't mapped yet, add the mapping there in
+the same change.
+
 ## Template Structure
 
 ### Template Organization

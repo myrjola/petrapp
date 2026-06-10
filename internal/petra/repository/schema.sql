@@ -47,8 +47,8 @@ CREATE TABLE workout_sessions
     difficulty_rating  INTEGER CHECK (difficulty_rating BETWEEN 1 AND 5),
     started_at         TEXT CHECK (started_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', started_at) = started_at),
     completed_at       TEXT CHECK (completed_at IS NULL OR STRFTIME('%Y-%m-%dT%H:%M:%fZ', completed_at) = completed_at),
-    periodization_type TEXT    NOT NULL DEFAULT 'strength'
-        CHECK (periodization_type IN ('strength', 'hypertrophy')),
+    session_goal TEXT    NOT NULL DEFAULT 'strength'
+        CHECK (session_goal IN ('strength', 'hypertrophy')),
     is_deload          INTEGER NOT NULL DEFAULT 0 CHECK (is_deload IN (0, 1)),
 
     PRIMARY KEY (user_id, workout_date)

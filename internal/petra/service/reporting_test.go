@@ -92,14 +92,14 @@ func Test_WeeklyMuscleGroupVolume_AggregatesPrimaryAndSecondary(t *testing.T) {
 	}
 
 	// Targets are joined from muscle_group_weekly_targets seed (Chest floor=10, Calves floor=8).
-	if v := byName["Chest"]; v.TargetSets != 10 {
-		t.Errorf("Chest target: want 10, got %d", v.TargetSets)
+	if v := byName["Chest"]; v.MinSets != 10 || v.MaxSets != 20 {
+		t.Errorf("Chest target band: want 10-20, got %d-%d", v.MinSets, v.MaxSets)
 	}
-	if v := byName["Calves"]; v.TargetSets != 8 {
-		t.Errorf("Calves target: want 8 (now seeded), got %d", v.TargetSets)
+	if v := byName["Calves"]; v.MinSets != 8 {
+		t.Errorf("Calves target: want 8 (now seeded), got %d", v.MinSets)
 	}
-	if v := byName["Traps"]; v.TargetSets != 0 {
-		t.Errorf("Traps target: want 0 (tag-only, not seeded), got %d", v.TargetSets)
+	if v := byName["Traps"]; v.MinSets != 0 || v.MaxSets != 0 {
+		t.Errorf("Traps target band: want 0-0 (tag-only, not seeded), got %d-%d", v.MinSets, v.MaxSets)
 	}
 
 	// Result must list every muscle group exactly once, in alphabetical order.

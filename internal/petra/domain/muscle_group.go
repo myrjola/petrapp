@@ -17,13 +17,46 @@ type MuscleGroupTarget struct {
 // Each set in the plan contributes to every muscle group it touches: PrimarySetFraction
 // for primaries and SecondarySetFraction for secondaries. Completed counts only sets
 // that have a CompletedAt timestamp; Planned counts every set in the weekly plan and
-// is therefore always >= Completed. TargetSets is 0 for muscle groups that don't
-// have a row in muscle_group_weekly_targets.
+// is therefore always >= Completed. MinSets/MaxSets carry the muscle group's target
+// band (≈ MEV/MRV) and are 0 for muscle groups that don't have a row in
+// muscle_group_weekly_targets.
 type MuscleGroupVolume struct {
 	Name            string
 	CompletedVolume float64
 	PlannedVolume   float64
-	TargetSets      int
+	MinSets         int
+	MaxSets         int
+}
+
+// MuscleGroupVolumeStatus classifies a muscle group's planned weekly volume
+// against its target band. The string values double as CSS state tokens on the
+// muscle-balance bars.
+type MuscleGroupVolumeStatus string
+
+const (
+	MuscleVolumeNoTarget MuscleGroupVolumeStatus = "no-target"
+	MuscleVolumeUnder    MuscleGroupVolumeStatus = "under"
+	MuscleVolumeOnTarget MuscleGroupVolumeStatus = "on-target"
+	MuscleVolumeOver     MuscleGroupVolumeStatus = "over"
+)
+
+// Status classifies the planned weekly volume against the MinSets…MaxSets
+// band: under below the floor (≈ MEV), on-target inside the band, over above
+// the ceiling (≈ MRV) — the same band the planner's set-count ramp climbs, so
+// the display never flags the planner's own late-cycle prescription as
+// excessive. Muscle groups without a seeded target are no-target so the UI
+// can render them informationally without a value judgment.
+func (v MuscleGroupVolume) Status() MuscleGroupVolumeStatus {
+	switch {
+	case v.MinSets <= 0:
+		return MuscleVolumeNoTarget
+	case v.PlannedVolume < float64(v.MinSets):
+		return MuscleVolumeUnder
+	case v.PlannedVolume <= float64(v.MaxSets):
+		return MuscleVolumeOnTarget
+	default:
+		return MuscleVolumeOver
+	}
 }
 
 // MuscleGroupRegion is a coarse anatomical grouping used by UI layers to arrange
@@ -96,15 +129,15 @@ const (
 // every muscle group in groupNames, sorted to match groupNames' order.
 // Groups with no contributions appear as zero-volume rows so callers can
 // render them without a separate query. Targets are joined from the targets
-// slice; muscle groups missing from targets carry TargetSets = 0.
+// slice; muscle groups missing from targets carry MinSets/MaxSets = 0.
 func WeeklyMuscleGroupVolume(
 	sessions []Session,
 	targets []MuscleGroupTarget,
 	groupNames []string,
 ) []MuscleGroupVolume {
-	targetByName := make(map[string]int, len(targets))
+	targetByName := make(map[string]MuscleGroupTarget, len(targets))
 	for _, t := range targets {
-		targetByName[t.MuscleGroupName] = t.MinSets
+		targetByName[t.MuscleGroupName] = t
 	}
 
 	known := make(map[string]struct{}, len(groupNames))
@@ -122,7 +155,8 @@ func WeeklyMuscleGroupVolume(
 			Name:            name,
 			CompletedVolume: completed[name],
 			PlannedVolume:   planned[name],
-			TargetSets:      targetByName[name],
+			MinSets:         targetByName[name].MinSets,
+			MaxSets:         targetByName[name].MaxSets,
 		})
 	}
 	return result

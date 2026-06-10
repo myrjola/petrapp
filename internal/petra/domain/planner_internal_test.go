@@ -77,7 +77,7 @@ func TestDetermineCategory(t *testing.T) {
 	}
 }
 
-func TestFirstSessionPeriodizationType(t *testing.T) {
+func TestFirstSessionSessionGoalType(t *testing.T) {
 	t.Parallel()
 
 	t.Run("consecutive weeks alternate for odd exercise count", func(t *testing.T) {
@@ -89,8 +89,8 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 		monday1 := monday2026Date()                  // week N
 		monday2 := monday2026Date().AddDate(0, 0, 7) // week N+1
 
-		pt1 := wp.firstSessionPeriodizationType(monday1)
-		pt2 := wp.firstSessionPeriodizationType(monday2)
+		pt1 := wp.firstSessionGoal(monday1)
+		pt2 := wp.firstSessionGoal(monday2)
 
 		if pt1 == pt2 {
 			t.Errorf("consecutive weeks must alternate: both got %v", pt1)
@@ -106,8 +106,8 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 		monday1 := monday2026Date()
 		monday2 := monday2026Date().AddDate(0, 0, 7)
 
-		pt1 := wp.firstSessionPeriodizationType(monday1)
-		pt2 := wp.firstSessionPeriodizationType(monday2)
+		pt1 := wp.firstSessionGoal(monday1)
+		pt2 := wp.firstSessionGoal(monday2)
 
 		if pt1 == pt2 {
 			t.Errorf("consecutive weeks must alternate even for even exercise count: both got %v", pt1)
@@ -120,9 +120,9 @@ func TestFirstSessionPeriodizationType(t *testing.T) {
 		wp := NewPlanner(p, nil, nil)
 
 		monday1 := monday2026Date()
-		pt1 := wp.firstSessionPeriodizationType(monday1)
-		if wp.firstSessionPeriodizationType(monday1) != pt1 {
-			t.Error("firstSessionPeriodizationType is not deterministic")
+		pt1 := wp.firstSessionGoal(monday1)
+		if wp.firstSessionGoal(monday1) != pt1 {
+			t.Error("firstSessionGoal is not deterministic")
 		}
 	})
 }
@@ -196,8 +196,8 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 		t.Parallel()
 		volume := map[string]float64{}
 		used := map[int]bool{}
-		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryLower, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+		slots := wp.selectExercisesForDayWithGoal(
+			CategoryLower, 2, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 		if len(slots) != 2 {
 			t.Fatalf("want 2 slots, got %d", len(slots))
@@ -214,8 +214,8 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 		t.Parallel()
 		volume := map[string]float64{}
 		used := map[int]bool{}
-		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper, 2, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+		slots := wp.selectExercisesForDayWithGoal(
+			CategoryUpper, 2, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 		for _, s := range slots {
 			ex := findExercise(wp.Exercises, s.Exercise.ID)
@@ -229,8 +229,8 @@ func TestSelectExercises_CategoryFilter(t *testing.T) {
 		t.Parallel()
 		volume := map[string]float64{}
 		used := map[int]bool{}
-		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryFullBody, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+		slots := wp.selectExercisesForDayWithGoal(
+			CategoryFullBody, 3, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 		seen := map[Category]bool{}
 		for _, s := range slots {
@@ -274,8 +274,8 @@ func TestSelectExercises_SessionDiversity(t *testing.T) {
 		})
 		volume := map[string]float64{}
 		used := map[int]bool{}
-		slots := wp.selectExercisesForDayWithPeriodization(
-			CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+		slots := wp.selectExercisesForDayWithGoal(
+			CategoryUpper, 3, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 		)
 
 		seenPrimary := map[string]bool{}
@@ -313,8 +313,8 @@ func TestSelectExercises_WeekUsedExclusion(t *testing.T) {
 	volume := map[string]float64{}
 	used := map[int]bool{1: true} // Exercise 1 was used earlier in the week.
 
-	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+	slots := wp.selectExercisesForDayWithGoal(
+		CategoryUpper, 1, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -346,8 +346,8 @@ func TestSelectExercises_TargetAwarePrefersUnderloadedMG(t *testing.T) {
 	})
 	volume := map[string]float64{"Shoulders": 10}
 	used := map[int]bool{}
-	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+	slots := wp.selectExercisesForDayWithGoal(
+		CategoryUpper, 1, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -376,8 +376,8 @@ func TestSelectExercises_FallsBackToLowestIDWhenScoresEqual(t *testing.T) {
 	wp := NewPlanner(prefs(time.Tuesday), exercises, nil)
 	volume := map[string]float64{}
 	used := map[int]bool{}
-	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+	slots := wp.selectExercisesForDayWithGoal(
+		CategoryUpper, 1, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -399,8 +399,8 @@ func TestSelectExercises_TimeBasedExerciseGetsThreeSets(t *testing.T) {
 	})
 	volume := map[string]float64{}
 	used := map[int]bool{}
-	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+	slots := wp.selectExercisesForDayWithGoal(
+		CategoryUpper, 1, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
@@ -417,9 +417,9 @@ func TestSelectExercises_TimeBasedExerciseGetsThreeSets(t *testing.T) {
 
 func TestSelectExercises_WeightedExerciseSetCountMatchesDeriveScheme(t *testing.T) {
 	t.Parallel()
-	// A weighted exercise picked via selectExercisesForDayWithPeriodization
+	// A weighted exercise picked via selectExercisesForDayWithGoal
 	// should carry the set count and per-set target reps that
-	// DeriveScheme produces for the same exercise + periodization.
+	// DeriveScheme produces for the same exercise + goal.
 	bench := Exercise{ //nolint:exhaustruct // Test exercise omits display fields.
 		ID: 1, Category: CategoryUpper, ExerciseType: ExerciseTypeWeighted,
 		PrimaryMuscleGroups: []string{"Chest"}, SecondaryMuscleGroups: nil,
@@ -430,13 +430,13 @@ func TestSelectExercises_WeightedExerciseSetCountMatchesDeriveScheme(t *testing.
 	})
 	volume := map[string]float64{}
 	used := map[int]bool{}
-	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 1, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+	slots := wp.selectExercisesForDayWithGoal(
+		CategoryUpper, 1, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Fatalf("want 1 slot, got %d", len(slots))
 	}
-	wantReps, wantSets := deriveSchemeForExercise(bench, PeriodizationStrength, false, 4)
+	wantReps, wantSets := deriveSchemeForExercise(bench, SessionGoalStrength, false, 4)
 	if len(slots[0].Sets) != wantSets {
 		t.Errorf("set count = %d, want %d", len(slots[0].Sets), wantSets)
 	}
@@ -475,8 +475,8 @@ func TestSelectExercises_GracefulDegradationWhenAllSharePrimaryMG(t *testing.T) 
 	})
 	volume := map[string]float64{}
 	used := map[int]bool{}
-	slots := wp.selectExercisesForDayWithPeriodization(
-		CategoryUpper, 3, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
+	slots := wp.selectExercisesForDayWithGoal(
+		CategoryUpper, 3, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, used, volume,
 	)
 	if len(slots) != 1 {
 		t.Errorf("want 1 slot (graceful degradation under primary-overlap exhaustion), got %d", len(slots))
@@ -530,7 +530,7 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndReducesSets(t *testing.T) {
 		MesocycleLength: 4,
 		MesocycleAnchor: anchor,
 	}
-	// Use a fixture exercise list with rep windows that produce 3 normal sets
+	// Use a fixture exercise list with rep ranges that produce 3 normal sets
 	// (mid rep band 8–12 with Hypertrophy → DeriveScheme gives 3 sets).
 	repMin, repMax := 8, 12
 	exercises := []Exercise{
@@ -575,11 +575,11 @@ func TestPlanner_DeloadWeekForcesHypertrophyAndReducesSets(t *testing.T) {
 		if !s.IsDeload {
 			t.Errorf("session %s IsDeload = false, want true", s.Date.Format("2006-01-02"))
 		}
-		if s.PeriodizationType != PeriodizationHypertrophy {
+		if s.Goal != SessionGoalHypertrophy {
 			t.Errorf(
-				"session %s PeriodizationType = %s, want hypertrophy",
+				"session %s SessionGoal = %s, want hypertrophy",
 				s.Date.Format("2006-01-02"),
-				s.PeriodizationType,
+				s.Goal,
 			)
 		}
 		for _, es := range s.Slots {
@@ -724,17 +724,17 @@ func TestPlan(t *testing.T) {
 		}
 		for _, sess := range sessions {
 			want := exercisesMedium
-			if sess.PeriodizationType == PeriodizationHypertrophy && !sess.IsDeload {
+			if sess.Goal == SessionGoalHypertrophy && !sess.IsDeload {
 				want = exercisesMediumHypertrophy
 			}
 			if len(sess.Slots) != want {
 				t.Errorf("60-min %s session: want %d exercises, got %d",
-					sess.PeriodizationType, want, len(sess.Slots))
+					sess.Goal, want, len(sess.Slots))
 			}
 		}
 	})
 
-	t.Run("consecutive sessions alternate periodization", func(t *testing.T) {
+	t.Run("consecutive sessions alternate goal", func(t *testing.T) {
 		t.Parallel()
 		p := prefs(time.Monday, time.Tuesday)
 		wp := NewPlanner(p, exercises, targets)
@@ -752,8 +752,8 @@ func TestPlan(t *testing.T) {
 		if len(sessions) < 2 {
 			t.Fatal("need at least 2 sessions to test alternation")
 		}
-		if sessions[0].PeriodizationType == sessions[1].PeriodizationType {
-			t.Error("consecutive sessions must have different periodization types")
+		if sessions[0].Goal == sessions[1].Goal {
+			t.Error("consecutive sessions must have different session goals")
 		}
 	})
 }
@@ -854,7 +854,7 @@ func Test_StartOfDay_TruncatesToUTCMidnight(t *testing.T) {
 	}
 }
 
-func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
+func Test_exercisesPerSession_SessionGoalAware(t *testing.T) {
 	t.Parallel()
 
 	// Build a Preferences value where each weekday carries a different minutes
@@ -870,21 +870,21 @@ func Test_exercisesPerSession_PeriodizationAware(t *testing.T) {
 	tests := []struct {
 		name     string
 		weekday  time.Weekday
-		pt       PeriodizationType
+		pt       SessionGoal
 		isDeload bool
 		want     int
 	}{
-		{"90 strength non-deload", time.Monday, PeriodizationStrength, false, exercisesLong},
-		{"90 hypertrophy non-deload", time.Monday, PeriodizationHypertrophy, false, exercisesLongHypertrophy},
-		{"90 hypertrophy deload", time.Monday, PeriodizationHypertrophy, true, exercisesLong},
-		{"60 strength non-deload", time.Tuesday, PeriodizationStrength, false, exercisesMedium},
-		{"60 hypertrophy non-deload", time.Tuesday, PeriodizationHypertrophy, false, exercisesMediumHypertrophy},
-		{"60 hypertrophy deload", time.Tuesday, PeriodizationHypertrophy, true, exercisesMedium},
-		{"45 strength non-deload", time.Wednesday, PeriodizationStrength, false, exercisesShort},
-		{"45 hypertrophy non-deload", time.Wednesday, PeriodizationHypertrophy, false, exercisesShort},
-		{"45 hypertrophy deload", time.Wednesday, PeriodizationHypertrophy, true, exercisesShort},
-		{"0 strength", time.Thursday, PeriodizationStrength, false, 0},
-		{"0 hypertrophy", time.Thursday, PeriodizationHypertrophy, false, 0},
+		{"90 strength non-deload", time.Monday, SessionGoalStrength, false, exercisesLong},
+		{"90 hypertrophy non-deload", time.Monday, SessionGoalHypertrophy, false, exercisesLongHypertrophy},
+		{"90 hypertrophy deload", time.Monday, SessionGoalHypertrophy, true, exercisesLong},
+		{"60 strength non-deload", time.Tuesday, SessionGoalStrength, false, exercisesMedium},
+		{"60 hypertrophy non-deload", time.Tuesday, SessionGoalHypertrophy, false, exercisesMediumHypertrophy},
+		{"60 hypertrophy deload", time.Tuesday, SessionGoalHypertrophy, true, exercisesMedium},
+		{"45 strength non-deload", time.Wednesday, SessionGoalStrength, false, exercisesShort},
+		{"45 hypertrophy non-deload", time.Wednesday, SessionGoalHypertrophy, false, exercisesShort},
+		{"45 hypertrophy deload", time.Wednesday, SessionGoalHypertrophy, true, exercisesShort},
+		{"0 strength", time.Thursday, SessionGoalStrength, false, 0},
+		{"0 hypertrophy", time.Thursday, SessionGoalHypertrophy, false, 0},
 	}
 
 	for _, tt := range tests {
@@ -923,7 +923,7 @@ func Test_scoreCandidate(t *testing.T) {
 		volume := map[string]float64{}
 		// Strength + 5-10 window: reps=5, sets=4 (DeriveScheme low band).
 		// contrib: Chest=4, Triceps=4, Shoulders=2 (secondary).
-		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, volume, targets)
+		score := scoreCandidate(bench, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, volume, targets)
 		// Chest:    segmentReward(0, 4, 10, 20) = 4*below(3)         = 12.
 		// Triceps:  segmentReward(0, 4, 8, 16)  = 4*below(3)         = 12.
 		// Shoulders:segmentReward(0, 2, 10, 20) = 2*below(3)         =  6.
@@ -937,7 +937,7 @@ func Test_scoreCandidate(t *testing.T) {
 		t.Parallel()
 		// MGs already at their floor: adding more sets earns aboveGoalSetReward.
 		volume := map[string]float64{"Chest": 10, "Triceps": 8, "Shoulders": 10}
-		score := scoreCandidate(bench, PeriodizationStrength, false, weekVolume{sets: 4, progress: 0}, volume, targets)
+		score := scoreCandidate(bench, SessionGoalStrength, false, weekVolume{sets: 4, progress: 0}, volume, targets)
 		// Chest:    segmentReward(10, 4, 10, 20) = 4*above(1)  =  4.
 		// Triceps:  segmentReward(8, 4, 8, 16)   = 4*above(1)  =  4.
 		// Shoulders:segmentReward(10, 2, 10, 20)  = 2*above(1) =  2.
@@ -960,7 +960,7 @@ func Test_scoreCandidate(t *testing.T) {
 		volume := map[string]float64{}
 		score := scoreCandidate(
 			calfRaise,
-			PeriodizationStrength,
+			SessionGoalStrength,
 			false,
 			weekVolume{sets: 4, progress: 0},
 			volume,
@@ -977,7 +977,7 @@ func Test_scoreCandidate(t *testing.T) {
 		// Strength + deload + 5-10 window: reps=10 (deload forces hypertrophy),
 		// base sets = 3 (mid band, 6 <= reps <= 10), deload drops to 2.
 		// contrib: Chest=2, Triceps=2, Shoulders=1 (secondary).
-		score := scoreCandidate(bench, PeriodizationStrength, true, weekVolume{sets: 3, progress: 0}, volume, targets)
+		score := scoreCandidate(bench, SessionGoalStrength, true, weekVolume{sets: 3, progress: 0}, volume, targets)
 		// Chest:    segmentReward(0, 2, 10, 20) = 2*below(3) = 6.
 		// Triceps:  segmentReward(0, 2, 8, 16)  = 2*below(3) = 6.
 		// Shoulders:segmentReward(0, 1, 10, 20) = 1*below(3) = 3.
@@ -993,8 +993,8 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 
 	// Anchor on a strength-first Monday so the alternation is deterministic.
 	monday := monday2026Date()
-	pl := &Planner{} //nolint:exhaustruct // only firstSessionPeriodizationType is used.
-	if pl.firstSessionPeriodizationType(monday) != PeriodizationStrength {
+	pl := &Planner{} //nolint:exhaustruct // only firstSessionGoal is used.
+	if pl.firstSessionGoal(monday) != SessionGoalStrength {
 		monday = monday.AddDate(0, 0, 7)
 	}
 
@@ -1027,20 +1027,20 @@ func Test_Plan_HypertrophyDaysGetExtraExerciseInMixedWeek(t *testing.T) {
 	}
 
 	wantCount := []int{exercisesMedium, exercisesMediumHypertrophy}
-	wantPT := []PeriodizationType{PeriodizationStrength, PeriodizationHypertrophy}
+	wantPT := []SessionGoal{SessionGoalStrength, SessionGoalHypertrophy}
 	for i, sess := range sessions {
-		if sess.PeriodizationType != wantPT[i] {
-			t.Errorf("session %d periodization: want %s, got %s", i, wantPT[i], sess.PeriodizationType)
+		if sess.Goal != wantPT[i] {
+			t.Errorf("session %d goal: want %s, got %s", i, wantPT[i], sess.Goal)
 		}
 		if got := len(sess.Slots); got != wantCount[i] {
 			t.Errorf("session %d (%s) exercise count: want %d, got %d",
-				i, sess.PeriodizationType, wantCount[i], got)
+				i, sess.Goal, wantCount[i], got)
 		}
 	}
 }
 
 // seedExercises mirrors the 39 exercises in internal/repository/fixtures.sql
-// verbatim (IDs, categories, types, rep windows, and primary/secondary
+// verbatim (IDs, categories, types, rep ranges, and primary/secondary
 // muscle groups all match). It keeps the regression test pure-domain while
 // exercising the algorithm against the actual seed users start with.
 // Update both this helper and fixtures.sql together when seed exercises
@@ -1372,7 +1372,7 @@ func Test_scoreCandidate_TagOnlyGroupContributesNothing(t *testing.T) {
 
 	got := scoreCandidate(
 		tagOnly,
-		PeriodizationHypertrophy,
+		SessionGoalHypertrophy,
 		false,
 		weekVolume{sets: 4, progress: 0},
 		map[string]float64{},
@@ -1404,7 +1404,7 @@ func Test_scoreCandidate_OverMaxPickLosesToFreshMuscle(t *testing.T) {
 
 	freshScore := scoreCandidate(
 		fresh,
-		PeriodizationHypertrophy,
+		SessionGoalHypertrophy,
 		false,
 		weekVolume{sets: 4, progress: 0},
 		volume,
@@ -1412,7 +1412,7 @@ func Test_scoreCandidate_OverMaxPickLosesToFreshMuscle(t *testing.T) {
 	)
 	satScore := scoreCandidate(
 		saturated,
-		PeriodizationHypertrophy,
+		SessionGoalHypertrophy,
 		false,
 		weekVolume{sets: 4, progress: 0},
 		volume,
@@ -1527,8 +1527,8 @@ func Test_scoreCandidate_GoalRampsWithProgress(t *testing.T) {
 	}
 	volume := map[string]float64{"Chest": 12} // above floor (10), below ceiling (20).
 
-	early := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 0}, volume, targets)
-	late := scoreCandidate(bench, PeriodizationHypertrophy, false, weekVolume{sets: 4, progress: 1}, volume, targets)
+	early := scoreCandidate(bench, SessionGoalHypertrophy, false, weekVolume{sets: 4, progress: 0}, volume, targets)
+	late := scoreCandidate(bench, SessionGoalHypertrophy, false, weekVolume{sets: 4, progress: 1}, volume, targets)
 	if !(late > early) {
 		t.Errorf("ramped goal should score higher late in block: early=%v late=%v", early, late)
 	}
@@ -1611,7 +1611,7 @@ func Test_Plan_ScoringMatchesPersistedSetCount(t *testing.T) {
 
 	wv := weekVolumeFor(weekStart, prefsV)
 	_, scored := deriveSchemeForExercise(
-		bench, plan.Sessions[0].PeriodizationType, plan.Sessions[0].IsDeload, wv.sets,
+		bench, plan.Sessions[0].Goal, plan.Sessions[0].IsDeload, wv.sets,
 	)
 	if persisted != scored {
 		t.Errorf("persisted set count (%d) != scored set count (%d) — invariant broken", persisted, scored)

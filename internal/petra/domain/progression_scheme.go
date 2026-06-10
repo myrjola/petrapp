@@ -19,25 +19,25 @@ const (
 )
 
 // Scheme is the per-exercise rep + rest prescription for one planned session,
-// computed from a per-exercise rep window (repMin, repMax) and the session's
-// PeriodizationType. Set count is no longer part of Scheme — since Phase D the
+// computed from a per-exercise rep range (repMin, repMax) and the session's
+// SessionGoal. Set count is no longer part of Scheme — since Phase D the
 // mesocycle week drives set count (see SetsForWeek / BuildPlannedSets), not the
-// periodization-derived rep band.
+// goal-derived rep band.
 type Scheme struct {
 	TargetReps  int
 	RestSeconds int
 }
 
 // DeriveScheme returns the rep target and inter-set rest for one exercise given
-// its rep window, the session periodization, and whether the session is a
+// its rep range, the session goal, and whether the session is a
 // deload. Pure: same inputs → same output, no DB, no clock. Set count is NOT
 // returned — since Phase D it is a function of the mesocycle week, not the rep
 // band (see SetsForWeek / deriveSchemeForExercise).
 //
 // Reps:
 //
-//	Strength    → repMin (low end of the window)
-//	Hypertrophy → repMax (high end of the window)
+//	Strength    → repMin (low end of the range)
+//	Hypertrophy → repMax (high end of the range)
 //	Deload      → repMax always (forces hypertrophy target regardless of p)
 //
 // Rest is derived from the resulting rep target:
@@ -45,20 +45,20 @@ type Scheme struct {
 //	reps ≤ 5  → 180s rest  (heavy work, full ATP-PCr recovery)
 //	reps 6-10 → 150s rest  (moderate; longer rest improves hypertrophy in trained lifters per Schoenfeld 2016)
 //	reps ≥ 11 → 90s rest   (lighter; rest shortens)
-func DeriveScheme(repMin, repMax int, p PeriodizationType, isDeload bool) Scheme {
+func DeriveScheme(repMin, repMax int, p SessionGoal, isDeload bool) Scheme {
 	if isDeload {
 		// Deload forces hypertrophy targets (repMax) regardless of incoming p.
-		p = PeriodizationHypertrophy
+		p = SessionGoalHypertrophy
 	}
 
 	var reps int
 	switch p {
-	case PeriodizationStrength:
+	case SessionGoalStrength:
 		reps = repMin
-	case PeriodizationHypertrophy:
+	case SessionGoalHypertrophy:
 		reps = repMax
 	default:
-		panic(fmt.Sprintf("domain: unknown PeriodizationType %q", p))
+		panic(fmt.Sprintf("domain: unknown SessionGoal %q", p))
 	}
 
 	var rest int
@@ -85,10 +85,10 @@ func deloadSets(normalSets int) int {
 }
 
 // RestSecondsFor returns the inter-set rest in seconds for the given exercise
-// under the session's periodization. Returns 0 for time-based exercises and
-// for exercises with missing rep windows — service code treats 0 as "no
+// under the session's goal. Returns 0 for time-based exercises and
+// for exercises with missing rep ranges — service code treats 0 as "no
 // rest scheduling".
-func RestSecondsFor(ex Exercise, pt PeriodizationType, isDeload bool) int {
+func RestSecondsFor(ex Exercise, pt SessionGoal, isDeload bool) int {
 	if ex.IsTimed() {
 		return 0
 	}

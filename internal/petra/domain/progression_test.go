@@ -11,7 +11,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		periodization  domain.PeriodizationType
+		goal           domain.SessionGoal
 		repMin         int
 		repMax         int
 		startingWeight float64
@@ -20,7 +20,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 	}{
 		{
 			name:           "strength returns 5 reps",
-			periodization:  domain.PeriodizationStrength,
+			goal:           domain.SessionGoalStrength,
 			repMin:         5,
 			repMax:         10,
 			startingWeight: 80.0,
@@ -29,7 +29,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		},
 		{
 			name:           "hypertrophy returns 8 reps",
-			periodization:  domain.PeriodizationHypertrophy,
+			goal:           domain.SessionGoalHypertrophy,
 			repMin:         5,
 			repMax:         8,
 			startingWeight: 60.0,
@@ -38,7 +38,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		},
 		{
 			name:           "zero starting weight is returned as-is",
-			periodization:  domain.PeriodizationHypertrophy,
+			goal:           domain.SessionGoalHypertrophy,
 			repMin:         5,
 			repMax:         8,
 			startingWeight: 0.0,
@@ -51,7 +51,7 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			p := domain.NewProgression(domain.Config{
-				Type:           tt.periodization,
+				Type:           tt.goal,
 				RepMin:         tt.repMin,
 				RepMax:         tt.repMax,
 				StartingWeight: tt.startingWeight,
@@ -99,7 +99,7 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			p := domain.NewProgression(domain.Config{
-				Type:           domain.PeriodizationHypertrophy,
+				Type:           domain.SessionGoalHypertrophy,
 				RepMin:         5,
 				RepMax:         8,
 				StartingWeight: startWeight,
@@ -123,7 +123,7 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 
 	// 23kg: |w|*0.10 = 2.3, below the 2.5kg minimum step → 23 - 2.5 = 20.5
 	p := domain.NewProgression(domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 23.0,
@@ -146,7 +146,7 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 	// Recommended set 1 = 100kg. User overrides to 95kg and signals OnTarget.
 	// Set 2 recommendation must be 95kg (from actual), not 100kg.
 	p := domain.NewProgression(domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 100.0,
@@ -169,7 +169,7 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 	// User overrides set 2 to 90kg and signals TooLight.
 	// Set 3 must be 90 + 2.5 = 92.5kg.
 	p := domain.NewProgression(domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 100.0,
@@ -195,7 +195,7 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 	t.Parallel()
 
 	config := domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 80.0,
@@ -230,7 +230,7 @@ func TestNewFromHistory_EmptySliceEqualsNew(t *testing.T) {
 	t.Parallel()
 
 	config := domain.Config{
-		Type:           domain.PeriodizationStrength,
+		Type:           domain.SessionGoalStrength,
 		RepMin:         5,
 		RepMax:         10,
 		StartingWeight: 60.0,
@@ -248,7 +248,7 @@ func TestSetsCompleted(t *testing.T) {
 	t.Parallel()
 
 	p := domain.NewProgression(domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         5,
 		RepMax:         8,
 		StartingWeight: 60.0,
@@ -378,7 +378,7 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 			t.Parallel()
 			p := domain.NewProgressionFromHistory(
 				domain.Config{
-					Type:           domain.PeriodizationStrength,
+					Type:           domain.SessionGoalStrength,
 					RepMin:         5,
 					RepMax:         10,
 					StartingWeight: 0,
@@ -396,18 +396,18 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 	}
 }
 
-// TestExhaustivePeriodizationCoverage documents that every PeriodizationType
+// TestExhaustiveSessionGoalCoverage documents that every SessionGoal
 // resolves to a non-zero rep count via DeriveScheme. Adding a new variant without
 // updating the switch in DeriveScheme will both fail this test and trip the
 // `exhaustive` linter on the package's internal switches.
-func TestExhaustivePeriodizationCoverage(t *testing.T) {
+func TestExhaustiveSessionGoalCoverage(t *testing.T) {
 	t.Parallel()
 
-	// Use a wide window so repMin/repMax don't mask any periodization branch.
+	// Use a wide window so repMin/repMax don't mask any goal branch.
 	const repMin, repMax = 5, 15
-	all := []domain.PeriodizationType{
-		domain.PeriodizationStrength,
-		domain.PeriodizationHypertrophy,
+	all := []domain.SessionGoal{
+		domain.SessionGoalStrength,
+		domain.SessionGoalHypertrophy,
 	}
 	for _, p := range all {
 		if got := domain.DeriveScheme(repMin, repMax, p, false).TargetReps; got <= 0 {
@@ -420,7 +420,7 @@ func TestProgression_DeloadFirstSetUsesStartingWeight(t *testing.T) {
 	t.Parallel()
 
 	cfg := domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         8,
 		RepMax:         12,
 		StartingWeight: 67.5,
@@ -446,7 +446,7 @@ func TestProgression_DeloadCarriesUserOverrideForward(t *testing.T) {
 	t.Parallel()
 
 	cfg := domain.Config{
-		Type:           domain.PeriodizationHypertrophy,
+		Type:           domain.SessionGoalHypertrophy,
 		RepMin:         8,
 		RepMax:         12,
 		StartingWeight: 61.0,
@@ -523,7 +523,7 @@ func TestDeloadSeedWeight(t *testing.T) {
 func TestAdjustedWeight_UnknownSignalDoesNotPanic(t *testing.T) {
 	t.Parallel()
 	p := domain.NewProgressionFromHistory(
-		domain.Config{Type: domain.PeriodizationStrength, RepMin: 5, RepMax: 8, StartingWeight: 50, IsDeload: false},
+		domain.Config{Type: domain.SessionGoalStrength, RepMin: 5, RepMax: 8, StartingWeight: 50, IsDeload: false},
 		[]domain.SetResult{{ActualReps: 5, Signal: domain.Signal("bogus"), WeightKg: 60}},
 	)
 	got := p.CurrentSet()
@@ -546,7 +546,7 @@ func TestExhaustiveSignalCoverage(t *testing.T) {
 	for _, s := range valid {
 		p := domain.NewProgressionFromHistory(
 			domain.Config{
-				Type:           domain.PeriodizationHypertrophy,
+				Type:           domain.SessionGoalHypertrophy,
 				RepMin:         5,
 				RepMax:         8,
 				StartingWeight: 50,

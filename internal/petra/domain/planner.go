@@ -18,7 +18,7 @@ const (
 	exercisesMediumHypertrophy = 4
 	exercisesShort             = 2
 
-	numPeriodizationTypes = 2
+	numSessionGoals = 2
 
 	hoursPerDay = 24
 )
@@ -62,7 +62,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		Sessions: [7]Session{},
 	}
 	for i := range 7 {
-		result.Sessions[i] = Session{ //nolint:exhaustruct // Rest-day placeholder; no slots or periodization.
+		result.Sessions[i] = Session{ //nolint:exhaustruct // Rest-day placeholder; no slots or goal.
 			Date: startingDate.AddDate(0, 0, i),
 		}
 	}
@@ -85,7 +85,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 		}
 	}
 
-	firstPT := wp.firstSessionPeriodizationType(startingDate)
+	firstPT := wp.firstSessionGoal(startingDate)
 	isDeload := IsDeloadWeek(
 		startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
 	)
@@ -94,20 +94,20 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 	weekUsedExercises := map[int]bool{}
 	volume := map[string]float64{}
 	for i, day := range workoutDays {
-		pt := nextPeriodizationType(firstPT, i)
+		pt := nextSessionGoal(firstPT, i)
 		if isDeload {
-			pt = PeriodizationHypertrophy
+			pt = SessionGoalHypertrophy
 		}
 		n := exercisesPerSession(wp.Prefs, day.Weekday(), pt, isDeload)
-		slots := wp.selectExercisesForDayWithPeriodization(
+		slots := wp.selectExercisesForDayWithGoal(
 			wp.determineCategory(day), n, pt, isDeload, wv, weekUsedExercises, volume,
 		)
 		dayOffset := int(day.Sub(startingDate).Hours() / hoursPerDay)
 		result.Sessions[dayOffset] = Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
-			Date:              day,
-			PeriodizationType: pt,
-			IsDeload:          isDeload,
-			Slots:             slots,
+			Date:     day,
+			Goal:     pt,
+			IsDeload: isDeload,
+			Slots:    slots,
 		}
 	}
 
@@ -161,21 +161,21 @@ func (wp *Planner) PlanDay(
 		}
 	}
 	monday := MondayOf(date)
-	firstPT := wp.firstSessionPeriodizationType(monday)
-	pt := nextPeriodizationType(firstPT, idx)
+	firstPT := wp.firstSessionGoal(monday)
+	pt := nextSessionGoal(firstPT, idx)
 
 	isDeload := IsDeloadWeek(
 		monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
 	)
 	if isDeload {
-		pt = PeriodizationHypertrophy
+		pt = SessionGoalHypertrophy
 	}
 	wv := weekVolumeFor(monday, wp.Prefs)
 
 	n := exercisesPerSession(wp.Prefs, date.Weekday(), pt, isDeload)
 	if n == 0 {
 		n = exercisesMedium
-		if pt == PeriodizationHypertrophy && !isDeload {
+		if pt == SessionGoalHypertrophy && !isDeload {
 			n = exercisesMediumHypertrophy
 		}
 	}
@@ -186,22 +186,22 @@ func (wp *Planner) PlanDay(
 	}
 	volume := make(map[string]float64, len(weekLoad))
 	maps.Copy(volume, weekLoad)
-	slots := wp.selectExercisesForDayWithPeriodization(category, n, pt, isDeload, wv, used, volume)
+	slots := wp.selectExercisesForDayWithGoal(category, n, pt, isDeload, wv, used, volume)
 
 	return Session{ //nolint:exhaustruct // DifficultyRating/StartedAt/CompletedAt start zero.
-		Date:              date,
-		PeriodizationType: pt,
-		IsDeload:          isDeload,
-		Slots:             slots,
+		Date:     date,
+		Goal:     pt,
+		IsDeload: isDeload,
+		Slots:    slots,
 	}, nil
 }
 
 // exercisesPerSession returns how many exercises to include based on session
-// duration and periodization. Hypertrophy non-deload sessions of >= 60 min
+// duration and goal. Hypertrophy non-deload sessions of >= 60 min
 // get one extra exercise to use the working-set time budget more fully;
 // strength and deload sessions keep their base counts.
-func exercisesPerSession(prefs Preferences, weekday time.Weekday, pt PeriodizationType, isDeload bool) int {
-	hyperBonus := pt == PeriodizationHypertrophy && !isDeload
+func exercisesPerSession(prefs Preferences, weekday time.Weekday, pt SessionGoal, isDeload bool) int {
+	hyperBonus := pt == SessionGoalHypertrophy && !isDeload
 	switch minutes := prefs.MinutesForDay(weekday); {
 	case minutes >= minutesLong:
 		if hyperBonus {
@@ -239,15 +239,15 @@ func (wp *Planner) determineCategory(date time.Time) Category {
 	return CategoryFullBody
 }
 
-// firstSessionPeriodizationType derives the periodization type for the first session of the
+// firstSessionGoal derives the session goal for the first session of the
 // week deterministically from the start date and preferences — no DB query needed.
-func (wp *Planner) firstSessionPeriodizationType(startingDate time.Time) PeriodizationType {
+func (wp *Planner) firstSessionGoal(startingDate time.Time) SessionGoal {
 	const secondsPerWeek = 7 * 24 * 3600
 	weeksSinceEpoch := startingDate.Unix() / secondsPerWeek
 	if weeksSinceEpoch%2 == 0 {
-		return PeriodizationStrength
+		return SessionGoalStrength
 	}
-	return PeriodizationHypertrophy
+	return SessionGoalHypertrophy
 }
 
 // isCategoryCompatible reports whether an exercise of exerciseCategory can be
@@ -272,7 +272,7 @@ func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]b
 	return false
 }
 
-// selectExercisesForDayWithPeriodization picks up to n category-compatible
+// selectExercisesForDayWithGoal picks up to n category-compatible
 // exercises for a session, mutating volume with each pick's primary
 // (PrimarySetFraction) and secondary (SecondarySetFraction) contributions
 // and marking each picked exercise's ID in weekUsedExercises so later
@@ -283,10 +283,10 @@ func primaryMuscleGroupsOverlap(ex Exercise, selectedPrimaryMuscles map[string]b
 // selected primaries are skipped (no two chest-primary picks in one
 // session). When no eligible candidate remains, selection stops early
 // (graceful degradation: the session may have fewer than n slots).
-func (wp *Planner) selectExercisesForDayWithPeriodization(
+func (wp *Planner) selectExercisesForDayWithGoal(
 	category Category,
 	n int,
-	pt PeriodizationType,
+	pt SessionGoal,
 	isDeload bool,
 	wv weekVolume,
 	weekUsedExercises map[int]bool,
@@ -333,7 +333,7 @@ func (wp *Planner) selectExercisesForDayWithPeriodization(
 // Ties are broken by lowest exercise ID. Returns -1 if no candidate qualifies.
 func (wp *Planner) pickBestExerciseIdx(
 	category Category,
-	pt PeriodizationType,
+	pt SessionGoal,
 	isDeload bool,
 	wv weekVolume,
 	selectedPrimaryMGs map[string]bool,
@@ -378,7 +378,7 @@ func applyVolume(volume map[string]float64, ex Exercise, nSets float64) {
 
 // buildPlannedExerciseSlot creates an ExerciseSlot for one exercise using
 // BuildPlannedSets as the single source of truth for set prescription.
-func buildPlannedExerciseSlot(ex Exercise, pt PeriodizationType, isDeload bool, weekSets int) ExerciseSlot {
+func buildPlannedExerciseSlot(ex Exercise, pt SessionGoal, isDeload bool, weekSets int) ExerciseSlot {
 	return ExerciseSlot{ //nolint:exhaustruct // WarmupCompletedAt nil.
 		Exercise: ex,
 		Sets:     BuildPlannedSets(ex, pt, isDeload, weekSets),
@@ -396,16 +396,16 @@ func (wp *Planner) hasExercisesForCategory(category Category) bool {
 	return false
 }
 
-// nextPeriodizationType cycles between PeriodizationStrength and PeriodizationHypertrophy.
+// nextSessionGoal cycles between SessionGoalStrength and SessionGoalHypertrophy.
 // It uses index-based alternation: even indices get the first type, odd indices get the second.
-func nextPeriodizationType(first PeriodizationType, idx int) PeriodizationType {
-	if idx%numPeriodizationTypes == 0 {
+func nextSessionGoal(first SessionGoal, idx int) SessionGoal {
+	if idx%numSessionGoals == 0 {
 		return first
 	}
-	if first == PeriodizationStrength {
-		return PeriodizationHypertrophy
+	if first == SessionGoalStrength {
+		return SessionGoalHypertrophy
 	}
-	return PeriodizationStrength
+	return SessionGoalStrength
 }
 
 // weekVolume captures the mesocycle-week-derived inputs to one planned session:
@@ -490,7 +490,7 @@ func overlapLength(lo, hi, segLo, segHi float64) float64 {
 // across the block via goalForWeek(t, wv.progress).
 func scoreCandidate(
 	ex Exercise,
-	pt PeriodizationType,
+	pt SessionGoal,
 	isDeload bool,
 	wv weekVolume,
 	volume map[string]float64,

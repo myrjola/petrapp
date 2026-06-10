@@ -981,7 +981,7 @@ func Test_ExerciseSet_RestChipAfterCompletedSet(t *testing.T) {
 	}
 
 	// Pick the first exercise slot URL — matches the pattern used by other tests
-	// in this file (the first exercise is a weighted exercise with a rep window).
+	// in this file (the first exercise is a weighted exercise with a rep range).
 	var slotURL string
 	doc.Find("a.exercise").EachWithBreak(func(_ int, s *goquery.Selection) bool {
 		if href, exists := s.Attr("href"); exists {

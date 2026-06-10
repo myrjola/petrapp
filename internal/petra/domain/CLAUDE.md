@@ -9,9 +9,9 @@ only — no SQL, no HTTP, no logger, no third-party clients.
 - **Entities:** `Exercise`, `Session`, `ExerciseSlot`, `Set`, `Preferences`,
   `FeatureFlag`, `MuscleGroupTarget`, `MuscleGroupVolume`.
 - **Value objects / enums:** `Category`, `ExerciseType`, `Signal`,
-  `PeriodizationType`, `MuscleGroupRegion`, `SessionStatus`,
-  `ExerciseSlotState`. The last two are display-state enums whose string
-  values double as CSS state tokens on the workout page.
+  `SessionGoal`, `MuscleGroupRegion`, `SessionStatus`,
+  `ExerciseSlotState`, `MuscleGroupVolumeStatus`. The last three are
+  display-state enums whose string values double as CSS state tokens.
 - **Aggregate methods on `Session`:** `Start`, `Complete`,
   `SetDifficulty`, `MarkWarmupComplete`, `RecordSet`, `UpdateSetWeight`,
   `UpdateCompletedValue`, `AddExercise`, `SwapExerciseInSlot`. These

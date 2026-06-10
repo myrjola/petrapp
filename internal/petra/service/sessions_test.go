@@ -397,7 +397,7 @@ func Test_StartSession_DoubleStartIsIdempotent(t *testing.T) {
 	}
 }
 
-func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T) {
+func Test_GenerateWorkout_SessionGoalTypeAlternatesAcrossSessions(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -438,24 +438,24 @@ func Test_GenerateWorkout_PeriodizationTypeAlternatesAcrossSessions(t *testing.T
 		t.Fatalf("save preferences: %v", err)
 	}
 
-	// Generate this week's plan and collect periodization types for all 3 workout days.
+	// Generate this week's plan and collect session goals for all 3 workout days.
 	plan, err := svc.ResolveWeeklySchedule(ctx)
 	if err != nil {
 		t.Fatalf("ResolveWeeklySchedule: %v", err)
 	}
 	sessions := plan.Sessions[:]
 
-	// Collect periodization types for scheduled days (Mon=0, Wed=2, Fri=4).
+	// Collect session goals for scheduled days (Mon=0, Wed=2, Fri=4).
 	scheduledIndices := []int{0, 2, 4}
-	types := make([]domain.PeriodizationType, len(scheduledIndices))
+	types := make([]domain.SessionGoal, len(scheduledIndices))
 	for j, i := range scheduledIndices {
-		types[j] = sessions[i].PeriodizationType
+		types[j] = sessions[i].Goal
 	}
 
-	// Each consecutive session must alternate periodization type.
+	// Each consecutive session must alternate session goal.
 	for i := 1; i < len(types); i++ {
 		if types[i] == types[i-1] {
-			t.Errorf("sessions[%d] and sessions[%d] have the same periodization type %q; want alternating",
+			t.Errorf("sessions[%d] and sessions[%d] have the same session goal %q; want alternating",
 				i-1, i, types[i])
 		}
 	}
@@ -1095,7 +1095,7 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, ?, 'hypertrophy')`,
 		userID, priorStr, priorMonday.Format("2006-01-02T15:04:05.000Z"))
 	if err != nil {

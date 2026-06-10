@@ -33,7 +33,7 @@ func sessionOn(offset int, started bool, completed bool, isDeload bool) domain.S
 	s.Slots = []domain.ExerciseSlot{{ //nolint:exhaustruct // test scaffolding.
 		Sets: []domain.Set{{}}, //nolint:exhaustruct // test scaffolding.
 	}}
-	s.PeriodizationType = domain.PeriodizationStrength
+	s.Goal = domain.SessionGoalStrength
 	return s
 }
 
@@ -127,7 +127,7 @@ func TestWeekPlan_ClearDeloadFromToday(t *testing.T) {
 // Rest-day placeholders (no slots) must NOT be touched by the deload
 // mutators: a placeholder with IsDeload=true would no longer satisfy the
 // repository's rest-day-placeholder predicate, and the reinsert pass would
-// try to write a workout_sessions row with empty PeriodizationType — failing
+// try to write a workout_sessions row with empty SessionGoal — failing
 // the schema's CHECK constraint. This test pins the protection.
 func TestWeekPlan_FlipAndClearDeloadFromToday_SkipRestDayPlaceholders(t *testing.T) {
 	t.Parallel()

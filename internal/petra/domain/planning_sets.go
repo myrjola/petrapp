@@ -11,13 +11,13 @@ const defaultTargetValue = 8
 const defaultTimedSets = 3
 
 // deriveSchemeForExercise returns the per-set target value and total set count
-// for an exercise in a session of the given periodization. Reps/seconds come
-// from the periodization (DeriveScheme / DefaultStartingSeconds); the set count
+// for an exercise in a session of the given goal. Reps/seconds come
+// from the goal (DeriveScheme / DefaultStartingSeconds); the set count
 // is weekSets (the mesocycle week's count, see SetsForWeek), reduced by one on a
 // deload (floored at deloadSetFloor). Timed exercises keep a fixed set count
 // (defaultTimedSets) and ignore weekSets — their per-session volume does not
 // ramp.
-func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool, weekSets int) (int, int) {
+func deriveSchemeForExercise(ex Exercise, pt SessionGoal, isDeload bool, weekSets int) (int, int) {
 	if ex.IsTimed() {
 		sets := defaultTimedSets
 		if isDeload {
@@ -45,7 +45,7 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool, w
 }
 
 // BuildPlannedSets returns the persisted set slice for an exercise prescribed
-// in a session of the given periodization. Single source of truth for "what
+// in a session of the given goal. Single source of truth for "what
 // target value and set count does this exercise get when first added to a
 // session".
 //
@@ -55,8 +55,8 @@ func deriveSchemeForExercise(ex Exercise, pt PeriodizationType, isDeload bool, w
 // `WeightKg == nil` meaning "never recorded".
 //
 // isDeload drops one set from weekSets (floored at 2) and targets repMax.
-func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDeload bool, weekSets int) []Set {
-	targetValue, n := deriveSchemeForExercise(exercise, periodization, isDeload, weekSets)
+func BuildPlannedSets(exercise Exercise, goal SessionGoal, isDeload bool, weekSets int) []Set {
+	targetValue, n := deriveSchemeForExercise(exercise, goal, isDeload, weekSets)
 	sets := make([]Set, n)
 	for i := range sets {
 		sets[i] = Set{ //nolint:exhaustruct // WeightKg, CompletedValue, CompletedAt, Signal start nil.
@@ -67,7 +67,7 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDelo
 }
 
 // BuildSetsForAdd produces the Set slice for an exercise being added to or
-// swapping into an existing session. The session's periodization dictates the
+// swapping into an existing session. The session's goal dictates the
 // rep/seconds TargetValue while the set count comes from the mesocycle week
 // (weekSets, deload-reduced) — a Deadlift added in a Strength week gets the
 // strength rep target and the week's set count, not whatever the historical
@@ -82,12 +82,12 @@ func BuildPlannedSets(exercise Exercise, periodization PeriodizationType, isDelo
 // isDeload drops one set (floored at 2) and targets repMax (see BuildPlannedSets).
 func BuildSetsForAdd(
 	exercise Exercise,
-	periodization PeriodizationType,
+	goal SessionGoal,
 	isDeload bool,
 	weekSets int,
 	historicalSets []Set,
 ) []Set {
-	sets := BuildPlannedSets(exercise, periodization, isDeload, weekSets)
+	sets := BuildPlannedSets(exercise, goal, isDeload, weekSets)
 	if !exercise.HasWeight() {
 		return sets
 	}

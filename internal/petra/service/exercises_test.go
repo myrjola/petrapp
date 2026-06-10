@@ -763,26 +763,26 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 	}
 }
 
-// Test_AddExercise_DerivesTargetValueFromPeriodization is a regression test for
+// Test_AddExercise_DerivesTargetValueFromSessionGoal is a regression test for
 // PR #89: AddExercise used to produce target_value=8 (the old repsHypertrophy
-// constant) for every new exercise regardless of the session's periodization and
-// the exercise's per-exercise rep window.
+// constant) for every new exercise regardless of the session's goal and
+// the exercise's per-exercise rep range.
 //
 // For Deadlift (rep_min=3, rep_max=6):
 //   - Hypertrophy → DeriveScheme(3, 6, Hypertrophy).TargetReps == 6, TargetSets == 3
 //   - Strength    → DeriveScheme(3, 6, Strength).TargetReps    == 3, TargetSets == 4
-func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
+func Test_AddExercise_DerivesTargetValueFromSessionGoal(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name            string
-		periodization   string
+		goal            string
 		wantTargetValue int
 		wantSetCount    int
 	}{
-		// Set count is now driven by the mesocycle week, not periodization. With
+		// Set count is now driven by the mesocycle week, not goal. With
 		// no anchor (DB default NULL) and deload off, SetsForWeek returns the base
-		// 3 for both. TargetValue (reps) stays periodization-driven: strength=repMin=3,
+		// 3 for both. TargetValue (reps) stays goal-driven: strength=repMin=3,
 		// hypertrophy=repMax=6.
 		{"hypertrophy", "hypertrophy", 6, 3},
 		{"strength", "strength", 3, 3},
@@ -811,7 +811,7 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 			var userID int
 			err = db.ReadWrite.QueryRowContext(ctx,
 				"INSERT INTO users (webauthn_user_id, display_name) VALUES (?, ?) RETURNING id",
-				[]byte("derive-user-"+tt.periodization), "Derive User").Scan(&userID)
+				[]byte("derive-user-"+tt.goal), "Derive User").Scan(&userID)
 			if err != nil {
 				t.Fatalf("insert user: %v", err)
 			}
@@ -834,8 +834,8 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 			sessionDateStr := sessionDate.Format("2006-01-02")
 
 			if _, err = db.ReadWrite.ExecContext(ctx,
-				"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, ?)",
-				userID, sessionDateStr, tt.periodization); err != nil {
+				"INSERT INTO workout_sessions (user_id, workout_date, session_goal) VALUES (?, ?, ?)",
+				userID, sessionDateStr, tt.goal); err != nil {
 				t.Fatalf("insert session: %v", err)
 			}
 
@@ -868,16 +868,16 @@ func Test_AddExercise_DerivesTargetValueFromPeriodization(t *testing.T) {
 	}
 }
 
-// Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization is a regression
+// Test_ReplaceExerciseInSession_DerivesTargetValueFromSessionGoal is a regression
 // test for PR #89: SwapExercise used to copy TargetValue verbatim from the most
-// recent historical session, which spread the wrong rep count across periodization
+// recent historical session, which spread the wrong rep count across goal
 // boundaries (e.g. a Calf Raise swapped in on a Strength week kept 20 reps from
 // a Hypertrophy-week history instead of getting the correct 10 reps).
 //
 // For Deadlift (rep_min=3, rep_max=6):
 //   - Hypertrophy swap → TargetValue == 6, TargetSets == 3
-//   - Historical weight (80kg) is preserved; periodization-wrong TargetValue (3) is overridden.
-func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testing.T) {
+//   - Historical weight (80kg) is preserved; goal-wrong TargetValue (3) is overridden.
+func Test_ReplaceExerciseInSession_DerivesTargetValueFromSessionGoal(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -934,7 +934,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 	// preserved but TargetValue should become 6 (hypertrophy target), not 3.
 	histDateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, 'strength')",
+		"INSERT INTO workout_sessions (user_id, workout_date, session_goal) VALUES (?, ?, 'strength')",
 		userID, histDateStr); err != nil {
 		t.Fatalf("insert hist session: %v", err)
 	}
@@ -956,7 +956,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromPeriodization(t *testin
 
 	// Today's hypertrophy session with squat in slot.
 	if _, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO workout_sessions (user_id, workout_date, periodization_type) VALUES (?, ?, 'hypertrophy')",
+		"INSERT INTO workout_sessions (user_id, workout_date, session_goal) VALUES (?, ?, 'hypertrophy')",
 		userID, dateStr); err != nil {
 		t.Fatalf("insert today's session: %v", err)
 	}

@@ -12,7 +12,7 @@ import (
 // GetStartingWeight returns the weight to seed a new session for the given exercise.
 // It pulls the latest successful set (completed and not signaled too heavy) from
 // the most recent qualifying session strictly before beforeDate, then converts the
-// load via Epley 1RM-equivalence when that session's periodization differs from
+// load via Epley 1RM-equivalence when that session's goal differs from
 // targetType so the relative intensity carries across rep schemes (e.g. 100 kg x5
 // strength → ~92 kg x8 hypertrophy). Using a cutoff keeps the starting weight
 // stable when earlier sets of beforeDate's session are edited. Returns 0 if no
@@ -21,28 +21,28 @@ func (s *Service) GetStartingWeight(
 	ctx context.Context,
 	exerciseID int,
 	beforeDate time.Time,
-	targetType domain.PeriodizationType,
+	targetType domain.SessionGoal,
 ) (float64, error) {
 	prev, err := s.repos.Sessions.GetLatestStartingWeightBefore(ctx, exerciseID, beforeDate)
 	if err != nil {
 		return 0, fmt.Errorf("get latest starting weight: %w", err)
 	}
-	if prev.PeriodizationType == "" || prev.PeriodizationType == targetType {
+	if prev.Goal == "" || prev.Goal == targetType {
 		return prev.WeightKg, nil
 	}
 	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
 	if err != nil {
-		return 0, fmt.Errorf("get exercise for rep window: %w", err)
+		return 0, fmt.Errorf("get exercise for rep range: %w", err)
 	}
 	if exercise.RepMin == nil || exercise.RepMax == nil {
-		// time-based exercises don't carry a rep window and shouldn't reach
+		// time-based exercises don't carry a rep range and shouldn't reach
 		// this path (their starting value is seconds via GetStartingSeconds);
 		// defensive return preserves the historical weight unchanged.
 		return prev.WeightKg, nil
 	}
 	fromReps := domain.DeriveScheme(
 		*exercise.RepMin, *exercise.RepMax,
-		prev.PeriodizationType,
+		prev.Goal,
 		false,
 	).TargetReps
 	toReps := domain.DeriveScheme(
@@ -103,21 +103,21 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get exercise: %w", err)
 	}
 	if exercise.RepMin == nil || exercise.RepMax == nil {
-		return nil, fmt.Errorf("exercise %d has no rep window (use BuildTimedProgression for time_based)", exerciseID)
+		return nil, fmt.Errorf("exercise %d has no rep range (use BuildTimedProgression for time_based)", exerciseID)
 	}
 
 	var startingWeight float64
 	if sess.IsDeload {
 		startingWeight, err = s.GetDeloadStartingWeight(ctx, exerciseID, date)
 	} else {
-		startingWeight, err = s.GetStartingWeight(ctx, exerciseID, date, sess.PeriodizationType)
+		startingWeight, err = s.GetStartingWeight(ctx, exerciseID, date, sess.Goal)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get starting weight: %w", err)
 	}
 
 	config := domain.Config{
-		Type:           sess.PeriodizationType,
+		Type:           sess.Goal,
 		RepMin:         *exercise.RepMin,
 		RepMax:         *exercise.RepMax,
 		StartingWeight: startingWeight,
@@ -193,7 +193,7 @@ func (s *Service) GetDeloadStartingWeight(
 		return 0, nil
 	}
 	factor := deloadFallback
-	if prev.PeriodizationType == domain.PeriodizationHypertrophy {
+	if prev.Goal == domain.SessionGoalHypertrophy {
 		factor = deloadFactor
 	}
 	return domain.DeloadSeedWeight(prev.WeightKg, factor), nil

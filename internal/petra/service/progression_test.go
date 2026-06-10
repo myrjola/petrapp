@@ -58,7 +58,7 @@ func Test_GetStartingWeight(t *testing.T) {
 	today := time.Now()
 
 	// No history: expect 0.
-	got, err := svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight no history: %v", err)
 	}
@@ -71,7 +71,7 @@ func Test_GetStartingWeight(t *testing.T) {
 	// (too_heavy). The latest *successful* set is set 2 at 100kg.
 	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, dateStr)
 	if err != nil {
@@ -94,9 +94,9 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert sets: %v", err)
 	}
 
-	// Same periodization (strength → strength): the latest successful set (set 2 at
+	// Same goal (strength → strength): the latest successful set (set 2 at
 	// 100kg) carries over unchanged, ignoring the failed set 3.
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight with history: %v", err)
 	}
@@ -104,11 +104,11 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Errorf("strength → strength: want 100.0, got %v", got)
 	}
 
-	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): Epley conversion
+	// Cross-goal (strength 5 reps → hypertrophy 8 reps): Epley conversion
 	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.1, rounded to 0.5 = 92.0.
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationHypertrophy)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalHypertrophy)
 	if err != nil {
-		t.Fatalf("GetStartingWeight cross-periodization: %v", err)
+		t.Fatalf("GetStartingWeight cross-goal: %v", err)
 	}
 	if got != 92.0 {
 		t.Errorf("strength → hypertrophy: want 92.0, got %v", got)
@@ -142,7 +142,7 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert today's sets: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight ignoring today: %v", err)
 	}
@@ -155,7 +155,7 @@ func Test_GetStartingWeight(t *testing.T) {
 	// session's latest successful set (100kg).
 	failDateStr := today.AddDate(0, 0, -3).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, failDateStr)
 	if err != nil {
@@ -177,7 +177,7 @@ func Test_GetStartingWeight(t *testing.T) {
 		t.Fatalf("insert fail sets: %v", err)
 	}
 
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight fallback: %v", err)
 	}
@@ -187,7 +187,7 @@ func Test_GetStartingWeight(t *testing.T) {
 }
 
 // Test_GetStartingWeight_Assisted covers the assisted-exercise (negative weight)
-// flow across periodization changes: an on-target -50 kg x5 strength set must
+// flow across goal changes: an on-target -50 kg x5 strength set must
 // translate into a more negative weight when the next session is hypertrophy
 // (8 reps), since more reps require more machine assistance for the same
 // relative intensity.
@@ -238,7 +238,7 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	// Insert a completed strength session 7 days ago at -50 kg x5, on target.
 	dateStr := today.AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, dateStr)
 	if err != nil {
@@ -259,8 +259,8 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 		t.Fatalf("insert sets: %v", err)
 	}
 
-	// Same periodization: -50 kg carries over unchanged.
-	got, err := svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationStrength)
+	// Same goal: -50 kg carries over unchanged.
+	got, err := svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalStrength)
 	if err != nil {
 		t.Fatalf("GetStartingWeight strength→strength: %v", err)
 	}
@@ -268,10 +268,10 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 		t.Errorf("assisted strength → strength: want -50.0, got %v", got)
 	}
 
-	// Cross-periodization (strength 5 reps → hypertrophy 8 reps): more reps
+	// Cross-goal (strength 5 reps → hypertrophy 8 reps): more reps
 	// require more assistance, so the recommendation must be more negative.
 	// -50 * (1 + 8/30) / (1 + 5/30) ≈ -54.29 → snaps to -54.5.
-	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.PeriodizationHypertrophy)
+	got, err = svc.GetStartingWeight(ctx, exerciseID, today, domain.SessionGoalHypertrophy)
 	if err != nil {
 		t.Fatalf("GetStartingWeight strength→hypertrophy: %v", err)
 	}
@@ -334,7 +334,7 @@ func Test_GetStartingSeconds(t *testing.T) {
 	// Case 2: seed a successful session 2 days ago.
 	twoDaysAgo := today.AddDate(0, 0, -2).Format("2006-01-02")
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO workout_sessions (user_id, workout_date, periodization_type)
+		INSERT INTO workout_sessions (user_id, workout_date, session_goal)
 		VALUES (?, ?, 'strength')`, userID, twoDaysAgo); err != nil {
 		t.Fatalf("insert session 1: %v", err)
 	}
@@ -363,7 +363,7 @@ func Test_GetStartingSeconds(t *testing.T) {
 	// Case 3: more recent too_heavy session should be skipped.
 	oneDayAgo := today.AddDate(0, 0, -1).Format("2006-01-02")
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO workout_sessions (user_id, workout_date, periodization_type)
+		INSERT INTO workout_sessions (user_id, workout_date, session_goal)
 		VALUES (?, ?, 'strength')`, userID, oneDayAgo); err != nil {
 		t.Fatalf("insert session 2: %v", err)
 	}
@@ -435,7 +435,7 @@ func Test_BuildTimedProgression(t *testing.T) {
 
 	// Seed today's session with the exercise but no completed sets yet.
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO workout_sessions (user_id, workout_date, periodization_type)
+		INSERT INTO workout_sessions (user_id, workout_date, session_goal)
 		VALUES (?, ?, 'strength')`, userID, today); err != nil {
 		t.Fatalf("insert session: %v", err)
 	}
@@ -530,7 +530,7 @@ func Test_BuildProgression(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	// Hypertrophy session (1 completed before this one).
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
 		userID, today)
 	if err != nil {
@@ -629,7 +629,7 @@ func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
 
 	today := time.Now().Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type, is_deload)
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, session_goal, is_deload)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy', 1)`,
 		userID, today)
 	if err != nil {
@@ -671,7 +671,7 @@ func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
 	}
 }
 
-func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
+func Test_BuildProgression_CrossSessionGoalConversion(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -713,7 +713,7 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	// Prior strength session 7 days ago: completed first set 100 kg x 5 on target.
 	prevStr := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, prevStr)
 	if err != nil {
@@ -737,7 +737,7 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 	// New hypertrophy session today.
 	todayStr := time.Now().Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
 		userID, todayStr)
 	if err != nil {
@@ -771,7 +771,7 @@ func Test_BuildProgression_CrossPeriodizationConversion(t *testing.T) {
 // Test_BuildProgression_CurrentSetUsesDeriveScheme is a regression test for the bug
 // where Progression.CurrentSet() returned TargetReps from the legacy TargetReps()
 // function (hardcoded 5/8/15) rather than from DeriveScheme on the exercise's
-// per-session rep window. A Deadlift (rep_min=3, rep_max=6) on a hypertrophy
+// per-session rep range. A Deadlift (rep_min=3, rep_max=6) on a hypertrophy
 // session must produce CurrentSet().TargetReps == 6 (repMax), not 8 (the old
 // hypertrophy constant). Before this fix the workout UI displayed "8 reps" even
 // though the planner had persisted target_value=6.
@@ -823,7 +823,7 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 
 	// Insert a completed hypertrophy session on monday with 80 kg on_target.
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, '2026-04-27T10:00:00.000Z', 'hypertrophy')`,
 		userID, mondayStr)
 	if err != nil {
@@ -903,7 +903,7 @@ func Test_GetDeloadStartingWeight_FloorsFractionalResult(t *testing.T) {
 	ts := monday.Format("2006-01-02T15:04:05.000Z")
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, ?, 'hypertrophy')`,
 		userID, mondayStr, ts)
 	if err != nil {
@@ -988,7 +988,7 @@ func Test_GetDeloadStartingWeight_Assisted(t *testing.T) {
 
 	// Hypertrophy session with -50 kg of assistance, on target.
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, completed_at, session_goal)
 		 VALUES (?, ?, ?, 'hypertrophy')`,
 		userID, mondayStr, ts)
 	if err != nil {
@@ -1062,7 +1062,7 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 
 	// Hypertrophy session today.
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'hypertrophy')`,
 		userID, today)
 	if err != nil {
@@ -1090,7 +1090,7 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 	// Strength session: DeriveScheme(3, 6, Strength).TargetReps == 3 (repMin).
 	strengthDay := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 	_, err = db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, started_at, periodization_type)
+		`INSERT INTO workout_sessions (user_id, workout_date, started_at, session_goal)
 		 VALUES (?, ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ'), 'strength')`,
 		userID, strengthDay)
 	if err != nil {

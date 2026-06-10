@@ -177,7 +177,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	// (power sets) and returning later still sees the "Ready" state instead
 	// of nothing. The on-screen JS flips elapsed deadlines to "Ready" itself.
 	var restEndAtMs int64
-	if restEnd, restActive := exerciseSlot.RestEndAt(session.PeriodizationType, session.IsDeload); restActive {
+	if restEnd, restActive := exerciseSlot.RestEndAt(session.Goal, session.IsDeload); restActive {
 		restEndAtMs = restEnd.UnixMilli()
 	}
 

@@ -59,7 +59,7 @@ func (s *Service) RecordSet(
 		wasComplete   bool
 		postSlot      domain.ExerciseSlot
 		postSlotOK    bool
-		periodization domain.PeriodizationType
+		goal          domain.SessionGoal
 		sessionDeload bool
 	)
 	now := time.Now().UTC()
@@ -75,7 +75,7 @@ func (s *Service) RecordSet(
 				wasComplete = slot.Sets[setIndex].CompletedAt != nil
 			}
 		}
-		periodization = sess.PeriodizationType
+		goal = sess.Goal
 		sessionDeload = sess.IsDeload
 
 		if recErr := sess.RecordSet(pos, setIndex, signal, weightKg, completedValue, now); recErr != nil {
@@ -95,7 +95,7 @@ func (s *Service) RecordSet(
 
 	if !wasComplete && postSlotOK {
 		userID := contexthelpers.AuthenticatedUserID(ctx)
-		s.applyRestPushDecision(ctx, userID, date, pos, postSlot, periodization, sessionDeload, now)
+		s.applyRestPushDecision(ctx, userID, date, pos, postSlot, goal, sessionDeload, now)
 	}
 	return nil
 }
@@ -111,7 +111,7 @@ func (s *Service) applyRestPushDecision(
 	date time.Time,
 	pos int,
 	slot domain.ExerciseSlot,
-	periodization domain.PeriodizationType,
+	goal domain.SessionGoal,
 	isDeload bool,
 	completedAt time.Time,
 ) {
@@ -119,7 +119,7 @@ func (s *Service) applyRestPushDecision(
 		return
 	}
 
-	decision := domain.PlanRestPush(slot, periodization, isDeload, completedAt)
+	decision := domain.PlanRestPush(slot, goal, isDeload, completedAt)
 	switch decision.Action {
 	case domain.RestPushActionNoOp:
 		return

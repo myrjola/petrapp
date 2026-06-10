@@ -66,7 +66,7 @@ func (s *Service) GetExerciseSetsForExerciseSince(ctx context.Context, exerciseI
 // group across the supplied sessions. One entry is returned for every known
 // muscle group, sorted alphabetically; groups with no contributions appear as
 // zero-load rows so the UI can render them without a separate query. Targets are
-// joined from muscle_group_weekly_targets; untracked groups carry TargetSets = 0.
+// joined from muscle_group_weekly_targets; untracked groups carry MinSets/MaxSets = 0.
 func (s *Service) WeeklyMuscleGroupVolume(
 	ctx context.Context,
 	sessions []domain.Session,

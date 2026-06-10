@@ -142,11 +142,11 @@ func (r baseRepository) insertSessionRowInTx(ctx context.Context, tx *sql.Tx, se
 	dateStr := formatDate(sess.Date)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO workout_sessions (
-			user_id, workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+			user_id, workout_date, difficulty_rating, started_at, completed_at, session_goal, is_deload
 		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		userID, dateStr, sess.DifficultyRating,
 		formatTimestamp(sess.StartedAt), formatTimestamp(sess.CompletedAt),
-		sess.PeriodizationType, sess.IsDeload); err != nil {
+		sess.Goal, sess.IsDeload); err != nil {
 		return fmt.Errorf("insert session: %w", err)
 	}
 	return nil

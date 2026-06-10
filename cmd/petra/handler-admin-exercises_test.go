@@ -185,7 +185,7 @@ func Test_application_adminExercises(t *testing.T) {
 			t.Error("Expected to find the updated exercise name in the table")
 		}
 
-		// Re-open the edit page and assert rep window round-tripped.
+		// Re-open the edit page and assert rep range round-tripped.
 		if doc, err = client.GetDoc(ctx, editURL); err != nil {
 			t.Fatalf("Failed to re-open exercise edit page: %v", err)
 		}
@@ -296,10 +296,10 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 	})
 
-	// Rep window is required for non-time-based exercises and must satisfy
+	// Rep range is required for non-time-based exercises and must satisfy
 	// min <= max within [1, 50]. Validation errors surface via flash + redirect,
 	// matching the empty-name pattern.
-	t.Run("Invalid rep window shows validation error", func(t *testing.T) {
+	t.Run("Invalid rep range shows validation error", func(t *testing.T) {
 		if doc, err = client.GetDoc(ctx, "/admin/exercises"); err != nil {
 			t.Fatalf("Failed to get admin exercises page: %v", err)
 		}
@@ -328,7 +328,7 @@ func Test_application_adminExercises(t *testing.T) {
 			"rep_max":     "8",
 		}
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
-			t.Fatalf("Failed to submit invalid rep window: %v", err)
+			t.Fatalf("Failed to submit invalid rep range: %v", err)
 		}
 		if doc.Find("[role=alert]").Length() == 0 {
 			t.Errorf("Expected validation alert on the edit page")

@@ -58,7 +58,7 @@ func parseSessionRow(
 	difficultyRating sql.NullInt32,
 	startedAtStr sql.NullString,
 	completedAtStr sql.NullString,
-	periodizationType domain.PeriodizationType,
+	goal domain.SessionGoal,
 	isDeload bool,
 ) (domain.Session, error) {
 	date, err := time.Parse(dateFormat, workoutDateStr)
@@ -66,9 +66,9 @@ func parseSessionRow(
 		return domain.Session{}, fmt.Errorf("parse workout date: %w", err)
 	}
 	session := domain.Session{ //nolint:exhaustruct // Slots filled by caller.
-		Date:              date,
-		PeriodizationType: periodizationType,
-		IsDeload:          isDeload,
+		Date:     date,
+		Goal:     goal,
+		IsDeload: isDeload,
 	}
 	if difficultyRating.Valid {
 		rating := int(difficultyRating.Int32)
@@ -380,7 +380,7 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		periodType string
 	)
 	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT es.weight_kg, ws.periodization_type
+		SELECT es.weight_kg, ws.session_goal
 		FROM exercise_sets es
 		JOIN exercise_slots we
 		    ON  we.workout_user_id = es.workout_user_id
@@ -406,8 +406,8 @@ func (r *sqliteSessionRepository) GetLatestStartingWeightBefore(
 		return domain.LatestStartingSet{}, fmt.Errorf("query latest starting weight: %w", err)
 	}
 	return domain.LatestStartingSet{
-		WeightKg:          weightKg,
-		PeriodizationType: domain.PeriodizationType(periodType),
+		WeightKg: weightKg,
+		Goal:     domain.SessionGoal(periodType),
 	}, nil
 }
 
@@ -468,7 +468,7 @@ func (r baseRepository) listSessionRows(
 	sinceDate time.Time,
 ) (_ []domain.Session, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+		SELECT workout_date, difficulty_rating, started_at, completed_at, session_goal, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date >= ?
 		ORDER BY workout_date DESC`,
@@ -485,21 +485,21 @@ func (r baseRepository) listSessionRows(
 	var sessions []domain.Session
 	for rows.Next() {
 		var (
-			workoutDateStr    string
-			difficultyRating  sql.NullInt32
-			startedAtStr      sql.NullString
-			completedAtStr    sql.NullString
-			periodizationType domain.PeriodizationType
-			isDeload          bool
+			workoutDateStr   string
+			difficultyRating sql.NullInt32
+			startedAtStr     sql.NullString
+			completedAtStr   sql.NullString
+			goal             domain.SessionGoal
+			isDeload         bool
 		)
 		if err = rows.Scan(
-			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload,
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &goal, &isDeload,
 		); err != nil {
 			return nil, fmt.Errorf("scan session row: %w", err)
 		}
 		var session domain.Session
 		session, err = parseSessionRow(
-			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
+			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, goal, isDeload,
 		)
 		if err != nil {
 			return nil, err
@@ -522,7 +522,7 @@ func (r baseRepository) listSessionRowsBetween(
 	from, to time.Time,
 ) (_ []domain.Session, err error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+		SELECT workout_date, difficulty_rating, started_at, completed_at, session_goal, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date BETWEEN ? AND ?
 		ORDER BY workout_date ASC`,
@@ -539,21 +539,21 @@ func (r baseRepository) listSessionRowsBetween(
 	var sessions []domain.Session
 	for rows.Next() {
 		var (
-			workoutDateStr    string
-			difficultyRating  sql.NullInt32
-			startedAtStr      sql.NullString
-			completedAtStr    sql.NullString
-			periodizationType domain.PeriodizationType
-			isDeload          bool
+			workoutDateStr   string
+			difficultyRating sql.NullInt32
+			startedAtStr     sql.NullString
+			completedAtStr   sql.NullString
+			goal             domain.SessionGoal
+			isDeload         bool
 		)
 		if err = rows.Scan(
-			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload,
+			&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &goal, &isDeload,
 		); err != nil {
 			return nil, fmt.Errorf("scan workout_sessions row: %w", err)
 		}
 		var session domain.Session
 		session, err = parseSessionRow(
-			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
+			workoutDateStr, difficultyRating, startedAtStr, completedAtStr, goal, isDeload,
 		)
 		if err != nil {
 			return nil, err
@@ -571,19 +571,19 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 	dateStr := formatDate(date)
 
 	var (
-		workoutDateStr    string
-		difficultyRating  sql.NullInt32
-		startedAtStr      sql.NullString
-		completedAtStr    sql.NullString
-		periodizationType domain.PeriodizationType
-		isDeload          bool
+		workoutDateStr   string
+		difficultyRating sql.NullInt32
+		startedAtStr     sql.NullString
+		completedAtStr   sql.NullString
+		goal             domain.SessionGoal
+		isDeload         bool
 	)
 	err := q.QueryRowContext(ctx, `
-		SELECT workout_date, difficulty_rating, started_at, completed_at, periodization_type, is_deload
+		SELECT workout_date, difficulty_rating, started_at, completed_at, session_goal, is_deload
 		FROM workout_sessions
 		WHERE user_id = ? AND workout_date = ?`,
 		userID, dateStr).Scan(
-		&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &periodizationType, &isDeload)
+		&workoutDateStr, &difficultyRating, &startedAtStr, &completedAtStr, &goal, &isDeload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Session{}, domain.ErrNotFound
 	}
@@ -592,7 +592,7 @@ func (r *sqliteSessionRepository) get(ctx context.Context, q queryer, date time.
 	}
 
 	session, err := parseSessionRow(
-		workoutDateStr, difficultyRating, startedAtStr, completedAtStr, periodizationType, isDeload,
+		workoutDateStr, difficultyRating, startedAtStr, completedAtStr, goal, isDeload,
 	)
 	if err != nil {
 		return domain.Session{}, err

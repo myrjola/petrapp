@@ -46,7 +46,7 @@ func TestPlanRestPush(t *testing.T) {
 	tests := []struct {
 		name     string
 		slot     domain.ExerciseSlot
-		pt       domain.PeriodizationType
+		pt       domain.SessionGoal
 		isDeload bool
 		want     domain.RestPushDecision
 	}{
@@ -55,7 +55,7 @@ func TestPlanRestPush(t *testing.T) {
 			slot: domain.ExerciseSlot{ //nolint:exhaustruct // Only Exercise and Sets are read by PlanRestPush.
 				Exercise: squat, Sets: []domain.Set{},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 			//nolint:exhaustruct // FireAt/Payload unused for Cancel.
 			want: domain.RestPushDecision{Action: domain.RestPushActionCancel},
 		},
@@ -65,7 +65,7 @@ func TestPlanRestPush(t *testing.T) {
 				Exercise: squat,
 				Sets:     []domain.Set{completedSet, completedSet, completedSet},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 			//nolint:exhaustruct // FireAt/Payload unused for Cancel.
 			want: domain.RestPushDecision{Action: domain.RestPushActionCancel},
 		},
@@ -75,7 +75,7 @@ func TestPlanRestPush(t *testing.T) {
 				Exercise: squat,
 				Sets:     []domain.Set{incompleteSet, incompleteSet, incompleteSet},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 			want: domain.RestPushDecision{
 				Action: domain.RestPushActionSchedule,
 				FireAt: completedAt.Add(170 * time.Second),
@@ -94,7 +94,7 @@ func TestPlanRestPush(t *testing.T) {
 				Exercise: squat,
 				Sets:     []domain.Set{completedSet, completedSet, incompleteSet},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 			want: domain.RestPushDecision{
 				Action: domain.RestPushActionSchedule,
 				FireAt: completedAt.Add(170 * time.Second),
@@ -113,7 +113,7 @@ func TestPlanRestPush(t *testing.T) {
 				Exercise: plank,
 				Sets:     []domain.Set{incompleteSet, incompleteSet},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 			//nolint:exhaustruct // FireAt/Payload unused for NoOp.
 			want: domain.RestPushDecision{Action: domain.RestPushActionNoOp},
 		},
@@ -123,7 +123,7 @@ func TestPlanRestPush(t *testing.T) {
 				Exercise: curl,
 				Sets:     []domain.Set{incompleteSet, incompleteSet},
 			},
-			pt:       domain.PeriodizationStrength,
+			pt:       domain.SessionGoalStrength,
 			isDeload: true,
 			want: domain.RestPushDecision{
 				Action: domain.RestPushActionSchedule,

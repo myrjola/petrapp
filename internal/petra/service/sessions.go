@@ -324,7 +324,7 @@ func (s *Service) MarkWarmupComplete(
 		wasComplete   bool
 		postSlot      domain.ExerciseSlot
 		postSlotOK    bool
-		periodization domain.PeriodizationType
+		goal          domain.SessionGoal
 		sessionDeload bool
 	)
 	now := time.Now().UTC()
@@ -337,7 +337,7 @@ func (s *Service) MarkWarmupComplete(
 		if pos >= 0 && pos < len(sess.Slots) {
 			wasComplete = sess.Slots[pos].WarmupCompletedAt != nil
 		}
-		periodization = sess.PeriodizationType
+		goal = sess.Goal
 		sessionDeload = sess.IsDeload
 
 		if mErr := sess.MarkWarmupComplete(pos, now); mErr != nil {
@@ -354,7 +354,7 @@ func (s *Service) MarkWarmupComplete(
 
 	if !wasComplete && postSlotOK {
 		userID := contexthelpers.AuthenticatedUserID(ctx)
-		s.applyRestPushDecision(ctx, userID, date, pos, postSlot, periodization, sessionDeload, now)
+		s.applyRestPushDecision(ctx, userID, date, pos, postSlot, goal, sessionDeload, now)
 	}
 	return nil
 }

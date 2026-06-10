@@ -13,13 +13,13 @@ func TestDetermineWorkoutStatus(t *testing.T) {
 	now := time.Now()
 	newSession := func(startedAt, completedAt time.Time) domain.Session {
 		return domain.Session{
-			Date:              time.Time{},
-			DifficultyRating:  nil,
-			StartedAt:         startedAt,
-			CompletedAt:       completedAt,
-			Slots:             nil,
-			PeriodizationType: "",
-			IsDeload:          false,
+			Date:             time.Time{},
+			DifficultyRating: nil,
+			StartedAt:        startedAt,
+			CompletedAt:      completedAt,
+			Slots:            nil,
+			Goal:             "",
+			IsDeload:         false,
 		}
 	}
 

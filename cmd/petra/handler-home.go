@@ -74,22 +74,12 @@ type muscleGroupBarView struct {
 	Status          string
 }
 
-// Status values for a muscle group bar; these drive the fill colour in the template.
 const (
-	muscleStatusUnder    = "under"
-	muscleStatusOnTarget = "on-target"
-	muscleStatusOver     = "over"
-	muscleStatusNoTarget = "no-target"
-
 	// scaleHeadroom adds 10% headroom above the largest planned/target value so an
 	// on-target bar doesn't pin the right edge.
 	scaleHeadroom = 1.1
 	// minScale guarantees a non-zero divisor when the week is empty (all volumes 0).
 	minScale = 10.0
-	// overTargetMultiplier above this many times the target a bar is flagged as
-	// over-prescribed. Picked permissively because going somewhat above target is fine;
-	// far above suggests redundant programming.
-	overTargetMultiplier = 1.5
 )
 
 // regionOrder returns the display order for muscle group regions in the UI.
@@ -340,7 +330,7 @@ func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 		if v.PlannedVolume > scale {
 			scale = v.PlannedVolume
 		}
-		if t := float64(v.TargetSets); t > scale {
+		if t := float64(v.MinSets); t > scale {
 			scale = t
 		}
 	}
@@ -354,12 +344,12 @@ func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 			Slug:            muscleGroupSlug(v.Name),
 			CompletedVolume: v.CompletedVolume,
 			PlannedVolume:   v.PlannedVolume,
-			TargetSets:      v.TargetSets,
-			HasTarget:       v.TargetSets > 0,
+			TargetSets:      v.MinSets,
+			HasTarget:       v.MinSets > 0,
 			FillPercent:     int(v.CompletedVolume / scale * percentMultiplier),
 			PlannedPercent:  int(v.PlannedVolume / scale * percentMultiplier),
-			TargetPercent:   int(float64(v.TargetSets) / scale * percentMultiplier),
-			Status:          muscleStatus(v.PlannedVolume, v.TargetSets),
+			TargetPercent:   int(float64(v.MinSets) / scale * percentMultiplier),
+			Status:          string(v.Status()),
 		})
 	}
 
@@ -382,24 +372,6 @@ func toMuscleBalance(volumes []domain.MuscleGroupVolume) muscleBalanceView {
 // (e.g. "Upper Back" → "upper-back") for use in attribute selectors.
 func muscleGroupSlug(name string) string {
 	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
-}
-
-// muscleStatus classifies a muscle group's planned weekly volume against its target.
-// Groups without a seeded target are reported as "no-target" so the UI can render
-// them informationally without making a value judgment.
-func muscleStatus(planned float64, target int) string {
-	if target <= 0 {
-		return muscleStatusNoTarget
-	}
-	t := float64(target)
-	switch {
-	case planned < t:
-		return muscleStatusUnder
-	case planned <= overTargetMultiplier*t:
-		return muscleStatusOnTarget
-	default:
-		return muscleStatusOver
-	}
 }
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {

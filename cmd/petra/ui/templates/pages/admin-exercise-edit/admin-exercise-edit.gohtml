@@ -30,7 +30,7 @@
                 {{ template "field" .SecondsField }}
             </div>
 
-            <div id="rep-window-field"{{ if .Exercise.IsTimed }} hidden{{ end }}>
+            <div id="rep-range-field"{{ if .Exercise.IsTimed }} hidden{{ end }}>
                 {{ template "field" .RepMinField }}
                 {{ template "field" .RepMaxField }}
                 <small>Target rep range per set (1–50).</small>
@@ -41,7 +41,7 @@
                     const typeSelect = document.getElementById('exercise_type');
                     const secondsField = document.getElementById('default-starting-seconds-field');
                     const secondsInput = document.getElementById('default_starting_seconds');
-                    const repField = document.getElementById('rep-window-field');
+                    const repField = document.getElementById('rep-range-field');
                     const repMinInput = document.getElementById('rep_min');
                     const repMaxInput = document.getElementById('rep_max');
 

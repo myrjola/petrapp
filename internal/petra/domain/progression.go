@@ -5,11 +5,11 @@ import (
 )
 
 // Config is provided once when starting an exercise execution.
-// RepMin/RepMax describe the exercise's per-session rep window — the
+// RepMin/RepMax describe the exercise's per-session rep range — the
 // progression uses DeriveScheme on each CurrentSet() call to know what reps
-// to recommend for the next set under the session's periodization.
+// to recommend for the next set under the session's goal.
 type Config struct {
-	Type           PeriodizationType
+	Type           SessionGoal
 	RepMin         int
 	RepMax         int
 	StartingWeight float64 // kg; caller-derived from history, may be user-overridden

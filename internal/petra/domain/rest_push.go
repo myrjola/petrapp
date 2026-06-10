@@ -55,7 +55,7 @@ type RestPushDecision struct {
 // "what is the first incomplete set in this slot?".
 func PlanRestPush(
 	slot ExerciseSlot,
-	periodization PeriodizationType,
+	goal SessionGoal,
 	isDeload bool,
 	completedAt time.Time,
 ) RestPushDecision {
@@ -71,7 +71,7 @@ func PlanRestPush(
 		return RestPushDecision{Action: RestPushActionCancel} //nolint:exhaustruct // FireAt/Payload unused for Cancel.
 	}
 
-	restSeconds := RestSecondsFor(slot.Exercise, periodization, isDeload)
+	restSeconds := RestSecondsFor(slot.Exercise, goal, isDeload)
 	if restSeconds <= 0 {
 		return RestPushDecision{Action: RestPushActionNoOp} //nolint:exhaustruct // FireAt/Payload unused for NoOp.
 	}

@@ -605,7 +605,7 @@
             <header class="panel-head">
                 <span class="panel-eyebrow"><span class="panel-eyebrow-num">03</span> Recovery</span>
                 <h2 class="panel-title" id="deload-title">Deload cycles</h2>
-                <p class="panel-blurb">Planned recovery weeks back off intensity and volume so the next block starts fresh — the goal is recovery, not progress.</p>
+                <p class="panel-blurb">Planned recovery weeks back off intensity and volume so the next cycle starts fresh — the goal is recovery, not progress.</p>
             </header>
 
             {{ template "banner" (index $.FlashByPanel "deload-title") }}
@@ -615,7 +615,7 @@
                     <input type="checkbox" name="deload_enabled" {{ if .DeloadEnabled }}checked{{ end }}>
                     <span class="toggle-card-text">
                         <span>Schedule recovery weeks</span>
-                        <span class="toggle-card-hint">Last week of each block runs light.</span>
+                        <span class="toggle-card-hint">Last week of each cycle runs light.</span>
                     </span>
                 </label>
 
@@ -624,7 +624,7 @@
                     <select name="mesocycle_length" class="prefs-select">
                         {{ range .MesocycleLengthOptions }}
                             <option value="{{ . }}" {{ if eq . $.MesocycleLength }}selected{{ end }}>
-                                {{ . }} weeks ({{ printf "%d+1" (sub . 1) }})
+                                {{ . }} weeks — {{ sub . 1 }} training + 1 recovery
                             </option>
                         {{ end }}
                     </select>

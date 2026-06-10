@@ -1,9 +1,39 @@
 # Domain Context — Ubiquitous Language
 
 The shared vocabulary of the workout bounded context (`internal/petra/domain`).
-These are the canonical names domain code, repository, handlers, and templates
-should all use. When code and this file disagree, treat it as a bug in one of
-them and reconcile.
+These are the canonical names domain, repository, and service code use, and the
+names developers use when discussing the model. When code and this file
+disagree, treat it as a bug in one of them and reconcile.
+
+The language deliberately runs in **two registers**:
+
+- **Domain register** — the training literature's terms (mesocycle,
+  session goal, signal, fractional set), used in `internal/petra/` code and
+  developer discussion. Precision over familiarity.
+- **UI register** — plain gym English an average gym user understands without
+  reading training literature, used in templates, handler-prepared labels, and
+  URLs. Familiarity over precision. Terms like MEV/MRV, session goal,
+  hypertrophy, and fractional set never appear in UI copy; where a concept
+  must surface, it is shown with its **UI label** (see the table below) or
+  explained inline in plain words.
+
+Handlers are the seam: they translate domain values into UI-register labels
+before rendering. The "Aliases to avoid" columns apply to the domain register
+only — a word can be a forbidden alias in code yet the correct UI label.
+
+## UI register — label map
+
+Domain terms whose user-facing label differs. Anything not listed surfaces
+under its domain name (Deload, Warmup, Swap, Set, Muscle group) or not at all.
+
+| Domain term       | UI label                                   |
+| ----------------- | ------------------------------------------ |
+| **Session**       | Workout (also in URLs: `/workouts/{date}`) |
+| **Week plan**     | Weekly schedule                            |
+| **Exercise slot** | Exercise                                   |
+| **Mesocycle**     | Cycle ("Deload cycles", "Cycle length") — never "block" in copy |
+| **Signal**        | The "How did N reps feel?" buttons: **too heavy / BARELY / easy**. "Barely" is the on-target label by design — a hard set near failure *feels* barely made, and an honest "easy" is what earns the next increment |
+| **Difficulty rating** | The "How did it feel today?" choices: **Too easy / I could do more / Just right / Very hard / Impossible**. "Just right" belongs to this rating only — never reuse it for the per-set signal |
 
 ## Training structure (the long view)
 
@@ -16,7 +46,7 @@ them and reconcile.
 | **Training week**  | Any week of the mesocycle except the last; weeks where the set count ramps up (block indices `0 … length-2`) | Normal week, work week         |
 | **Deload week**   | The last week of a mesocycle: reduced volume (fewer sets, floored so a couple remain) and hypertrophy-rep targets | Rest week, easy week, taper    |
 | **Set-count ramp** | The week-over-week increase in per-exercise set count across the training weeks, peaking before the deload | Volume ramp, progression, build-up |
-| **Periodization** | The rep-target style assigned **per session** — **Strength** (low reps) or **Hypertrophy** (high reps). Consecutive sessions alternate, and the week's starting style flips each week; independent of mesocycle position | Phase, intensity, style |
+| **Session goal**  | The rep-target style assigned **per session** — **Strength** (low reps) or **Hypertrophy** (high reps). Consecutive sessions alternate, and the week's starting goal flips each week; independent of mesocycle position. The alternation as a whole is what the literature calls **daily undulating periodization (DUP)** | Periodization (retired — in the literature that means the long-term scheme, not the per-session value), phase, intensity, style |
 
 ## The weekly plan
 
@@ -32,7 +62,7 @@ them and reconcile.
 
 | Term              | Definition                                                                                                       | Aliases to avoid            |
 | ----------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| **Session**       | One day's workout: an ordered list of exercise slots, a periodization, and deload flag, with lifecycle timestamps | Workout, day                |
+| **Session**       | One day's workout: an ordered list of exercise slots, a session goal, and deload flag, with lifecycle timestamps | Workout, day                |
 | **Session status**| The lifecycle state derived from timestamps: **Not started → In progress → Completed**                          | State (unqualified)         |
 | **Category**      | The muscle-split focus of a session or exercise: **Full Body**, **Upper**, or **Lower**                          | Split, type, focus          |
 | **Workout type**  | The category *derived* from a session's actual slots (upper + lower present ⇒ full body)                         | —                           |
@@ -49,9 +79,9 @@ them and reconcile.
 | **Exercise type**  | The load classification: **Weighted**, **Bodyweight**, **Assisted**, or **Time-based**                         | Kind, variant                 |
 | **Load model**     | The measurement axis several exercise types share: **Weighted**, **Bodyweight**, **Timed** (drives progression/recording) | Mode                |
 | **Set**            | One bout of an exercise: a target value (reps or seconds), optional weight, and — once done — completed value, signal, timestamp. Warmups are tracked on the **exercise slot** (a completion timestamp), not stored as Sets, so every Set counts toward volume | Rep, round |
-| **Set count**      | The number of **Sets** prescribed per exercise for a session; driven by the **week in block**, not periodization | Sets (unqualified), volume  |
-| **Scheme**         | The per-exercise rep + rest prescription for a session, derived from the rep window and periodization (no set count) | Prescription (unqualified)|
-| **Rep window**     | An exercise's `RepMin … RepMax` band; periodization picks the low end (strength) or high end (hypertrophy)     | Rep range, target range       |
+| **Set count**      | The number of **Sets** prescribed per exercise for a session; driven by the **week in block**, not the session goal | Sets (unqualified), volume  |
+| **Scheme**         | The per-exercise rep + rest prescription for a session, derived from the rep range and session goal (no set count) | Prescription (unqualified)|
+| **Rep range**      | An exercise's `RepMin … RepMax` band; the session goal picks the low end (strength) or high end (hypertrophy)     | Rep window (retired), target range |
 | **Set target**     | What the progression recommends for the *next* set: a weight and a target-reps value                           | Recommendation, goal          |
 | **Signal**         | The user's perceived effort on a completed set: **Too heavy / On target / Too light**; drives weight progression | RPE, feedback, difficulty   |
 
@@ -79,22 +109,22 @@ them and reconcile.
 
 - A **Mesocycle** is `length` weeks long; its first `length-1` are **training weeks** and the last is the **deload week**.
 - A **Week plan** holds seven **session** slots; each **workout day** has a populated session, each **rest day** an empty one.
-- A **Session** carries one **periodization** and one deload flag, and holds ordered **exercise slots**.
+- A **Session** carries one **session goal** and one deload flag, and holds ordered **exercise slots**.
 - An **Exercise slot** binds one **exercise** to its **sets**; the slot's identity is its position.
 - An **Exercise** has one **exercise type**, which maps to one **load model**, and one or more **muscle groups** (primary/secondary).
 - A **Set** contributes to every muscle group its exercise touches — a full set to each primary, a **fractional set** (½) to each secondary — summed into **muscle-group volume**.
-- **Set count** comes from the **week in block** (the **set-count ramp**); **reps + rest** come from **periodization** via the **scheme** — the two are independent prescriptions.
+- **Set count** comes from the **week in block** (the **set-count ramp**); **reps + rest** come from the **session goal** via the **scheme** — the two are independent prescriptions.
 - The unit of **muscle-group volume** is the **fractional set**; a **muscle-group target** is authored in whole sets but compared against accumulated volume (a secondary set counts ½). "Load" means kilograms only — never muscle-group volume.
 
 ## Example dialogue
 
-> **Dev:** "When the planner builds Wednesday's **session**, where does the **set count** come from — the **periodization**?"
+> **Dev:** "When the planner builds Wednesday's **session**, where does the **set count** come from — the **session goal**?"
 
-> **Domain expert:** "No, those are decoupled. **Periodization** only decides reps and rest through the **scheme** — strength takes the low end of the **rep window**, hypertrophy the high end. The **set count** comes from the **week in block**: it ramps from its base up to its peak across the **training weeks**."
+> **Domain expert:** "No, those are decoupled. The **session goal** only decides reps and rest through the **scheme** — strength takes the low end of the **rep range**, hypertrophy the high end. The **set count** comes from the **week in block**: it ramps from its base up to its peak across the **training weeks**."
 
 > **Dev:** "And on the **deload week**?"
 
-> **Domain expert:** "The deload drops the set count — floored so a couple of sets remain — and forces hypertrophy reps regardless of the session's periodization. It's still training, just lower **volume**."
+> **Domain expert:** "The deload drops the set count — floored so a couple of sets remain — and forces hypertrophy reps regardless of the session's goal. It's still training, just lower **volume**."
 
 > **Dev:** "If I log a set as **too heavy**, that **signal** feeds the **progression**, right — not the **difficulty rating**?"
 
@@ -105,7 +135,8 @@ them and reconcile.
 - **"Volume"** — bare **volume** means training stimulus per muscle, summed in **fractional sets**, i.e. **muscle-group volume**. The week-over-week growth in per-exercise **set count** is the **set-count ramp** — never "volume ramp." Keep the word "volume" out of the set-count cluster.
 - **"Weight" and "load"** always mean kilograms lifted (`WeightKg`). A set's contribution to a muscle group's weekly volume (a full set for a primary, a **fractional set** for a secondary) is *never* a "weight" or a "load" — those are kilograms; volume is sets. ("Credit" was a retired in-house name for the fractional set.)
 - **"Set"** is both the entity (one bout, with reps/weight/signal) and a count. When you mean the number per exercise, say **set count**; when you mean a muscle group's weekly MinSets/MaxSets, say **muscle-group target** (its unit is the **hard set**). "Working set" is fine in prose for a performed Set, but it is not a separate counted thing.
+- **"Range"** — established fitness language won over the in-house "rep window" (retired 2026-06), so qualify every "range": **rep range** (per-exercise `RepMin…RepMax`), the **muscle-group target**'s hard-set range (MinSets…MaxSets), and the **dumbbell range** (the fine-increment load region). Bare "range" in prose is a bug; Go's `range` keyword makes the word ungreppable, so the qualifier is doing real work.
 - **"Target"** appears three ways: **muscle-group target** (weekly hard-set range, MEV/MRV), **set target** (next-set weight + reps recommendation), and **target reps / target value** (the per-set rep-or-seconds goal — computed in a scheme/recommendation, stored as `TargetValue` once on a Set). Qualify which.
 - **"Category" vs "Workout type"**: **Category** is the stored focus of an exercise or session; **workout type** is the category *derived* from a session's actual slots. They can differ — keep "workout type" for the derived value only.
 - **"Difficulty" vs "Signal"**: **Signal** is per-set perceived effort feeding weight progression; **Difficulty rating** is the post-session 1–5. They are distinct inputs to distinct mechanisms — never use "difficulty" for the per-set signal.
-- **Three "week" rhythms** are independent and easily conflated. (1) **Periodization** alternates session-to-session, and its weekly *starting* style flips week-to-week. (2) The **set-count ramp** climbs with the **week in block**. (3) The **deload week** is the last week of the **mesocycle**. Periodization parity is keyed to the calendar (weeks since epoch); the ramp and deload are keyed to the **mesocycle anchor**. One "week" is not interchangeable with another.
+- **Three "week" rhythms** are independent and easily conflated. (1) The **session goal** alternates session-to-session, and the weekly *starting* goal flips week-to-week. (2) The **set-count ramp** climbs with the **week in block**. (3) The **deload week** is the last week of the **mesocycle**. Session-goal parity is keyed to the calendar (weeks since epoch); the ramp and deload are keyed to the **mesocycle anchor**. One "week" is not interchangeable with another.

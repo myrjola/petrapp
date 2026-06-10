@@ -63,6 +63,12 @@ type workoutTemplateData struct {
 
 ### Prefer Handler-Side Processing
 
+Handlers are also the **register seam**: domain code speaks the training
+literature's terms, UI copy speaks plain gym English (see "UI register" in
+the root [CONTEXT.md](../CONTEXT.md)). Label maps like the difficulty
+options below are where that translation happens — keep domain identifiers
+out of user-facing strings.
+
 - Filter collections in handlers (e.g., remove already-selected exercises)
 - Transform enums to display-friendly structures with labels
 - Compute derived values and format data before template rendering

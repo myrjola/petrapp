@@ -134,3 +134,37 @@ func diffKeys(got map[string]float64, want map[string]float64) []string {
 	}
 	return extra
 }
+
+func Test_MuscleGroupVolume_Status(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		planned float64
+		min     int
+		max     int
+		want    domain.MuscleGroupVolumeStatus
+	}{
+		{"no seeded target", 12, 0, 0, domain.MuscleVolumeNoTarget},
+		{"below the floor", 9.5, 10, 20, domain.MuscleVolumeUnder},
+		{"exactly the floor", 10, 10, 20, domain.MuscleVolumeOnTarget},
+		{"inside the band", 15, 10, 20, domain.MuscleVolumeOnTarget},
+		{"exactly the ceiling", 20, 10, 20, domain.MuscleVolumeOnTarget},
+		{"above the ceiling", 20.5, 10, 20, domain.MuscleVolumeOver},
+		// The planner's late-cycle ramp targets MaxSets; the display must not
+		// flag the app's own prescription as excessive.
+		{"late-cycle ramp at MaxSets", 16, 8, 16, domain.MuscleVolumeOnTarget},
+	}
+	for _, tc := range cases {
+		v := domain.MuscleGroupVolume{
+			Name:            "Chest",
+			CompletedVolume: 0,
+			PlannedVolume:   tc.planned,
+			MinSets:         tc.min,
+			MaxSets:         tc.max,
+		}
+		if got := v.Status(); got != tc.want {
+			t.Errorf("%s: Status() = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

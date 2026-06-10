@@ -407,12 +407,12 @@ func Test_Exercise_Validate(t *testing.T) {
 			true, "At least one primary muscle group is required.",
 		},
 		{
-			"missing rep window",
+			"missing rep range",
 			func() domain.Exercise { e := validWeighted(); e.RepMin = nil; e.RepMax = nil; return e }(),
 			true, "Min and max reps must be whole numbers between 1 and 50.",
 		},
 		{
-			"rep window out of range",
+			"rep range out of bounds",
 			func() domain.Exercise { e := validWeighted(); e.RepMax = intPtr(99); return e }(),
 			true, "Min and max reps must be whole numbers between 1 and 50.",
 		},

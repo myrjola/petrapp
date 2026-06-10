@@ -84,10 +84,10 @@ func TestPlanner_PlanDay_AdjacencyToScheduledTomorrowPicksLower(t *testing.T) {
 	}
 }
 
-func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *testing.T) {
+func TestPlanner_PlanDay_SessionGoalMatchesWeeklyPlannerForScheduledDate(t *testing.T) {
 	t.Parallel()
 
-	// Mon, Wed, Fri scheduled. Plan(monday) assigns periodization by workoutDays index:
+	// Mon, Wed, Fri scheduled. Plan(monday) assigns goal by workoutDays index:
 	// Mon=idx0 first, Wed=idx1 second, Fri=idx2 first. PlanDay must agree for each.
 	p := prefs(time.Monday, time.Wednesday, time.Friday)
 	wp := newPlanDayPlanner(t, p)
@@ -107,9 +107,9 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForScheduledDate(t *te
 		if err != nil {
 			t.Fatalf("PlanDay(%s): %v", want.Date.Weekday(), err)
 		}
-		if got.PeriodizationType != want.PeriodizationType {
-			t.Errorf("PlanDay(%s) PeriodizationType = %s, want %s (matches weekly planner)",
-				want.Date.Weekday(), got.PeriodizationType, want.PeriodizationType)
+		if got.Goal != want.Goal {
+			t.Errorf("PlanDay(%s) SessionGoal = %s, want %s (matches weekly planner)",
+				want.Date.Weekday(), got.Goal, want.Goal)
 		}
 	}
 }
@@ -185,7 +185,7 @@ func TestPlanner_PlanDay_EmptyCategoryPoolReturnsError(t *testing.T) {
 	}
 }
 
-func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *testing.T) {
+func TestPlanner_PlanDay_SessionGoalMatchesWeeklyPlannerForSundaySchedule(t *testing.T) {
 	t.Parallel()
 
 	// Mon+Sun schedule. Plan assigns Mon→idx0, Sun→idx1. PlanDay must agree
@@ -199,11 +199,11 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *t
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
-	var planSunPT PeriodizationType
+	var planSunPT SessionGoal
 	for i := range weekly.Sessions {
 		s := weekly.Sessions[i]
 		if s.Date.Equal(sun) {
-			planSunPT = s.PeriodizationType
+			planSunPT = s.Goal
 		}
 	}
 
@@ -211,9 +211,9 @@ func TestPlanner_PlanDay_PeriodizationMatchesWeeklyPlannerForSundaySchedule(t *t
 	if err != nil {
 		t.Fatalf("PlanDay(Sunday): %v", err)
 	}
-	if got.PeriodizationType != planSunPT {
-		t.Errorf("Sunday PeriodizationType = %s, want %s (matches weekly planner)",
-			got.PeriodizationType, planSunPT)
+	if got.Goal != planSunPT {
+		t.Errorf("Sunday SessionGoal = %s, want %s (matches weekly planner)",
+			got.Goal, planSunPT)
 	}
 }
 

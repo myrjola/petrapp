@@ -2,14 +2,16 @@ package domain
 
 import "time"
 
-// PeriodizationType is the rep-target style for a session. The two values
-// alternate week-to-week (see Planner.firstSessionPeriodizationType) and
-// determine the rep target via DeriveScheme.
-type PeriodizationType string
+// SessionGoal is the rep-target style for a session. Consecutive sessions
+// alternate between the two values and the week's starting goal flips each
+// week (see Planner.firstSessionGoal / nextSessionGoal) — the literature's
+// daily undulating periodization. The goal determines the rep target via
+// DeriveScheme.
+type SessionGoal string
 
 const (
-	PeriodizationStrength    PeriodizationType = "strength"
-	PeriodizationHypertrophy PeriodizationType = "hypertrophy"
+	SessionGoalStrength    SessionGoal = "strength"
+	SessionGoalHypertrophy SessionGoal = "hypertrophy"
 )
 
 // SessionStatus is the lifecycle state of a workout session, for display.
@@ -77,7 +79,7 @@ func (es ExerciseSlot) CompletedSetCount() int {
 // in the past; the on-screen chip renders that as "Ready" so a user who
 // rotates through other exercises (power sets) and returns later still
 // sees the slot's rest state instead of nothing.
-func (es ExerciseSlot) RestEndAt(periodization PeriodizationType, isDeload bool) (time.Time, bool) {
+func (es ExerciseSlot) RestEndAt(goal SessionGoal, isDeload bool) (time.Time, bool) {
 	if es.WarmupCompletedAt == nil {
 		return time.Time{}, false
 	}
@@ -96,7 +98,7 @@ func (es ExerciseSlot) RestEndAt(periodization PeriodizationType, isDeload bool)
 	if !incomplete {
 		return time.Time{}, false
 	}
-	restSeconds := RestSecondsFor(es.Exercise, periodization, isDeload)
+	restSeconds := RestSecondsFor(es.Exercise, goal, isDeload)
 	if restSeconds <= 0 {
 		return time.Time{}, false
 	}
@@ -134,13 +136,13 @@ type ExerciseProgress struct {
 //
 //nolint:recvcheck // WorkoutType uses a value receiver so templates can call it on non-addressable Session values.
 type Session struct {
-	Date              time.Time
-	DifficultyRating  *int
-	StartedAt         time.Time
-	CompletedAt       time.Time
-	Slots             []ExerciseSlot
-	PeriodizationType PeriodizationType
-	IsDeload          bool
+	Date             time.Time
+	DifficultyRating *int
+	StartedAt        time.Time
+	CompletedAt      time.Time
+	Slots            []ExerciseSlot
+	Goal             SessionGoal
+	IsDeload         bool
 }
 
 // Start marks the session as begun at now. Returns ErrAlreadyStarted if the
@@ -386,7 +388,7 @@ func (s *Session) HasIncompleteSets() bool {
 
 // rebuildUncompletedSetsForCurrentPrescription rewrites each slot's Sets so
 // completed sets stay verbatim and uncompleted sets match what BuildPlannedSets
-// would emit for the session's current PeriodizationType and IsDeload. Called
+// would emit for the session's current SessionGoal and IsDeload. Called
 // from SwitchToDeload and ClearDeload after toggling the flag so the persisted
 // shape never diverges from what a fresh BuildSetsForAdd would produce.
 //
@@ -396,7 +398,7 @@ func (s *Session) HasIncompleteSets() bool {
 func (s *Session) rebuildUncompletedSetsForCurrentPrescription(weekSets int) {
 	for i := range s.Slots {
 		slot := &s.Slots[i]
-		fresh := BuildPlannedSets(slot.Exercise, s.PeriodizationType, s.IsDeload, weekSets)
+		fresh := BuildPlannedSets(slot.Exercise, s.Goal, s.IsDeload, weekSets)
 		n := len(fresh)
 
 		var completed []Set

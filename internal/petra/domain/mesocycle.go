@@ -22,7 +22,7 @@ const (
 	// deload. The set-count ramp interpolates between them across the block. The
 	// gap is deliberately small (+1): session length already bounds the number
 	// of exercises, so one extra set per exercise is a meaningful week-over-week
-	// set-count increase. Decoupled from PeriodizationType — the mesocycle week,
+	// set-count increase. Decoupled from SessionGoal — the mesocycle week,
 	// not Strength/Hypertrophy, drives set count (Phase D).
 	baseWeeklySets = 3
 	peakWeeklySets = 4

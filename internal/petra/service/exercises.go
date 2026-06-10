@@ -91,7 +91,7 @@ func (s *Service) SwapExercise(
 			return domain.ErrNotFound
 		}
 		newSets := domain.BuildSetsForAdd(
-			newExercise, sess.PeriodizationType, sess.IsDeload, weekSets, historicalSets,
+			newExercise, sess.Goal, sess.IsDeload, weekSets, historicalSets,
 		)
 		return sess.SwapExerciseInSlot(pos, newExercise, newSets)
 	})
@@ -234,7 +234,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	if getErr != nil && !errors.Is(getErr, domain.ErrNotFound) {
 		return 0, fmt.Errorf("check session existence: %w", getErr)
 	}
-	// PeriodizationType defaults to a non-empty value in the DB schema, so a
+	// SessionGoal defaults to a non-empty value in the DB schema, so a
 	// zero-value field on the session pointer signals a rest-day placeholder
 	// produced by WeekPlanRepository.Get for days with no workout_sessions row.
 	// This preserves the original Sessions.Get-based existence check, which
@@ -243,7 +243,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	if getErr == nil {
 		preSess = plan.SessionOn(date)
 	}
-	if preSess == nil || preSess.PeriodizationType == "" {
+	if preSess == nil || preSess.Goal == "" {
 		return 0, domain.ValidationError{
 			Message: "This day has no planned workout. Schedule one from the home page first.",
 		}
@@ -255,7 +255,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 			return domain.ErrNotFound
 		}
 		newSets := domain.BuildSetsForAdd(
-			exercise, sess.PeriodizationType, sess.IsDeload, weekSets, historicalSets,
+			exercise, sess.Goal, sess.IsDeload, weekSets, historicalSets,
 		)
 		return sess.AddExercise(exercise, newSets)
 	})

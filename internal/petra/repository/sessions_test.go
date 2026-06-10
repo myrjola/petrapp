@@ -46,8 +46,8 @@ func TestSessionRepository_GetHydratesExercise(t *testing.T) {
 
 	monday := time.Date(2026, 5, 11, 0, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero by design.
-		Date:              monday,
-		PeriodizationType: domain.PeriodizationStrength,
+		Date: monday,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID assigned by DB; WarmupCompletedAt nil.
 				Exercise: exercise,
@@ -98,8 +98,8 @@ func TestSessionRepository_ListHydratesEverySession(t *testing.T) {
 	later := monday.AddDate(0, 0, 2) // Wednesday — same week so a single WeekPlans.Create suffices.
 	mkSession := func(day time.Time) domain.Session {
 		return domain.Session{ //nolint:exhaustruct // StartedAt/CompletedAt zero.
-			Date:              day,
-			PeriodizationType: domain.PeriodizationStrength,
+			Date: day,
+			Goal: domain.SessionGoalStrength,
 			Slots: []domain.ExerciseSlot{
 				{ //nolint:exhaustruct // ID assigned by DB; WarmupCompletedAt nil.
 					Exercise: exercise,
@@ -158,9 +158,9 @@ func TestSessionRepository_RoundTripIsDeload(t *testing.T) {
 
 	monday := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
 	sess := domain.Session{ //nolint:exhaustruct // only IsDeload round-trip is exercised
-		Date:              monday,
-		PeriodizationType: domain.PeriodizationHypertrophy,
-		IsDeload:          true,
+		Date:     monday,
+		Goal:     domain.SessionGoalHypertrophy,
+		IsDeload: true,
 	}
 	wp := domain.WeekPlan{Monday: monday} //nolint:exhaustruct // Sessions initialised below.
 	for i := range 7 {
@@ -199,9 +199,9 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 	completedAt := time.Date(2026, time.April, 27, 10, 0, 0, 0, time.UTC)
 
 	normal := domain.Session{ //nolint:exhaustruct // only fields relevant to deload skip test
-		Date:              mondayNormal,
-		PeriodizationType: domain.PeriodizationHypertrophy,
-		IsDeload:          false,
+		Date:     mondayNormal,
+		Goal:     domain.SessionGoalHypertrophy,
+		IsDeload: false,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID and WarmupCompletedAt not needed for round-trip test
 				Exercise: exercise,
@@ -218,9 +218,9 @@ func TestSessionRepository_StartingWeight_SkipsDeloadSessions(t *testing.T) {
 		},
 	}
 	deload := domain.Session{ //nolint:exhaustruct // only fields relevant to deload skip test
-		Date:              mondayDeload,
-		PeriodizationType: domain.PeriodizationHypertrophy,
-		IsDeload:          true,
+		Date:     mondayDeload,
+		Goal:     domain.SessionGoalHypertrophy,
+		IsDeload: true,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID and WarmupCompletedAt not needed for round-trip test
 				Exercise: exercise,

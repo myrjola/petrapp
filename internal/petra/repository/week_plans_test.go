@@ -21,7 +21,7 @@ func seedScheduledSession(ctx context.Context, t *testing.T, db *sqlitekit.Datab
 	userID := contexthelpers.AuthenticatedUserID(ctx)
 	dateStr := date.Format("2006-01-02")
 	if _, err := db.ReadWrite.ExecContext(ctx,
-		`INSERT INTO workout_sessions (user_id, workout_date, periodization_type, is_deload)
+		`INSERT INTO workout_sessions (user_id, workout_date, session_goal, is_deload)
 		 VALUES (?, ?, 'strength', 0) ON CONFLICT DO NOTHING`,
 		userID, dateStr); err != nil {
 		t.Fatalf("insert session %s: %v", dateStr, err)
@@ -190,8 +190,8 @@ func buildPlanWithOneSlot(
 		plan.Sessions[i] = domain.Session{Date: monday.AddDate(0, 0, i)} //nolint:exhaustruct // rest-day placeholder.
 	}
 	plan.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
-		Date:              monday,
-		PeriodizationType: domain.PeriodizationStrength,
+		Date: monday,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // ID assigned by repo; warmup nil.
 				Exercise: deadlift,
@@ -243,8 +243,8 @@ func TestWeekPlanRepository_Update_AddsNewSessionAlongsideExisting(t *testing.T)
 			t.Fatal("Tuesday seed should have a slot")
 		}
 		wp.Sessions[0] = domain.Session{ //nolint:exhaustruct // Day-zero state only.
-			Date:              monday,
-			PeriodizationType: domain.PeriodizationStrength,
+			Date: monday,
+			Goal: domain.SessionGoalStrength,
 			Slots: []domain.ExerciseSlot{{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: newSlotExercise,
 				Sets:     []domain.Set{{TargetValue: 5}}, //nolint:exhaustruct // CompletedValue etc. nil.
@@ -282,11 +282,11 @@ func TestWeekPlanRepository_Create_ReturnsErrAlreadyExistsOnConflict(t *testing.
 }
 
 // TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots covers the case
-// where the planner schedules a day (so PeriodizationType is set) but the
+// where the planner schedules a day (so SessionGoal is set) but the
 // per-week exercise pool is exhausted and the session ends up with zero slots.
 // The row must persist through Create, hydrate through Get with its
-// PeriodizationType intact, and survive a subsequent Start through Update —
-// otherwise Start re-inserts a row with empty PeriodizationType and trips the
+// SessionGoal intact, and survive a subsequent Start through Update —
+// otherwise Start re-inserts a row with empty SessionGoal and trips the
 // workout_sessions CHECK constraint.
 func TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots(t *testing.T) {
 	t.Parallel()
@@ -300,8 +300,8 @@ func TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots(t *testing.T) {
 	// Scheduled Wednesday with no exercise slots — what the planner produces
 	// when the week's pool has already been spent on earlier days.
 	plan.Sessions[2] = domain.Session{ //nolint:exhaustruct // Slots intentionally empty.
-		Date:              wednesday,
-		PeriodizationType: domain.PeriodizationStrength,
+		Date: wednesday,
+		Goal: domain.SessionGoalStrength,
 	}
 	if err := repos.WeekPlans.Create(ctx, plan); err != nil {
 		t.Fatalf("Create: %v", err)
@@ -311,9 +311,9 @@ func TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if reloaded.Sessions[2].PeriodizationType != domain.PeriodizationStrength {
-		t.Errorf("Wednesday PeriodizationType after Get = %q, want %q",
-			reloaded.Sessions[2].PeriodizationType, domain.PeriodizationStrength)
+	if reloaded.Sessions[2].Goal != domain.SessionGoalStrength {
+		t.Errorf("Wednesday SessionGoal after Get = %q, want %q",
+			reloaded.Sessions[2].Goal, domain.SessionGoalStrength)
 	}
 
 	if err = repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
@@ -329,8 +329,8 @@ func TestWeekPlanRepository_RoundtripsScheduledDayWithNoSlots(t *testing.T) {
 	if reloaded.Sessions[2].StartedAt.IsZero() {
 		t.Error("Wednesday Start did not persist")
 	}
-	if reloaded.Sessions[2].PeriodizationType != domain.PeriodizationStrength {
-		t.Errorf("Wednesday PeriodizationType after Start = %q, want %q",
-			reloaded.Sessions[2].PeriodizationType, domain.PeriodizationStrength)
+	if reloaded.Sessions[2].Goal != domain.SessionGoalStrength {
+		t.Errorf("Wednesday SessionGoal after Start = %q, want %q",
+			reloaded.Sessions[2].Goal, domain.SessionGoalStrength)
 	}
 }

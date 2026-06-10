@@ -151,7 +151,7 @@ func (e Exercise) HasWeight() bool { return e.behavior().load == LoadWeighted }
 // FormatSetValue returns the user-visible string for a set's target or
 // completed value. Reps render as "%d"; seconds render as "%ds". The unit
 // choice is driven by ExerciseType — display layers must call this rather
-// than reconstruct the formatting from periodization or any other field.
+// than reconstruct the formatting from goal or any other field.
 func (e Exercise) FormatSetValue(value int) string {
 	if e.IsTimed() {
 		return fmt.Sprintf("%ds", value)
@@ -217,7 +217,7 @@ func (e Exercise) FormatSetDescription(set Set) string {
 // with errors.As and surface it via the flash + banner flow. Validate checks
 // only that the populated fields are valid and that the fields required for
 // the exercise type are present — it does not cross-check that a timed
-// exercise lacks a rep window, because handler struct-shaping guarantees it.
+// exercise lacks a rep range, because handler struct-shaping guarantees it.
 func (e Exercise) Validate() error {
 	const (
 		repBoundMin = 1

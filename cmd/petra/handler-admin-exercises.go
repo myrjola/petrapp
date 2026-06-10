@@ -230,7 +230,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 	}
 
 	// Time-based exercises carry a starting-seconds value; every other type
-	// carries a rep window. The handler reads the type-appropriate fields;
+	// carries a rep range. The handler reads the type-appropriate fields;
 	// Exercise.Validate enforces that the populated fields are valid.
 	exerciseType := domain.ExerciseType(r.PostForm.Get("exercise_type"))
 	var defaultStartingSeconds, repMin, repMax *int

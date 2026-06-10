@@ -232,7 +232,7 @@ func newWorkoutTemplateData(
 	for i, es := range session.Slots {
 		exerciseViews = append(
 			exerciseViews,
-			newWorkoutExerciseView(i, es, session.PeriodizationType, session.IsDeload),
+			newWorkoutExerciseView(i, es, session.Goal, session.IsDeload),
 		)
 	}
 
@@ -274,7 +274,7 @@ func finishNoteFor(incomplete int) string {
 // including the sub-line copy and the per-set dot indicator. pos is the
 // 0-based slot index in Session.Slots.
 func newWorkoutExerciseView(
-	pos int, es domain.ExerciseSlot, pt domain.PeriodizationType, isDeload bool,
+	pos int, es domain.ExerciseSlot, pt domain.SessionGoal, isDeload bool,
 ) workoutExerciseView {
 	dots := make([]workoutExerciseDot, len(es.Sets))
 	for j, s := range es.Sets {

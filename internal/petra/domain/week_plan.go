@@ -16,18 +16,6 @@ type WeekPlan struct {
 	Sessions [7]Session
 }
 
-// PeriodizationType returns the week-wide periodization style. Every scheduled
-// session shares the same value (enforced by the planner and by the repo).
-// Returns the zero value when the week has no scheduled sessions.
-func (wp *WeekPlan) PeriodizationType() PeriodizationType {
-	for i := range wp.Sessions {
-		if len(wp.Sessions[i].Slots) > 0 {
-			return wp.Sessions[i].PeriodizationType
-		}
-	}
-	return ""
-}
-
 // SessionOn returns a pointer to the session for date, or nil if date falls
 // outside this WeekPlan's week. The returned pointer aliases into wp.Sessions
 // so dispatchers can mutate in place.

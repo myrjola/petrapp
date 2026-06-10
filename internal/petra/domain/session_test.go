@@ -688,11 +688,11 @@ func Test_Session_SwitchToDeload_Idempotent(t *testing.T) {
 		RepMax:       &repMax,
 	}
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
+				Sets:     domain.BuildPlannedSets(ex, domain.SessionGoalStrength, false, 4),
 			},
 		},
 	}
@@ -745,11 +745,11 @@ func Test_Session_ClearDeload_Idempotent(t *testing.T) {
 		RepMax:       &repMax,
 	}
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
+				Sets:     domain.BuildPlannedSets(ex, domain.SessionGoalStrength, false, 4),
 			},
 		},
 	}
@@ -783,11 +783,11 @@ func Test_Session_SwitchToDeload_RebuildsUncompletedSets(t *testing.T) {
 	}
 	// Build a Strength session as the planner would: 4 untouched sets, TargetValue=3 (repMin).
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
+				Sets:     domain.BuildPlannedSets(ex, domain.SessionGoalStrength, false, 4),
 			},
 		},
 	}
@@ -836,7 +836,7 @@ func Test_Session_SwitchToDeload_PreservesCompletedSets(t *testing.T) {
 	weight := 100.0
 
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
@@ -918,7 +918,7 @@ func Test_Session_SwitchToDeload_OverQuotaCompletedSetsKept(t *testing.T) {
 	signal := domain.SignalOnTarget
 
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
@@ -982,12 +982,12 @@ func Test_Session_ClearDeload_ExpandsUncompletedSets(t *testing.T) {
 	}
 	// Start in deload: 3 untouched sets, TargetValue=repMax=5.
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
-		IsDeload:          true,
+		Goal:     domain.SessionGoalStrength,
+		IsDeload: true,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, true, 4),
+				Sets:     domain.BuildPlannedSets(ex, domain.SessionGoalStrength, true, 4),
 			},
 		},
 	}
@@ -1028,11 +1028,11 @@ func Test_Session_SwitchToDeload_TimeBasedExercise(t *testing.T) {
 		DefaultStartingSeconds: &startingSeconds,
 	}
 	sess := domain.Session{ //nolint:exhaustruct // Only deload-relevant fields set.
-		PeriodizationType: domain.PeriodizationStrength,
+		Goal: domain.SessionGoalStrength,
 		Slots: []domain.ExerciseSlot{
 			{ //nolint:exhaustruct // WarmupCompletedAt nil.
 				Exercise: ex,
-				Sets:     domain.BuildPlannedSets(ex, domain.PeriodizationStrength, false, 4),
+				Sets:     domain.BuildPlannedSets(ex, domain.SessionGoalStrength, false, 4),
 			},
 		},
 	}
@@ -1089,7 +1089,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 	tests := []struct {
 		name      string
 		slot      domain.ExerciseSlot
-		pt        domain.PeriodizationType
+		pt        domain.SessionGoal
 		isDeload  bool
 		wantOK    bool
 		wantEndAt time.Time
@@ -1099,7 +1099,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 			slot: domain.ExerciseSlot{ //nolint:exhaustruct // WarmupCompletedAt intentionally nil.
 				Exercise: squat, Sets: []domain.Set{incompleteSet, incompleteSet},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 		},
 		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
 			name: "all sets complete returns false",
@@ -1107,14 +1107,14 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 				Exercise: squat, WarmupCompletedAt: &warmupAt,
 				Sets: []domain.Set{completedSet, completedSet},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 		},
 		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
 			name: "no sets planned returns false",
 			slot: domain.ExerciseSlot{
 				Exercise: squat, WarmupCompletedAt: &warmupAt, Sets: []domain.Set{},
 			},
-			pt: domain.PeriodizationStrength,
+			pt: domain.SessionGoalStrength,
 		},
 		{ //nolint:exhaustruct // wantOK/wantEndAt default to zero; isDeload defaults to false.
 			name: "timed exercise returns false (no rest defined)",
@@ -1122,7 +1122,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 				Exercise: plank, WarmupCompletedAt: &warmupAt,
 				Sets: []domain.Set{incompleteSet, incompleteSet},
 			},
-			pt: domain.PeriodizationHypertrophy,
+			pt: domain.SessionGoalHypertrophy,
 		},
 		{ //nolint:exhaustruct // isDeload defaults to false; only deload-true case overrides.
 			name: "warmup just done, no sets started: clock starts at warmup",
@@ -1130,7 +1130,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 				Exercise: squat, WarmupCompletedAt: &warmupAt,
 				Sets: []domain.Set{incompleteSet, incompleteSet, incompleteSet},
 			},
-			pt:        domain.PeriodizationStrength,
+			pt:        domain.SessionGoalStrength,
 			wantOK:    true,
 			wantEndAt: warmupAt.Add(180 * time.Second),
 		},
@@ -1140,7 +1140,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 				Exercise: squat, WarmupCompletedAt: &warmupAt,
 				Sets: []domain.Set{completedSet, incompleteSet, incompleteSet},
 			},
-			pt:        domain.PeriodizationStrength,
+			pt:        domain.SessionGoalStrength,
 			wantOK:    true,
 			wantEndAt: setDoneAt.Add(180 * time.Second),
 		},
@@ -1150,7 +1150,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 				Exercise: curl, WarmupCompletedAt: &warmupAt,
 				Sets: []domain.Set{completedSet, incompleteSet},
 			},
-			pt:        domain.PeriodizationHypertrophy,
+			pt:        domain.SessionGoalHypertrophy,
 			wantOK:    true,
 			wantEndAt: setDoneAt.Add(90 * time.Second),
 		},
@@ -1160,7 +1160,7 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 				Exercise: squat, WarmupCompletedAt: &warmupAt,
 				Sets: []domain.Set{incompleteSet, incompleteSet},
 			},
-			pt:        domain.PeriodizationStrength,
+			pt:        domain.SessionGoalStrength,
 			isDeload:  true,
 			wantOK:    true,
 			wantEndAt: warmupAt.Add(180 * time.Second),
