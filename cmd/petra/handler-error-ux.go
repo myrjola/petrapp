@@ -18,7 +18,7 @@ type errorUXTemplateData struct {
 }
 
 // devErrorUXGET renders the live catalog of the four error-surfacing classes
-// documented in docs/superpowers/specs/2026-05-18-error-ux-conventions-design.md.
+// documented in cmd/petra/README.md under "Error Handling".
 // Wired in routes.go only when app.devMode is true; returns 404 otherwise.
 func (app *application) devErrorUXGET(w http.ResponseWriter, r *http.Request) {
 	if !app.devMode {

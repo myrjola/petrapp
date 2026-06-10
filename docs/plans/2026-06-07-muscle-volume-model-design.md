@@ -245,8 +245,8 @@ the data-model groundwork laid in A and B.
 
 ### Plan status
 
-- **Phase A (Taxonomy):** plan written —
-  `docs/superpowers/plans/2026-06-07-muscle-volume-phase-a-taxonomy.md`.
+- **Phase A (Taxonomy):** implemented and shipped (its execution plan is
+  deleted per the plan lifecycle — see git history).
 - **Phases B, D, C:** plans intentionally deferred. Write them only after the
   preceding phase is implemented and merged, so each is grounded in the
-  then-current code (see the Follow-up section of the Phase A plan).
+  then-current code.

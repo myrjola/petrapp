@@ -118,7 +118,8 @@ An inline cleanup script in `ui/templates/base.gohtml` strips
 `?bf_inv=...` via `history.replaceState` before first paint, so the
 URL bar carries the canonical target form (fragment included).
 
-See `docs/superpowers/specs/2026-05-26-stack-navigator-replace-force-fresh-design.md`.
+See "Using redirect() and redirectReplace()" in `cmd/petra/README.md` and
+[ADR 0002](../docs/adr/0002-stack-navigator-mpa-enhancement.md).
 
 ## Property of interest
 

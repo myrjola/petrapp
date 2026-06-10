@@ -371,9 +371,9 @@ func Test_playwright_smoketest(t *testing.T) {
 }
 
 // Test_playwright_stacknav verifies that the stack navigator behaves like a native
-// mobile app for the six core flows defined in
-// docs/superpowers/specs/2026-05-03-stack-navigator-push-default-design.md
-// (which supersedes 2026-04-25-stack-navigator-redesign-design.md).
+// mobile app for the six core flows of the pop-or-push protocol defined in
+// cmd/petra/README.md "The stack-navigator wire protocol" (rationale in
+// docs/adr/0002-stack-navigator-mpa-enhancement.md).
 //
 // The flows:
 //

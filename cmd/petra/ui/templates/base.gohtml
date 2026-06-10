@@ -45,7 +45,7 @@
             // Runs synchronously during HTML parse, before main.js
             // loads, so the user never sees ?bf_inv=... after first
             // paint.
-            // See docs/superpowers/specs/2026-05-26-stack-navigator-replace-force-fresh-design.md
+            // See "Using redirect() and redirectReplace()" in cmd/petra/README.md.
             (() => {
                 const u = new URL(location.href);
                 if (!u.searchParams.has('bf_inv')) return;

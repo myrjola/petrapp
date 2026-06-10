@@ -120,8 +120,8 @@ func (app *application) registerAPIRoutes(mux *http.ServeMux) {
 
 // registerDevRoutes registers developer-only routes. Each handler gates on
 // app.devMode so prod returns 404; routes are registered unconditionally
-// to keep startup simple. See docs/superpowers/specs/2026-05-19-dev-error-ux-showcase-design.md
-// for the error-UX showcase.
+// to keep startup simple. The /dev/error-ux page is the live catalog of the
+// error-surfacing classes documented in cmd/petra/README.md "Error Handling".
 func (app *application) registerDevRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /dev/styleguide", app.sessionStack(http.HandlerFunc(app.styleguideGET)))
 	mux.Handle("GET /dev/error-ux", app.sessionStack(http.HandlerFunc(app.devErrorUXGET)))

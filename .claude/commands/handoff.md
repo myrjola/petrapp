@@ -8,7 +8,7 @@ Output **exactly one fenced code block** and nothing else — no preamble, no co
 
 2. **Plan path.**
    - If `$ARGUMENTS` is non-empty, use it verbatim as the plan path.
-   - Otherwise, infer the most recently written/edited plan under `docs/superpowers/plans/` from this conversation. If multiple are plausible, pick the one most recently authored or edited in this session. Cite the absolute repo-relative path.
+   - Otherwise, infer the most recently written/edited plan under `docs/plans/` from this conversation. If multiple are plausible, pick the one most recently authored or edited in this session. Cite the absolute repo-relative path.
    - If no plan can be inferred, emit the prompt with `<PLAN_PATH>` as a placeholder and a one-line note inside the code block telling the user to fill it in.
 
 3. **Execution recipe**, in this order:

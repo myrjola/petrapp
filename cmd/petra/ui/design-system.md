@@ -1,11 +1,11 @@
 # PetrApp Design System
 
 The visual identity, design-token catalogue, and colour / motion / active-state
-conventions for the UI. Referenced from
-[`ui/templates/CLAUDE.md`](../ui/templates/CLAUDE.md) — read this before any
+conventions for the UI. Companion to
+[`templates/README.md`](templates/README.md) — read this before any
 visual or CSS work.
 
-File paths below are relative to the repository root.
+File paths below are relative to this directory (`cmd/petra/ui/`).
 
 ## Design Language
 
@@ -35,8 +35,8 @@ element earns its space.
   line-height `0.95`, tracking `-0.025em`) → meta row. The overline ends
   with a 1px hairline fading right via
   `linear-gradient(to right, var(--stone-3), transparent)`. Worked
-  example in `ui/templates/pages/workout/workout.gohtml` and
-  `ui/templates/pages/exerciseset/exercise-header.gohtml`. Reuse this
+  example in `templates/pages/workout/workout.gohtml` and
+  `templates/pages/exerciseset/exercise-header.gohtml`. Reuse this
   rhythm; don't reinvent it.
 - **State is never colour-only.** Every state carries a non-colour
   signal too: in-progress = amber wash *plus* a 3px left-edge tab;
@@ -64,7 +64,7 @@ with terracotta as the only saturated voice. That's the brand.
 
 ### CSS Custom Properties (Design Tokens)
 
-Always verify these exist in `ui/static/main.css` before using:
+Always verify these exist in `static/main.css` before using:
 
 #### Spacing System
 
@@ -106,7 +106,7 @@ retired page-by-page.
 
 - Use proper contrast ratios by pairing light backgrounds with dark text
 - Map semantic intentions to the semantic tokens (e.g., success state → `--color-success-bg` background, `--color-success` text; neutral surface → `--color-surface` / `--stone-*`)
-- **NEVER use undefined color tokens** - always verify they exist in `ui/static/main.css` first
+- **NEVER use undefined color tokens** - always verify they exist in `static/main.css` first
 
 ### No `:hover` — mobile-first
 
@@ -142,7 +142,7 @@ the state change, so the percentages slide toward 100%:
 
 | Base lightness                                  | Active       | Example                                      |
 |-------------------------------------------------|--------------|----------------------------------------------|
-| Mid (saturated, e.g. `--color-error`)           | `78%, black` | `.btn--danger` in `ui/static/main.css`       |
+| Mid (saturated, e.g. `--color-error`)           | `78%, black` | `.btn--danger` in `static/main.css`       |
 | Bright accent (`--ember`)                       | `85%, black` | Focus-mode CTA in `sets-container.gohtml`    |
 
 If you reach for `color-mix(... var(--clay-N) NN%, black)` you're

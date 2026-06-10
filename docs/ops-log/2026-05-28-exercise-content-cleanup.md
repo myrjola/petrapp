@@ -2,9 +2,8 @@
 
 ## Context
 
-Companion to the generator fixes in
-[spec](superpowers/specs/2026-05-27-exercise-data-quality-design.md) /
-[plan](superpowers/plans/2026-05-27-exercise-data-quality.md). The new prompt
+Companion to the generator fixes shipped 2026-05-27 (exercise data quality;
+design docs retired per the plan lifecycle — see git history). The new prompt
 and Pass-2 URL validator (landed in `feat(service): drop rep guidance and
 placeholders from exercise prompt` and the three commits after it) stop
 new exercises from shipping with dead tutorial links or redundant rep

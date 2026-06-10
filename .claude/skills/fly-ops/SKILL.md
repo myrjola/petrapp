@@ -62,7 +62,7 @@ green, then merge the PR**. Don't run `fly deploy` from this skill. The only leg
 is a **rollback to a prior image** when CD itself is the cause of an incident — and that needs
 explicit human approval each time.
 
-The full flow lives in the README's "CI/CD and preview environments" section. When walking a user
+The full flow lives in `docs/operations.md` under "CI/CD and preview environments". When walking a user
 through a risky change, point them at:
 
 1. Open a PR → CI runs `make migratetest` against real prod data (this catches migration bugs).
@@ -85,6 +85,10 @@ Match action to risk:
   user where the snapshot lives.
 
 If you're unsure whether a query mutates state, treat it as a write.
+
+Mutating SQL run against prod is recorded in `docs/ops-log/` as
+`YYYY-MM-DD-<slug>.{md,sql}` (conventions in `docs/README.md`) — it is the only
+durable record of manual prod surgery.
 
 ## Workflow patterns
 
@@ -133,12 +137,12 @@ make fly-logs FLY_APP=petra-staging | grep -i error
 `fly logs --no-tail` returns a bounded snapshot. To narrow the window or filter by route, pipe to
 `grep`. When you see a stack trace or error message, look up the relevant code:
 
-- HTTP handlers: `cmd/web/handler-*.go`
-- Service layer: `internal/workout/service.go`
-- DB layer: `internal/sqlite/`, `internal/workout/repository-*.go`
+- HTTP handlers: `cmd/petra/handler-*.go`
+- Service layer: `internal/petra/service/`
+- DB layer: `internal/petra/repository/`, `internal/platform/sqlitekit/`
 
-For request-timeout traces, the README explains how to fetch them via `fly sftp get` and analyze
-with `go tool trace`.
+For request-timeout traces, `docs/operations.md` ("Flight recorder") explains how to fetch them
+via `fly sftp get` and analyze with `go tool trace`.
 
 ### 3. Investigate performance issues
 
@@ -224,7 +228,7 @@ path, so you can iterate freely.
 ## Don't
 
 - Don't run `fly deploy`. Deployment is CI-driven (push to `main` → staging → prod; PR → review
-  app). See the README "CI/CD and preview environments" section.
+  app). See `docs/operations.md` "CI/CD and preview environments".
 - Don't invoke `fly` commands without `--app $FLY_APP` (they fail with a confusing error and may
   silently target the wrong app if `FLY_APP` happens to be exported).
 - Don't use `make fly-sqlite3` from this skill — it's an interactive REPL meant for humans. Use
