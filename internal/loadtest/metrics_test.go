@@ -112,7 +112,12 @@ func TestRecordingTransport_records(t *testing.T) {
 	defer srv.Close()
 
 	rec := NewRecorder()
-	client := &http.Client{Transport: NewRecordingTransport(nil, rec)}
+	// Wrap the server's own isolated transport rather than the shared
+	// http.DefaultTransport: a parallel test's srv.Close() calls
+	// http.DefaultTransport.CloseIdleConnections(), which would otherwise race
+	// this in-flight request and break it ("http: CloseIdleConnections called").
+	client := srv.Client()
+	client.Transport = NewRecordingTransport(client.Transport, rec)
 	resp, err := client.Get(srv.URL + "/workouts/2026-05-18/exercises/9")
 	if err != nil {
 		t.Fatalf("get: %v", err)
