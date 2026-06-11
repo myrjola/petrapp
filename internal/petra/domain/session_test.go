@@ -1184,3 +1184,68 @@ func Test_ExerciseSlot_RestEndAt(t *testing.T) {
 		})
 	}
 }
+
+// seedTestSession builds a deload session with one weighted slot (exercise ID
+// 1, two sets) and one timed slot (exercise ID 2, one set) for the
+// SeedDeloadWeights tests.
+func seedTestSession() domain.Session {
+	repMin, repMax := 3, 5
+	weighted := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           1,
+		Name:         "Squat",
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       &repMin,
+		RepMax:       &repMax,
+	}
+	timed := domain.Exercise{ //nolint:exhaustruct // Only planning fields read.
+		ID:           2,
+		Name:         "Plank",
+		ExerciseType: domain.ExerciseTypeTime,
+	}
+	return domain.Session{ //nolint:exhaustruct // Only seeding-relevant fields set.
+		Date:     time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC),
+		Goal:     domain.SessionGoalHypertrophy,
+		IsDeload: true,
+		Slots: []domain.ExerciseSlot{
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: weighted,
+				Sets:     []domain.Set{{TargetValue: 5}, {TargetValue: 5}}, //nolint:exhaustruct // Uncompleted sets.
+			},
+			{ //nolint:exhaustruct // WarmupCompletedAt nil.
+				Exercise: timed,
+				Sets:     []domain.Set{{TargetValue: 30}}, //nolint:exhaustruct // Uncompleted set.
+			},
+		},
+	}
+}
+
+func Test_Session_SeedDeloadWeights_AppliesToMatchingSlots(t *testing.T) {
+	t.Parallel()
+
+	sess := seedTestSession()
+	sess.SeedDeloadWeights(map[int]float64{1: 42.5})
+
+	for k, set := range sess.Slots[0].Sets {
+		if set.WeightKg == nil || *set.WeightKg != 42.5 {
+			t.Errorf("weighted slot set %d: WeightKg = %v, want 42.5", k, set.WeightKg)
+		}
+	}
+	if sess.Slots[1].Sets[0].WeightKg != nil {
+		t.Errorf("timed slot without map entry got WeightKg = %v, want nil", *sess.Slots[1].Sets[0].WeightKg)
+	}
+	if sess.Slots[0].Sets[0].WeightKg == sess.Slots[0].Sets[1].WeightKg {
+		t.Error("sets share one WeightKg pointer; want a copy per set")
+	}
+}
+
+func Test_Session_SeedDeloadWeights_NoOpOnNonDeloadSession(t *testing.T) {
+	t.Parallel()
+
+	sess := seedTestSession()
+	sess.IsDeload = false
+	sess.SeedDeloadWeights(map[int]float64{1: 42.5})
+
+	if got := sess.Slots[0].Sets[0].WeightKg; got != nil {
+		t.Errorf("non-deload session got WeightKg = %v, want nil", *got)
+	}
+}

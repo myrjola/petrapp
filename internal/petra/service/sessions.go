@@ -103,8 +103,11 @@ func (s *Service) planWeek(ctx context.Context, monday time.Time) (domain.WeekPl
 // seedDeloadWeights sets the per-set weight for every weighted exercise in a
 // deload session to GetDeloadStartingWeight (a fraction of the user's recent
 // working weight). Called for both weekly-plan generation and ad-hoc session
-// creation when sess.IsDeload is true.
+// creation when sess.IsDeload is true. This helper only does the repository
+// I/O; applying the weights to the slots is the aggregate's job
+// (Session.SeedDeloadWeights).
 func (s *Service) seedDeloadWeights(ctx context.Context, sess *domain.Session) error {
+	weights := make(map[int]float64)
 	for j := range sess.Slots {
 		ex := sess.Slots[j].Exercise
 		if !ex.HasWeight() {
@@ -114,11 +117,9 @@ func (s *Service) seedDeloadWeights(ctx context.Context, sess *domain.Session) e
 		if err != nil {
 			return fmt.Errorf("seed deload weight for %s: %w", ex.Name, err)
 		}
-		weight := w
-		for k := range sess.Slots[j].Sets {
-			sess.Slots[j].Sets[k].WeightKg = &weight
-		}
+		weights[ex.ID] = w
 	}
+	sess.SeedDeloadWeights(weights)
 	return nil
 }
 

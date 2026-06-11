@@ -196,6 +196,28 @@ func (s *Session) ClearDeload(weekSets int) error {
 	return nil
 }
 
+// SeedDeloadWeights applies per-exercise deload seed weights to every set of
+// the matching slots. weights is keyed by exercise ID; slots whose exercise has
+// no entry (e.g. exercises without weight) are left untouched. No-op on a
+// non-deload session — seed weights are a deload-week concept. Each set gets
+// its own copy of the weight so a later per-set update cannot alias across
+// sets.
+func (s *Session) SeedDeloadWeights(weights map[int]float64) {
+	if !s.IsDeload {
+		return
+	}
+	for i := range s.Slots {
+		w, ok := weights[s.Slots[i].Exercise.ID]
+		if !ok {
+			continue
+		}
+		for k := range s.Slots[i].Sets {
+			wc := w
+			s.Slots[i].Sets[k].WeightKg = &wc
+		}
+	}
+}
+
 // MarkWarmupComplete records the warmup completion timestamp for the
 // exercise slot at pos. Returns ErrSlotNotFound when pos is out of range.
 func (s *Session) MarkWarmupComplete(pos int, now time.Time) error {

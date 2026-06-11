@@ -15,7 +15,8 @@ here is the repo's ubiquitous language — see [CONTEXT.md](../../../CONTEXT.md)
   display-state enums whose string values double as CSS state tokens.
 - **Aggregate methods on `Session`:** `Start`, `Complete`,
   `SetDifficulty`, `MarkWarmupComplete`, `RecordSet`, `UpdateSetWeight`,
-  `UpdateCompletedValue`, `AddExercise`, `SwapExerciseInSlot`. These
+  `UpdateCompletedValue`, `AddExercise`, `SwapExerciseInSlot`,
+  `SwitchToDeload`, `ClearDeload`, `SeedDeloadWeights`. These
   enforce invariants and return sentinel errors when violated.
 - **Domain services:** `Planner` (weekly plan generation),
   `Progression` / `TimedProgression` (set-to-set weight/seconds
