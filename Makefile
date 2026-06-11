@@ -169,6 +169,12 @@ setup-git-hooks:
 	@./scripts/setup-git-hooks.sh
 
 # ── Fly.io ops ───────────────────────────────────────────────────────
+#
+# Claude Code permission gating (.claude/settings.json) enumerates these
+# targets one by one: read-only ones (fly-wake, fly-sql-readonly, fly-logs)
+# are allowed, the rest ask. Ask rules beat allow rules regardless of
+# specificity, so there is no fly-* catch-all — when adding a fly-* target,
+# add it to the ask list (or allow, if strictly read-only) in the same change.
 
 # fly-wake issues an HTTP request to wake the deployed instance, since it scales to zero when idle.
 # Every other fly-* target depends on this so commands don't time out against a cold machine.

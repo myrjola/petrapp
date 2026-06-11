@@ -13,10 +13,18 @@
       "Bash(make fuzz*)",
       "Bash(go build *)",
       "Bash(go test *)",
-      "Bash(go vet *)"
+      "Bash(go vet *)",
+      "Bash(make fly-wake *)",
+      "Bash(make fly-sql-readonly *)",
+      "Bash(make fly-logs *)"
     ],
     "ask": [
-      "Bash(make fly-*)",
+      "Bash(make fly-backup *)",
+      "Bash(make fly-pprof-*)",
+      "Bash(make fly-secrets-push *)",
+      "Bash(make fly-sql-write *)",
+      "Bash(make fly-sqlite3 *)",
+      "Bash(make fly-stresstest *)",
       "Bash(make * fly-*)",
       "Bash(make secrets-*)",
       "Bash(fly *)",
