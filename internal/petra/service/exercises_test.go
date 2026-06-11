@@ -781,7 +781,7 @@ func Test_AddExercise_DerivesTargetValueFromSessionGoal(t *testing.T) {
 		wantSetCount    int
 	}{
 		// Set count is now driven by the mesocycle week, not goal. With
-		// no anchor (DB default NULL) and deload off, SetsForWeek returns the base
+		// no anchor (DB default NULL) and deload off, SetCountFor returns the base
 		// 3 for both. TargetValue (reps) stays goal-driven: strength=repMin=3,
 		// hypertrophy=repMax=6.
 		{"hypertrophy", "hypertrophy", 6, 3},
@@ -996,7 +996,7 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromSessionGoal(t *testing.
 	sets := slot.Sets
 
 	// Hypertrophy: reps=repMax=6. Set count comes from the mesocycle week; with
-	// no anchor and deload off, SetsForWeek returns the base 3.
+	// no anchor and deload off, SetCountFor returns the base 3.
 	const wantTargetValue = 6
 	const wantSetCount = 3
 	if len(sets) != wantSetCount {
@@ -1233,9 +1233,9 @@ func Test_AddExercise_UsesMesocycleWeekSetCount(t *testing.T) {
 	if errGet != nil {
 		t.Fatalf("GetSession: %v", errGet)
 	}
-	want := domain.SetsForWeek(monday, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled)
+	want := prefs.SetCountFor(monday)
 	if want != peakSetsExpected {
-		t.Fatalf("precondition: SetsForWeek at peak = %d, want %d", want, peakSetsExpected)
+		t.Fatalf("precondition: SetCountFor at peak = %d, want %d", want, peakSetsExpected)
 	}
 	if pos < 0 || pos >= len(sess.Slots) {
 		t.Fatalf("added slot position %d out of range (session has %d slots)", pos, len(sess.Slots))

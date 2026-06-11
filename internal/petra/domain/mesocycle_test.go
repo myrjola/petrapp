@@ -7,6 +7,16 @@ import (
 	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
+// mesoPrefs builds Preferences with only the mesocycle fields set, the shape
+// these tests care about.
+func mesoPrefs(anchor time.Time, length int, deloadEnabled bool) domain.Preferences {
+	return domain.Preferences{ //nolint:exhaustruct // Minutes/RestNotificationsEnabled irrelevant here.
+		MesocycleAnchor: anchor,
+		MesocycleLength: length,
+		DeloadEnabled:   deloadEnabled,
+	}
+}
+
 func TestWeekInBlock(t *testing.T) {
 	t.Parallel()
 
@@ -29,8 +39,9 @@ func TestWeekInBlock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := domain.WeekInBlock(tt.date, anchor, tt.length); got != tt.want {
-				t.Errorf("WeekInBlock(%s, %s, %d) = %d, want %d",
+			prefs := mesoPrefs(anchor, tt.length, true)
+			if got := prefs.WeekInBlock(tt.date); got != tt.want {
+				t.Errorf("WeekInBlock(%s) with anchor %s, length %d = %d, want %d",
 					tt.date.Format("2006-01-02"), anchor.Format("2006-01-02"), tt.length, got, tt.want)
 			}
 		})
@@ -63,7 +74,8 @@ func TestIsDeloadWeek(t *testing.T) {
 			if tt.name == "zero anchor returns false" {
 				a = time.Time{}
 			}
-			if got := domain.IsDeloadWeek(tt.date, a, tt.length, tt.enabled); got != tt.want {
+			prefs := mesoPrefs(a, tt.length, tt.enabled)
+			if got := prefs.IsDeloadWeek(tt.date); got != tt.want {
 				t.Errorf("IsDeloadWeek = %v, want %v", got, tt.want)
 			}
 		})
@@ -75,7 +87,8 @@ func TestIsDeloadWeek_LengthBounds(t *testing.T) {
 
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC)
 	for _, length := range []int{0, 1, -1} {
-		if got := domain.IsDeloadWeek(anchor, anchor, length, true); got {
+		prefs := mesoPrefs(anchor, length, true)
+		if got := prefs.IsDeloadWeek(anchor); got {
 			t.Errorf("IsDeloadWeek(length=%d) = true, want false (defensive)", length)
 		}
 	}
@@ -113,7 +126,8 @@ func TestMesocycleRampProgress(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := domain.MesocycleRampProgress(tt.date, anchor, tt.length, tt.deloadEnabled)
+			prefs := mesoPrefs(anchor, tt.length, tt.deloadEnabled)
+			got := prefs.MesocycleRampProgress(tt.date)
 			if got != tt.want {
 				t.Errorf("MesocycleRampProgress = %v, want %v", got, tt.want)
 			}
@@ -123,12 +137,13 @@ func TestMesocycleRampProgress(t *testing.T) {
 
 func TestMesocycleRampProgress_ZeroAnchor(t *testing.T) {
 	t.Parallel()
-	if got := domain.MesocycleRampProgress(time.Now(), time.Time{}, 4, true); got != 0 {
+	prefs := mesoPrefs(time.Time{}, 4, true)
+	if got := prefs.MesocycleRampProgress(time.Now()); got != 0 {
 		t.Errorf("zero anchor: got %v, want 0", got)
 	}
 }
 
-func TestSetsForWeek(t *testing.T) {
+func TestSetCountFor(t *testing.T) {
 	t.Parallel()
 
 	anchor := time.Date(2026, time.May, 4, 0, 0, 0, 0, time.UTC) // Monday, week 0.
@@ -150,9 +165,10 @@ func TestSetsForWeek(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := domain.SetsForWeek(tt.date, anchor, tt.length, tt.deloadEnabled)
+			prefs := mesoPrefs(anchor, tt.length, tt.deloadEnabled)
+			got := prefs.SetCountFor(tt.date)
 			if got != tt.want {
-				t.Errorf("SetsForWeek = %d, want %d", got, tt.want)
+				t.Errorf("SetCountFor = %d, want %d", got, tt.want)
 			}
 		})
 	}

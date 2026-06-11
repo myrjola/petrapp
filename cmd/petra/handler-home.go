@@ -433,10 +433,8 @@ func (app *application) homePopulateAuthenticated(w http.ResponseWriter, r *http
 	}
 	monday := time.Date(y, m, d, 0, 0, 0, 0, time.UTC).AddDate(0, 0, mondayOffset)
 
-	weekInBlock := domain.WeekInBlock(monday, preferences.MesocycleAnchor, preferences.MesocycleLength)
-	isDeload := domain.IsDeloadWeek(
-		monday, preferences.MesocycleAnchor, preferences.MesocycleLength, preferences.DeloadEnabled,
-	)
+	weekInBlock := preferences.WeekInBlock(monday)
+	isDeload := preferences.IsDeloadWeek(monday)
 	data.WeekInBlock = weekInBlock + 1
 	data.MesocycleLength = preferences.MesocycleLength
 	data.IsDeloadWeek = isDeload

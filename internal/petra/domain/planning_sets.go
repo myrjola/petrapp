@@ -13,7 +13,7 @@ const defaultTimedSets = 3
 // deriveSchemeForExercise returns the per-set target value and total set count
 // for an exercise in a session of the given goal. Reps/seconds come
 // from the goal (DeriveScheme / DefaultStartingSeconds); the set count
-// is weekSets (the mesocycle week's count, see SetsForWeek), reduced by one on a
+// is weekSets (the mesocycle week's count, see Preferences.SetCountFor), reduced by one on a
 // deload (floored at deloadSetFloor). Timed exercises keep a fixed set count
 // (defaultTimedSets) and ignore weekSets — their per-session volume does not
 // ramp.

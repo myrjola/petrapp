@@ -21,7 +21,7 @@ const (
 // Scheme is the per-exercise rep + rest prescription for one planned session,
 // computed from a per-exercise rep range (repMin, repMax) and the session's
 // SessionGoal. Set count is no longer part of Scheme — since Phase D the
-// mesocycle week drives set count (see SetsForWeek / BuildPlannedSets), not the
+// mesocycle week drives set count (see Preferences.SetCountFor / BuildPlannedSets), not the
 // goal-derived rep band.
 type Scheme struct {
 	TargetReps  int
@@ -32,7 +32,7 @@ type Scheme struct {
 // its rep range, the session goal, and whether the session is a
 // deload. Pure: same inputs → same output, no DB, no clock. Set count is NOT
 // returned — since Phase D it is a function of the mesocycle week, not the rep
-// band (see SetsForWeek / deriveSchemeForExercise).
+// band (see Preferences.SetCountFor / deriveSchemeForExercise).
 //
 // Reps:
 //

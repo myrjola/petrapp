@@ -379,7 +379,7 @@ func (s *Service) StartDeloadNow(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get preferences: %w", err)
 	}
-	weekSets := domain.SetsForWeek(monday, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled)
+	weekSets := prefs.SetCountFor(monday)
 
 	err = s.repos.WeekPlans.Update(ctx, monday, func(wp *domain.WeekPlan) error {
 		return wp.FlipDeloadFromToday(today, weekSets)

@@ -29,30 +29,31 @@ const (
 )
 
 // WeekInBlock returns the 0-based week index within the mesocycle for date,
-// given a Monday anchor and a block length. Dates strictly before the anchor
-// return 0 (treated as "the anchor week starts in the future, count it as
-// week 0 for now"). The calculation truncates to whole weeks; intra-week
-// dates resolve to the same week as their Monday.
-func WeekInBlock(date, anchor time.Time, length int) int {
-	if length < minDeloadCadence || anchor.IsZero() {
+// measured from the MesocycleAnchor over MesocycleLength weeks. Dates strictly
+// before the anchor return 0 (treated as "the anchor week starts in the
+// future, count it as week 0 for now"). The calculation truncates to whole
+// weeks; intra-week dates resolve to the same week as their Monday.
+func (p Preferences) WeekInBlock(date time.Time) int {
+	if p.MesocycleLength < minDeloadCadence || p.MesocycleAnchor.IsZero() {
 		return 0
 	}
-	dayDiff := int(date.Sub(anchor).Hours() / 24)
+	dayDiff := int(date.Sub(p.MesocycleAnchor).Hours() / 24)
 	if dayDiff < 0 {
 		return 0
 	}
 	weeks := dayDiff / 7
-	return weeks % length
+	return weeks % p.MesocycleLength
 }
 
 // IsDeloadWeek reports whether the date falls on the last (deload) week of
-// its mesocycle. Returns false when the feature is disabled, when length is
-// below minDeloadCadence, or when the anchor is the zero time.
-func IsDeloadWeek(date, anchor time.Time, length int, enabled bool) bool {
-	if !enabled || length < minDeloadCadence || anchor.IsZero() {
+// its mesocycle. Returns false when the feature is disabled, when
+// MesocycleLength is below minDeloadCadence, or when the anchor is the zero
+// time.
+func (p Preferences) IsDeloadWeek(date time.Time) bool {
+	if !p.DeloadEnabled || p.MesocycleLength < minDeloadCadence || p.MesocycleAnchor.IsZero() {
 		return false
 	}
-	return WeekInBlock(date, anchor, length) == length-1
+	return p.WeekInBlock(date) == p.MesocycleLength-1
 }
 
 // MesocycleRampProgress returns the volume-ramp position in [0,1] for date
@@ -63,28 +64,28 @@ func IsDeloadWeek(date, anchor time.Time, length int, enabled bool) bool {
 // Phase B behaviour). Training weeks are the block-week indices 0..length-2; the
 // deload week is length-1. Built on WeekInBlock so the 0-based block-week index
 // is derived in exactly one place.
-func MesocycleRampProgress(date, anchor time.Time, length int, deloadEnabled bool) float64 {
-	if !deloadEnabled || length < minDeloadCadence || anchor.IsZero() {
+func (p Preferences) MesocycleRampProgress(date time.Time) float64 {
+	if !p.DeloadEnabled || p.MesocycleLength < minDeloadCadence || p.MesocycleAnchor.IsZero() {
 		return 0
 	}
-	if IsDeloadWeek(date, anchor, length, deloadEnabled) {
+	if p.IsDeloadWeek(date) {
 		return 0
 	}
-	lastTrainingIdx := length - deloadAndZeroIndexOffset // 0..length-2 train; length-1 deloads.
+	lastTrainingIdx := p.MesocycleLength - deloadAndZeroIndexOffset // 0..length-2 train; length-1 deloads.
 	if lastTrainingIdx <= 0 {
 		return 0 // single training week: no room to ramp.
 	}
-	week := min(WeekInBlock(date, anchor, length), lastTrainingIdx)
+	week := min(p.WeekInBlock(date), lastTrainingIdx)
 	return float64(week) / float64(lastTrainingIdx)
 }
 
-// SetsForWeek returns the base per-exercise working-set count for a session in
-// date's mesocycle week, before any deload reduction: baseWeeklySets ramping to
-// peakWeeklySets across the training weeks (see MesocycleRampProgress). The
-// deload week and all feature-off states return baseWeeklySets; the deload -1
-// reduction is applied downstream by deriveSchemeForExercise. The ramp is
-// rounded to the nearest whole set.
-func SetsForWeek(date, anchor time.Time, length int, deloadEnabled bool) int {
-	progress := MesocycleRampProgress(date, anchor, length, deloadEnabled)
+// SetCountFor returns the base per-exercise working-set count for a session on
+// date, before any deload reduction: baseWeeklySets ramping to peakWeeklySets
+// across the training weeks (see MesocycleRampProgress). The deload week and
+// all feature-off states return baseWeeklySets; the deload -1 reduction is
+// applied downstream by deriveSchemeForExercise. The ramp is rounded to the
+// nearest whole set.
+func (p Preferences) SetCountFor(date time.Time) int {
+	progress := p.MesocycleRampProgress(date)
 	return baseWeeklySets + int(math.Round(progress*float64(peakWeeklySets-baseWeeklySets)))
 }

@@ -81,9 +81,7 @@ func (s *Service) SwapExercise(
 	if err != nil {
 		return fmt.Errorf("get preferences: %w", err)
 	}
-	weekSets := domain.SetsForWeek(
-		domain.MondayOf(date), prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled,
-	)
+	weekSets := prefs.SetCountFor(date)
 
 	err = s.repos.WeekPlans.Update(ctx, domain.MondayOf(date), func(wp *domain.WeekPlan) error {
 		sess := wp.SessionOn(date)
@@ -229,7 +227,7 @@ func (s *Service) AddExercise(ctx context.Context, date time.Time, exerciseID in
 	if err != nil {
 		return 0, fmt.Errorf("get preferences: %w", err)
 	}
-	weekSets := domain.SetsForWeek(monday, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled)
+	weekSets := prefs.SetCountFor(monday)
 	plan, getErr := s.repos.WeekPlans.Get(ctx, monday)
 	if getErr != nil && !errors.Is(getErr, domain.ErrNotFound) {
 		return 0, fmt.Errorf("check session existence: %w", getErr)

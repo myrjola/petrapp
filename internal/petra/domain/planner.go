@@ -86,9 +86,7 @@ func (wp *Planner) Plan(startingDate time.Time) (WeekPlan, error) {
 	}
 
 	firstPT := wp.firstSessionGoal(startingDate)
-	isDeload := IsDeloadWeek(
-		startingDate, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
-	)
+	isDeload := wp.Prefs.IsDeloadWeek(startingDate)
 	wv := weekVolumeFor(startingDate, wp.Prefs)
 
 	weekUsedExercises := map[int]bool{}
@@ -164,9 +162,7 @@ func (wp *Planner) PlanDay(
 	firstPT := wp.firstSessionGoal(monday)
 	pt := nextSessionGoal(firstPT, idx)
 
-	isDeload := IsDeloadWeek(
-		monday, wp.Prefs.MesocycleAnchor, wp.Prefs.MesocycleLength, wp.Prefs.DeloadEnabled,
-	)
+	isDeload := wp.Prefs.IsDeloadWeek(monday)
 	if isDeload {
 		pt = SessionGoalHypertrophy
 	}
@@ -437,8 +433,8 @@ func goalForWeek(t MuscleGroupTarget, progress float64) float64 {
 // and the base set count — the Phase B behaviour.
 func weekVolumeFor(date time.Time, prefs Preferences) weekVolume {
 	return weekVolume{
-		sets:     SetsForWeek(date, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled),
-		progress: MesocycleRampProgress(date, prefs.MesocycleAnchor, prefs.MesocycleLength, prefs.DeloadEnabled),
+		sets:     prefs.SetCountFor(date),
+		progress: prefs.MesocycleRampProgress(date),
 	}
 }
 
