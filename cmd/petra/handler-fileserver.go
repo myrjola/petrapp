@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
+	"log/slog"
 	"net/http"
-	"os"
-	"path"
 )
 
 // notFoundInterceptor wraps http.ResponseWriter so we can detect when
@@ -12,9 +12,9 @@ import (
 // 404 page instead. This eliminates the per-request os.Stat the handler
 // previously used to make the same decision up-front.
 //
-// The interceptor buffers the WriteHeader call so headers set by upstream
-// middleware (Cache-Control from cacheForever in prod or noStore in dev)
-// are not flushed before we know the response is a 404.
+// The interceptor buffers the WriteHeader call so the static Cache-Control set
+// by the handler before serving is not flushed before we know the response is a
+// 404 (at which point it is removed; see WriteHeader).
 type notFoundInterceptor struct {
 	http.ResponseWriter
 
@@ -28,10 +28,12 @@ func (i *notFoundInterceptor) WriteHeader(status int) {
 		// http.FileServer's 404 path goes through http.Error, which sets
 		// Content-Type: text/plain and X-Content-Type-Options: nosniff
 		// before WriteHeader. Remove them so the custom 404 template can
-		// be rendered as text/html.
+		// be rendered as text/html. Also drop the static Cache-Control set
+		// for the (missing) asset so the 404 page isn't cached as immutable.
 		h := i.Header()
 		h.Del("Content-Type")
 		h.Del("X-Content-Type-Options")
+		h.Del("Cache-Control")
 		return
 	}
 	i.headerWritten = true
@@ -54,38 +56,74 @@ func (i *notFoundInterceptor) Write(b []byte) (int, error) {
 	return written, nil
 }
 
-// fileServerHandler creates a file server handler with custom 404 handling.
+// fileServerHandler creates a file server handler with content-hashed asset
+// resolution and custom 404 handling. It serves ui/static from app.staticFS
+// (the embedded tree in prod, os.DirFS in dev). A fingerprinted request path
+// like /main.<hash>.css is stripped back to the real file before serving;
+// assets whose body links other assets (manifest.json) are served from the
+// rewritten in-memory copy.
 func (app *application) fileServerHandler() (http.Handler, error) {
-	fileRoot := path.Join(".", "ui", "static")
-	if _, err := os.Stat(fileRoot); os.IsNotExist(err) {
-		dir, findErr := findModuleDir()
-		if findErr != nil {
-			return nil, fmt.Errorf("findModuleDir: %w", findErr)
+	staticFS := app.staticFS
+	if staticFS == nil {
+		// Tests build *application literals without wiring staticFS; fall back
+		// to the embedded tree (always compiled in) so routes() still builds.
+		var err error
+		if staticFS, err = fs.Sub(embeddedUI, "ui/static"); err != nil {
+			return nil, fmt.Errorf("sub embedded static: %w", err)
 		}
-		fileRoot = path.Join(dir, "cmd", "petra", "ui", "static")
-	}
-	stat, err := os.Stat(fileRoot)
-	if err != nil || !stat.IsDir() {
-		return nil, fmt.Errorf("file server root %s does not exist or is not a directory", fileRoot)
 	}
 
-	fileServer := http.FileServer(http.Dir(fileRoot))
+	fileServer := http.FileServerFS(staticFS)
 	notFoundHandler := app.sessionDeltaStack(http.HandlerFunc(app.notFound))
 
-	// In dev, disable browser caching so edits to ui/static/* are visible on
-	// refresh. In prod, main.css and main.js are md5-fingerprinted by the
-	// Dockerfile ui-builder stage so cacheForever (immutable) is safe.
-	cache := cacheForever
-	if app.devMode {
-		cache = noStore
-	}
+	return app.noAuthStack(app.staticAssetHandler(fileServer, notFoundHandler)), nil
+}
 
-	return app.noAuthStack(cache(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			interceptor := &notFoundInterceptor{ResponseWriter: w, is404: false, headerWritten: false}
-			fileServer.ServeHTTP(interceptor, r)
-			if interceptor.is404 {
-				notFoundHandler.ServeHTTP(w, r)
+// staticAssetHandler resolves a (possibly fingerprinted) request path to a real
+// asset, sets the appropriate Cache-Control, and serves it — from the rewritten
+// in-memory copy for processed assets (manifest.json), otherwise from fileServer
+// with the hash stripped off the path. Genuine misses fall through to
+// notFoundHandler. Split out from fileServerHandler so it is unit-testable
+// without the session-bearing middleware stacks.
+func (app *application) staticAssetHandler(fileServer, notFoundHandler http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		realPath, exact := app.assets.resolve(r.URL.Path)
+		app.setStaticCacheControl(w, exact)
+
+		// Serve assets with rewritten bodies (hashed icon srcs) from memory.
+		if pa, ok := app.assets.processedAssetFor(realPath); ok {
+			w.Header().Set("Content-Type", pa.contentType)
+			if _, err := w.Write(pa.body); err != nil {
+				app.logger.LogAttrs(r.Context(), slog.LevelError,
+					"write processed asset", slog.Any("error", err))
 			}
-		}))), nil
+			return
+		}
+
+		interceptor := &notFoundInterceptor{ResponseWriter: w, is404: false, headerWritten: false}
+		served := r
+		if realPath != r.URL.Path {
+			served = r.Clone(r.Context())
+			served.URL.Path = realPath
+		}
+		fileServer.ServeHTTP(interceptor, served)
+		if interceptor.is404 {
+			notFoundHandler.ServeHTTP(w, r)
+		}
+	}
+}
+
+// setStaticCacheControl sets the Cache-Control header for a static asset
+// response. Dev always disables caching so edits surface on refresh. In prod a
+// request that carried the current content hash is immutable; a plain or stale
+// path is only revalidated so it can never go stale for a year.
+func (app *application) setStaticCacheControl(w http.ResponseWriter, exact bool) {
+	switch {
+	case app.devMode:
+		w.Header().Set("Cache-Control", "no-store, max-age=0, must-revalidate")
+	case exact:
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	default:
+		w.Header().Set("Cache-Control", "public, max-age=0, must-revalidate")
+	}
 }

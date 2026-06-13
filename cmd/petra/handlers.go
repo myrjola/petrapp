@@ -19,10 +19,12 @@ func formatFloat(f float64) string {
 	return strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
-// templateFuncs returns the funcs registered at parse time. All entries
-// are stateless and safe to share across goroutines.
-func templateFuncs() template.FuncMap {
+// templateFuncs returns the funcs registered at parse time. Entries are safe to
+// share across goroutines; asset closes over the (immutable) asset manifest to
+// emit content-hashed URLs for cache busting.
+func (app *application) templateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"asset":       app.assets.URL,
 		"formatFloat": formatFloat,
 		"sub":         func(a, b int) int { return a - b },
 		"backLink": func(href string, nonce template.HTMLAttr) BackLinkData {
@@ -84,7 +86,7 @@ func (app *application) pageTemplate(pageName string) (*template.Template, error
 }
 
 func (app *application) parsePageTemplate(pageName string) (*template.Template, error) {
-	t := template.New(pageName).Funcs(templateFuncs())
+	t := template.New(pageName).Funcs(app.templateFuncs())
 	t, err := t.ParseFS(app.templateFS,
 		"base.gohtml",
 		"components/*.gohtml",

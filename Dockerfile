@@ -16,24 +16,10 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Build the Go binary
+# Build the Go binary. cmd/petra/ui is embedded into the binary via //go:embed
+# (see cmd/petra/assets.go), so the runtime image needs no ui/ directory and
+# assets are content-fingerprinted at startup rather than by a build-time sed.
 RUN go build -o ./bin/petrapp ./cmd/petra
-
-# -------------------------------------------------------
-#  Build stage for preparing UI files
-# -------------------------------------------------------
-FROM --platform=linux/amd64 alpine:3.21.0 AS ui-builder
-
-WORKDIR /workspace/
-
-# Hash main CSS and JS for cache busting and copy UI files to dist
-COPY /cmd/petra/ui ./ui
-RUN csshash=`md5sum ./ui/static/main.css | awk '{ print $1 }'` && \
-    sed -i "s/\/main.css/\/main.${csshash}.css/g" ui/templates/base.gohtml && \
-    mv ./ui/static/main.css ui/static/main.${csshash}.css && \
-    jshash=`md5sum ./ui/static/main.js | awk '{ print $1 }'` && \
-    sed -i "s/\/main.js/\/main.${jshash}.js/g" ui/templates/base.gohtml && \
-    mv ./ui/static/main.js ui/static/main.${jshash}.js
 
 # -----------------------------------------------------------------------------
 #  Dependency image for litestream
@@ -61,9 +47,6 @@ RUN adduser \
   --uid 65532 \
   petrapp
 
-# Copy UI files
-COPY --from=ui-builder /workspace/ui /dist/ui
-
 # Configure Litestream for backups to object storage
 COPY /litestream.yml /etc/litestream.yml
 COPY --from=litestream /usr/local/bin/litestream /dist/litestream
@@ -75,7 +58,6 @@ COPY --from=go-builder /app/bin/petrapp /dist/petrapp
 ENV TZ=Europe/Helsinki
 ENV PETRAPP_ADDR=":4000"
 ENV PETRAPP_PPROF_ADDR=":6060"
-ENV PETRAPP_TEMPLATE_PATH="/dist/ui/templates"
 
 EXPOSE 4000 6060 9090
 

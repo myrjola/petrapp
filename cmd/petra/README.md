@@ -25,13 +25,24 @@ and testing in `cmd/petra/`.
 
 ## Runtime layout
 
-- Templates (`ui/templates/`) and static assets (`ui/static/`) are loaded from
-  the filesystem at runtime (`os.DirFS`, not `//go:embed`). Editing a template
-  and refreshing the browser is the whole dev loop — no rebuild needed.
-- In the Docker image, `main.css` and `main.js` are fingerprinted with an md5
-  hash at build time and `base.gohtml` is rewritten to reference the hashed
-  names (see `Dockerfile`). Other static files (`webauthn.js`, icons) are
-  served under their original names.
+- `cmd/petra/ui` (templates and static assets) is baked into the binary with
+  `//go:embed` (see `assets.go`), so production is a single self-contained
+  executable — no `ui/` directory on disk, no `PETRAPP_TEMPLATE_PATH`. In dev
+  (`FLY_APP_NAME` unset) the same files are read live from disk via `os.DirFS`,
+  so editing a template or asset and refreshing is the whole dev loop — the
+  embedded copy is ignored. `uiFilesystems` picks the source per mode.
+- Static assets are content-fingerprinted at startup, not by a build-time
+  `sed`. `buildAssetManifest` walks `ui/static`, SHA-256s each file, and the
+  `asset` template func emits hashed URLs (`{{ asset "/main.css" }}` →
+  `/main.<hash>.css`). `manifest.json` is processed in memory so its icon srcs
+  are hashed too; `manifest.json`'s own hash reflects the rewritten bytes.
+  `sw.js` and `robots.txt` stay at their plain well-known URLs.
+- The file server (`handler-fileserver.go`) strips the hash off a request path
+  and serves the current bytes, so a stale hashed URL never 404s. Caching keys
+  on the path shape: an exact current-hash match is `immutable`; a plain or
+  stale path is `must-revalidate` (so non-fingerprinted files can't go stale for
+  a year); dev is always `no-store`, which is why hot reload survives even
+  though the emitted URL still carries a (startup) hash.
 
 ## Handler Structure
 

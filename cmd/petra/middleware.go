@@ -92,15 +92,6 @@ report-uri /api/reports; report-to reports;`, cspNonce, cspNonce)
 	})
 }
 
-// cacheForever for static assets ensures they are cached indefinitely.
-func cacheForever(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-
-		next.ServeHTTP(w, r)
-	})
-}
-
 // noCache ensures authenticated requests force revalidation.
 func noCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

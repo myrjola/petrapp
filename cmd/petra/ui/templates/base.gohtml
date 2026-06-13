@@ -10,16 +10,16 @@
         <meta name="invalidation-token" content="{{ .InvalidationToken }}"/>
         <title>Petra</title>
         <meta name="description" content="Personal trainer in your pocket."/>
-        <link rel="stylesheet" {{ $.Nonce }} href="/main.css"/>
-        <link rel="icon" href="/logo.svg"/>
-        <link rel="mask-icon" href="/logo.svg" color="#000"/>
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
-        <link rel="manifest" href="/manifest.json"/>
+        <link rel="stylesheet" {{ $.Nonce }} href="{{ asset "/main.css" }}"/>
+        <link rel="icon" href="{{ asset "/logo.svg" }}"/>
+        <link rel="mask-icon" href="{{ asset "/logo.svg" }}" color="#000"/>
+        <link rel="apple-touch-icon" sizes="180x180" href="{{ asset "/apple-touch-icon.png" }}"/>
+        <link rel="manifest" href="{{ asset "/manifest.json" }}"/>
         <meta name="theme-color" content="#1c1813"/>
         <script type="importmap" {{ $.Nonce }}>
             {
               "imports": {
-                "webauthn": "/webauthn.js"
+                "webauthn": "{{ asset "/webauthn.js" }}"
               }
             }
         </script>
@@ -53,7 +53,7 @@
                 history.replaceState(null, '', u.toString());
             })();
         </script>
-        <script {{ $.Nonce }} src="/main.js"></script>
+        <script {{ $.Nonce }} src="{{ asset "/main.js" }}"></script>
         <script {{ $.Nonce }}>
             if ('serviceWorker' in navigator) {
                 registerServiceWorker().catch(() => { /* ignore — push is opt-in */ });

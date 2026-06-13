@@ -37,6 +37,11 @@ type application struct {
 	webAuthnHandler *auth.WebAuthnHandler
 	sessionManager  *scs.SessionManager
 	templateFS      fs.FS
+	// staticFS serves ui/static — the embedded tree in prod, os.DirFS in dev.
+	staticFS fs.FS
+	// assets maps plain asset paths to content-hashed URLs (and back) for
+	// cache busting. Built once at startup from staticFS. See assets.go.
+	assets *assetManifest
 	// parsedTemplates memoizes page templates so renders skip filesystem reads
 	// and re-parsing. Bypassed in devMode so template edits surface on refresh.
 	parsedTemplates *templateCache
@@ -117,9 +122,10 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		pprofserver.Launch(ctx, cfg.PProfAddr, logger)
 	}
 
-	var htmlTemplatePath string
-	if htmlTemplatePath, err = resolveAndVerifyTemplatePath(cfg.TemplatePath); err != nil {
-		return fmt.Errorf("resolve template path: %w", err)
+	devMode := cfg.FlyAppName == ""
+	templateFS, staticFS, assets, err := setupUI(devMode, cfg.TemplatePath)
+	if err != nil {
+		return err
 	}
 
 	db, err := openDatabase(ctx, cfg.SqliteURL, logger)
@@ -162,21 +168,9 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		return fmt.Errorf("new webauthn handler: %w", err)
 	}
 
-	var flightRecorderService *flightrecorder.Service
-	if cfg.TracesDirectory != "" {
-		if flightRecorderService, err = flightrecorder.New(flightrecorder.Config{
-			Logger:          logger,
-			MinAge:          0, // Use default
-			MaxBytes:        0, // Use default
-			MaxFiles:        0, // Use default
-			TracesDirectory: cfg.TracesDirectory,
-		}); err != nil {
-			return fmt.Errorf("new flight recorder: %w", err)
-		}
-		// Start flight recording.
-		if err = flightRecorderService.Start(ctx); err != nil {
-			return fmt.Errorf("start flight recorder: %w", err)
-		}
+	flightRecorderService, err := startFlightRecorder(ctx, cfg.TracesDirectory, logger)
+	if err != nil {
+		return err
 	}
 
 	if err = ensureVAPIDKeys(ctx, &cfg, logger); err != nil {
@@ -193,10 +187,12 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 		logger,
 		webAuthnHandler,
 		sessionManager,
-		htmlTemplatePath,
+		templateFS,
+		staticFS,
+		assets,
 		notif.svc,
 		flightRecorderService,
-		cfg.FlyAppName == "",
+		devMode,
 		cfg.VAPIDPublic,
 		notif.lastRequestAt,
 	)
@@ -207,6 +203,32 @@ func run(ctx context.Context, logger *slog.Logger, lookupEnv func(string) (strin
 	}
 
 	return app.configureAndStartServer(ctx, listener, actualAddr, cfg.TLSCert, cfg.TLSKey, routes)
+}
+
+// startFlightRecorder builds and starts the flight recorder when a traces
+// directory is configured, returning nil (and no error) when tracing is off.
+func startFlightRecorder(
+	ctx context.Context,
+	tracesDirectory string,
+	logger *slog.Logger,
+) (*flightrecorder.Service, error) {
+	if tracesDirectory == "" {
+		return nil, nil //nolint:nilnil // nil service + nil error means tracing is disabled.
+	}
+	svc, err := flightrecorder.New(flightrecorder.Config{
+		Logger:          logger,
+		MinAge:          0, // Use default
+		MaxBytes:        0, // Use default
+		MaxFiles:        0, // Use default
+		TracesDirectory: tracesDirectory,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new flight recorder: %w", err)
+	}
+	if err = svc.Start(ctx); err != nil {
+		return nil, fmt.Errorf("start flight recorder: %w", err)
+	}
+	return svc, nil
 }
 
 // openDatabase opens petra's SQLite database, applying the product schema and
@@ -232,7 +254,9 @@ func newApplication(
 	logger *slog.Logger,
 	webAuthnHandler *auth.WebAuthnHandler,
 	sessionManager *scs.SessionManager,
-	htmlTemplatePath string,
+	templateFS fs.FS,
+	staticFS fs.FS,
+	assets *assetManifest,
 	svc *service.Service,
 	flightRecorderService *flightrecorder.Service,
 	devMode bool,
@@ -243,7 +267,9 @@ func newApplication(
 		logger:          logger,
 		webAuthnHandler: webAuthnHandler,
 		sessionManager:  sessionManager,
-		templateFS:      os.DirFS(htmlTemplatePath),
+		templateFS:      templateFS,
+		staticFS:        staticFS,
+		assets:          assets,
 		parsedTemplates: newTemplateCache(),
 		service:         svc,
 		flightRecorder:  flightRecorderService,
