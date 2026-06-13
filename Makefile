@@ -132,9 +132,14 @@ dev-tailnet: build  ## Build and run with Tailscale HTTPS (for iOS WebAuthn).
 # claude-worktree-remote serves Claude Code remote-control sessions: each session started
 # from claude.ai or the mobile app gets its own fresh worktree under .claude/worktrees/,
 # branched from origin/HEAD (fetched here at server start; a long-running server drifts from
-# the remote, and the pre-push rebase flow absorbs that). Arms the tracked git hooks first so
-# every push to main is gated by .githooks/pre-push, in worktrees and the primary checkout
-# alike.
+# the remote, and the pre-push rebase flow absorbs that).
+#
+# The core.hooksPath arming below is a best-effort baseline: the remote-control harness resets
+# core.hooksPath to the default for its own git operations, which disables .githooks/pre-push.
+# The real gate is the SessionStart hook in .claude/settings.json, which re-arms .githooks at
+# the start of every session (after the harness has reset it, before any push) — so the gate
+# holds in worktrees and the primary checkout alike, regardless of the harness. core.hooksPath
+# is shared across worktrees, so one re-arm covers them all.
 .PHONY: claude-worktree-remote
 claude-worktree-remote:
 	@git config core.hooksPath .githooks

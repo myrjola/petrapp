@@ -28,12 +28,21 @@ earlier `err` variable instead of introducing a new name.
 
 ## Worktrees
 
-Any multi-step design or implementation task happens in an isolated git
-worktree, not the primary checkout. Remote sessions via `make
-claude-worktree-remote` already run in one; local sessions enter one (the
-EnterWorktree tool, or `claude --worktree <name>`) before the first written
-artifact. After shipping, end the session (or ExitWorktree with remove) — the
-commits are already on origin/main.
+Multi-step design or implementation work happens in an isolated git worktree,
+never the primary checkout.
+
+- Remote sessions (`make claude-worktree-remote`) are **already** spawned into a
+  fresh worktree under `.claude/worktrees/`, branched from origin/HEAD. Just
+  work and ship — do not enter another worktree.
+- Local sessions: enter one yourself (the EnterWorktree tool, or `claude
+  --worktree <name>`) before the first written artifact.
+
+Once `make ci` passes, ship with `git push origin HEAD:main`; the commits are
+on origin/main from that point, so the worktree holds nothing you need to
+preserve. Spawned remote worktrees are not removed when the session ends
+(they're locked to the agent process), so they accumulate — prune them with
+`git worktree remove --force` or a periodic sweep rather than relying on
+session exit.
 
 ## Security
 
