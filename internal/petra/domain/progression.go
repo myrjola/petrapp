@@ -16,10 +16,14 @@ type Config struct {
 	IsDeload       bool
 }
 
-// SetTarget is what the package recommends for the upcoming set.
+// SetTarget is what the progression recommends for the upcoming set: the load
+// (WeightKg — zero for timed/bodyweight, signed for assisted) and the
+// rep-or-seconds goal (TargetValue), whose unit the exercise's load model
+// decides. TargetValue mirrors the Set entity's single value axis, so
+// kilograms and seconds never share a field.
 type SetTarget struct {
-	WeightKg   float64
-	TargetReps int
+	WeightKg    float64
+	TargetValue int
 }
 
 // AbsWeightKg returns the unsigned magnitude of WeightKg. Assisted exercises
@@ -27,11 +31,13 @@ type SetTarget struct {
 // and any other display surface that wants the bare magnitude calls this.
 func (s SetTarget) AbsWeightKg() float64 { return math.Abs(s.WeightKg) }
 
-// SetResult is recorded by the caller after the user completes a set.
+// SetResult is recorded by the caller after the user completes a set. Shared by
+// both progression engines: ActualValue is reps for weighted, seconds for
+// timed; WeightKg is unused (zero) for timed.
 type SetResult struct {
-	ActualReps int
-	Signal     Signal
-	WeightKg   float64 // weight actually used; may differ from recommendation if user overrode
+	ActualValue int
+	Signal      Signal
+	WeightKg    float64 // weight actually used; may differ from recommendation if user overrode
 }
 
 const (
@@ -74,14 +80,14 @@ func NewProgressionFromHistory(config Config, completed []SetResult) *Progressio
 func (p *Progression) CurrentSet() SetTarget {
 	reps := DeriveScheme(p.config.RepMin, p.config.RepMax, p.config.Type, p.config.IsDeload).TargetReps
 	if len(p.completed) == 0 {
-		return SetTarget{WeightKg: p.config.StartingWeight, TargetReps: reps}
+		return SetTarget{WeightKg: p.config.StartingWeight, TargetValue: reps}
 	}
 	last := p.completed[len(p.completed)-1]
 	if p.config.IsDeload {
-		return SetTarget{WeightKg: last.WeightKg, TargetReps: reps}
+		return SetTarget{WeightKg: last.WeightKg, TargetValue: reps}
 	}
 	weight := adjustedWeight(last)
-	return SetTarget{WeightKg: weight, TargetReps: reps}
+	return SetTarget{WeightKg: weight, TargetValue: reps}
 }
 
 // RecordCompletion records what actually happened and advances internal state.

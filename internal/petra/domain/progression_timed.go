@@ -9,17 +9,6 @@ type TimedConfig struct {
 	StartingSeconds int // seconds; caller-derived from history, may be user-overridden
 }
 
-// TimedSetTarget is what the package recommends for the upcoming hold.
-type TimedSetTarget struct {
-	TargetSeconds int
-}
-
-// TimedSetResult is recorded by the caller after the user completes a hold.
-type TimedSetResult struct {
-	ActualSeconds int
-	Signal        Signal
-}
-
 const (
 	timedSnapSeconds   = 5
 	timedFloorSeconds  = 5
@@ -34,7 +23,7 @@ const (
 // TimedProgression manages duration progression for one timed exercise execution.
 type TimedProgression struct {
 	config    TimedConfig
-	completed []TimedSetResult
+	completed []SetResult
 }
 
 // NewTimedProgression creates a TimedProgression for a new exercise execution.
@@ -43,24 +32,25 @@ func NewTimedProgression(c TimedConfig) *TimedProgression {
 }
 
 // NewTimedProgressionFromHistory reconstructs a TimedProgression from sets already completed in this session.
-func NewTimedProgressionFromHistory(c TimedConfig, completed []TimedSetResult) *TimedProgression {
+func NewTimedProgressionFromHistory(c TimedConfig, completed []SetResult) *TimedProgression {
 	p := NewTimedProgression(c)
-	p.completed = make([]TimedSetResult, len(completed))
+	p.completed = make([]SetResult, len(completed))
 	copy(p.completed, completed)
 	return p
 }
 
-// CurrentSet returns the recommended target for the next hold.
-func (p *TimedProgression) CurrentSet() TimedSetTarget {
+// CurrentSet returns the recommended target for the next hold. TargetValue
+// carries the seconds goal; WeightKg stays zero (timed holds have no load).
+func (p *TimedProgression) CurrentSet() SetTarget {
 	if len(p.completed) == 0 {
-		return TimedSetTarget{TargetSeconds: p.config.StartingSeconds}
+		return SetTarget{WeightKg: 0, TargetValue: p.config.StartingSeconds}
 	}
 	last := p.completed[len(p.completed)-1]
-	return TimedSetTarget{TargetSeconds: adjustedSeconds(last)}
+	return SetTarget{WeightKg: 0, TargetValue: adjustedSeconds(last)}
 }
 
 // RecordCompletion records what actually happened and advances internal state.
-func (p *TimedProgression) RecordCompletion(r TimedSetResult) {
+func (p *TimedProgression) RecordCompletion(r SetResult) {
 	p.completed = append(p.completed, r)
 }
 
@@ -69,23 +59,23 @@ func (p *TimedProgression) SetsCompleted() int {
 	return len(p.completed)
 }
 
-func adjustedSeconds(last TimedSetResult) int {
-	step := timedIncrement(last.ActualSeconds)
+func adjustedSeconds(last SetResult) int {
+	step := timedIncrement(last.ActualValue)
 	switch last.Signal {
 	case SignalTooLight:
-		return snap5(last.ActualSeconds + step)
+		return snap5(last.ActualValue + step)
 	case SignalTooHeavy:
 		decrement := step
-		if pct := snap5(int(math.Round(float64(last.ActualSeconds) * timedDecrFraction))); pct > decrement {
+		if pct := snap5(int(math.Round(float64(last.ActualValue) * timedDecrFraction))); pct > decrement {
 			decrement = pct
 		}
-		next := max(last.ActualSeconds-decrement, timedFloorSeconds)
+		next := max(last.ActualValue-decrement, timedFloorSeconds)
 		return snap5(next)
 	case SignalOnTarget:
-		return last.ActualSeconds
+		return last.ActualValue
 	default:
 		// Unknown signal: degrade gracefully to no adjustment. See adjustedWeight.
-		return last.ActualSeconds
+		return last.ActualValue
 	}
 }
 

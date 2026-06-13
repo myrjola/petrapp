@@ -1118,11 +1118,11 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	}
 
 	// Capture the pre-flip recommendation (non-deload path).
-	progBefore, err := svc.BuildProgression(ctx, today, exerciseID)
+	targetBefore, err := svc.NextSetTarget(ctx, today, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression before flip: %v", err)
+		t.Fatalf("NextSetTarget before flip: %v", err)
 	}
-	weightBefore := progBefore.CurrentSet().WeightKg
+	weightBefore := targetBefore.WeightKg
 
 	// Flip the session into deload.
 	if err = svc.StartDeloadNow(ctx); err != nil {
@@ -1130,11 +1130,11 @@ func Test_StartDeloadNow_BuildProgressionReturnsDeloadWeight(t *testing.T) {
 	}
 
 	// Capture the post-flip recommendation (deload path).
-	progAfter, err := svc.BuildProgression(ctx, today, exerciseID)
+	targetAfter, err := svc.NextSetTarget(ctx, today, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression after flip: %v", err)
+		t.Fatalf("NextSetTarget after flip: %v", err)
 	}
-	weightAfter := progAfter.CurrentSet().WeightKg
+	weightAfter := targetAfter.WeightKg
 
 	// Expected: GetDeloadStartingWeight for the same exercise/date.
 	expected, err := svc.GetDeloadStartingWeight(ctx, exerciseID, today)

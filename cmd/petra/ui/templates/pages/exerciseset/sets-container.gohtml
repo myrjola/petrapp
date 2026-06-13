@@ -402,7 +402,7 @@
                         <div class="active-hero">
                             <span>{{ formatFloat $.CurrentSetTarget.WeightKg }}<span class="unit">kg</span></span>
                             <span class="sep">×</span>
-                            <span>{{ $.CurrentSetTarget.TargetReps }}<span class="unit">reps</span></span>
+                            <span>{{ $.CurrentSetTarget.TargetValue }}<span class="unit">reps</span></span>
                         </div>
                         <form method="post"
                               action="/workouts/{{ $.Date.Format "2006-01-02" }}/exercises/{{ $.Position }}/sets/{{ $index }}/update"
@@ -417,7 +417,7 @@
                                             inputmode="decimal"
                                             pattern="[0-9,\.]*"
                                             name="weight"
-                                            value="{{ formatFloat $.AbsCurrentWeight }}"
+                                            value="{{ formatFloat $.CurrentSetTarget.AbsWeightKg }}"
                                             step="0.5"
                                             required
                                     >
@@ -429,7 +429,7 @@
                                             inputmode="numeric"
                                             pattern="[0-9]*"
                                             name="reps"
-                                            value="{{ $.CurrentSetTarget.TargetReps }}"
+                                            value="{{ $.CurrentSetTarget.TargetValue }}"
                                             required
                                             class="reps-input"
                                     >
@@ -453,7 +453,7 @@
                                 <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                             {{ else }}
                                 <fieldset class="signal-group">
-                                    <legend>How did {{ $.CurrentSetTarget.TargetReps }} reps feel?</legend>
+                                    <legend>How did {{ $.CurrentSetTarget.TargetValue }} reps feel?</legend>
                                     <div class="signal-buttons">
                                         <button type="submit" name="signal" value="too_heavy"
                                                 class="signal-btn too-heavy-btn"
@@ -470,10 +470,10 @@
                         </form>
                     {{ else if eq $.ExerciseSlot.Exercise.ExerciseType "time_based" }}
                         <div class="active-hero">
-                            <span>{{ $.CurrentSetTimedTarget }}<span class="unit">sec</span></span>
+                            <span>{{ $.CurrentSetTarget.TargetValue }}<span class="unit">sec</span></span>
                         </div>
                         <div class="timed-runner" data-timed-runner
-                             data-target-seconds="{{ $.CurrentSetTimedTarget }}"
+                             data-target-seconds="{{ $.CurrentSetTarget.TargetValue }}"
                              hidden>
                             <div class="timed-runner-display" data-phase="idle">
                                 <span class="timed-runner-label" data-label aria-live="polite">Get ready</span>
@@ -542,7 +542,7 @@
                                         inputmode="numeric"
                                         pattern="[0-9]*"
                                         name="completed_value"
-                                        value="{{ $.CurrentSetTimedTarget }}"
+                                        value="{{ $.CurrentSetTarget.TargetValue }}"
                                         required
                                         class="reps-input"
                                 >
@@ -551,7 +551,7 @@
                                 <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                             {{ else }}
                                 <fieldset class="signal-group">
-                                    <legend>How did {{ $.CurrentSetTimedTarget }}s feel?</legend>
+                                    <legend>How did {{ $.CurrentSetTarget.TargetValue }}s feel?</legend>
                                     <div class="signal-buttons">
                                         <button type="submit" name="signal" value="too_heavy"
                                                 class="signal-btn too-heavy-btn"
@@ -758,7 +758,7 @@
                             {{ else }}
                                 <span class="set-weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
                                 <span class="sep">·</span>
-                                <span class="set-reps">{{ $.CurrentSetTarget.TargetReps }}</span>
+                                <span class="set-reps">{{ $.CurrentSetTarget.TargetValue }}</span>
                             {{ end }}
                         {{ else }}
                             {{ if $set.CompletedValue }}

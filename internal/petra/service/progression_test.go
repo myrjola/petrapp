@@ -456,15 +456,12 @@ func Test_BuildTimedProgression(t *testing.T) {
 	}
 
 	// Case 1: no completed sets in this session → first set returns starting seconds (default 30).
-	progression, err := svc.BuildTimedProgression(ctx, todayTime, exerciseID)
+	target, err := svc.NextSetTarget(ctx, todayTime, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildTimedProgression no completion: %v", err)
+		t.Fatalf("NextSetTarget no completion: %v", err)
 	}
-	if got := progression.CurrentSet().TargetSeconds; got != 30 {
+	if got := target.TargetValue; got != 30 {
 		t.Errorf("first set: got %d, want 30 (default)", got)
-	}
-	if got := progression.SetsCompleted(); got != 0 {
-		t.Errorf("first set: SetsCompleted = %d, want 0", got)
 	}
 
 	// Case 2: complete set 1 with too_light → second set should be 35s.
@@ -476,15 +473,12 @@ func Test_BuildTimedProgression(t *testing.T) {
 		t.Fatalf("update set 1: %v", err)
 	}
 
-	progression, err = svc.BuildTimedProgression(ctx, todayTime, exerciseID)
+	target, err = svc.NextSetTarget(ctx, todayTime, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildTimedProgression after set 1: %v", err)
+		t.Fatalf("NextSetTarget after set 1: %v", err)
 	}
-	if got := progression.CurrentSet().TargetSeconds; got != 35 {
+	if got := target.TargetValue; got != 35 {
 		t.Errorf("after too_light: got %d, want 35", got)
-	}
-	if got := progression.SetsCompleted(); got != 1 {
-		t.Errorf("after set 1: SetsCompleted = %d, want 1", got)
 	}
 }
 
@@ -555,16 +549,15 @@ func Test_BuildProgression(t *testing.T) {
 	date, _ := time.Parse("2006-01-02", today)
 
 	// No history: starting weight 0, target 8 reps (hypertrophy).
-	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	target, err := svc.NextSetTarget(ctx, date, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression: %v", err)
+		t.Fatalf("NextSetTarget: %v", err)
 	}
-	target := prog.CurrentSet()
 	if target.WeightKg != 0 {
 		t.Errorf("first set weight: want 0, got %v", target.WeightKg)
 	}
-	if target.TargetReps != 8 {
-		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
+	if target.TargetValue != 8 {
+		t.Errorf("first set reps: want 8, got %v", target.TargetValue)
 	}
 
 	// Record set 0 as TooLight at 0kg.
@@ -575,11 +568,10 @@ func Test_BuildProgression(t *testing.T) {
 	}
 
 	// Rebuild: next set should be 0 + 1 = 1 kg (1kg increment in dumbbell range).
-	prog, err = svc.BuildProgression(ctx, date, exerciseID)
+	target, err = svc.NextSetTarget(ctx, date, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression after set 1: %v", err)
+		t.Fatalf("NextSetTarget after set 1: %v", err)
 	}
-	target = prog.CurrentSet()
 	if target.WeightKg != 1.0 {
 		t.Errorf("second set weight: want 1.0, got %v", target.WeightKg)
 	}
@@ -661,11 +653,10 @@ func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
 		t.Fatalf("RecordSet: %v", err)
 	}
 
-	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	target, err := svc.NextSetTarget(ctx, date, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression: %v", err)
+		t.Fatalf("NextSetTarget: %v", err)
 	}
-	target := prog.CurrentSet()
 	if target.WeightKg != 60.0 {
 		t.Errorf("after deload override, second-set weight = %v, want 60.0", target.WeightKg)
 	}
@@ -753,18 +744,17 @@ func Test_BuildProgression_CrossSessionGoalConversion(t *testing.T) {
 	svc := service.NewService(db, logger, "")
 	date, _ := time.Parse("2006-01-02", todayStr)
 
-	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	target, err := svc.NextSetTarget(ctx, date, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression: %v", err)
+		t.Fatalf("NextSetTarget: %v", err)
 	}
-	target := prog.CurrentSet()
 	// Strength 100kg x5 → Hypertrophy 8 reps via Epley:
 	// 100 * (1 + 5/30) / (1 + 8/30) ≈ 92.105, rounded to 0.5 = 92.0.
 	if target.WeightKg != 92.0 {
 		t.Errorf("first set weight: want 92.0, got %v", target.WeightKg)
 	}
-	if target.TargetReps != 8 {
-		t.Errorf("first set reps: want 8, got %v", target.TargetReps)
+	if target.TargetValue != 8 {
+		t.Errorf("first set reps: want 8, got %v", target.TargetValue)
 	}
 }
 
@@ -772,7 +762,7 @@ func Test_BuildProgression_CrossSessionGoalConversion(t *testing.T) {
 // where Progression.CurrentSet() returned TargetReps from the legacy TargetReps()
 // function (hardcoded 5/8/15) rather than from DeriveScheme on the exercise's
 // per-session rep range. A Deadlift (rep_min=3, rep_max=6) on a hypertrophy
-// session must produce CurrentSet().TargetReps == 6 (repMax), not 8 (the old
+// session must produce a next-set target with TargetValue == 6 (repMax), not 8 (the old
 // hypertrophy constant). Before this fix the workout UI displayed "8 reps" even
 // though the planner had persisted target_value=6.
 func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
@@ -1079,12 +1069,12 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 
 	// Hypertrophy: DeriveScheme(3, 6, Hypertrophy).TargetReps == 6 (repMax).
 	// Before the fix this returned 8 (the legacy TargetReps hypertrophy constant).
-	prog, err := svc.BuildProgression(ctx, date, exerciseID)
+	target, err := svc.NextSetTarget(ctx, date, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression hypertrophy: %v", err)
+		t.Fatalf("NextSetTarget hypertrophy: %v", err)
 	}
-	if got := prog.CurrentSet().TargetReps; got != 6 {
-		t.Errorf("hypertrophy CurrentSet().TargetReps: want 6, got %d (legacy bug returned 8)", got)
+	if got := target.TargetValue; got != 6 {
+		t.Errorf("hypertrophy NextSetTarget TargetValue: want 6, got %d (legacy bug returned 8)", got)
 	}
 
 	// Strength session: DeriveScheme(3, 6, Strength).TargetReps == 3 (repMin).
@@ -1104,11 +1094,11 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 	}
 
 	strengthDate, _ := time.Parse("2006-01-02", strengthDay)
-	prog, err = svc.BuildProgression(ctx, strengthDate, exerciseID)
+	target, err = svc.NextSetTarget(ctx, strengthDate, exerciseID)
 	if err != nil {
-		t.Fatalf("BuildProgression strength: %v", err)
+		t.Fatalf("NextSetTarget strength: %v", err)
 	}
-	if got := prog.CurrentSet().TargetReps; got != 3 {
-		t.Errorf("strength CurrentSet().TargetReps: want 3, got %d", got)
+	if got := target.TargetValue; got != 3 {
+		t.Errorf("strength NextSetTarget TargetValue: want 3, got %d", got)
 	}
 }

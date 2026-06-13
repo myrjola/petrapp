@@ -86,9 +86,42 @@ func (s *Service) GetStartingSeconds(
 	}
 }
 
-// BuildProgression constructs a domain.Progression for the given exercise
+// NextSetTarget returns the progression's recommendation for the next set of
+// the given exercise on the given date, owning the load-model switch so callers
+// never branch on it. Weighted/timed exercises consult their respective
+// engines; bodyweight and unknown load models have no progression and return
+// the zero SetTarget (the stored target is used as-is).
+func (s *Service) NextSetTarget(
+	ctx context.Context,
+	date time.Time,
+	exerciseID int,
+) (domain.SetTarget, error) {
+	exercise, err := s.repos.Exercises.Get(ctx, exerciseID)
+	if err != nil {
+		return domain.SetTarget{}, fmt.Errorf("get exercise: %w", err)
+	}
+	switch exercise.LoadModel() {
+	case domain.LoadWeighted:
+		var progression *domain.Progression
+		if progression, err = s.buildWeightedProgression(ctx, date, exerciseID); err != nil {
+			return domain.SetTarget{}, fmt.Errorf("build progression: %w", err)
+		}
+		return progression.CurrentSet(), nil
+	case domain.LoadTimed:
+		var progression *domain.TimedProgression
+		if progression, err = s.buildTimedProgression(ctx, date, exerciseID); err != nil {
+			return domain.SetTarget{}, fmt.Errorf("build timed progression: %w", err)
+		}
+		return progression.CurrentSet(), nil
+	case domain.LoadBodyweight, domain.LoadUnknown:
+		// No progression engine — the stored target is used as-is.
+	}
+	return domain.SetTarget{}, nil
+}
+
+// buildWeightedProgression constructs a domain.Progression for the given exercise
 // in the given session, ready to call CurrentSet() for the next set recommendation.
-func (s *Service) BuildProgression(
+func (s *Service) buildWeightedProgression(
 	ctx context.Context,
 	date time.Time,
 	exerciseID int,
@@ -103,7 +136,7 @@ func (s *Service) BuildProgression(
 		return nil, fmt.Errorf("get exercise: %w", err)
 	}
 	if exercise.RepMin == nil || exercise.RepMax == nil {
-		return nil, fmt.Errorf("exercise %d has no rep range (use BuildTimedProgression for time_based)", exerciseID)
+		return nil, fmt.Errorf("exercise %d has no rep range (use buildTimedProgression for time_based)", exerciseID)
 	}
 
 	var startingWeight float64
@@ -154,9 +187,9 @@ func collectWeightedHistory(sess domain.Session, exerciseID int) []domain.SetRes
 				sig = *set.Signal
 			}
 			completed = append(completed, domain.SetResult{
-				ActualReps: *set.CompletedValue,
-				Signal:     sig,
-				WeightKg:   kg,
+				ActualValue: *set.CompletedValue,
+				Signal:      sig,
+				WeightKg:    kg,
 			})
 		}
 		break
@@ -199,11 +232,11 @@ func (s *Service) GetDeloadStartingWeight(
 	return domain.DeloadSeedWeight(prev.WeightKg, factor), nil
 }
 
-// BuildTimedProgression constructs a domain.TimedProgression
+// buildTimedProgression constructs a domain.TimedProgression
 // for the given time-based exercise in the given session, ready to call
 // CurrentSet() for the next hold's recommendation. Returns an error if the
 // exercise is not time_based or if the lookup fails.
-func (s *Service) BuildTimedProgression(
+func (s *Service) buildTimedProgression(
 	ctx context.Context,
 	date time.Time,
 	exerciseID int,
@@ -218,7 +251,7 @@ func (s *Service) BuildTimedProgression(
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 
-	var completed []domain.TimedSetResult
+	var completed []domain.SetResult
 	for _, es := range sess.Slots {
 		if es.Exercise.ID != exerciseID {
 			continue
@@ -227,9 +260,10 @@ func (s *Service) BuildTimedProgression(
 			if set.CompletedValue == nil || set.Signal == nil {
 				continue
 			}
-			completed = append(completed, domain.TimedSetResult{
-				ActualSeconds: *set.CompletedValue,
-				Signal:        *set.Signal,
+			completed = append(completed, domain.SetResult{
+				ActualValue: *set.CompletedValue,
+				Signal:      *set.Signal,
+				WeightKg:    0, // timed holds carry no weight
 			})
 		}
 		break

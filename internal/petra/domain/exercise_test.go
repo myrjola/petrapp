@@ -298,9 +298,9 @@ func Test_SetTarget_AbsWeightKg(t *testing.T) {
 		t    domain.SetTarget
 		want float64
 	}{
-		{"positive weight", domain.SetTarget{WeightKg: 50, TargetReps: 0}, 50},
-		{"negative weight (assisted convention)", domain.SetTarget{WeightKg: -10, TargetReps: 0}, 10},
-		{"zero weight", domain.SetTarget{WeightKg: 0, TargetReps: 0}, 0},
+		{"positive weight", domain.SetTarget{WeightKg: 50, TargetValue: 0}, 50},
+		{"negative weight (assisted convention)", domain.SetTarget{WeightKg: -10, TargetValue: 0}, 10},
+		{"zero weight", domain.SetTarget{WeightKg: 0, TargetValue: 0}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

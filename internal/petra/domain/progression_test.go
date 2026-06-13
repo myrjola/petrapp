@@ -58,8 +58,8 @@ func TestCurrentSet_FirstSet(t *testing.T) {
 				IsDeload:       false,
 			})
 			got := p.CurrentSet()
-			if got.TargetReps != tt.wantReps {
-				t.Errorf("TargetReps = %d, want %d", got.TargetReps, tt.wantReps)
+			if got.TargetValue != tt.wantReps {
+				t.Errorf("TargetValue = %d, want %d", got.TargetValue, tt.wantReps)
 			}
 			if got.WeightKg != tt.wantWeight {
 				t.Errorf("WeightKg = %v, want %v", got.WeightKg, tt.wantWeight)
@@ -106,9 +106,9 @@ func TestCurrentSet_SignalAdjustment(t *testing.T) {
 				IsDeload:       false,
 			})
 			p.RecordCompletion(domain.SetResult{
-				ActualReps: 8,
-				Signal:     tt.signal,
-				WeightKg:   startWeight,
+				ActualValue: 8,
+				Signal:      tt.signal,
+				WeightKg:    startWeight,
 			})
 			got := p.CurrentSet()
 			if got.WeightKg != tt.wantWeight {
@@ -130,9 +130,9 @@ func TestCurrentSet_TooHeavyRounding(t *testing.T) {
 		IsDeload:       false,
 	})
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 5,
-		Signal:     domain.SignalTooHeavy,
-		WeightKg:   23.0,
+		ActualValue: 5,
+		Signal:      domain.SignalTooHeavy,
+		WeightKg:    23.0,
 	})
 	got := p.CurrentSet()
 	if got.WeightKg != 20.5 {
@@ -153,9 +153,9 @@ func TestCurrentSet_OverridePropagates(t *testing.T) {
 		IsDeload:       false,
 	})
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 8,
-		Signal:     domain.SignalOnTarget,
-		WeightKg:   95.0, // user lifted less than recommended
+		ActualValue: 8,
+		Signal:      domain.SignalOnTarget,
+		WeightKg:    95.0, // user lifted less than recommended
 	})
 	got := p.CurrentSet()
 	if got.WeightKg != 95.0 {
@@ -176,14 +176,14 @@ func TestCurrentSet_OverrideThenTooLight(t *testing.T) {
 		IsDeload:       false,
 	})
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 8,
-		Signal:     domain.SignalOnTarget,
-		WeightKg:   100.0,
+		ActualValue: 8,
+		Signal:      domain.SignalOnTarget,
+		WeightKg:    100.0,
 	})
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 8,
-		Signal:     domain.SignalTooLight,
-		WeightKg:   90.0, // user overrode set 2 down to 90kg
+		ActualValue: 8,
+		Signal:      domain.SignalTooLight,
+		WeightKg:    90.0, // user overrode set 2 down to 90kg
 	})
 	got := p.CurrentSet()
 	if got.WeightKg != 92.5 {
@@ -202,8 +202,8 @@ func TestNewFromHistory_MatchesReplay(t *testing.T) {
 		IsDeload:       false,
 	}
 	results := []domain.SetResult{
-		{ActualReps: 8, Signal: domain.SignalTooLight, WeightKg: 80.0},
-		{ActualReps: 8, Signal: domain.SignalOnTarget, WeightKg: 82.5},
+		{ActualValue: 8, Signal: domain.SignalTooLight, WeightKg: 80.0},
+		{ActualValue: 8, Signal: domain.SignalOnTarget, WeightKg: 82.5},
 	}
 
 	// Build via replay.
@@ -260,18 +260,18 @@ func TestSetsCompleted(t *testing.T) {
 	}
 
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 8,
-		Signal:     domain.SignalOnTarget,
-		WeightKg:   60.0,
+		ActualValue: 8,
+		Signal:      domain.SignalOnTarget,
+		WeightKg:    60.0,
 	})
 	if p.SetsCompleted() != 1 {
 		t.Errorf("SetsCompleted after 1 set = %d, want 1", p.SetsCompleted())
 	}
 
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 8,
-		Signal:     domain.SignalTooLight,
-		WeightKg:   60.0,
+		ActualValue: 8,
+		Signal:      domain.SignalTooLight,
+		WeightKg:    60.0,
 	})
 	if p.SetsCompleted() != 2 {
 		t.Errorf("SetsCompleted after 2 sets = %d, want 2", p.SetsCompleted())
@@ -385,7 +385,7 @@ func TestAdjustedWeight_AssistedAndZeroBoundary(t *testing.T) {
 					IsDeload:       false,
 				},
 				[]domain.SetResult{
-					{ActualReps: 5, Signal: tt.signal, WeightKg: tt.lastWeight},
+					{ActualValue: 5, Signal: tt.signal, WeightKg: tt.lastWeight},
 				},
 			)
 			got := p.CurrentSet().WeightKg
@@ -432,8 +432,8 @@ func TestProgression_DeloadFirstSetUsesStartingWeight(t *testing.T) {
 	if target.WeightKg != 67.5 {
 		t.Errorf("initial CurrentSet WeightKg = %v, want 67.5", target.WeightKg)
 	}
-	if target.TargetReps != 12 {
-		t.Errorf("initial CurrentSet TargetReps = %d, want 12 (hypertrophy → repMax)", target.TargetReps)
+	if target.TargetValue != 12 {
+		t.Errorf("initial CurrentSet TargetValue = %d, want 12 (hypertrophy → repMax)", target.TargetValue)
 	}
 }
 
@@ -457,9 +457,9 @@ func TestProgression_DeloadCarriesUserOverrideForward(t *testing.T) {
 	// User adjusts the seeded weight down to 60 kg and signals "Done!"
 	// (deload submits no signal — the zero-value Signal stands in).
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 12,
-		Signal:     "",
-		WeightKg:   60.0,
+		ActualValue: 12,
+		Signal:      "",
+		WeightKg:    60.0,
 	})
 	if got := p.CurrentSet().WeightKg; got != 60.0 {
 		t.Errorf("after override, deload CurrentSet WeightKg = %v, want 60.0", got)
@@ -467,9 +467,9 @@ func TestProgression_DeloadCarriesUserOverrideForward(t *testing.T) {
 
 	// A second set at the same weight keeps the recommendation steady.
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 12,
-		Signal:     "",
-		WeightKg:   60.0,
+		ActualValue: 12,
+		Signal:      "",
+		WeightKg:    60.0,
 	})
 	if got := p.CurrentSet().WeightKg; got != 60.0 {
 		t.Errorf("after second set, deload CurrentSet WeightKg = %v, want 60.0", got)
@@ -477,9 +477,9 @@ func TestProgression_DeloadCarriesUserOverrideForward(t *testing.T) {
 
 	// Another override (e.g. the user takes a heavier dumbbell) propagates too.
 	p.RecordCompletion(domain.SetResult{
-		ActualReps: 12,
-		Signal:     "",
-		WeightKg:   62.5,
+		ActualValue: 12,
+		Signal:      "",
+		WeightKg:    62.5,
 	})
 	if got := p.CurrentSet().WeightKg; got != 62.5 {
 		t.Errorf("after second override, deload CurrentSet WeightKg = %v, want 62.5", got)
@@ -524,7 +524,7 @@ func TestAdjustedWeight_UnknownSignalDoesNotPanic(t *testing.T) {
 	t.Parallel()
 	p := domain.NewProgressionFromHistory(
 		domain.Config{Type: domain.SessionGoalStrength, RepMin: 5, RepMax: 8, StartingWeight: 50, IsDeload: false},
-		[]domain.SetResult{{ActualReps: 5, Signal: domain.Signal("bogus"), WeightKg: 60}},
+		[]domain.SetResult{{ActualValue: 5, Signal: domain.Signal("bogus"), WeightKg: 60}},
 	)
 	got := p.CurrentSet()
 	if got.WeightKg != 60 {
@@ -553,7 +553,7 @@ func TestExhaustiveSignalCoverage(t *testing.T) {
 				IsDeload:       false,
 			},
 			[]domain.SetResult{
-				{ActualReps: 8, Signal: s, WeightKg: 50},
+				{ActualValue: 8, Signal: s, WeightKg: 50},
 			},
 		)
 		// The call would panic if the switch in adjustedWeight failed to

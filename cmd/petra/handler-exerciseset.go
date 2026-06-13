@@ -31,20 +31,18 @@ type setDisplay struct {
 type exerciseSetTemplateData struct {
 	BaseTemplateData
 
-	Date                  time.Time
-	Position              int // Slot's 0-based index in Session.Slots, used for URL building and view-transition names.
-	ExerciseSlot          domain.ExerciseSlot
-	SetsDisplay           []setDisplay // Enhanced set data with formatted rep strings
-	FirstIncompleteIndex  int
-	EditingIndex          int              // Index of the set being edited
-	IsEditing             bool             // Whether we're in edit mode
-	IsDeload              bool             // Whether this session is a deload week.
-	CurrentSetTarget      domain.SetTarget // Recommended weight and reps from progression
-	CurrentSetTimedTarget int              // Recommended seconds for time_based exercises; 0 for others.
-	AbsCurrentWeight      float64          // |CurrentSetTarget.WeightKg|, for assisted form input
-	RestEndAtMs           int64            // 0 when no rest chip should be shown.
-	CurrentSetNumber      int              // 1-based number of the first incomplete set, clamped to TotalSetCount when all done.
-	TotalSetCount         int              // len(ExerciseSlot.Sets), for the "Set N of M" overline.
+	Date                 time.Time
+	Position             int // Slot's 0-based index in Session.Slots, used for URL building and view-transition names.
+	ExerciseSlot         domain.ExerciseSlot
+	SetsDisplay          []setDisplay // Enhanced set data with formatted rep strings
+	FirstIncompleteIndex int
+	EditingIndex         int              // Index of the set being edited
+	IsEditing            bool             // Whether we're in edit mode
+	IsDeload             bool             // Whether this session is a deload week.
+	CurrentSetTarget     domain.SetTarget // Next-set recommendation: weight + TargetValue (reps or seconds, per load model).
+	RestEndAtMs          int64            // 0 when no rest chip should be shown.
+	CurrentSetNumber     int              // 1-based number of the first incomplete set, clamped to TotalSetCount when all done.
+	TotalSetCount        int              // len(ExerciseSlot.Sets), for the "Set N of M" overline.
 }
 
 func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDisplay {
@@ -81,34 +79,6 @@ func getFirstIncompleteIndex(sets []domain.Set) int {
 		}
 	}
 	return len(sets)
-}
-
-// buildProgressionTargets returns the current set target and timed target seconds for the
-// given exercise on the given date. Both are zero-valued when not applicable.
-func (app *application) buildProgressionTargets(
-	r *http.Request,
-	date time.Time,
-	exercise domain.Exercise,
-) (domain.SetTarget, int, error) {
-	var currentSetTarget domain.SetTarget
-	var currentSetTimedTarget int
-	switch exercise.LoadModel() {
-	case domain.LoadWeighted:
-		progression, err := app.service.BuildProgression(r.Context(), date, exercise.ID)
-		if err != nil {
-			return domain.SetTarget{}, 0, fmt.Errorf("build progression: %w", err)
-		}
-		currentSetTarget = progression.CurrentSet()
-	case domain.LoadTimed:
-		progression, err := app.service.BuildTimedProgression(r.Context(), date, exercise.ID)
-		if err != nil {
-			return domain.SetTarget{}, 0, fmt.Errorf("build timed progression: %w", err)
-		}
-		currentSetTimedTarget = progression.CurrentSet().TargetSeconds
-	case domain.LoadBodyweight, domain.LoadUnknown:
-		// No progression engine for bodyweight — uses the stored target as-is.
-	}
-	return currentSetTarget, currentSetTimedTarget, nil
 }
 
 // computeSetActive reports whether a set row should render its completion form.
@@ -166,7 +136,7 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 	exerciseSlot := session.Slots[pos]
 
-	currentSetTarget, currentSetTimedTarget, err := app.buildProgressionTargets(r, date, exerciseSlot.Exercise)
+	currentSetTarget, err := app.service.NextSetTarget(r.Context(), date, exerciseSlot.Exercise.ID)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -182,21 +152,19 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := exerciseSetTemplateData{
-		BaseTemplateData:      newBaseTemplateData(r),
-		Date:                  date,
-		Position:              pos,
-		ExerciseSlot:          exerciseSlot,
-		SetsDisplay:           prepareSetsDisplay(exerciseSlot.Exercise, exerciseSlot.Sets),
-		FirstIncompleteIndex:  getFirstIncompleteIndex(exerciseSlot.Sets),
-		EditingIndex:          editingIndex,
-		IsEditing:             isEditing,
-		IsDeload:              session.IsDeload,
-		CurrentSetTarget:      currentSetTarget,
-		CurrentSetTimedTarget: currentSetTimedTarget,
-		AbsCurrentWeight:      currentSetTarget.AbsWeightKg(),
-		RestEndAtMs:           restEndAtMs,
-		CurrentSetNumber:      min(getFirstIncompleteIndex(exerciseSlot.Sets)+1, len(exerciseSlot.Sets)),
-		TotalSetCount:         len(exerciseSlot.Sets),
+		BaseTemplateData:     newBaseTemplateData(r),
+		Date:                 date,
+		Position:             pos,
+		ExerciseSlot:         exerciseSlot,
+		SetsDisplay:          prepareSetsDisplay(exerciseSlot.Exercise, exerciseSlot.Sets),
+		FirstIncompleteIndex: getFirstIncompleteIndex(exerciseSlot.Sets),
+		EditingIndex:         editingIndex,
+		IsEditing:            isEditing,
+		IsDeload:             session.IsDeload,
+		CurrentSetTarget:     currentSetTarget,
+		RestEndAtMs:          restEndAtMs,
+		CurrentSetNumber:     min(getFirstIncompleteIndex(exerciseSlot.Sets)+1, len(exerciseSlot.Sets)),
+		TotalSetCount:        len(exerciseSlot.Sets),
 	}
 
 	for i := range data.SetsDisplay {
