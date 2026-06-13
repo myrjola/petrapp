@@ -40,8 +40,9 @@ decision in the design language.
 ## Consequences
 
 - Inline page CSS stays; we do not extract per-page stylesheets or a second
-  bundle. The `sed`-based single-file fingerprint step in the Dockerfile remains
-  sufficient.
+  bundle. Only `main.css` is content-fingerprinted (at startup, via the asset
+  manifest in `cmd/petra/assets.go`) and cached immutably; the inline page CSS
+  rides uncached inside each HTML document, which is the cost recorded above.
 - The promotion rule is a review-time judgement; nothing automated enforces it
   today, so the ≥3 / token-duplication thresholds are the checklist.
 - Brand primitives belong in `main.css` even when they first appear on one page;
