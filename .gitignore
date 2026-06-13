@@ -62,6 +62,9 @@ node_modules
 .superpowers
 .claude/worktrees/
 
+# Stray binary from `go build ./cmd/petra` at the repo root (build with -o instead).
+/petra
+
 # Decrypted secrets: commit only the *.env.age ciphertext, never the plaintext
 # or any age private key. (*.env.example templates are kept.)
 /secrets/*.env
