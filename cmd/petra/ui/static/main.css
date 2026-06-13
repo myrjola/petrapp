@@ -92,7 +92,7 @@
         --font-system-ui: system-ui, sans-serif;
         --font-monospace-code: Dank Mono, Operator Mono, Inconsolata, Fira Mono, ui-monospace, SF Mono, Monaco, Droid Sans Mono, Source Code Pro, Cascadia Code, Menlo, Consolas, DejaVu Sans Mono, monospace;
         --font-sans: var(--font-system-ui);
-        --font-serif: ui-serif, serif;
+        --font-serif: Charter, "Iowan Old Style", Georgia, ui-serif, serif;
         --font-mono: var(--font-monospace-code);
         --font-weight-1: 100;
         --font-weight-2: 200;
