@@ -71,24 +71,11 @@
                     border-radius: 0;
                 }
 
+                /* base + trailing rule from .overline.overline--rule (main.css);
+                   the hero uses slightly wider tracking and spans the grid. */
                 .hero-overline {
                     grid-column: 1 / -1;
-                    display: flex;
-                    align-items: center;
-                    gap: var(--size-2);
-                    font-family: var(--font-mono);
-                    font-size: var(--font-size-0);
                     letter-spacing: var(--font-letterspacing-4);
-                    text-transform: uppercase;
-                    color: var(--clay-4);
-                    font-weight: var(--font-weight-6);
-                }
-
-                .hero-overline::after {
-                    content: "";
-                    flex: 1;
-                    height: 1px;
-                    background: linear-gradient(to right, var(--stone-3), transparent);
                 }
 
                 .hero-overline .pipe {
@@ -343,7 +330,7 @@
         </div>
 
         <header class="hero">
-            <div class="hero-overline" aria-hidden="true">
+            <div class="overline overline--rule hero-overline" aria-hidden="true">
                 <span>Exercise Guide</span>
                 <span class="pipe">·</span>
                 <span>{{ .Exercise.Category.Label }}</span>

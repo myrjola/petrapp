@@ -9,25 +9,7 @@
                     padding-top: var(--size-3);
                 }
 
-                .brief-overline {
-                    font-family: var(--font-mono);
-                    font-size: var(--font-size-0);
-                    letter-spacing: var(--font-letterspacing-3);
-                    text-transform: uppercase;
-                    color: var(--clay-4);
-                    font-weight: var(--font-weight-6);
-                    display: flex;
-                    align-items: center;
-                    gap: var(--size-2);
-                }
-
-                .brief-overline::after {
-                    content: "";
-                    flex: 1;
-                    height: 1px;
-                    background: linear-gradient(to right, var(--stone-3), transparent);
-                }
-
+                /* base + trailing rule from .overline.overline--rule (main.css) */
                 .brief-overline .dot {
                     color: var(--stone-4);
                 }
@@ -90,7 +72,7 @@
             }
         </style>
 
-        <div class="brief-overline">
+        <div class="overline overline--rule brief-overline">
             <span class="overline-date">{{ .Date.Format "Mon · Jan 2" }}</span>
             <span class="overline-suffix">
                 <span class="dot">·</span>

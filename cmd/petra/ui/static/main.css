@@ -430,6 +430,35 @@
         color: var(--color-info);
     }
 
+    /* Editorial overline: mono + uppercase + terracotta, the small caption that
+       sits above a serif display title. Promoted from per-page copies (ADR 0007).
+       Pages may override letter-spacing / margin / grid placement as needed.
+       The neutral day-card meta row is a deliberate variant and stays bespoke. */
+    .overline {
+        font-family: var(--font-mono);
+        font-size: var(--font-size-0);
+        letter-spacing: var(--font-letterspacing-3);
+        text-transform: uppercase;
+        font-weight: var(--font-weight-6);
+        color: var(--clay-4);
+    }
+
+    /* Modifier: lay the overline out as a flex row with a trailing hairline that
+       fades into the page. The row must be a flex container for the ::after to
+       stretch. */
+    .overline--rule {
+        display: flex;
+        align-items: center;
+        gap: var(--size-2);
+    }
+
+    .overline--rule::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(to right, var(--stone-3), transparent);
+    }
+
     .muscle-chip {
         display: inline-flex;
         align-items: center;

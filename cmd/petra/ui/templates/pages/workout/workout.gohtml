@@ -19,24 +19,9 @@
                     padding-top: var(--size-3);
                 }
 
+                /* base + trailing rule from .overline.overline--rule (main.css) */
                 .workout-overline {
-                    font-family: var(--font-mono);
-                    font-size: var(--font-size-0);
-                    letter-spacing: var(--font-letterspacing-3);
-                    text-transform: uppercase;
-                    color: var(--clay-4);
-                    font-weight: var(--font-weight-6);
-                    display: flex;
-                    align-items: center;
-                    gap: var(--size-2);
                     margin-bottom: var(--size-2);
-                }
-
-                .workout-overline::after {
-                    content: "";
-                    flex: 1;
-                    height: 1px;
-                    background: linear-gradient(to right, var(--stone-3), transparent);
                 }
 
                 /* Shared element with the exercise-set page overline: the date
@@ -121,7 +106,7 @@
 
         <div class="workout-body stack">
             <header class="workout-header">
-                <div class="workout-overline">
+                <div class="overline overline--rule workout-overline">
                     <span class="overline-date">{{ .Date.Format "Mon · Jan 2" }}</span>
                 </div>
                 <h1 class="workout-title">{{ .WorkoutTypeName }}</h1>
