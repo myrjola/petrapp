@@ -35,11 +35,12 @@ func TestSender_Send_SubjectIsBareEmail(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	sender := notification.NewSender(notification.SenderConfig{ //nolint:exhaustruct // HTTPClient defaulted.
+	sender := notification.NewSender(notification.SenderConfig{
 		VAPIDSubject:    "vapid@example.com",
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Logger:          testkit.NewLogger(testkit.NewWriter(t)),
+		HTTPClient:      srv.Client(), // isolated transport; see TestSender_Send_410 for why not the default.
 	})
 
 	sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt unused by the sender.
@@ -70,11 +71,16 @@ func TestSender_Send_410ReturnsErrSubscriptionGone(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	sender := notification.NewSender(notification.SenderConfig{ //nolint:exhaustruct // HTTPClient defaulted.
+	sender := notification.NewSender(notification.SenderConfig{
 		VAPIDSubject:    "vapid@example.com",
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Logger:          testkit.NewLogger(testkit.NewWriter(t)),
+		// Use the server's isolated transport, not http.DefaultClient: these
+		// tests run in parallel, and a sibling's srv.Close() calls
+		// http.DefaultTransport.CloseIdleConnections(), which would race this
+		// in-flight request and break it ("http: CloseIdleConnections called").
+		HTTPClient: srv.Client(),
 	})
 	sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt unused by the sender.
 		Endpoint: srv.URL,
@@ -97,11 +103,12 @@ func TestSender_Send_5xxReturnsErrorButNotGone(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	sender := notification.NewSender(notification.SenderConfig{ //nolint:exhaustruct // HTTPClient defaulted.
+	sender := notification.NewSender(notification.SenderConfig{
 		VAPIDSubject:    "vapid@example.com",
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Logger:          testkit.NewLogger(testkit.NewWriter(t)),
+		HTTPClient:      srv.Client(), // isolated transport; see TestSender_Send_410 for why not the default.
 	})
 	sub := domain.PushSubscription{ //nolint:exhaustruct // ID/UserID/CreatedAt unused by the sender.
 		Endpoint: srv.URL,
