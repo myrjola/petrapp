@@ -179,6 +179,7 @@ new component, and assert it in `cmd/petra/handler-styleguide_test.go`.
 - The whole component — markup and styles — lives in one file. Delete the file to delete the feature; nothing to hunt down in `main.css`
 - If a component is rendered many times on the same page and the duplicated `<style>` tag becomes a real cost, hoist the rule to `main.css` under `@layer components` (measure first; gzip makes duplicate inline `<style>` blocks cheap)
 - Only add rules to `main.css` if they need to apply to markup outside the component — otherwise keep them local
+- **Promotion rule ([ADR 0007](../../../docs/adr/0007-inline-scoped-page-css.md)).** Inline is for genuinely page-unique layout and template-emitted dynamic values. A pattern reused in **≥3 templates** (overline, display title, gradient divider…) graduates to a class/utility in `main.css`. Any inline literal that duplicates a token is a bug at *any* count — use the token (e.g. the serif display stack is `var(--font-serif)`, never a hardcoded `Charter, …` chain). "First used here" is not "specific to here."
 
 ## Available Template Functions
 
