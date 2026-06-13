@@ -13,10 +13,6 @@ const (
 	scaleGrayMax       = 10
 	scaleStoneMax      = 10
 	scaleClayMax       = 6
-	scaleSkyMax        = 10
-	scaleLimeMax       = 10
-	scaleRedMax        = 12
-	scaleYellowMax     = 12
 	scaleSizeMax       = 15
 	scaleFontSizeMax   = 8
 	scaleFluidFontMax  = 3
@@ -30,10 +26,6 @@ type styleguideTemplateData struct {
 	Grays          []string
 	Stones         []string
 	Clays          []string
-	Skies          []string
-	Limes          []string
-	Reds           []string
-	Yellows        []string
 	SemanticColors []string
 	// ColorTokens is the union of all color slices above. The template iterates over
 	// it once to emit a `.bg-{name}` utility rule per token, avoiding inline `style=`
@@ -73,10 +65,6 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 	grays := rangeNames("gray", 0, scaleGrayMax)
 	stones := rangeNames("stone", 0, scaleStoneMax)
 	clays := rangeNames("clay", 0, scaleClayMax)
-	skies := rangeNames("sky", 0, scaleSkyMax)
-	limes := rangeNames("lime", 0, scaleLimeMax)
-	reds := rangeNames("red", 0, scaleRedMax)
-	yellows := rangeNames("yellow", 0, scaleYellowMax)
 	semantics := []string{
 		"color-surface",
 		"color-surface-elevated",
@@ -98,14 +86,10 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		"ember",
 	}
 	colorTokens := make([]string, 0,
-		len(grays)+len(stones)+len(clays)+len(skies)+len(limes)+len(reds)+len(yellows)+len(semantics))
+		len(grays)+len(stones)+len(clays)+len(semantics))
 	colorTokens = append(colorTokens, grays...)
 	colorTokens = append(colorTokens, stones...)
 	colorTokens = append(colorTokens, clays...)
-	colorTokens = append(colorTokens, skies...)
-	colorTokens = append(colorTokens, limes...)
-	colorTokens = append(colorTokens, reds...)
-	colorTokens = append(colorTokens, yellows...)
 	colorTokens = append(colorTokens, semantics...)
 
 	base := newBaseTemplateData(r)
@@ -114,10 +98,6 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 		Grays:             grays,
 		Stones:            stones,
 		Clays:             clays,
-		Skies:             skies,
-		Limes:             limes,
-		Reds:              reds,
-		Yellows:           yellows,
 		SemanticColors:    semantics,
 		ColorTokens:       colorTokens,
 		Sizes:             rangeNames("size", 1, scaleSizeMax),
