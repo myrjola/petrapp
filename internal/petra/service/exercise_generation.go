@@ -38,10 +38,10 @@ type exerciseJSONSchema struct {
 
 // JSON Schema keys ("type", "description", "string", "enum") are spec-fixed strings.
 //
-//nolint:goconst // see comment above; constants add no clarity here.
+
 func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 	schema := map[string]any{
-		"type": "object",
+		"type": "object", //nolint:goconst // JSON Schema keyword, not a shared constant.
 		"required": []string{
 			"id",
 			"name",
@@ -55,16 +55,20 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 		"properties": map[string]any{
 			"id": map[string]any{
 				"type":        "integer",
-				"description": "Unique identifier for the exercise, leave as -1 for new exercises",
+				"description": "Unique identifier for the exercise, leave as -1 for new exercises", //nolint:goconst // JSON Schema keyword, not a shared constant.
 			},
 			"name": map[string]any{
-				"type":        "string",
+				"type":        "string", //nolint:goconst // JSON Schema type value, not a shared constant.
 				"description": "Name of the exercise",
 			},
 			"category": map[string]any{
 				"type":        "string",
 				"description": "Category of the exercise",
-				"enum":        []string{"full_body", "upper", "lower"},
+				"enum": []string{ //nolint:goconst // JSON Schema keyword, not a shared constant.
+					"full_body",
+					"upper",
+					"lower",
+				},
 			},
 			"exercise_type": map[string]any{
 				"type":        "string",

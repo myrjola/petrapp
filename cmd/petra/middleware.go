@@ -320,25 +320,27 @@ func (app *application) stampLastRequest(next http.Handler) http.Handler {
 func setInvalidationCookieOnPost(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			//nolint:gosec // G124: HttpOnly intentionally false; the cookie is read client-side in the pagereveal handler.
-			http.SetCookie(w, &http.Cookie{
-				Name:  "inv_bfcache",
-				Value: rand.Text(),
-				Path:  "/",
-				// Session cookie (no MaxAge / no Expires): outlives any
-				// bfcache snapshot by definition. bfcache lives in the
-				// renderer process and is cleared on browser restart;
-				// a session cookie is cleared no earlier than the
-				// session itself. With a finite MaxAge the cookie can
-				// disappear while a pre-POST bfcache snapshot is still
-				// restorable -- the JS handler then reads both rendered
-				// and current as "" and declares the stale snapshot
-				// "fresh" (the staleness bug surfaced by
-				// tlaplus/StackNav_CookieExpire.cfg).
-				SameSite: http.SameSiteLaxMode,
-				Secure:   true,
-				HttpOnly: false, // Read client-side in the pagereveal handler to compare against the rendered snapshot.
-			})
+			http.SetCookie(
+				w,
+				&http.Cookie{ //nolint:gosec // HttpOnly is intentionally false: read client-side in the pagereveal handler (see field comment below).
+					Name:  "inv_bfcache",
+					Value: rand.Text(),
+					Path:  "/",
+					// Session cookie (no MaxAge / no Expires): outlives any
+					// bfcache snapshot by definition. bfcache lives in the
+					// renderer process and is cleared on browser restart;
+					// a session cookie is cleared no earlier than the
+					// session itself. With a finite MaxAge the cookie can
+					// disappear while a pre-POST bfcache snapshot is still
+					// restorable -- the JS handler then reads both rendered
+					// and current as "" and declares the stale snapshot
+					// "fresh" (the staleness bug surfaced by
+					// tlaplus/StackNav_CookieExpire.cfg).
+					SameSite: http.SameSiteLaxMode,
+					Secure:   true,
+					HttpOnly: false, // Read client-side in the pagereveal handler to compare against the rendered snapshot.
+				},
+			)
 		}
 		next.ServeHTTP(w, r)
 	})
