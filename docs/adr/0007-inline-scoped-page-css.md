@@ -37,6 +37,27 @@ decision in the design language.
   values that must be emitted from the template (e.g.
   `width: {{ .ProgressPercent }}%`), which cannot be hoisted.
 
+## Amendment (2026-06-14): the rule covers JavaScript too
+
+The same failure mode applies to inline scripts, so the promotion rule is not
+CSS-only. `templates/README.md` ("JavaScript in Templates") is right that
+**inline-first stands for page logic** — page-specific DOM wiring, `@scope`d
+behaviour, and template-context scripts stay inline, and length alone is never a
+promotion trigger. But a **device/capability helper used by ≥2 surfaces lives in
+`main.js` (or an importmap module), not copied inline** — a primitive duplicated
+across surfaces is a bug regardless of medium. Duplication is the trigger, not
+size.
+
+This was written while the screen wake-lock and `AudioContext`-unlock helpers
+were re-implemented inline in the rest-timer (`sets-container.gohtml`) despite
+already living in `main.js`, and the WebAuthn register/login bindings were two
+near-identical inline scripts in `unauthenticated.gohtml`. Promoting those —
+shared helpers to `main.js`, the auth binding to the existing `webauthn`
+importmap module — is the standing follow-up this clause governs. Any new module
+must respect the CSP / Trusted-Types rules in the README (build DOM with
+nodes/`textContent`; reach script URLs only through the sanctioned importmap /
+`sw-loader` policy, never a script-URL sink).
+
 ## Consequences
 
 - Inline page CSS stays; we do not extract per-page stylesheets or a second

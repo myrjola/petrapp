@@ -1,4 +1,4 @@
-{{- /*gotype: github.com/myrjola/petrapp/cmd/web.preferencesTemplateData*/ -}}
+{{- /*gotype: github.com/myrjola/petrapp/cmd/petra.preferencesTemplateData*/ -}}
 
 {{ define "page" }}
     <main class="prefs center stack">
@@ -101,7 +101,7 @@
                 .prefs-select:focus-visible {
                     outline: none;
                     border-color: var(--color-border-focus);
-                    box-shadow: 0 0 0 3px color-mix(in oklab, var(--clay-3) 28%, transparent);
+                    box-shadow: var(--focus-glow);
                 }
 
                 /* Schedule day list: tight segmented column. */

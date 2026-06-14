@@ -1,4 +1,4 @@
-{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
+{{- /*gotype: github.com/myrjola/petrapp/cmd/petra.exerciseSetTemplateData*/ -}}
 
 {{ define "sets-container" }}
     <div class="sets-container stack{{ if not .ExerciseSlot.WarmupCompletedAt }} disabled{{ end }}"
@@ -207,7 +207,7 @@
                 .exercise-set.active .input-field input:focus {
                     outline: none;
                     border-color: var(--ember);
-                    box-shadow: 0 0 0 3px rgb(224 138 76 / 0.25);
+                    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ember) 25%, transparent);
                 }
 
                 .exercise-set.active .input-field input:user-invalid {

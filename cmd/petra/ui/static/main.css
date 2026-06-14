@@ -183,6 +183,9 @@
         --duration-2: 160ms;
         --duration-3: 240ms;
         --duration-4: 320ms;
+
+        /* Focus */
+        --focus-glow: 0 0 0 3px color-mix(in oklab, var(--clay-3) 28%, transparent);
     }
 }
 
@@ -324,12 +327,24 @@
     }
 
     .btn--sm {
+        position: relative;
         min-height: 2rem;
         padding: var(--size-1) var(--size-3);
         font-size: var(--font-size-0);
         font-weight: var(--font-weight-5);
         letter-spacing: var(--font-letterspacing-1);
         text-transform: none;
+    }
+
+    /* The 32px visual stays small; an invisible centred ::before lifts the
+       tap target to 48px so .btn--sm clears the touch-target minimum. */
+    .btn--sm::before {
+        content: "";
+        position: absolute;
+        inset: 50%;
+        min-width: 48px;
+        min-height: 48px;
+        translate: -50% -50%;
     }
 
 
@@ -455,13 +470,13 @@
         position: fixed;
         inset: 0;
         transform: translateY(100%);
-        animation: sheet-dialog-slide-up 0.3s ease-in-out forwards;
+        animation: sheet-dialog-slide-up var(--duration-4) var(--ease-out-quiet) forwards;
         transition-behavior: allow-discrete;
     }
 
     .sheet-dialog::backdrop {
         background-color: rgba(0, 0, 0, 0.5);
-        animation: fade-in 0.3s ease-out forwards;
+        animation: fade-in var(--duration-4) var(--ease-out-quiet) forwards;
     }
 
     .sheet-dialog__close {

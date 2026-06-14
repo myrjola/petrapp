@@ -1,4 +1,4 @@
-{{- /*gotype: github.com/myrjola/petrapp/cmd/web.exerciseSetTemplateData*/ -}}
+{{- /*gotype: github.com/myrjola/petrapp/cmd/petra.exerciseSetTemplateData*/ -}}
 
 {{ define "exercise-header" }}
     <header class="exercise-brief stack">
@@ -55,6 +55,7 @@
                 }
 
                 .brief-action {
+                    position: relative;
                     display: inline-flex;
                     align-items: center;
                     padding: var(--size-1) var(--size-2);
@@ -63,6 +64,16 @@
                     font-size: var(--font-size-1);
                     text-decoration: none;
                     border-radius: var(--radius-2);
+                }
+
+                /* Lift the tap target to 48px without enlarging the visual. */
+                .brief-action::before {
+                    content: "";
+                    position: absolute;
+                    inset: 50%;
+                    min-width: 48px;
+                    min-height: 48px;
+                    translate: -50% -50%;
                 }
 
                 .brief-action:focus-visible {
