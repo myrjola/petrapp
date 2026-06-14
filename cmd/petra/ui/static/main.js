@@ -457,6 +457,61 @@ window.addEventListener('pageshow', (event) => {
     addEventListener('pagehide', flush)
 })()
 
+// Lazily create + resume the page's AudioContext on demand. The first call
+// after a user gesture unlocks audio; later calls return the live context
+// (resuming if the platform suspended it). Shared by the rest-chip chime here
+// and the timed-runner beeps in sets-container.gohtml — see ADR 0007 (a
+// device/capability helper used by >=2 surfaces lives in main.js, not inline).
+function createAudioUnlocker() {
+    let ctx = null
+    return () => {
+        const Ctor = window.AudioContext || window.webkitAudioContext
+        if (!Ctor) return null
+        if (!ctx) ctx = new Ctor()
+        if (ctx.state === 'suspended') ctx.resume()
+        return ctx
+    }
+}
+
+// Screen Wake Lock sentinel manager: holds one 'screen' lock, re-acquires
+// safely (re-entry guard + visibility precheck), and auto-clears its handle
+// when the platform releases the lock (e.g. on tab hide). `stillWanted` is the
+// per-surface predicate checked AFTER the async request resolves, so a lock
+// that arrives once the activity already ended is released, not stored. The
+// *when* to acquire/release — and any visibilitychange re-acquire policy —
+// stays with each caller; only the sentinel lifecycle is shared. Used by the
+// rest-chip countdown here and the timed-runner in sets-container.gohtml.
+function createScreenWakeLock(stillWanted = () => true) {
+    let sentinel = null
+    let busy = false
+    return {
+        async acquire() {
+            if (!('wakeLock' in navigator) || sentinel || busy) return
+            if (document.visibilityState !== 'visible') return
+            busy = true
+            try {
+                const s = await navigator.wakeLock.request('screen')
+                if (!stillWanted()) { s.release().catch(() => {}); return }
+                s.addEventListener('release', () => {
+                    if (sentinel === s) sentinel = null
+                }, {once: true})
+                sentinel = s
+            } catch (_) {
+                // Rejected (not visible, blocked by policy, unsupported): leave it.
+            } finally {
+                busy = false
+            }
+        },
+        release() {
+            if (!sentinel) return
+            const held = sentinel
+            sentinel = null
+            held.release().catch(() => {})
+        },
+        get held() { return sentinel !== null },
+    }
+}
+
 // Rest-chip tick. Drives every [data-rest-end-at-ms] chip on the page —
 // the exerciseset active card and per-row chips on the workout overview
 // — so the same logic powers both contexts. Each chip carries its own
@@ -471,32 +526,27 @@ function initRestChips() {
     const chips = document.querySelectorAll('[data-rest-end-at-ms]')
     if (chips.length === 0) return
 
-    let audioCtx = null
-    const unlockAudio = () => {
-        const Ctor = window.AudioContext || window.webkitAudioContext
-        if (!Ctor) return
-        if (!audioCtx) audioCtx = new Ctor()
-        if (audioCtx.state === 'suspended') audioCtx.resume()
-    }
+    const unlockAudio = createAudioUnlocker()
     document.addEventListener('pointerdown', unlockAudio, {once: true})
     document.addEventListener('keydown', unlockAudio, {once: true})
     unlockAudio()
 
     const playChime = () => {
-        if (!audioCtx || audioCtx.state !== 'running') return
-        const start = audioCtx.currentTime
+        const ctx = unlockAudio()
+        if (!ctx || ctx.state !== 'running') return
+        const start = ctx.currentTime
         ;[880, 1320].forEach((freq, i) => {
             const t0 = start + i * 0.18
             const t1 = t0 + 0.16
-            const osc = audioCtx.createOscillator()
-            const gain = audioCtx.createGain()
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
             osc.type = 'sine'
             osc.frequency.value = freq
             gain.gain.setValueAtTime(0, t0)
             gain.gain.linearRampToValueAtTime(0.3, t0 + 0.01)
             gain.gain.setValueAtTime(0.3, t1 - 0.01)
             gain.gain.linearRampToValueAtTime(0, t1)
-            osc.connect(gain).connect(audioCtx.destination)
+            osc.connect(gain).connect(ctx.destination)
             osc.start(t0)
             osc.stop(t1)
         })
@@ -515,31 +565,10 @@ function initRestChips() {
     // visibilitychange while a rest is still active. Degrades silently where
     // unsupported (pre-iOS 18.4 installed PWAs, older browsers); the countdown
     // and the server push both still work without it.
-    let wakeLock = null
-    let wakeLockBusy = false
     const restActive = () => states.some((st) => st.endAt - Date.now() > 0)
-    const acquireWakeLock = async () => {
-        if (!('wakeLock' in navigator) || wakeLock || wakeLockBusy) return
-        if (document.visibilityState !== 'visible') return
-        wakeLockBusy = true
-        try {
-            wakeLock = await navigator.wakeLock.request('screen')
-            wakeLock.addEventListener('release', () => { wakeLock = null }, {once: true})
-        } catch (_) {
-            // Rejected (not visible, blocked by policy, unsupported): leave it.
-            wakeLock = null
-        } finally {
-            wakeLockBusy = false
-        }
-    }
-    const releaseWakeLock = () => {
-        if (!wakeLock) return
-        const held = wakeLock
-        wakeLock = null
-        held.release().catch(() => {})
-    }
+    const wakeLock = createScreenWakeLock(restActive)
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && restActive()) acquireWakeLock()
+        if (document.visibilityState === 'visible' && restActive()) wakeLock.acquire()
     })
 
     let intervalId = null
@@ -566,13 +595,13 @@ function initRestChips() {
             }
         }
         if (allReady) {
-            releaseWakeLock()
+            wakeLock.release()
             if (intervalId !== null) {
                 clearInterval(intervalId)
                 intervalId = null
             }
         } else {
-            acquireWakeLock()
+            wakeLock.acquire()
         }
     }
     tick()

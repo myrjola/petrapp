@@ -276,10 +276,7 @@
                     Begin training<span class="arrow" aria-hidden="true">→</span>
                 </button>
                 <script {{ $.Nonce }}>
-                  (async (form = me()) => {
-                    const {registerUser} = await import("webauthn")
-                    form.addEventListener("submit", registerUser)
-                  })()
+                  (async (form = me()) => (await import("webauthn")).bindRegister(form))()
                 </script>
             </form>
 
@@ -289,10 +286,7 @@
                     <span class="muted">Already a member?</span>Sign in →
                 </button>
                 <script {{ $.Nonce }}>
-                  (async (form = me()) => {
-                    const {loginUser} = await import("webauthn")
-                    form.addEventListener("submit", loginUser)
-                  })()
+                  (async (form = me()) => (await import("webauthn")).bindLogin(form))()
                 </script>
             </form>
         </div>

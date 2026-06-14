@@ -202,3 +202,21 @@ export async function loginUser(e) {
     throw new Error("Login failed!")
   }
 }
+
+/**
+ * Wires a form's submit to the registration flow. The import-and-attach
+ * skeleton lives here once instead of being copied into each landing-page
+ * inline script — see ADR 0007.
+ * @param form {HTMLFormElement}
+ */
+export function bindRegister(form) {
+  form.addEventListener("submit", registerUser)
+}
+
+/**
+ * Wires a form's submit to the login flow.
+ * @param form {HTMLFormElement}
+ */
+export function bindLogin(form) {
+  form.addEventListener("submit", loginUser)
+}

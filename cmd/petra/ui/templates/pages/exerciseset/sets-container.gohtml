@@ -588,8 +588,13 @@
                                 let phase = 'idle';
                                 let deadline = 0;
                                 let lastWhole = -1;
-                                let audioCtx = null;
-                                let wakeLock = null;
+
+                                // Audio unlock + screen wake-lock are device helpers shared with
+                                // the rest-chip countdown; their lifecycle lives in main.js (see
+                                // ADR 0007). Only the *when* — this state machine, the beep tones,
+                                // and the visibilitychange policy below — stays inline here.
+                                const ensureAudio = createAudioUnlocker();
+                                const wakeLock = createScreenWakeLock(() => phase !== 'idle');
 
                                 startBtn.hidden = false;
 
@@ -598,14 +603,6 @@
                                     const m = Math.floor(s / 60);
                                     const r = s % 60;
                                     return m + ':' + String(r).padStart(2, '0');
-                                }
-
-                                function ensureAudio() {
-                                    const Ctor = window.AudioContext || window.webkitAudioContext;
-                                    if (!Ctor) return null;
-                                    if (!audioCtx) audioCtx = new Ctor();
-                                    if (audioCtx.state === 'suspended') audioCtx.resume();
-                                    return audioCtx;
                                 }
 
                                 function playBeep(freq, ms) {
@@ -626,30 +623,6 @@
                                     osc.stop(t1);
                                 }
 
-                                async function acquireWakeLock() {
-                                    if (!('wakeLock' in navigator)) return;
-                                    try {
-                                        const sentinel = await navigator.wakeLock.request('screen');
-                                        if (phase === 'idle') {
-                                            sentinel.release().catch((err) => console.debug('wake lock release failed', err));
-                                            return;
-                                        }
-                                        sentinel.addEventListener('release', () => {
-                                            if (wakeLock === sentinel) wakeLock = null;
-                                        });
-                                        wakeLock = sentinel;
-                                    } catch (err) {
-                                        console.debug('wake lock request failed', err);
-                                    }
-                                }
-
-                                function releaseWakeLock() {
-                                    if (!wakeLock) return;
-                                    const sentinel = wakeLock;
-                                    wakeLock = null;
-                                    sentinel.release().catch((err) => console.debug('wake lock release failed', err));
-                                }
-
                                 function tick() {
                                     const remainingMs = deadline - Date.now();
                                     const remainingSec = remainingMs / 1000;
@@ -668,7 +641,7 @@
 
                                 function beginPrep() {
                                     ensureAudio();
-                                    acquireWakeLock();
+                                    wakeLock.acquire();
                                     form.hidden = true;
                                     startBtn.hidden = true;
                                     root.hidden = false;
@@ -701,7 +674,7 @@
                                         intervalId = null;
                                     }
                                     phase = 'idle';
-                                    releaseWakeLock();
+                                    wakeLock.release();
                                     root.hidden = true;
                                     display.dataset.phase = 'idle';
                                     form.hidden = false;
@@ -713,12 +686,12 @@
 
                                 document.addEventListener('visibilitychange', () => {
                                     if (document.visibilityState === 'visible'
-                                            && phase !== 'idle' && !wakeLock) {
-                                        acquireWakeLock();
+                                            && phase !== 'idle' && !wakeLock.held) {
+                                        wakeLock.acquire();
                                     }
                                 });
 
-                                window.addEventListener('beforeunload', releaseWakeLock);
+                                window.addEventListener('beforeunload', () => wakeLock.release());
                             })();
                         </script>
                     {{ else }}
