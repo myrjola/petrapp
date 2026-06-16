@@ -1,4 +1,4 @@
-# PetrApp — agent instructions
+# Petra — agent instructions
 
 Orientation, development workflow, and the documentation index:
 [README.md](README.md). Domain vocabulary: [CONTEXT.md](CONTEXT.md) — use those

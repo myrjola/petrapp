@@ -1,4 +1,4 @@
-# PetrApp Design System
+# Petra Design System
 
 The visual identity, design-token catalogue, and colour / motion / active-state
 conventions for the UI. Companion to

@@ -4,7 +4,7 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root — the canonical domain vocabulary for PetrApp.
+- **`CONTEXT.md`** at the repo root — the canonical domain vocabulary for Petra.
 - **`docs/adr/`** — read ADRs that touch the area you're about to work in (e.g. `0002-stack-navigator-mpa-enhancement.md`, `0006-unify-set-target-value-keep-progression-engines-separate.md`).
 - Every layer also has a `README.md` next to the code — read it before working in that layer.
 

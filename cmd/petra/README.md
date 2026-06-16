@@ -404,7 +404,7 @@ parallel under `make ci`.
 the app server via `e2etest.StartServer`, launches a browser context at a
 390x844 mobile viewport with `prefers-reduced-motion: reduce` emulated,
 wires a virtual WebAuthn authenticator via CDP, and returns a page parked
-at `/`. Petrapp is a mobile-first PWA — don't introduce desktop
+at `/`. Petra is a mobile-first PWA — don't introduce desktop
 dimensions without a reason that's worth documenting in the test.
 
 The CSS honors `prefers-reduced-motion`: view transitions collapse to

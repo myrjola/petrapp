@@ -78,7 +78,7 @@ func NewClientWithSecFetchSite(url, rpID, rpOrigin, secFetchSite string) (*Clien
 			Transport: transport,
 		},
 		url:           url,
-		rp:            virtualwebauthn.RelyingParty{Name: "Petrapp", ID: rpID, Origin: rpOrigin},
+		rp:            virtualwebauthn.RelyingParty{Name: "Petra", ID: rpID, Origin: rpOrigin},
 		authenticator: virtualwebauthn.NewAuthenticator(),
 	}, nil
 }

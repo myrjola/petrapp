@@ -74,7 +74,7 @@ func setupPlaywrightPage(t *testing.T, allowedConsoleErrors ...string) (playwrig
 	// button transforms, and disables the loading-bar animation — all of
 	// which Playwright waits on for actionability/stability checks.
 	//
-	// The viewport defaults to a portrait phone size (iPhone 13). Petrapp
+	// The viewport defaults to a portrait phone size (iPhone 13). Petra
 	// is a mobile-first PWA — running e2e flows at desktop dimensions
 	// exercises a layout users never see.
 	bCtx, err := browser.NewContext(playwright.BrowserNewContextOptions{

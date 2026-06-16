@@ -91,7 +91,7 @@ sessions in a single pass. Slot identity is the array index in
 there is no autoincrement, so the order in which slots are inserted
 does not matter and there is nothing for SQLite to collide on (see
 [ADR 0004](../../../docs/adr/0004-natural-key-exercise-slots.md)). For
-PetrApp's data sizes (a handful of exercises × a handful of sets per
+Petra's data sizes (a handful of exercises × a handful of sets per
 session) the cost is negligible and the simplicity is worth the trade.
 
 ## Hydration policy
