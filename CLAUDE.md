@@ -48,3 +48,22 @@ session exit.
 
 - Never introduce code that exposes or logs secrets and keys.
 - Never commit secrets or keys to the repository.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live as GitHub issues in `myrjola/petrapp`, managed via the
+`gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical triage roles map to identically-named labels (`needs-triage`,
+`needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Skill consumer rules — which ADRs to read before working an area, and how to
+flag ADR conflicts — extend the CONTEXT.md guidance above. See
+`docs/agents/domain.md`.
