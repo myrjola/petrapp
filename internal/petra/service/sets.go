@@ -102,9 +102,8 @@ func (s *Service) RecordSet(
 
 // applyRestPushDecision runs the rest-push policy against the post-mutation
 // slot and acts on the result. The completion itself is already persisted,
-// so failures here just mean the user won't get a notification — never
-// propagate. Every log line carries user_id, workout_date, and position so
-// triage can filter by any of them.
+// so failures here just mean the user won't get a notification — they are
+// logged via logRestPushFailure and never propagated.
 func (s *Service) applyRestPushDecision(
 	ctx context.Context,
 	userID int,
@@ -125,11 +124,7 @@ func (s *Service) applyRestPushDecision(
 		return
 	case domain.RestPushActionCancel:
 		if err := s.scheduler.Cancel(ctx, userID, date, pos); err != nil {
-			s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: cancel failed",
-				slog.Int("user_id", userID),
-				slog.String("workout_date", date.Format(time.DateOnly)),
-				slog.Int("position", pos),
-				slog.Any("error", err))
+			s.logRestPushFailure(ctx, userID, date, pos, "rest push: cancel failed", err)
 		}
 		return
 	case domain.RestPushActionSchedule:
@@ -138,11 +133,7 @@ func (s *Service) applyRestPushDecision(
 
 	prefs, err := s.repos.Preferences.Get(ctx)
 	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: get preferences failed",
-			slog.Int("user_id", userID),
-			slog.String("workout_date", date.Format(time.DateOnly)),
-			slog.Int("position", pos),
-			slog.Any("error", err))
+		s.logRestPushFailure(ctx, userID, date, pos, "rest push: get preferences failed", err)
 		return
 	}
 	if !prefs.RestNotificationsEnabled {
@@ -150,11 +141,7 @@ func (s *Service) applyRestPushDecision(
 	}
 	subCount, err := s.repos.PushSubscriptions.CountByUser(ctx)
 	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: count subscriptions failed",
-			slog.Int("user_id", userID),
-			slog.String("workout_date", date.Format(time.DateOnly)),
-			slog.Int("position", pos),
-			slog.Any("error", err))
+		s.logRestPushFailure(ctx, userID, date, pos, "rest push: count subscriptions failed", err)
 		return
 	}
 	if subCount == 0 {
@@ -177,11 +164,7 @@ func (s *Service) applyRestPushDecision(
 		FireAtMS:     decision.FireAt.UnixMilli(),
 	})
 	if err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: marshal payload",
-			slog.Int("user_id", userID),
-			slog.String("workout_date", date.Format(time.DateOnly)),
-			slog.Int("position", pos),
-			slog.Any("error", err))
+		s.logRestPushFailure(ctx, userID, date, pos, "rest push: marshal payload", err)
 		return
 	}
 
@@ -193,10 +176,19 @@ func (s *Service) applyRestPushDecision(
 		Payload:     string(payloadBytes),
 	}
 	if err = s.scheduler.Schedule(ctx, push); err != nil {
-		s.logger.LogAttrs(ctx, slog.LevelWarn, "rest push: schedule failed",
-			slog.Int("user_id", userID),
-			slog.String("workout_date", date.Format(time.DateOnly)),
-			slog.Int("position", pos),
-			slog.Any("error", err))
+		s.logRestPushFailure(ctx, userID, date, pos, "rest push: schedule failed", err)
 	}
+}
+
+// logRestPushFailure emits a warn-level rest-push failure. Every rest-push log
+// line carries user_id, workout_date, and position so triage can filter by any
+// of them; centralising the attrs here keeps that invariant in one place.
+func (s *Service) logRestPushFailure(
+	ctx context.Context, userID int, date time.Time, pos int, msg string, err error,
+) {
+	s.logger.LogAttrs(ctx, slog.LevelWarn, msg,
+		slog.Int("user_id", userID),
+		slog.String("workout_date", date.Format(time.DateOnly)),
+		slog.Int("position", pos),
+		slog.Any("error", err))
 }
