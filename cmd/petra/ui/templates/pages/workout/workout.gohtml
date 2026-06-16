@@ -194,6 +194,13 @@
                         }
 
                         .exercise-dot {
+                            /* inline-block (not the default inline) so the
+                               computed display is block-level: Chromium ignores
+                               view-transition-name on inline boxes, so a bare
+                               <span> dot would never be captured as its own
+                               snapshot and the dot-pop animation would not run.
+                               (The strike escapes this via position:absolute.) */
+                            display: inline-block;
                             width: 7px;
                             height: 7px;
                             border-radius: 50%;
