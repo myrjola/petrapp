@@ -331,17 +331,38 @@
                     {{ end }}
                     {{ end }}
 
+                    /* Per-dot names, gated the same way. A dot only carries a name
+                       while it is --done, so a just-completed dot (absent from the
+                       stale bfcache old-snapshot, present in the fresh new-snapshot)
+                       has a name only in the new snapshot and pops; already-done
+                       dots carry it in both and just morph. */
+                    {{ range .Exercises }}{{ $pos := .Position }}{{ range $i, $d := .Dots }}{{ if $d.Done }}
+                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ $pos }}"] .exercise-dots .exercise-dot:nth-child({{ add $i 1 }}) { view-transition-name: ex-dot-{{ $pos }}-{{ $i }}; }
+                    {{ end }}{{ end }}{{ end }}
+
                     html:active-view-transition-type(state-refresh) {
                         /* Suppress the global page slide so per-card snapshots dominate. */
                         &::view-transition-old(page),
                         &::view-transition-new(page) {
                             animation: none;
                         }
+                        /* Pop newly-completed dots (asymmetric: name exists in the
+                           new snapshot but not the old). The back-ease supplies the
+                           overshoot, so a plain 0->1 scale is enough. */
+                        {{ range .Exercises }}{{ $pos := .Position }}{{ range $i, $d := .Dots }}{{ if $d.Done }}
+                        &::view-transition-new(ex-dot-{{ $pos }}-{{ $i }}) {
+                            animation: dot-pop 400ms cubic-bezier(.34, 1.56, .64, 1) both;
+                            transform-origin: center;
+                        }
+                        {{ end }}{{ end }}{{ end }}
                         /* Strike draw on newly-completed cards (asymmetric: line exists in
-                           new snapshot but not old). */
+                           new snapshot but not old). On the last set both the dot pop and
+                           the strike fire; the delay lets the dot land first, then the
+                           line draws — a two-beat "rep done -> exercise done" sequence. */
                         {{ range .Exercises }}{{ if eq .State "completed" }}
                         &::view-transition-new(ex-strike-{{ .Position }}) {
                             animation: strike-draw 320ms cubic-bezier(.2, .7, .3, 1) both;
+                            animation-delay: 100ms;
                             transform-origin: left center;
                         }
                         {{ end }}{{ end }}
@@ -352,13 +373,24 @@
                         to   { transform: scaleX(1); }
                     }
 
+                    @keyframes dot-pop {
+                        from { transform: scale(0); opacity: 0; }
+                        to   { transform: scale(1); opacity: 1; }
+                    }
+
                     @media (prefers-reduced-motion: reduce) {
                         html:active-view-transition-type(state-refresh) {
                             {{ range .Exercises }}{{ if eq .State "completed" }}
                             &::view-transition-new(ex-strike-{{ .Position }}) {
                                 animation-duration: 0.001ms;
+                                animation-delay: 0ms;
                             }
                             {{ end }}{{ end }}
+                            {{ range .Exercises }}{{ $pos := .Position }}{{ range $i, $d := .Dots }}{{ if $d.Done }}
+                            &::view-transition-new(ex-dot-{{ $pos }}-{{ $i }}) {
+                                animation-duration: 0.001ms;
+                            }
+                            {{ end }}{{ end }}{{ end }}
                         }
                     }
                 </style>
@@ -382,8 +414,8 @@
                             {{ end }}
                             {{ if .Dots }}
                                 <span class="exercise-dots" aria-hidden="true">
-                                    {{ range .Dots }}
-                                        <span class="exercise-dot{{ if .Done }} exercise-dot--done{{ end }}"></span>
+                                    {{ range $i, $d := .Dots }}
+                                        <span class="exercise-dot{{ if $d.Done }} exercise-dot--done{{ end }}"></span>
                                     {{ end }}
                                 </span>
                             {{ end }}

@@ -27,6 +27,7 @@ func (app *application) templateFuncs() template.FuncMap {
 		"asset":       app.assets.URL,
 		"formatFloat": formatFloat,
 		"sub":         func(a, b int) int { return a - b },
+		"add":         func(a, b int) int { return a + b },
 		"backLink": func(href string, nonce template.HTMLAttr) BackLinkData {
 			return BackLinkData{Href: href, Nonce: nonce}
 		},
