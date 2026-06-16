@@ -12,17 +12,24 @@ drives toward. See "Schema & migrations" at the bottom.
 
 ## What lives here
 
-- **SQLite implementations** of the eight repository contracts:
-  `WeekPlanRepository`, `SessionRepository`, `ExerciseRepository`,
-  `PreferencesRepository`, `FeatureFlagRepository`,
-  `MuscleGroupTargetRepository`, `PushSubscriptionRepository`,
-  `ScheduledPushRepository`. Implementations are unexported
-  (`sqliteWeekPlanRepository`, `sqliteSessionRepository`, etc.).
-  `WeekPlanRepository` owns workout writes at week scope; `SessionRepository`
-  is read-only (see "Update closure contract" below).
+- **Eight SQLite repositories**, one per aggregate:
+  `sqliteWeekPlanRepository`, `sqliteSessionRepository`,
+  `sqliteExerciseRepository`, `sqlitePreferencesRepository`,
+  `sqliteFeatureFlagRepository`, `sqliteMuscleGroupTargetRepository`,
+  `sqlitePushSubscriptionRepository`, `sqliteScheduledPushRepository`.
+  The types are unexported; their methods are the contract. The week-plan
+  repository owns workout writes at week scope; the session repository is
+  read-only (see "Update closure contract" below).
 - **The `Repositories` composite struct** plus the single public
   constructor `New(db *sqlitekit.Database) *Repositories` that wires every
-  repository together.
+  repository together. Its fields hold the concrete repositories directly —
+  there is no per-aggregate interface. With one adapter (SQLite) and tests
+  running against an in-memory database, an interface would be a seam with
+  nothing on the other side. SQL is hidden by the package boundary (methods
+  take/return `domain.*` types and translate `sql.ErrNoRows`), not by an
+  interface. A consumer that needs to narrow or fake one repository declares
+  its own interface at the call site — see `notification.ScheduledPushRepo`,
+  which the concrete type satisfies structurally.
 - **Shared helpers** in `shared.go`:
   - Format primitives — `parseTimestamp`, `formatTimestamp`, `formatDate`,
     the `queryer` interface, the `baseRepository` mixin, and the
@@ -111,13 +118,17 @@ sentinel has no SQL ancestry.
 
 ## Adding a new repository
 
-1. Declare the interface in `internal/petra/repository/repository.go`.
-2. Add the SQLite implementation in a new file (e.g. `widgets.go`) with
+1. Add the SQLite implementation in a new file (e.g. `widgets.go`) with
    an unexported struct `sqliteWidgetRepository` and an unexported
    constructor `newSQLiteWidgetRepository`.
-3. Wire the new repo into `Repositories` and `New`.
-4. Add round-trip tests in `widgets_test.go` (external `package
+2. Wire the new repo into the `Repositories` struct and `New` in
+   `repository.go` as a concrete `*sqliteWidgetRepository` field.
+3. Add round-trip tests in `widgets_test.go` (external `package
    repository_test`) using the `setupTestRepos` helper.
+
+Add an interface only when a second adapter actually appears (a different
+backend, or a wrapper that varies behaviour). Until then, an interface is a
+seam with one side — declare it at the consumer that needs it, not here.
 
 ## Testing
 

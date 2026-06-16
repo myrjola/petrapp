@@ -122,8 +122,8 @@ func formatTimestamp(t time.Time) string {
 }
 
 // insertSessionInTx inserts a workout_sessions row and its child exercise_slots
-// + exercise_sets rows for the authenticated user. Shared by SessionRepository
-// and WeekPlanRepository so both repos persist with identical SQL shape.
+// + exercise_sets rows for the authenticated user. Shared by the session and
+// week-plan repositories so both persist with identical SQL shape.
 func (r baseRepository) insertSessionInTx(ctx context.Context, tx *sql.Tx, sess domain.Session) error {
 	if err := r.insertSessionRowInTx(ctx, tx, sess); err != nil {
 		return err
@@ -135,7 +135,7 @@ func (r baseRepository) insertSessionInTx(ctx context.Context, tx *sql.Tx, sess 
 }
 
 // insertSessionRowInTx inserts only the workout_sessions row for sess, without
-// touching exercise_slots or exercise_sets. Used by WeekPlanRepository.Update
+// touching exercise_slots or exercise_sets. Used by sqliteWeekPlanRepository.Update
 // to stage every session row before any slot is inserted.
 func (r baseRepository) insertSessionRowInTx(ctx context.Context, tx *sql.Tx, sess domain.Session) error {
 	userID := contexthelpers.AuthenticatedUserID(ctx)
@@ -218,7 +218,7 @@ func (r baseRepository) saveOneSlotInTx(
 
 // deleteWeekInTx removes all workout_sessions for the user between [monday,
 // monday+6] inside tx. CASCADE clears child exercise_slots and
-// exercise_sets rows. Called from WeekPlanRepository.Update before the
+// exercise_sets rows. Called from sqliteWeekPlanRepository.Update before the
 // single-pass reinsert.
 func (r baseRepository) deleteWeekInTx(
 	ctx context.Context, tx *sql.Tx, userID int, monday time.Time,

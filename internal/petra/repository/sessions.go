@@ -514,7 +514,7 @@ func (r baseRepository) listSessionRows(
 
 // listSessionRowsBetween returns sessions whose workout_date is in [from, to]
 // inclusive, oldest first. Slots is left nil — caller hydrates. Takes a
-// queryer so WeekPlanRepository.Update can read inside its open transaction.
+// queryer so sqliteWeekPlanRepository.Update can read inside its open transaction.
 func (r baseRepository) listSessionRowsBetween(
 	ctx context.Context,
 	q queryer,

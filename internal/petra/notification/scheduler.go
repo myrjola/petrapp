@@ -17,9 +17,10 @@ import (
 // responsible for their own context propagation.
 type DispatchFunc func(ctx context.Context, push domain.ScheduledPush) error
 
-// ScheduledPushRepo is the subset of repository.ScheduledPushRepository the
+// ScheduledPushRepo is the subset of the scheduled-push repository's methods the
 // scheduler needs. Declared locally so the package doesn't import the whole
 // repository package — keeps notification at a lower layer in the dep graph.
+// repository's concrete *sqliteScheduledPushRepository satisfies it structurally.
 type ScheduledPushRepo interface {
 	Replace(ctx context.Context, push domain.ScheduledPush) (domain.ScheduledPush, error)
 	Delete(ctx context.Context, id int) error
