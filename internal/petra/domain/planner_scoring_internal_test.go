@@ -2,33 +2,21 @@ package domain
 
 import "testing"
 
-// The planner's candidate scoring is a private implementation detail tested for
-// its behaviour through Plan/PlanDay in planner_test.go (package domain_test).
-// These two in-package tests pin the only pure-function invariants the planner
-// relies on — properties that are real contracts (not tunable magnitudes) and
-// invisible through Plan's output, so they cannot be asserted behaviourally.
+// goalForWeek's half-integer quantisation is a numeric invariant with no public
+// seam: scoreCandidate sums per-muscle-group rewards by ranging over a map
+// (Go randomises map-iteration order), and float addition is not associative,
+// so the only thing keeping an exercise's score identical run-to-run — and thus
+// keeping Plan's output reproducible and pickBestExerciseIdx's lowest-id
+// tie-break meaningful — is that every term is an exact multiple of 0.5. The
+// reward magnitudes are already half-integers; goalForWeek is where a fractional
+// ramp progress (e.g. 1/3 → 13.333…) would otherwise leak a non-half-integer
+// segment boundary into segmentReward. Plan_Deterministic cannot catch a
+// regression here (one binary picks the same map order twice by luck), so the
+// invariant is pinned directly. The scoring *ordering* is a separate matter and
+// is asserted behaviourally through PlanDay in planner_test.go.
 
-// segmentReward's marginal per-set reward must order below-floor > between
-// floor-and-ceiling > 0 > past-ceiling. The exact magnitudes are tuning knobs;
-// this ordering is the contract pickBestExerciseIdx depends on to drive every
-// muscle toward its floor, then keep paying with diminishing returns up to its
-// ceiling, then penalise excess.
-func Test_segmentReward_OrdersBelowAboveOverMax(t *testing.T) {
-	t.Parallel()
-
-	const goal, maxSets = 10.0, 20.0
-	below := segmentReward(0, 1, goal, maxSets)  // one set entirely below the floor
-	above := segmentReward(10, 1, goal, maxSets) // one set between floor and ceiling
-	over := segmentReward(20, 1, goal, maxSets)  // one set entirely past the ceiling
-
-	if !(below > above && above > 0 && 0 > over) {
-		t.Errorf("want below > above > 0 > over; got below=%v above=%v over=%v", below, above, over)
-	}
-}
-
-// goalForWeek must always return a multiple of 0.5. Quantisation keeps every
-// segmentReward term on half-integer values so scores stay exact in IEEE-754
-// and pickBestExerciseIdx's lowest-id tie-break holds.
+// goalForWeek must always return a multiple of 0.5 — see the file comment for
+// why exactness, not the ramp value itself, is the contract under test.
 func Test_goalForWeek(t *testing.T) {
 	t.Parallel()
 

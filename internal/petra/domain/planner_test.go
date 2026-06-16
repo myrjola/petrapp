@@ -13,9 +13,10 @@ import (
 // of the package; its observable effects — under-target muscles get pulled up,
 // over-saturated ones get passed over, ties break to the lowest exercise ID —
 // are asserted here through PlanDay's public weekUsedExerciseIDs / weekLoad
-// seam. The two pure-function invariants the planner relies on
-// (segmentReward ordering, goalForWeek quantisation) are unit-tested in-package
-// in planner_scoring_internal_test.go.
+// seam, so the scoring ordering needs no separate white-box test. The one
+// scoring invariant with no public seam — goalForWeek's half-integer
+// quantisation, which keeps scores reproducible under Go's randomised
+// map iteration — is unit-tested in-package in planner_scoring_internal_test.go.
 
 // --- Plan: shape and scheduling -------------------------------------------
 

@@ -65,3 +65,24 @@ when violated; the service layer calls the method inside a repository
 Update closure (the closure pattern is what gives us atomicity — see
 the [repository README](../repository/README.md) and
 [ADR 0003](../../../docs/adr/0003-weekplan-aggregate-delete-and-reinsert.md)).
+
+## Testing
+
+Domain tests live in `package domain_test` (external) and assert behaviour
+through the exported API — that is the default and covers all but a sliver of
+this package. A white-box test in `package domain` (a `*_internal_test.go`
+file) is justified **only** when an invariant the code genuinely relies on is
+invisible to every public seam, and the test must name the seam it protects and
+why no behavioural assertion reaches it. The bar is deliberately high: a
+white-box test that *could* be written behaviourally is a duplicate that pins an
+implementation detail, and it will rot.
+
+The lone current example is `Test_goalForWeek` in
+`planner_scoring_internal_test.go`: it pins the half-integer quantisation that
+keeps planner scores reproducible under Go's randomised map iteration — a
+numeric property no `Plan`/`PlanDay` output exposes (and that
+`TestPlanner_Plan_Deterministic` cannot catch, since one binary may pick the
+same map order twice by luck). The scoring *ordering*, by contrast, **is**
+observable — `TestPlanner_PlanDay_PrefersUnderTargetMuscle` and
+`OverSaturatedMuscleLosesToFreshMuscle` assert it through the public surface — so
+it gets no white-box test.
