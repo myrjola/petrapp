@@ -362,11 +362,13 @@ forbidden by convention.
 
 Suspect pairings to audit before reuse:
 
-- `--color-text-muted` (`--stone-5`) on `--color-surface` — likely
-  borderline for body; reserve for large text or darken to `--stone-6`.
+- `--color-text-muted` (`--stone-5`) — **retired**: failed AA for body
+  text. Use `--color-text-secondary` (`--stone-6`) for secondary copy, or
+  `--stone-7` for small mono labels.
 - `--color-text-secondary` (`--stone-6`) on `--color-surface` — verify.
-- `--clay-4` overlines on `--stone-1` — verify; may need `--clay-5` for
-  body-sized usage.
+- `--clay-4` overlines — **resolved**: overlines, links and the primary
+  button use `--clay-5` (AA-safe small text). `--clay-4` is now reserved
+  for large display (≥18.66px/700) or non-text fills.
 - Status text on its matching wash (`--color-success` on
   `--color-success-bg`, warning on `-bg`, error on `-bg`) — these were
   tuned muted; need empirical numbers before adding new usages.

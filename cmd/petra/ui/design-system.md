@@ -19,7 +19,11 @@ element earns its space.
 - **Warm-only palette.** Stone neutrals + Clay terracotta accent + Ember
   one-off pop. No cool grays anywhere; shadows are warm-tinted
   (`rgb(120 90 60 / .10)`), never neutral black. The semantic-token
-  catalogue is documented under "Color System" below.
+  catalogue is documented under "Color System" below. **Clay-5 is the
+  AA-safe small-text accent** (overlines, links, the primary button
+  surface, ~5.7–6.1:1 on stone); **Clay-4 is reserved for large display
+  (≥18.66px/700) or non-text fills** (progress bars, accent dots, the
+  select chevron) — it measures ~4.0–4.3:1 and fails AA for small text.
 - **Three type voices, system stacks only — zero web fonts.** Display =
   serif (Charter → Iowan Old Style → Georgia → ui-serif), tight tracking
   `-0.025em`, line-height `0.95`, weight 6. Body = `system-ui`. Mono =
@@ -31,7 +35,7 @@ element earns its space.
   per OS, not pixel-identical rendering. Don't propose a Google-fonted
   look or introduce a custom face.
 - **Signature page-header motif.** Uppercase mono overline in
-  `--clay-4` → serif display title (`clamp(2.25rem, 9vw, 3rem)`,
+  `--clay-5` → serif display title (`clamp(2.25rem, 9vw, 3rem)`,
   line-height `0.95`, tracking `-0.025em`) → meta row. The overline ends
   with a 1px hairline fading right via
   `linear-gradient(to right, var(--stone-3), transparent)`. Worked
@@ -79,9 +83,11 @@ retired page-by-page.
 
 - **Semantic colors** (prefer these): `--color-surface`, `--color-surface-elevated`,
   `--color-surface-active`, `--color-surface-completed`, `--color-border`,
-  `--color-border-focus`, `--color-text-primary` / `-secondary` / `-muted`,
+  `--color-border-focus`, `--color-text-primary` / `-secondary`,
   `--color-success` / `-bg`, `--color-warning` / `-bg`, `--color-error` / `-bg`,
-  `--color-info` / `-bg`
+  `--color-info` / `-bg`. `--color-text-muted` (stone-5) is **retired** — it
+  fails AA for text; use `--color-text-secondary` (stone-6) for secondary
+  copy, or `--stone-7` for small mono labels.
 - **Stone**: `--stone-0` through `--stone-10` (warm neutral ramp — surfaces, borders, text)
 - **Clay**: `--clay-0` through `--clay-6` (primary accent — buttons, links, active state)
 - **Ember**: `--ember` (single bright accent, reserved for Focus-mode CTAs)
@@ -118,6 +124,15 @@ Reserve interactive-state styling for `:active` (fires on touch and mouse
 alike) and `:focus-visible` (keyboard). Don't reintroduce `:hover`,
 `cursor: pointer`, `@media (hover: hover)` gates, or `mouseenter` /
 `mouseleave` listeners.
+
+### Focus rings — outline, never a glow
+
+Focus-visible is a **2px `--color-border-focus` (clay-4) outline at 2px
+offset** — clay-4 clears the 3:1 non-text floor (4.3:1 on stone-0). The
+offset is applied once globally (`:focus-visible { outline-offset: 2px }`
+in `static/main.css`); per-component rules only set the outline colour/width
+via the token. There is **no glow token** — don't reach for a
+`box-shadow` focus ring.
 
 ### Active-state darkening — named-ramp step vs `color-mix`
 

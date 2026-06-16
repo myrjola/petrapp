@@ -164,10 +164,12 @@
         --color-surface-active: var(--clay-0);
         --color-surface-completed: #eef1e2;
         --color-border: var(--stone-3);
-        --color-border-focus: var(--clay-3);
+        --color-border-focus: var(--clay-4); /* 4.3:1 on stone-0 — clears the 3:1 non-text floor for focus rings */
         --color-text-primary: var(--stone-9);
         --color-text-secondary: var(--stone-6);
-        --color-text-muted: var(--stone-5);
+        /* --color-text-muted (stone-5) retired — fails AA for text. Use
+           --color-text-secondary (stone-6) for secondary copy, or --stone-7
+           for small mono labels. */
         --color-success: #5c6b38;
         --color-success-bg: #e8ecd9;
         --color-warning: #8a5a17;
@@ -184,8 +186,6 @@
         --duration-3: 240ms;
         --duration-4: 320ms;
 
-        /* Focus */
-        --focus-glow: 0 0 0 3px color-mix(in oklab, var(--clay-3) 28%, transparent);
     }
 }
 
@@ -223,7 +223,7 @@
         justify-content: center;
         min-height: 3rem;
         border-radius: var(--radius-2);
-        background-color: var(--clay-4);
+        background-color: var(--clay-5);
         color: var(--color-surface-elevated);
         font-family: var(--font-sans);
         font-size: var(--font-size-1);
@@ -237,7 +237,8 @@
         transition: background-color var(--duration-2) var(--ease-out-quiet), transform var(--duration-1) var(--ease-out-quiet);
 
         &:focus-visible {
-            outline: var(--clay-3) solid 2px;
+            outline: var(--color-border-focus) solid 2px;
+            outline-offset: 2px;
         }
 
         &:active:not([aria-busy="true"]) {
@@ -406,7 +407,9 @@
         letter-spacing: var(--font-letterspacing-3);
         text-transform: uppercase;
         font-weight: var(--font-weight-6);
-        color: var(--clay-4);
+        /* Clay-5 (5.7–6.1:1 on stone) is the AA-safe small-text accent.
+           Clay-4 (~4.0–4.3:1) is reserved for large display / non-text fills. */
+        color: var(--clay-5);
     }
 
     /* Modifier: lay the overline out as a flex row with a trailing hairline that
@@ -596,6 +599,13 @@
 
 @view-transition {
     navigation: auto;
+}
+
+/* Focus rings sit 2px off the element everywhere (design-system focus spec).
+   Components set the outline colour/width via --color-border-focus; the offset
+   is applied once here so per-page rules don't each repeat it. */
+:focus-visible {
+    outline-offset: 2px;
 }
 
 :root {
