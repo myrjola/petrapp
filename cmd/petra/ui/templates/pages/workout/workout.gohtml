@@ -338,14 +338,12 @@
                     {{ end }}
                     {{ end }}
 
-                    /* Per-dot names, gated the same way. A dot only carries a name
-                       while it is --done, so a just-completed dot (absent from the
-                       stale bfcache old-snapshot, present in the fresh new-snapshot)
-                       has a name only in the new snapshot and pops; already-done
-                       dots carry it in both and just morph. */
-                    {{ range .Exercises }}{{ $pos := .Position }}{{ range $i, $d := .Dots }}{{ if $d.Done }}
-                    body[data-vt="state-refresh"] .exercise[data-workout-exercise-id="{{ $pos }}"] .exercise-dots .exercise-dot:nth-child({{ add $i 1 }}) { view-transition-name: ex-dot-{{ $pos }}-{{ $i }}; }
-                    {{ end }}{{ end }}{{ end }}
+                    /* Per-dot view-transition-names are assigned by the page-local
+                       script below — and ONLY to dots that were not already --done in
+                       the outgoing (stale bfcache) snapshot. A just-completed dot
+                       becomes a new-only pseudo that pops; an already-done dot gets no
+                       name, stays baked into its card snapshot, and holds still. The
+                       script sets ex-dotpop-<pos>-<setIndex>, matching the rule below. */
 
                     html:active-view-transition-type(state-refresh) {
                         /* Suppress the global page slide so per-card snapshots dominate. */
@@ -353,23 +351,25 @@
                         &::view-transition-new(page) {
                             animation: none;
                         }
-                        /* Pop newly-completed dots (asymmetric: name exists in the
-                           new snapshot but not the old). The back-ease supplies the
-                           overshoot, so a plain 0->1 scale is enough. */
+                        /* Pop newly-completed dots one-by-one (asymmetric: name exists
+                           in the new snapshot but not the old). Each dot is delayed by
+                           its index so the set fills left-to-right, and the keyframe
+                           overshoots past full size for a visible "pop" on the 7px dot. */
                         {{ range .Exercises }}{{ $pos := .Position }}{{ range $i, $d := .Dots }}{{ if $d.Done }}
-                        &::view-transition-new(ex-dot-{{ $pos }}-{{ $i }}) {
-                            animation: dot-pop 400ms cubic-bezier(.34, 1.56, .64, 1) both;
+                        &::view-transition-new(ex-dotpop-{{ $pos }}-{{ $i }}) {
+                            animation: dot-pop 360ms cubic-bezier(.22, 1, .36, 1) both;
+                            animation-delay: calc({{ $i }} * 70ms);
                             transform-origin: center;
                         }
                         {{ end }}{{ end }}{{ end }}
                         /* Strike draw on newly-completed cards (asymmetric: line exists in
-                           new snapshot but not old). On the last set both the dot pop and
-                           the strike fire; the delay lets the dot land first, then the
-                           line draws — a two-beat "rep done -> exercise done" sequence. */
+                           new snapshot but not old). Delayed until the dots have filled in
+                           (one stagger step per dot) so the sequence reads as
+                           "reps tick in left-to-right -> exercise strikes through". */
                         {{ range .Exercises }}{{ if eq .State "completed" }}
                         &::view-transition-new(ex-strike-{{ .Position }}) {
                             animation: strike-draw 320ms cubic-bezier(.2, .7, .3, 1) both;
-                            animation-delay: 100ms;
+                            animation-delay: calc({{ len .Dots }} * 70ms);
                             transform-origin: left center;
                         }
                         {{ end }}{{ end }}
@@ -381,8 +381,9 @@
                     }
 
                     @keyframes dot-pop {
-                        from { transform: scale(0); opacity: 0; }
-                        to   { transform: scale(1); opacity: 1; }
+                        0%   { transform: scale(0);   opacity: 0; }
+                        60%  { transform: scale(1.6); opacity: 1; }
+                        100% { transform: scale(1);   opacity: 1; }
                     }
 
                     @media (prefers-reduced-motion: reduce) {
@@ -394,8 +395,9 @@
                             }
                             {{ end }}{{ end }}
                             {{ range .Exercises }}{{ $pos := .Position }}{{ range $i, $d := .Dots }}{{ if $d.Done }}
-                            &::view-transition-new(ex-dot-{{ $pos }}-{{ $i }}) {
+                            &::view-transition-new(ex-dotpop-{{ $pos }}-{{ $i }}) {
                                 animation-duration: 0.001ms;
+                                animation-delay: 0ms;
                             }
                             {{ end }}{{ end }}{{ end }}
                         }
@@ -495,6 +497,43 @@
                   // context (after `await viewTransition.finished`). Stripped on arrival.
                   const STATE_REFRESH_QUERY = '?_inv=1'
 
+                  // sessionStorage key holding the done-dot set of the last overview the
+                  // user navigated away from — the "before" state the pop diffs against.
+                  const DONE_DOTS_KEY = 'vt-done-dots'
+
+                  // collectDoneDots returns a "<pos>-<setIndex>" key for every --done dot.
+                  const collectDoneDots = () => {
+                    const keys = []
+                    document.querySelectorAll('.exercise[data-workout-exercise-id]').forEach((card) => {
+                      const pos = card.dataset.workoutExerciseId
+                      card.querySelectorAll('.exercise-dots .exercise-dot').forEach((dot, i) => {
+                        if (dot.classList.contains('exercise-dot--done')) keys.push(pos + '-' + i)
+                      })
+                    })
+                    return keys
+                  }
+
+                  // tagFreshDots gives the pop view-transition-name to dots that are --done
+                  // now but were NOT --done in the stashed outgoing snapshot, so only
+                  // just-completed sets pop while already-done sets stay baked into their
+                  // card snapshot. Must run synchronously in pagereveal, before the incoming
+                  // snapshot is captured. Returns the number of dots tagged.
+                  const tagFreshDots = () => {
+                    let prev
+                    try { prev = new Set(JSON.parse(sessionStorage.getItem(DONE_DOTS_KEY) || '[]')) } catch (_) { prev = new Set() }
+                    let n = 0
+                    document.querySelectorAll('.exercise[data-workout-exercise-id]').forEach((card) => {
+                      const pos = card.dataset.workoutExerciseId
+                      card.querySelectorAll('.exercise-dots .exercise-dot').forEach((dot, i) => {
+                        if (dot.classList.contains('exercise-dot--done') && !prev.has(pos + '-' + i)) {
+                          dot.style.viewTransitionName = 'ex-dotpop-' + pos + '-' + i
+                          n++
+                        }
+                      })
+                    })
+                    return n
+                  }
+
                   window.addEventListener('pagereveal', async (e) => {
                     if (e.viewTransition && window.navigation?.activation?.navigationType === 'replace') {
                       // Set the state-refresh context for this transition. The body
@@ -505,7 +544,15 @@
                       // animations. Both clear when the transition ends.
                       e.viewTransition.types.add('state-refresh')
                       document.body.dataset.vt = 'state-refresh'
-                      e.viewTransition.finished.finally(() => { delete document.body.dataset.vt })
+                      // Tag only dots that became done since the outgoing snapshot so the
+                      // pop animation runs on just-completed sets, not already-done ones.
+                      tagFreshDots()
+                      // .catch keeps an aborted/skipped transition (the finished promise
+                      // rejects) from surfacing as an unhandled rejection; the cleanup runs
+                      // either way.
+                      e.viewTransition.finished
+                        .catch(() => { /* aborted or skipped */ })
+                        .finally(() => { delete document.body.dataset.vt })
                     }
 
                     // Clean the cache-buster from the URL on the arrival pagereveal.
@@ -536,6 +583,14 @@
                     } else {
                       location.replace(target)
                     }
+                  })
+
+                  // Stash this page's done-dots as it swaps out, so when we come back to a
+                  // stale snapshot the incoming page can tell which dots are newly completed
+                  // (pop) vs already done (hold still). This is the "before" the pop diffs
+                  // against; the forward nav to an exercise captures the pre-completion state.
+                  window.addEventListener('pageswap', () => {
+                    try { sessionStorage.setItem(DONE_DOTS_KEY, JSON.stringify(collectDoneDots())) } catch (_) { /* ignore */ }
                   })
                 </script>
             </div>
