@@ -446,19 +446,6 @@ func (r *sqliteSessionRepository) GetLatestSuccessfulSecondsBefore(
 	return seconds, nil
 }
 
-func (r *sqliteSessionRepository) CountCompleted(ctx context.Context) (int, error) {
-	userID := contexthelpers.AuthenticatedUserID(ctx)
-	var count int
-	err := r.db.ReadOnly.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM workout_sessions
-		WHERE user_id = ? AND completed_at IS NOT NULL`,
-		userID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("count completed sessions: %w", err)
-	}
-	return count, nil
-}
-
 // listSessionRows scans the workout_sessions scalar rows for a user on or
 // after sinceDate, newest first. Slots is left nil — List hydrates it
 // in a single batched follow-up query.
