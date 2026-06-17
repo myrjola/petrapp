@@ -1127,3 +1127,90 @@ func capturePlaywrightFailureScreenshot(t *testing.T, page playwright.Page) {
 	}
 	t.Logf("failure screenshot: %s", path)
 }
+
+// axeAsset is the vendored axe-core build used for in-browser accessibility
+// scanning. It is a dev-only test asset — never embedded in the binary, never
+// shipped to clients. Fetch it once with `make fetch-axe`; Test_playwright_axe_aa
+// skips cleanly while it is absent.
+const axeAsset = "testdata/axe.min.js"
+
+// runAxeAA injects axe-core into the current page and fails the test on any
+// WCAG 2.x A/AA violation. axe evaluates the *rendered* DOM, so it measures
+// real computed colour contrast — this is what retires the hand-maintained
+// token-pairing matrix for every page it runs on (ADR 0008).
+//
+// Injection goes through page.Evaluate (CDP main-world eval), which is exempt
+// from the page CSP and the require-trusted-types-for enforcement that would
+// otherwise block a normal <script> injection.
+func runAxeAA(t *testing.T, page playwright.Page, label string) {
+	t.Helper()
+
+	src, err := os.ReadFile(axeAsset)
+	if err != nil {
+		t.Fatalf("[%s] read axe asset %s: %v", label, axeAsset, err)
+	}
+	if _, err = page.Evaluate(string(src)); err != nil {
+		t.Fatalf("[%s] inject axe-core: %v", label, err)
+	}
+
+	raw, err := page.Evaluate(`async () => {
+		const result = await axe.run(document, {
+			runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'],
+		});
+		return result.violations.map(v => ({
+			id: v.id,
+			impact: v.impact,
+			help: v.help,
+			targets: v.nodes.map(n => n.target.join(' ')),
+		}));
+	}`)
+	if err != nil {
+		t.Fatalf("[%s] run axe: %v", label, err)
+	}
+
+	violations, _ := raw.([]any)
+	if len(violations) == 0 {
+		return
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "[%s] %d axe WCAG A/AA violation(s):", label, len(violations))
+	for _, v := range violations {
+		m, _ := v.(map[string]any)
+		fmt.Fprintf(&b, "\n  - %v (%v): %v\n    at: %v", m["id"], m["impact"], m["help"], m["targets"])
+	}
+	t.Error(b.String())
+}
+
+// Test_playwright_axe_aa runs axe-core against the rendered DOM of the pages the
+// suite already drives through — unauthenticated home, schedule, authenticated
+// home, and a workout — asserting zero WCAG A/AA violations. It reuses the
+// existing fixture helpers so it adds coverage without new navigation scaffolding.
+//
+// It skips when the dev-only axe asset is not vendored (see axeAsset); fetch it
+// with `make fetch-axe`.
+func Test_playwright_axe_aa(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("skipping slow playwright accessibility scan")
+	}
+	if _, err := os.Stat(axeAsset); err != nil {
+		t.Skipf("axe asset %s not vendored — run `make fetch-axe` to enable the accessibility scan", axeAsset)
+	}
+
+	page, serverURL := setupPlaywrightPage(t)
+
+	runAxeAA(t, page, "home (unauthenticated)")
+
+	registerAndWaitSchedule(t, page, serverURL)
+	runAxeAA(t, page, "schedule")
+
+	selectAndSubmitSchedule(t, page, serverURL, allWeekdays())
+	runAxeAA(t, page, "home (authenticated)")
+
+	workoutURL := serverURL + "/workouts/" + time.Now().Format("2006-01-02")
+	if _, err := page.Goto(workoutURL); err != nil {
+		t.Fatalf("goto today's workout: %v", err)
+	}
+	runAxeAA(t, page, "workout")
+}

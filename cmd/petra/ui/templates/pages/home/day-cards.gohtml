@@ -82,7 +82,10 @@
                     font-family: var(--font-mono);
                     font-size: var(--font-size-0);
                     letter-spacing: var(--font-letterspacing-1);
-                    color: var(--color-text-secondary);
+                    /* stone-7, not text-secondary (stone-6): the "N / M sets"
+                       span is small mono text and stone-6 falls just under AA
+                       4.5:1 here (caught by Test_playwright_axe_aa). */
+                    color: var(--stone-7);
                 }
 
                 .day-progress .progress-rule {

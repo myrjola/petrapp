@@ -3,6 +3,8 @@
 
 export GOTOOLCHAIN := auto
 GOLANGCI_LINT_VERSION := v2.12.2
+# Pinned axe-core build for the Playwright accessibility scan (make fetch-axe).
+AXE_VERSION ?= 4.10.2
 
 # Per-worktree golangci-lint cache. The cache stores diagnostics keyed by file
 # content hash and records absolute paths in the cached results; sharing one
@@ -168,6 +170,17 @@ repomix:
 .PHONY: repomix-clipboard
 repomix-clipboard: repomix
 	@cat repomix-output.txt | pbcopy
+
+# fetch-axe vendors the dev-only axe-core asset that Test_playwright_axe_aa
+# injects to scan rendered pages for WCAG A/AA violations. The asset is not
+# embedded in the binary; the test skips until it is present.
+.PHONY: fetch-axe
+fetch-axe:
+	@echo "Fetching axe-core $(AXE_VERSION)..."
+	@mkdir -p cmd/petra/testdata
+	@curl -fsSL https://cdn.jsdelivr.net/npm/axe-core@$(AXE_VERSION)/axe.min.js \
+		-o cmd/petra/testdata/axe.min.js
+	@echo "Wrote cmd/petra/testdata/axe.min.js"
 
 .PHONY: setup-git-hooks
 setup-git-hooks:

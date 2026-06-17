@@ -43,6 +43,28 @@ fractional set) lives in the root [CONTEXT.md](../../../../CONTEXT.md) under
 that table first; if the concept isn't mapped yet, add the mapping there in
 the same change.
 
+## Enforcement (automated)
+
+Many rules below were prose-only until [ADR 0008](../../../docs/adr/0008-static-template-linting-over-templ.md);
+they are now machine-checked, so a violation fails `make test`/`make ci`, not
+just review:
+
+- **`cmd/petra/template_check_test.go`** — parses every page and runs
+  `jba/templatecheck` against its view-model (field/type/arity mismatches,
+  unresolved `{{template "x"}}`). The page→view-model map is **fail-closed**:
+  a new `pages/*` dir with no entry fails the test, so add its struct to
+  `pageViewModels()` when you add a page.
+- **`cmd/petra/template_hygiene_test.go`** — a text scan of the `.gohtml` files
+  enforcing the CSP / design-token rules *absolutely* (no inline opt-out):
+  no `style="…"` attributes, a nonce on every `<style>`/`<script>`, no
+  `:hover`/`cursor:pointer`/`mouseenter|leave`, no `@font-face`/font-CDN, and no
+  token-duplicating literals (font stacks, raw hex/rgb) inside `<style>` blocks.
+  A genuine exception means editing the test.
+- **`Test_playwright_axe_aa`** (in `cmd/petra/playwright_test.go`) — runs
+  axe-core against the rendered DOM of the pages the suite visits and fails on
+  any WCAG A/AA violation, measuring **real computed contrast** (see the
+  design-system note below). Needs the dev-only asset: `make fetch-axe`.
+
 ## Template Structure
 
 ### Template Organization
@@ -359,6 +381,13 @@ pairing matrix in `/dev/styleguide` that names every legal
 text-on-surface combination with its measured ratio (AA: 4.5:1 body,
 3:1 large text ≥ 18 pt or 14 pt bold). Pairings not in the matrix are
 forbidden by convention.
+
+The matrix is a design reference, not the safety net: `Test_playwright_axe_aa`
+measures **real computed contrast** on the rendered pages it visits and fails
+on any AA violation, so a drifted or unlisted pairing is caught there even if
+the matrix misses it (it already caught two — `.day-progress` and
+`.exercise-num`). The matrix still earns its place for pages the axe scan
+doesn't visit and for documenting *intended* pairings.
 
 Suspect pairings to audit before reuse:
 

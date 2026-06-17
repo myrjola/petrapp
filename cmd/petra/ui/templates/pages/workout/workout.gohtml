@@ -160,7 +160,10 @@
                             font-family: var(--font-serif);
                             font-weight: var(--font-weight-5);
                             font-size: var(--font-size-4);
-                            color: var(--stone-4);
+                            /* stone-6, not stone-4: the ordinal is real content
+                               and stone-4 fails contrast even at the large-text
+                               3:1 floor (caught by Test_playwright_axe_aa). */
+                            color: var(--stone-6);
                             line-height: 1;
                         }
 
