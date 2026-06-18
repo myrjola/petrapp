@@ -8,7 +8,6 @@
 !**/*.go
 !**/*.sql
 !cmd/petra/ui
-!bin/petrapp.linux_amd64
 
 # Ignore temporary or OS-generated files
 .DS_Store
