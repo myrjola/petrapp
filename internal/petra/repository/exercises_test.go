@@ -15,7 +15,9 @@ func newTestExercise() domain.Exercise {
 		Name:                  "Test_Repo_Bench",
 		Category:              domain.CategoryUpper,
 		ExerciseType:          domain.ExerciseTypeWeighted,
-		DescriptionMarkdown:   "# Bench",
+		Instructions:          []string{"Lie on the bench", "Press the bar up"},
+		CommonMistakes:        []string{"Flaring the elbows"},
+		Resources:             []domain.Resource{{Title: "Form guide", URL: "https://example.com/bench"}},
 		PrimaryMuscleGroups:   []string{"Chest"},
 		SecondaryMuscleGroups: []string{"Triceps"},
 		RepMin:                new(5),
@@ -72,6 +74,16 @@ func TestExerciseRepository_CreateThenGetRoundTrip(t *testing.T) {
 	}
 	if len(got.SecondaryMuscleGroups) != 1 || got.SecondaryMuscleGroups[0] != "Triceps" {
 		t.Errorf("SecondaryMuscleGroups: want [Triceps], got %v", got.SecondaryMuscleGroups)
+	}
+	if !slices.Equal(got.Instructions, []string{"Lie on the bench", "Press the bar up"}) {
+		t.Errorf("Instructions round-trip: got %v", got.Instructions)
+	}
+	if !slices.Equal(got.CommonMistakes, []string{"Flaring the elbows"}) {
+		t.Errorf("CommonMistakes round-trip: got %v", got.CommonMistakes)
+	}
+	if len(got.Resources) != 1 || got.Resources[0].Title != "Form guide" ||
+		got.Resources[0].URL != "https://example.com/bench" {
+		t.Errorf("Resources round-trip: got %v", got.Resources)
 	}
 }
 

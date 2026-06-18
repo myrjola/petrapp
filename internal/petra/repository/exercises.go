@@ -53,7 +53,7 @@ func (r *sqliteExerciseRepository) ListMuscleGroups(ctx context.Context) (_ []st
 
 func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []domain.Exercise, err error) {
 	rows, err := r.db.ReadOnly.QueryContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown,
+		SELECT id, name, category, exercise_type, content,
 		       default_starting_seconds, rep_min, rep_max
 		FROM exercises
 		ORDER BY id`)
@@ -69,12 +69,16 @@ func (r *sqliteExerciseRepository) List(ctx context.Context) (_ []domain.Exercis
 	var exercises []domain.Exercise
 	for rows.Next() {
 		var exercise domain.Exercise
+		var content string
 		var defaultStartingSeconds, repMin, repMax sql.NullInt64
 		if err = rows.Scan(
 			&exercise.ID, &exercise.Name, &exercise.Category, &exercise.ExerciseType,
-			&exercise.DescriptionMarkdown, &defaultStartingSeconds, &repMin, &repMax,
+			&content, &defaultStartingSeconds, &repMin, &repMax,
 		); err != nil {
 			return nil, fmt.Errorf("scan exercise: %w", err)
+		}
+		if err = unmarshalExerciseContent(content, &exercise); err != nil {
+			return nil, err
 		}
 		if defaultStartingSeconds.Valid {
 			v := int(defaultStartingSeconds.Int64)
@@ -172,10 +176,11 @@ func (r *sqliteExerciseRepository) Update(
 // exercise read-modify-write atomic.
 func (r *sqliteExerciseRepository) get(ctx context.Context, q queryer, id int) (domain.Exercise, error) {
 	var exercise domain.Exercise
+	var content string
 	var defaultStartingSeconds, repMin, repMax sql.NullInt64
 
 	err := q.QueryRowContext(ctx, `
-		SELECT id, name, category, exercise_type, description_markdown,
+		SELECT id, name, category, exercise_type, content,
 		       default_starting_seconds, rep_min, rep_max
 		FROM exercises
 		WHERE id = ?`, id).Scan(
@@ -183,7 +188,7 @@ func (r *sqliteExerciseRepository) get(ctx context.Context, q queryer, id int) (
 		&exercise.Name,
 		&exercise.Category,
 		&exercise.ExerciseType,
-		&exercise.DescriptionMarkdown,
+		&content,
 		&defaultStartingSeconds,
 		&repMin,
 		&repMax,
@@ -193,6 +198,9 @@ func (r *sqliteExerciseRepository) get(ctx context.Context, q queryer, id int) (
 	}
 	if err != nil {
 		return domain.Exercise{}, fmt.Errorf("query exercise: %w", err)
+	}
+	if err = unmarshalExerciseContent(content, &exercise); err != nil {
+		return domain.Exercise{}, err
 	}
 	if defaultStartingSeconds.Valid {
 		v := int(defaultStartingSeconds.Int64)
@@ -234,23 +242,25 @@ func (r *sqliteExerciseRepository) set(
 		}
 	}
 
-	var (
-		result sql.Result
-		err    error
-	)
+	content, err := marshalExerciseContent(ex)
+	if err != nil {
+		return ex, err
+	}
+
+	var result sql.Result
 	if upsert {
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (id, name, category, exercise_type, description_markdown,
+			INSERT INTO exercises (id, name, category, exercise_type, content,
 			                       default_starting_seconds, rep_min, rep_max)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			ex.ID, ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown,
+			ex.ID, ex.Name, ex.Category, ex.ExerciseType, content,
 			ex.DefaultStartingSeconds, ex.RepMin, ex.RepMax)
 	} else {
 		result, err = tx.ExecContext(ctx, `
-			INSERT INTO exercises (name, category, exercise_type, description_markdown,
+			INSERT INTO exercises (name, category, exercise_type, content,
 			                       default_starting_seconds, rep_min, rep_max)
 			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			ex.Name, ex.Category, ex.ExerciseType, ex.DescriptionMarkdown,
+			ex.Name, ex.Category, ex.ExerciseType, content,
 			ex.DefaultStartingSeconds, ex.RepMin, ex.RepMax)
 	}
 	if err != nil {

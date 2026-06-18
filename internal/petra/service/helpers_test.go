@@ -105,8 +105,8 @@ func tryInsertMuscleGroup(ctx context.Context, t *testing.T, db *sqlitekit.Datab
 func createTestExercise(ctx context.Context, t *testing.T, db *sqlitekit.Database, name, category string) (int, error) {
 	t.Helper()
 	_, err := db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		name, category, "Test description", 5, 10)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		name, category, "{}", 5, 10)
 	if err != nil {
 		return 0, err
 	}

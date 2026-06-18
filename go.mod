@@ -10,10 +10,10 @@ require (
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/go-webauthn/webauthn v0.17.4
 	github.com/google/go-cmp v0.7.0
+	github.com/jba/templatecheck v0.7.1
 	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/openai/openai-go/v3 v3.39.0
 	github.com/playwright-community/playwright-go v0.5700.1
-	github.com/yuin/goldmark v1.8.2
 	golang.org/x/sync v0.20.0
 )
 
@@ -29,7 +29,6 @@ require (
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/safehtml v0.0.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/jba/templatecheck v0.7.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect

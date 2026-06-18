@@ -1,47 +1,27 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/petra/domain"
 	"github.com/myrjola/petrapp/internal/platform/contexthelpers"
-	"github.com/yuin/goldmark"
 )
-
-// markdownToHTML renders Markdown to template.HTML. On error it logs
-// and returns a fallback paragraph; goldmark.Convert into a bytes.Buffer
-// does not error in practice, but the defensive branch matches prior
-// behaviour.
-func markdownToHTML(ctx context.Context, logger *slog.Logger, md string) template.HTML {
-	gm := goldmark.New()
-	var buf bytes.Buffer
-	if err := gm.Convert([]byte(md), &buf); err != nil {
-		logger.LogAttrs(ctx, slog.LevelError, "failed to render markdown",
-			slog.Any("error", err))
-		return "<p>Error rendering markdown content.</p>"
-	}
-	return template.HTML(buf.String()) //nolint:gosec // markdown renderer output is trusted.
-}
 
 // exerciseInfoTemplateData contains data for the exercise info template.
 type exerciseInfoTemplateData struct {
 	BaseTemplateData
 
-	Date            time.Time
-	Header          PageHeaderData
-	Position        int
-	Exercise        domain.Exercise
-	IsAdmin         bool
-	ProgressPoints  []ExerciseProgressDataPoint
-	DescriptionHTML template.HTML
+	Date           time.Time
+	Header         PageHeaderData
+	Position       int
+	Exercise       domain.Exercise
+	IsAdmin        bool
+	ProgressPoints []ExerciseProgressDataPoint
 }
 
 // exerciseInfoGET handles GET requests to view exercise information.
@@ -94,11 +74,10 @@ func (app *application) exerciseInfoGET(w http.ResponseWriter, r *http.Request) 
 			Subtitle: "",
 			Nonce:    base.Nonce,
 		},
-		Position:        pos,
-		Exercise:        exercise,
-		IsAdmin:         isAdmin,
-		ProgressPoints:  progressData,
-		DescriptionHTML: markdownToHTML(r.Context(), app.logger, exercise.DescriptionMarkdown),
+		Position:       pos,
+		Exercise:       exercise,
+		IsAdmin:        isAdmin,
+		ProgressPoints: progressData,
 	}
 
 	app.render(w, r, http.StatusOK, "exercise-info", data)

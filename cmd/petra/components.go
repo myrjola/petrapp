@@ -58,16 +58,15 @@ type FieldData struct {
 }
 
 // ExerciseResultCardData drives the components/exercise-result-card partial,
-// shared by the Add and Swap exercise pages. DescriptionHTML carries the
-// pre-rendered markdown description so templates don't need to invoke the
-// markdown pipeline at render time.
+// shared by the Add and Swap exercise pages. The template renders the
+// exercise's structured content (Instructions, CommonMistakes, Resources)
+// directly off Exercise.
 type ExerciseResultCardData struct {
-	Exercise        domain.Exercise
-	FormAction      string        // POST target for the add/swap form
-	FieldName       string        // hidden input name ("exercise_id" or "new_exercise_id")
-	ButtonLabel     string        // submit button text
-	DescriptionHTML template.HTML // pre-rendered exercise description markdown
-	Nonce           template.HTMLAttr
+	Exercise    domain.Exercise
+	FormAction  string // POST target for the add/swap form
+	FieldName   string // hidden input name ("exercise_id" or "new_exercise_id")
+	ButtonLabel string // submit button text
+	Nonce       template.HTMLAttr
 }
 
 // BackLinkData is the dot for the `back-link` component.

@@ -14,7 +14,7 @@ func newTestExerciseFor(t *testing.T) domain.Exercise {
 		Name:                  "Test_Repo_Bench_Press_Sessions",
 		Category:              domain.CategoryUpper,
 		ExerciseType:          domain.ExerciseTypeWeighted,
-		DescriptionMarkdown:   "# Test_Repo_Bench_Press_Sessions",
+		Instructions:          []string{"Press the bar up"},
 		PrimaryMuscleGroups:   []string{"Chest"},
 		SecondaryMuscleGroups: []string{"Triceps"},
 		RepMin:                new(5),

@@ -111,11 +111,10 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 			t.Errorf("Got exercise category %q, want %q", got, want)
 		}
 
-		// Assert the prompt's structural contract rather than a verbatim
-		// mention of the name — the model may describe the movement without
-		// repeating "Squat".
-		if !strings.Contains(exercise.DescriptionMarkdown, "## Instructions") {
-			t.Errorf("description missing '## Instructions' heading: %s", exercise.DescriptionMarkdown)
+		// Assert the structural contract rather than a verbatim mention of the
+		// name — the model may describe the movement without repeating "Squat".
+		if len(exercise.Instructions) == 0 {
+			t.Errorf("expected at least one instruction step, got none")
 		}
 
 		if !slices.Contains(exercise.PrimaryMuscleGroups, "quadriceps") {
@@ -170,68 +169,6 @@ func TestExerciseGenerator_validateMuscleGroups(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestExerciseGenerator_updateResourcesInDescription(t *testing.T) {
-	t.Parallel()
-
-	eg := newExerciseGenerator("dummy-key", nil, testkit.NewLogger(testkit.NewWriter(t)))
-	resources := []domain.Resource{
-		{Title: "Real video", URL: "https://youtube.com/real"},
-		{Title: "Real guide", URL: "https://exrx.net/real"},
-	}
-
-	t.Run("replaces existing Resources section", func(t *testing.T) {
-		t.Parallel()
-
-		input := "## Instructions\n1. Step one\n\n## Resources\n" +
-			"- [Old video](https://example.com/video)\n" +
-			"- [Old guide](https://example.com/guide)\n"
-		got := eg.updateResourcesInDescription(input, resources)
-
-		if !strings.Contains(got, "[Real video](https://youtube.com/real)") {
-			t.Errorf("missing real video link; got:\n%s", got)
-		}
-		if strings.Contains(got, "https://example.com/video") {
-			t.Errorf("placeholder URL leaked through; got:\n%s", got)
-		}
-		if !strings.Contains(got, "## Instructions") {
-			t.Errorf("Instructions section was dropped; got:\n%s", got)
-		}
-	})
-
-	t.Run("appends Resources section when missing", func(t *testing.T) {
-		t.Parallel()
-
-		input := "## Instructions\n1. Step one\n"
-		got := eg.updateResourcesInDescription(input, resources)
-
-		if !strings.Contains(got, "## Resources") {
-			t.Errorf("Resources section not appended; got:\n%s", got)
-		}
-		if !strings.Contains(got, "[Real guide](https://exrx.net/real)") {
-			t.Errorf("real guide link not appended; got:\n%s", got)
-		}
-	})
-
-	t.Run("empty resources drops existing Resources section", func(t *testing.T) {
-		t.Parallel()
-
-		input := "## Instructions\n1. Step one\n\n## Resources\n" +
-			"- [Old video](https://example.com/video)\n" +
-			"- [Old guide](https://example.com/guide)\n"
-		got := eg.updateResourcesInDescription(input, nil)
-
-		if strings.Contains(got, "## Resources") {
-			t.Errorf("orphan ## Resources heading left behind; got:\n%s", got)
-		}
-		if strings.Contains(got, "https://example.com/") {
-			t.Errorf("placeholder URLs leaked through; got:\n%s", got)
-		}
-		if !strings.Contains(got, "## Instructions") {
-			t.Errorf("Instructions section was dropped; got:\n%s", got)
-		}
-	})
 }
 
 // TestExerciseGenerator_PromptDataQualityRules asserts the prompt instructs
@@ -339,10 +276,8 @@ func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
 }
 
 // TestExerciseGenerator_enhanceWithWebSearch_validatesURLs is a focused unit
-// test on the integration between Pass 2's JSON parsing and the URL
-// validator. We exercise validateResourceURLs and updateResourcesInDescription
-// directly with a representative mix and assert that only live URLs land in
-// the final markdown — covering the wiring without mocking the OpenAI client.
+// test on Pass 2's URL validation: only live URLs survive into the structured
+// Resources slice, covering the wiring without mocking the OpenAI client.
 func TestExerciseGenerator_enhanceWithWebSearch_validatesURLs(t *testing.T) {
 	t.Parallel()
 
@@ -365,14 +300,8 @@ func TestExerciseGenerator_enhanceWithWebSearch_validatesURLs(t *testing.T) {
 	}
 	alive := eg.validateResourceURLs(t.Context(), parsed)
 
-	desc := "## Instructions\n1. Step one\n\n## Common Mistakes\n- Bad form\n"
-	got := eg.updateResourcesInDescription(desc, alive)
-
-	if !strings.Contains(got, "[Live]") {
-		t.Errorf("live URL missing from output; got:\n%s", got)
-	}
-	if strings.Contains(got, "[Dead]") {
-		t.Errorf("dead URL leaked through; got:\n%s", got)
+	if len(alive) != 1 || alive[0].Title != "Live" {
+		t.Errorf("expected only the Live resource to survive, got %#v", alive)
 	}
 }
 
@@ -446,7 +375,8 @@ func TestCreateMinimalExercise(t *testing.T) {
 		t.Errorf("rep range = (%v, %v), want (5, 10) so DB CHECK passes for non-time_based",
 			ex.RepMin, ex.RepMax)
 	}
-	if !strings.Contains(ex.DescriptionMarkdown, "Goblet Squat") {
-		t.Errorf("description missing exercise name; got %q", ex.DescriptionMarkdown)
+	if len(ex.Instructions) != 0 || len(ex.CommonMistakes) != 0 || len(ex.Resources) != 0 {
+		t.Errorf("minimal exercise should have empty structured content; got %#v / %#v / %#v",
+			ex.Instructions, ex.CommonMistakes, ex.Resources)
 	}
 }

@@ -31,7 +31,7 @@ CREATE TABLE exercises
     category                 TEXT    NOT NULL CHECK (category IN ('full_body', 'upper', 'lower')),
     exercise_type            TEXT    NOT NULL DEFAULT 'weighted'
                              CHECK (exercise_type IN ('weighted', 'bodyweight', 'assisted', 'time_based')),
-    description_markdown     TEXT    NOT NULL DEFAULT '' CHECK (LENGTH(description_markdown) < 20000),
+    content                  TEXT    NOT NULL DEFAULT '{}' CHECK (LENGTH(content) < 20000),
     default_starting_seconds INTEGER CHECK (default_starting_seconds IS NULL OR default_starting_seconds > 0),
     rep_min                  INTEGER CHECK (rep_min IS NULL OR (rep_min >= 1 AND rep_min <= 50)),
     rep_max                  INTEGER CHECK (rep_max IS NULL OR (rep_max >= 1 AND rep_max <= 50)),

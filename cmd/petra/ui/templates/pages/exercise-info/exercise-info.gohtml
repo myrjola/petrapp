@@ -197,7 +197,7 @@
                     flex-shrink: 0;
                 }
 
-                /* MARKDOWN PROSE */
+                /* STRUCTURED CONTENT */
                 .prose {
                     display: flex;
                     flex-direction: column;
@@ -217,13 +217,9 @@
 
                 /*
                  * The numeral hangs in a fixed gutter via absolute
-                 * positioning rather than a grid column. A grid here would
-                 * auto-place each inline child of the <li> (e.g. the bold
-                 * lead-in and the trailing text of "**Adjust the machine**:
-                 * Set the lever…") into a separate cell, spilling the text
-                 * into the narrow 2.75rem column one word per line. Keeping
-                 * the content in normal flow lets it wrap across the full
-                 * width.
+                 * positioning rather than a grid column, so the step text
+                 * stays in normal flow and wraps across the full width
+                 * instead of being squeezed into the narrow 2.75rem gutter.
                  */
                 .prose ol li {
                     counter-increment: step;
@@ -261,7 +257,7 @@
                 }
 
                 /* Common-mistake cards */
-                .prose ul li:has(> strong) {
+                .prose ul.mistakes li {
                     background: var(--color-surface-elevated);
                     border: 1px solid var(--stone-2);
                     border-left: 3px solid var(--clay-3);
@@ -274,28 +270,20 @@
                     position: relative;
                 }
 
-                .prose ul li:has(> strong) > strong {
-                    display: block;
-                    font-weight: var(--font-weight-7);
-                    color: var(--stone-9);
-                    margin-bottom: var(--size-1);
-                    letter-spacing: -0.005em;
-                }
-
                 /* Resource pills */
-                .prose ul:has(> li > a:only-child) {
+                .prose ul.resources {
                     flex-direction: row;
                     flex-wrap: wrap;
                     gap: var(--size-2);
                 }
 
-                .prose ul li:has(> a:only-child) {
+                .prose ul.resources li {
                     background: transparent;
                     border: none;
                     padding: 0;
                 }
 
-                .prose ul li > a:only-child {
+                .prose ul.resources li > a {
                     display: inline-flex;
                     align-items: center;
                     gap: var(--size-2);
@@ -309,13 +297,13 @@
                     text-decoration: none;
                 }
 
-                .prose ul li > a:only-child::after {
+                .prose ul.resources li > a::after {
                     content: "↗";
                     font-size: 0.95em;
                     color: var(--clay-3);
                 }
 
-                .prose ul li > a:only-child:focus-visible {
+                .prose ul.resources li > a:focus-visible {
                     outline: 2px solid var(--color-border-focus);
                     outline-offset: 2px;
                 }
@@ -361,7 +349,32 @@
         </section>
 
         <section class="prose">
-            {{ .DescriptionHTML }}
+            {{ if .Exercise.Instructions }}
+                <h2>Instructions</h2>
+                <ol>
+                    {{ range .Exercise.Instructions }}
+                        <li>{{ . }}</li>
+                    {{ end }}
+                </ol>
+            {{ end }}
+
+            {{ if .Exercise.CommonMistakes }}
+                <h2>Common Mistakes</h2>
+                <ul class="mistakes">
+                    {{ range .Exercise.CommonMistakes }}
+                        <li>{{ . }}</li>
+                    {{ end }}
+                </ul>
+            {{ end }}
+
+            {{ if .Exercise.Resources }}
+                <h2>Resources</h2>
+                <ul class="resources">
+                    {{ range .Exercise.Resources }}
+                        <li><a href="{{ .URL }}">{{ .Title }}</a></li>
+                    {{ end }}
+                </ul>
+            {{ end }}
         </section>
 
         <section class="progress">

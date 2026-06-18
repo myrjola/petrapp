@@ -371,12 +371,11 @@ func (app *application) workoutSwapExerciseGET(w http.ResponseWriter, r *http.Re
 	cards := make([]ExerciseResultCardData, 0, len(candidates))
 	for _, ex := range candidates {
 		cards = append(cards, ExerciseResultCardData{
-			Exercise:        ex,
-			FormAction:      fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, pos),
-			FieldName:       "new_exercise_id",
-			ButtonLabel:     "Swap to this exercise",
-			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
-			Nonce:           base.Nonce,
+			Exercise:    ex,
+			FormAction:  fmt.Sprintf("/workouts/%s/exercises/%d/swap", dateStr, pos),
+			FieldName:   "new_exercise_id",
+			ButtonLabel: "Swap to this exercise",
+			Nonce:       base.Nonce,
 		})
 	}
 
@@ -498,12 +497,11 @@ func (app *application) workoutAddExerciseGET(w http.ResponseWriter, r *http.Req
 	cards := make([]ExerciseResultCardData, 0, len(availableExercises))
 	for _, ex := range availableExercises {
 		cards = append(cards, ExerciseResultCardData{
-			Exercise:        ex,
-			FormAction:      fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
-			FieldName:       "exercise_id",
-			ButtonLabel:     "Add this exercise",
-			DescriptionHTML: markdownToHTML(r.Context(), app.logger, ex.DescriptionMarkdown),
-			Nonce:           base.Nonce,
+			Exercise:    ex,
+			FormAction:  fmt.Sprintf("/workouts/%s/add-exercise", dateStr),
+			FieldName:   "exercise_id",
+			ButtonLabel: "Add this exercise",
+			Nonce:       base.Nonce,
 		})
 	}
 

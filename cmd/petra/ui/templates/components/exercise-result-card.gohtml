@@ -26,7 +26,30 @@
             <form method="dialog" class="sheet-dialog__close">
                 <button class="btn btn--ghost btn--sm">Close</button>
             </form>
-            {{ .DescriptionHTML }}
+            {{ if .Exercise.Instructions }}
+                <h2>Instructions</h2>
+                <ol>
+                    {{ range .Exercise.Instructions }}
+                        <li>{{ . }}</li>
+                    {{ end }}
+                </ol>
+            {{ end }}
+            {{ if .Exercise.CommonMistakes }}
+                <h2>Common Mistakes</h2>
+                <ul>
+                    {{ range .Exercise.CommonMistakes }}
+                        <li>{{ . }}</li>
+                    {{ end }}
+                </ul>
+            {{ end }}
+            {{ if .Exercise.Resources }}
+                <h2>Resources</h2>
+                <ul>
+                    {{ range .Exercise.Resources }}
+                        <li><a href="{{ .URL }}">{{ .Title }}</a></li>
+                    {{ end }}
+                </ul>
+            {{ end }}
         </dialog>
     </div>
 {{ end }}

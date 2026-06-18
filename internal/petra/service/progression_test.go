@@ -42,8 +42,8 @@ func Test_GetStartingWeight(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Test Squat", "lower", "desc", 5, 8)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Test Squat", "lower", "{}", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -219,8 +219,8 @@ func Test_GetStartingWeight_Assisted(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Assisted Test Exercise", "upper", "desc", 5, 8)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Assisted Test Exercise", "upper", "{}", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -308,9 +308,9 @@ func Test_GetStartingSeconds(t *testing.T) {
 
 	// Insert a time_based exercise with default 30s.
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
+		INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, content)
 		VALUES (?, ?, ?, ?, ?)`,
-		"Test Plank", "upper", "time_based", 30, ""); err != nil {
+		"Test Plank", "upper", "time_based", 30, "{}"); err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
 	var exerciseID int
@@ -417,9 +417,9 @@ func Test_BuildTimedProgression(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	if _, err = db.ReadWrite.ExecContext(ctx, `
-		INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
+		INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, content)
 		VALUES (?, ?, ?, ?, ?)`,
-		"Test Plank BTP", "upper", "time_based", 30, ""); err != nil {
+		"Test Plank BTP", "upper", "time_based", 30, "{}"); err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
 	var exerciseID int
@@ -510,8 +510,8 @@ func Test_BuildProgression(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"OHP", "upper", "desc", 5, 8)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"OHP", "upper", "{}", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -612,8 +612,8 @@ func Test_BuildProgression_DeloadCarriesOverride(t *testing.T) {
 
 	var exerciseID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
-		 VALUES (?, 'upper', '', 5, 8) RETURNING id`,
+		`INSERT INTO exercises (name, category, content, rep_min, rep_max)
+		 VALUES (?, 'upper', '{}', 5, 8) RETURNING id`,
 		"Deload Override Press").Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
@@ -690,8 +690,8 @@ func Test_BuildProgression_CrossSessionGoalConversion(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Test Squat", "lower", "desc", 5, 8)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Test Squat", "lower", "{}", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -793,8 +793,8 @@ func Test_GetStartingWeight_DeloadAppliesNinetyPercent(t *testing.T) {
 	ctx = context.WithValue(ctx, contexthelpers.IsAuthenticatedContextKey, true)
 
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Deload Test Press", "upper", "desc", 5, 8)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Deload Test Press", "upper", "{}", 5, 8)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
 	}
@@ -878,8 +878,8 @@ func Test_GetDeloadStartingWeight_FloorsFractionalResult(t *testing.T) {
 
 	var exerciseID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
-		 VALUES (?, 'upper', '', 5, 8) RETURNING id`,
+		`INSERT INTO exercises (name, category, content, rep_min, rep_max)
+		 VALUES (?, 'upper', '{}', 5, 8) RETURNING id`,
 		"Deload Floor Press").Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
@@ -962,8 +962,8 @@ func Test_GetDeloadStartingWeight_Assisted(t *testing.T) {
 
 	var exerciseID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, exercise_type, description_markdown, rep_min, rep_max)
-		 VALUES (?, 'upper', 'assisted', '', 5, 8) RETURNING id`,
+		`INSERT INTO exercises (name, category, exercise_type, content, rep_min, rep_max)
+		 VALUES (?, 'upper', 'assisted', '{}', 5, 8) RETURNING id`,
 		"Assisted Pull-Up Test").Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)
@@ -1039,8 +1039,8 @@ func Test_BuildProgression_CurrentSetUsesDeriveScheme(t *testing.T) {
 	// Deadlift-like exercise: rep_min=3, rep_max=6.
 	var exerciseID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
-		 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+		`INSERT INTO exercises (name, category, content, rep_min, rep_max)
+		 VALUES (?, 'lower', '{}', 3, 6) RETURNING id`,
 		"Test Deadlift DS").Scan(&exerciseID)
 	if err != nil {
 		t.Fatalf("insert exercise: %v", err)

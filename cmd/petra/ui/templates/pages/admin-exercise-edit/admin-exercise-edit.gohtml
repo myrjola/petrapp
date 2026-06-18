@@ -80,8 +80,21 @@
             </div>
 
             <div>
-                <label for="description">Description (Markdown):</label>
-                <textarea id="description" name="description" rows="10">{{ .Exercise.DescriptionMarkdown }}</textarea>
+                <label for="instructions">Instructions:</label>
+                <textarea id="instructions" name="instructions" rows="8">{{ .InstructionsText }}</textarea>
+                <small>One step per line.</small>
+            </div>
+
+            <div>
+                <label for="common_mistakes">Common Mistakes:</label>
+                <textarea id="common_mistakes" name="common_mistakes" rows="6">{{ .CommonMistakesText }}</textarea>
+                <small>One mistake per line.</small>
+            </div>
+
+            <div>
+                <label for="resources">Resources:</label>
+                <textarea id="resources" name="resources" rows="4">{{ .ResourcesText }}</textarea>
+                <small>One per line, as <code>Title | https://example.com</code>.</small>
             </div>
 
             <button type="submit">Update Exercise</button>

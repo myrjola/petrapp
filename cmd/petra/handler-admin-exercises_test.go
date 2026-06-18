@@ -161,14 +161,14 @@ func Test_application_adminExercises(t *testing.T) {
 
 		// Update the exercise
 		formData := map[string]string{
-			"Name":        "Updated Test Squat",
-			"Category":    "lower",
-			"Type":        "weighted",
-			"Primary":     "Quads,Glutes",
-			"Secondary":   "Hamstrings,Calves,Abs,Lower Back",
-			"Description": "An updated test squat exercise description",
-			"rep_min":     "5",
-			"rep_max":     "10",
+			"Name":         "Updated Test Squat",
+			"Category":     "lower",
+			"Type":         "weighted",
+			"Primary":      "Quads,Glutes",
+			"Secondary":    "Hamstrings,Calves,Abs,Lower Back",
+			"instructions": "An updated test squat step",
+			"rep_min":      "5",
+			"rep_max":      "10",
 		}
 
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
@@ -219,14 +219,14 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 
 		formData := map[string]string{
-			"Name":        "",
-			"Category":    "lower",
-			"Type":        "weighted",
-			"Primary":     "Quads,Glutes",
-			"Secondary":   "",
-			"Description": "",
-			"rep_min":     "5",
-			"rep_max":     "10",
+			"Name":         "",
+			"Category":     "lower",
+			"Type":         "weighted",
+			"Primary":      "Quads,Glutes",
+			"Secondary":    "",
+			"instructions": "",
+			"rep_min":      "5",
+			"rep_max":      "10",
 		}
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
 			t.Fatalf("Failed to submit empty-name update: %v", err)
@@ -270,14 +270,14 @@ func Test_application_adminExercises(t *testing.T) {
 		const descriptionSize = 15 * 1024
 		largeDescription := strings.Repeat("a", descriptionSize)
 		formData := map[string]string{
-			"Name":        "Updated Test Squat",
-			"Category":    "lower",
-			"Type":        "weighted",
-			"Primary":     "Quads,Glutes",
-			"Secondary":   "Hamstrings,Calves,Abs,Lower Back",
-			"Description": largeDescription,
-			"rep_min":     "5",
-			"rep_max":     "10",
+			"Name":         "Updated Test Squat",
+			"Category":     "lower",
+			"Type":         "weighted",
+			"Primary":      "Quads,Glutes",
+			"Secondary":    "Hamstrings,Calves,Abs,Lower Back",
+			"instructions": largeDescription,
+			"rep_min":      "5",
+			"rep_max":      "10",
 		}
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
 			t.Fatalf("Failed to submit exercise update with large description: %v", err)
@@ -290,7 +290,7 @@ func Test_application_adminExercises(t *testing.T) {
 		if doc, err = client.GetDoc(ctx, editURL); err != nil {
 			t.Fatalf("Failed to re-open exercise edit page: %v", err)
 		}
-		got := doc.Find("textarea[name='description']").Text()
+		got := doc.Find("textarea[name='instructions']").Text()
 		if len(got) != descriptionSize {
 			t.Errorf("expected description length %d, got %d", descriptionSize, len(got))
 		}
@@ -318,14 +318,14 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 
 		formData := map[string]string{
-			"Name":        "Updated Test Squat",
-			"Category":    "lower",
-			"Type":        "weighted",
-			"Primary":     "Quads,Glutes",
-			"Secondary":   "",
-			"Description": "",
-			"rep_min":     "12",
-			"rep_max":     "8",
+			"Name":         "Updated Test Squat",
+			"Category":     "lower",
+			"Type":         "weighted",
+			"Primary":      "Quads,Glutes",
+			"Secondary":    "",
+			"instructions": "",
+			"rep_min":      "12",
+			"rep_max":      "8",
 		}
 		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
 			t.Fatalf("Failed to submit invalid rep range: %v", err)

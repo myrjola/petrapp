@@ -56,8 +56,8 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 
 	// 1. Create a test exercise directly in the database
 	_, err = db.ReadWrite.ExecContext(ctx,
-		"INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
-		"Test Exercise", "lower", "Test description", 5, 10)
+		"INSERT INTO exercises (name, category, content, rep_min, rep_max) VALUES (?, ?, ?, ?, ?)",
+		"Test Exercise", "lower", "{}", 5, 10)
 	if err != nil {
 		t.Fatalf("Failed to insert exercise: %v", err)
 	}
@@ -132,7 +132,7 @@ func Test_UpdateExercise_PreservesExerciseSets(t *testing.T) {
 		Name:                  "Updated Test Exercise",
 		Category:              domain.CategoryLower,
 		ExerciseType:          domain.ExerciseTypeWeighted,
-		DescriptionMarkdown:   "Updated test description",
+		Instructions:          []string{"Updated test description"},
 		PrimaryMuscleGroups:   []string{"Quads", "Glutes"},
 		SecondaryMuscleGroups: []string{"Hamstrings", "Core"},
 		RepMin:                &repMin,
@@ -579,8 +579,8 @@ func Test_AddExercise_TimeBased_NoHistory_SeedsDefaultStartingSeconds(t *testing
 	const startingSeconds = 30
 	var plankID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
-		 VALUES (?, 'full_body', 'time_based', ?, '') RETURNING id`,
+		`INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, content)
+		 VALUES (?, 'full_body', 'time_based', ?, '{}') RETURNING id`,
 		"TestPlankAdd", startingSeconds).Scan(&plankID)
 	if err != nil {
 		t.Fatalf("insert plank exercise: %v", err)
@@ -687,8 +687,8 @@ func Test_SwapExercise_ToTimeBased_NoHistory_SeedsDefaultStartingSeconds(t *test
 	const startingSeconds = 30
 	var plankID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, description_markdown)
-		 VALUES (?, 'full_body', 'time_based', ?, '') RETURNING id`,
+		`INSERT INTO exercises (name, category, exercise_type, default_starting_seconds, content)
+		 VALUES (?, 'full_body', 'time_based', ?, '{}') RETURNING id`,
 		"TestPlankSwap", startingSeconds).Scan(&plankID)
 	if err != nil {
 		t.Fatalf("insert plank: %v", err)
@@ -823,8 +823,8 @@ func Test_AddExercise_DerivesTargetValueFromSessionGoal(t *testing.T) {
 			// Deadlift-like exercise: rep_min=3, rep_max=6.
 			var deadliftID int
 			err = db.ReadWrite.QueryRowContext(ctx,
-				`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
-				 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+				`INSERT INTO exercises (name, category, content, rep_min, rep_max)
+				 VALUES (?, 'lower', '{}', 3, 6) RETURNING id`,
 				"Test Deadlift Derive").Scan(&deadliftID)
 			if err != nil {
 				t.Fatalf("insert deadlift: %v", err)
@@ -919,8 +919,8 @@ func Test_ReplaceExerciseInSession_DerivesTargetValueFromSessionGoal(t *testing.
 	// Deadlift-like exercise: rep_min=3, rep_max=6.
 	var deadliftID int
 	err = db.ReadWrite.QueryRowContext(ctx,
-		`INSERT INTO exercises (name, category, description_markdown, rep_min, rep_max)
-		 VALUES (?, 'lower', '', 3, 6) RETURNING id`,
+		`INSERT INTO exercises (name, category, content, rep_min, rep_max)
+		 VALUES (?, 'lower', '{}', 3, 6) RETURNING id`,
 		"Test Deadlift Swap Derive").Scan(&deadliftID)
 	if err != nil {
 		t.Fatalf("insert deadlift: %v", err)

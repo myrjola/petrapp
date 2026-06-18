@@ -44,6 +44,13 @@ type exerciseJSONSchema struct {
 
 // JSON Schema keys ("type", "description", "string", "enum") are spec-fixed strings.
 //
+// schemaTypeArray and schemaKeyItems name the two keywords that now repeat
+// across the schema (the muscle-group arrays plus the instructions and
+// common-mistakes arrays) so goconst stays quiet without scattered nolints.
+const (
+	schemaTypeArray = "array"
+	schemaKeyItems  = "items"
+)
 
 func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 	result, err := json.Marshal(ejs.schemaMap())
@@ -65,7 +72,8 @@ func (ejs exerciseJSONSchema) schemaMap() map[string]any {
 			"category",
 			"exercise_type",
 			"default_starting_seconds",
-			"description_markdown",
+			"instructions",
+			"common_mistakes",
 			"primary_muscle_groups",
 			"secondary_muscle_groups",
 		},
@@ -96,22 +104,28 @@ func (ejs exerciseJSONSchema) schemaMap() map[string]any {
 				"type":        []string{"integer", "null"},
 				"description": "Default starting seconds for time_based exercises; null for other types",
 			},
-			"description_markdown": map[string]any{
-				"type":        "string",
-				"description": "Markdown description of the exercise",
+			"instructions": map[string]any{
+				"type":         schemaTypeArray,
+				"description":  "Ordered form steps, one per item, plain text (no Markdown).",
+				schemaKeyItems: map[string]any{"type": "string"},
+			},
+			"common_mistakes": map[string]any{
+				"type":         schemaTypeArray,
+				"description":  "Common mistakes to avoid, one per item, plain text (no Markdown).",
+				schemaKeyItems: map[string]any{"type": "string"},
 			},
 			"primary_muscle_groups": map[string]any{
-				"type":        "array",
+				"type":        schemaTypeArray,
 				"description": "Primary muscle groups targeted by the exercise",
-				"items": map[string]any{
+				schemaKeyItems: map[string]any{
 					"type": "string",
 					"enum": ejs.muscleGroups,
 				},
 			},
 			"secondary_muscle_groups": map[string]any{
-				"type":        "array",
+				"type":        schemaTypeArray,
 				"description": "Secondary muscle groups targeted by the exercise",
-				"items": map[string]any{
+				schemaKeyItems: map[string]any{
 					"type": "string",
 					"enum": ejs.muscleGroups,
 				},
@@ -173,7 +187,8 @@ The response must strictly follow this JSON structure:
   "category": "CATEGORY",
   "exercise_type": "EXERCISE_TYPE",
   "default_starting_seconds": 30,
-  "description_markdown": "MARKDOWN_DESCRIPTION",
+  "instructions": ["Step 1 ...", "Step 2 ...", "Step 3 ..."],
+  "common_mistakes": ["Mistake 1 ...", "Mistake 2 ...", "Mistake 3 ..."],
   "primary_muscle_groups": ["PRIMARY_MUSCLE_GROUP1", "PRIMARY_MUSCLE_GROUP2"],
   "secondary_muscle_groups": ["SECONDARY_MUSCLE_GROUP1", "SECONDARY_MUSCLE_GROUP2"]
 }
@@ -193,30 +208,22 @@ working contraction (concentric or eccentric load). Pure isometric stabilizers
 (e.g. the lats during a push-up, the upper back during a bench press, the core
 during an overhead press) do not count and must be omitted.
 
-The "description_markdown" must follow this exact structure:
+"instructions" is an ordered list of 3-5 form steps. Each item is one step of
+clear form guidance (positioning, movement, breathing/tempo), in plain text —
+no Markdown, no leading numbers.
 
-## Instructions
-1. [Step 1 with clear form guidance]
-2. [Step 2 with positioning details]
-3. [Step 3 with movement description]
-4. [Optional step 4 with breathing/tempo guidance]
+"common_mistakes" is a list of 3-4 items. Each item names a mistake and its
+correction in one plain-text sentence — no Markdown, no leading bullet.
 
-## Common Mistakes
-- [Mistake 1: explanation of error and correction]
-- [Mistake 2: explanation of error and correction]
-- [Mistake 3: explanation of error and correction]
-- [Optional Mistake 4: explanation of error and correction]
+Content rules:
+- Do not include rep counts, set counts, weights, or durations anywhere. The app
+  tracks rep and set targets separately and shows them to the user. Mentions like
+  "perform 8-12 reps", "do 3 sets", or "hold for 30 seconds" must not appear.
+- Do not include tutorial links or a resources list. They are added by a
+  follow-up search step automatically.
 
-Description content rules:
-- Do not include rep counts, set counts, weights, or durations anywhere in the
-  description. The app tracks rep and set targets separately and shows them to
-  the user. Mentions like "perform 8-12 reps", "do 3 sets", or "hold for 30
-  seconds" must not appear.
-- Do not include a Resources section. Tutorial links are added by a
-  follow-up search step and appended automatically.
-
-Instructions must be clear, concise, and focus on proper form using simple language for beginners.
-Include relevant safety considerations. The entire description should be 150-200 words.
+Use simple language for beginners and include relevant safety considerations.
+Across instructions and common_mistakes combined, aim for 150-200 words total.
 
 Return only the valid JSON object with no additional text or explanation.`,
 		name, name, strings.Join(eg.muscleGroups, ", "))
@@ -257,7 +264,7 @@ func (eg *exerciseGenerator) generateBaseExercise(ctx context.Context, name stri
 	}
 
 	// Validate the exercise
-	if exercise.Name == "" || exercise.Category == "" || exercise.DescriptionMarkdown == "" {
+	if exercise.Name == "" || exercise.Category == "" || len(exercise.Instructions) == 0 {
 		return domain.Exercise{}, errors.New("generated exercise is missing required fields")
 	}
 
@@ -330,18 +337,15 @@ Return only the JSON object.`, exercise.Name)
 		return fmt.Errorf("parse resources response: %w", err)
 	}
 
-	// Validate URLs before injecting them: drop dead links so the
-	// description never ships with broken Resources entries.
+	// Validate URLs before storing them: drop dead links so the exercise
+	// never ships with broken Resources entries.
 	alive := eg.validateResourceURLs(ctx, resourceResponse.Resources)
 	if len(alive) == 0 && len(resourceResponse.Resources) > 0 {
 		eg.logger.LogAttrs(ctx, slog.LevelInfo, "dropped all resource URLs",
 			slog.String("exercise", exercise.Name),
 			slog.Int("returned", len(resourceResponse.Resources)))
 	}
-	exercise.DescriptionMarkdown = eg.updateResourcesInDescription(
-		exercise.DescriptionMarkdown,
-		alive,
-	)
+	exercise.Resources = alive
 
 	return nil
 }
@@ -423,59 +427,6 @@ func (eg *exerciseGenerator) validateResourceURLs(
 		}
 	}
 	return alive
-}
-
-// updateResourcesInDescription replaces placeholder URLs with real ones.
-// When resources is empty the ## Resources section is dropped entirely so no
-// orphan heading is left behind.
-func (eg *exerciseGenerator) updateResourcesInDescription(
-	markdown string,
-	resources []domain.Resource,
-) string {
-	lines := strings.Split(markdown, "\n")
-	var result []string
-	inResourcesSection := false
-
-	for _, line := range lines {
-		switch {
-		case strings.HasPrefix(line, "## Resources"):
-			inResourcesSection = true
-			if len(resources) == 0 {
-				continue
-			}
-			result = append(result, line)
-			for _, res := range resources {
-				result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
-			}
-		case inResourcesSection && strings.HasPrefix(line, "##"):
-			inResourcesSection = false
-			result = append(result, line)
-		case !inResourcesSection:
-			result = append(result, line)
-		}
-	}
-
-	// If no Resources section was present and we have resources to add, append one.
-	if !inResourcesSection && len(resources) > 0 && !containsResourcesHeading(result) {
-		result = append(result, "\n## Resources")
-		for _, res := range resources {
-			result = append(result, fmt.Sprintf("- [%s](%s)", res.Title, res.URL))
-		}
-	}
-
-	return strings.Join(result, "\n")
-}
-
-// containsResourcesHeading reports whether any line in result already starts
-// with "## Resources". Used by updateResourcesInDescription to avoid emitting
-// a duplicate section when the input already had one and it was replaced.
-func containsResourcesHeading(lines []string) bool {
-	for _, l := range lines {
-		if strings.HasPrefix(l, "## Resources") {
-			return true
-		}
-	}
-	return false
 }
 
 // extractJSONObject returns the first complete top-level JSON object found in
@@ -590,7 +541,9 @@ func createMinimalExercise(name string) domain.Exercise {
 		Name:                  name,
 		Category:              domain.CategoryFullBody,
 		ExerciseType:          domain.ExerciseTypeWeighted,
-		DescriptionMarkdown:   fmt.Sprintf("# %s\n\nNo description available yet.", name),
+		Instructions:          []string{},
+		CommonMistakes:        []string{},
+		Resources:             []domain.Resource{},
 		PrimaryMuscleGroups:   []string{},
 		SecondaryMuscleGroups: []string{},
 		RepMin:                &repMin,

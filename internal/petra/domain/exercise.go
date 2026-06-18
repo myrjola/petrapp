@@ -125,12 +125,20 @@ type Resource struct {
 }
 
 // Exercise represents a single exercise type, e.g. Squat, Bench Press, etc.
+//
+// Instructions, CommonMistakes, and Resources are the structured instructional
+// content shown on the exercise-info page. Instructions are ordered form steps;
+// CommonMistakes are flat one-line cues; Resources are learning links. They
+// replace the former free-form Markdown description — the rendering layer ranges
+// over these fields directly instead of parsing prose.
 type Exercise struct {
 	ID                     int          `json:"id"`
 	Name                   string       `json:"name"`
 	Category               Category     `json:"category"`
 	ExerciseType           ExerciseType `json:"exercise_type"`
-	DescriptionMarkdown    string       `json:"description_markdown"`
+	Instructions           []string     `json:"instructions"`
+	CommonMistakes         []string     `json:"common_mistakes"`
+	Resources              []Resource   `json:"resources"`
 	PrimaryMuscleGroups    []string     `json:"primary_muscle_groups"`
 	SecondaryMuscleGroups  []string     `json:"secondary_muscle_groups"`
 	DefaultStartingSeconds *int         `json:"default_starting_seconds,omitempty"`
@@ -239,6 +247,11 @@ func (e Exercise) Validate() error {
 	}
 	if len(e.PrimaryMuscleGroups) == 0 {
 		return ValidationError{Message: "At least one primary muscle group is required."}
+	}
+	for _, res := range e.Resources {
+		if res.Title == "" || res.URL == "" {
+			return ValidationError{Message: "Each resource needs both a title and a URL."}
+		}
 	}
 	if !e.IsTimed() {
 		if e.RepMin == nil || e.RepMax == nil ||

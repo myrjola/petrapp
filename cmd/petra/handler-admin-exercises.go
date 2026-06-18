@@ -63,6 +63,11 @@ type exerciseEditTemplateData struct {
 	TypeOptions            []selectOption
 	PrimaryMuscleOptions   []MuscleGroupOption
 	SecondaryMuscleOptions []MuscleGroupOption
+	// Structured content rendered as line-delimited textarea bodies: one
+	// instruction/mistake per line, resources as "Title | URL" per line.
+	InstructionsText   string
+	CommonMistakesText string
+	ResourcesText      string
 }
 
 // adminExercisesGET handles GET requests to the exercise admin page.
@@ -211,6 +216,9 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		TypeOptions:            buildTypeOptions(exercise.ExerciseType),
 		PrimaryMuscleOptions:   buildMuscleGroupOptions(muscleGroups, exercise.PrimaryMuscleGroups),
 		SecondaryMuscleOptions: buildMuscleGroupOptions(muscleGroups, exercise.SecondaryMuscleGroups),
+		InstructionsText:       strings.Join(exercise.Instructions, "\n"),
+		CommonMistakesText:     strings.Join(exercise.CommonMistakes, "\n"),
+		ResourcesText:          formatResourcesText(exercise.Resources),
 	}
 
 	app.render(w, r, http.StatusOK, "admin-exercise-edit", data)
@@ -246,7 +254,9 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 		Name:                   r.PostForm.Get("name"),
 		Category:               domain.Category(r.PostForm.Get("category")),
 		ExerciseType:           exerciseType,
-		DescriptionMarkdown:    r.PostForm.Get("description"),
+		Instructions:           splitLines(r.PostForm.Get("instructions")),
+		CommonMistakes:         splitLines(r.PostForm.Get("common_mistakes")),
+		Resources:              parseResourcesText(r.PostForm.Get("resources")),
 		PrimaryMuscleGroups:    r.PostForm["primary_muscles"],
 		SecondaryMuscleGroups:  r.PostForm["secondary_muscles"],
 		DefaultStartingSeconds: defaultStartingSeconds,
@@ -293,6 +303,48 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 	}
 
 	redirect(w, r, fmt.Sprintf("/admin/exercises/%d", exercise.ID))
+}
+
+// splitLines splits a textarea body into trimmed, non-empty lines — the
+// deterministic transform that turns one-item-per-line authoring into a
+// structured slice. It tolerates CRLF and blank lines.
+func splitLines(raw string) []string {
+	var out []string
+	for line := range strings.SplitSeq(raw, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+// parseResourcesText parses the resources textarea — one "Title | URL" per
+// line — into domain.Resource values. Lines without a separator, or missing
+// either side, are dropped; Exercise.Validate is the backstop for what remains.
+func parseResourcesText(raw string) []domain.Resource {
+	var out []domain.Resource
+	for _, line := range splitLines(raw) {
+		title, url, ok := strings.Cut(line, "|")
+		if !ok {
+			continue
+		}
+		title, url = strings.TrimSpace(title), strings.TrimSpace(url)
+		if title == "" || url == "" {
+			continue
+		}
+		out = append(out, domain.Resource{Title: title, URL: url})
+	}
+	return out
+}
+
+// formatResourcesText renders resources back into the "Title | URL" per-line
+// form the edit textarea expects, the inverse of parseResourcesText.
+func formatResourcesText(resources []domain.Resource) string {
+	lines := make([]string, len(resources))
+	for i, res := range resources {
+		lines[i] = res.Title + " | " + res.URL
+	}
+	return strings.Join(lines, "\n")
 }
 
 // optionalInt parses a form field into an *int, returning nil for an empty or

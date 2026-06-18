@@ -6,7 +6,7 @@ import (
 	"github.com/myrjola/petrapp/internal/petra/domain"
 )
 
-//nolint:exhaustruct // Test exercises omit unused fields (ID, Name, ExerciseType, DescriptionMarkdown).
+//nolint:exhaustruct // Test exercises omit unused fields (ID, Name, ExerciseType, content).
 func TestSwapSimilarityScore(t *testing.T) {
 	t.Parallel()
 
@@ -154,7 +154,7 @@ func TestSwapSimilarityScore(t *testing.T) {
 	}
 }
 
-//nolint:exhaustruct // Test exercises omit unused fields (ID, Name, ExerciseType, DescriptionMarkdown).
+//nolint:exhaustruct // Test exercises omit unused fields (ID, Name, ExerciseType, content).
 func TestSwapSimilarityScore_isSymmetric(t *testing.T) {
 	t.Parallel()
 

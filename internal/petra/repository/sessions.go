@@ -100,7 +100,7 @@ type loadExerciseSetsRow struct {
 	exerciseName           string
 	exerciseCategory       domain.Category
 	exerciseType           domain.ExerciseType
-	exerciseDescription    string
+	exerciseContent        string
 	defaultStartingSeconds sql.NullInt64
 	repMin                 sql.NullInt64
 	repMax                 sql.NullInt64
@@ -136,7 +136,7 @@ func scanExerciseSetRows(rows *sql.Rows) ([]domain.ExerciseSlot, []string, error
 		if err = rows.Scan(&workoutDateStr, &row.position, &row.exerciseID, &row.warmupCompletedAtStr,
 			&row.setNumber, &row.weightKg, &row.targetValue,
 			&row.completedValue, &row.completedAtStr, &row.signalStr,
-			&row.exerciseName, &row.exerciseCategory, &row.exerciseType, &row.exerciseDescription,
+			&row.exerciseName, &row.exerciseCategory, &row.exerciseType, &row.exerciseContent,
 			&row.defaultStartingSeconds, &row.repMin, &row.repMax); err != nil {
 			return nil, nil, fmt.Errorf("scan exercise set: %w", err)
 		}
@@ -209,11 +209,13 @@ func startExerciseSet(row loadExerciseSetsRow) (domain.ExerciseSlot, error) {
 		return domain.ExerciseSlot{}, err
 	}
 	exercise := domain.Exercise{ //nolint:exhaustruct // muscle groups filled in by hydrateMuscleGroups.
-		ID:                  row.exerciseID,
-		Name:                row.exerciseName,
-		Category:            row.exerciseCategory,
-		ExerciseType:        row.exerciseType,
-		DescriptionMarkdown: row.exerciseDescription,
+		ID:           row.exerciseID,
+		Name:         row.exerciseName,
+		Category:     row.exerciseCategory,
+		ExerciseType: row.exerciseType,
+	}
+	if err = unmarshalExerciseContent(row.exerciseContent, &exercise); err != nil {
+		return domain.ExerciseSlot{}, err
 	}
 	if row.defaultStartingSeconds.Valid {
 		v := int(row.defaultStartingSeconds.Int64)
@@ -610,7 +612,7 @@ func (r *sqliteSessionRepository) loadExerciseSets(
 		SELECT we.workout_date, we.position, we.exercise_id, we.warmup_completed_at,
 		       es.set_number, es.weight_kg, es.target_value,
 		       es.completed_value, es.completed_at, es.signal,
-		       e.name, e.category, e.exercise_type, e.description_markdown,
+		       e.name, e.category, e.exercise_type, e.content,
 		       e.default_starting_seconds, e.rep_min, e.rep_max
 		FROM exercise_slots we
 		LEFT JOIN exercise_sets es
@@ -656,7 +658,7 @@ func (r baseRepository) loadExerciseSetsSince(
 		SELECT we.workout_date, we.position, we.exercise_id, we.warmup_completed_at,
 		       es.set_number, es.weight_kg, es.target_value,
 		       es.completed_value, es.completed_at, es.signal,
-		       e.name, e.category, e.exercise_type, e.description_markdown,
+		       e.name, e.category, e.exercise_type, e.content,
 		       e.default_starting_seconds, e.rep_min, e.rep_max
 		FROM exercise_slots we
 		LEFT JOIN exercise_sets es

@@ -713,7 +713,9 @@ func Test_application_workoutSwapExercise_sorts_by_similarity(t *testing.T) {
 				Name:                  name,
 				Category:              domain.Category(category),
 				ExerciseType:          "",
-				DescriptionMarkdown:   "",
+				Instructions:          nil,
+				CommonMistakes:        nil,
+				Resources:             nil,
 				PrimaryMuscleGroups:   nil,
 				SecondaryMuscleGroups: nil,
 			}
