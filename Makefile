@@ -104,17 +104,23 @@ lint-fix: bin/golangci-lint
 sec:
 	@go tool govulncheck ./...
 
+# ci-base is the shared prep for both gates: build the binaries and lint.
+.PHONY: ci-base
+ci-base: init build lint-fix
+
 # ci is the local pre-push gate: fast because lint and test are cache-backed,
 # so it only re-validates what changed since the last run.
 .PHONY: ci
-ci: init build lint-fix test
+ci: ci-base test
 
-# ci-full is what server CI runs (.github/workflows/pull-request.yml): a strict
-# superset of ci, adding shuffled tests and govulncheck. Shuffle results don't
-# cache and the vuln DB changes independently of the code, so both run where
-# the wall-clock is free. Prod deploys gate on this passing.
+# ci-full is what server CI runs (.github/workflows/pull-request.yml): adds
+# govulncheck and runs the suite shuffled instead of in order. It deliberately
+# does NOT also run the plain `test` target — test-shuffle already executes
+# every test (just shuffled and uncached), so a second in-order pass would only
+# duplicate the full suite. The vuln DB changes independently of the code, so
+# sec runs where wall-clock is free. Prod deploys gate on this passing.
 .PHONY: ci-full
-ci-full: ci test-shuffle sec
+ci-full: ci-base test-shuffle sec
 
 .PHONY: clean
 clean:
