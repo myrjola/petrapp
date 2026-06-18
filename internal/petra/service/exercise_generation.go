@@ -1,10 +1,10 @@
 package service
 
 // This file owns the OpenAI-driven generator that fills in a freshly
-// named exercise's metadata (category, type, muscle groups, description,
-// resources). The decision tree in generateExerciseContent prefers the
-// AI path; on any failure (missing API key, network error, malformed
-// response, schema validation failure) it falls back to a minimal
+// named exercise's metadata (category, type, muscle groups, instructions,
+// common mistakes, resources). The decision tree in generateExerciseContent
+// prefers the AI path; on any failure (missing API key, network error,
+// malformed response, schema validation failure) it falls back to a minimal
 // exercise so the user can edit the rest by hand. GenerateExercise
 // persists whichever exercise was produced.
 
