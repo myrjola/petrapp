@@ -28,14 +28,11 @@
                     view-transition-name: overline-suffix;
                 }
 
+                /* Type from .display .display-xl (matches .workout-title so the
+                   cross-page morph is seamless and on the same Charter stack).
+                   Only morph mechanics + layout live here. */
                 .exercise-title {
                     width: fit-content; /* for a smoother morph animation between workout page */
-                    font-family: ui-serif, serif;
-                    font-weight: var(--font-weight-6);
-                    font-size: clamp(2.25rem, 9vw, 3rem);
-                    line-height: 0.95;
-                    letter-spacing: -0.025em;
-                    color: var(--color-text-primary);
                     margin: 0;
                     view-transition-name: exercise-title-{{ .Position }};
                 }
@@ -91,7 +88,7 @@
             </span>
         </div>
 
-        <h1 class="exercise-title"
+        <h1 class="exercise-title display display-xl"
             data-workout-exercise-id="{{ .Position }}">{{ .ExerciseSlot.Exercise.Name }}</h1>
 
         <div class="brief-nav">

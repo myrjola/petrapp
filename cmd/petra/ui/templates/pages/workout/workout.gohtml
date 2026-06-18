@@ -30,14 +30,7 @@
                     view-transition-name: overline-date;
                 }
 
-                .workout-title {
-                    font-family: var(--font-serif);
-                    font-weight: var(--font-weight-6);
-                    font-size: clamp(2.25rem, 9vw, 3rem);
-                    line-height: 0.95;
-                    letter-spacing: -0.025em;
-                    color: var(--color-text-primary);
-                }
+                /* .workout-title type from .display .display-xl. */
 
                 .workout-meta {
                     margin-top: var(--size-3);
@@ -109,7 +102,7 @@
                 <div class="overline overline--rule workout-overline">
                     <span class="overline-date">{{ .Date.Format "Mon · Jan 2" }}</span>
                 </div>
-                <h1 class="workout-title">{{ .WorkoutTypeName }}</h1>
+                <h1 class="workout-title display display-xl">{{ .WorkoutTypeName }}</h1>
                 <div class="workout-meta">
                     <div class="workout-progress">
                         <div class="workout-progress-bar">
