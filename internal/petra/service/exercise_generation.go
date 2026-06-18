@@ -22,10 +22,16 @@ import (
 	"github.com/myrjola/petrapp/internal/petra/domain"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/responses"
 )
 
-// resourceURLValidationTimeout caps each HEAD check issued by validateResourceURLs.
+// resourceURLValidationTimeout caps each probe issued by validateResourceURLs.
 const resourceURLValidationTimeout = 5 * time.Second
+
+// resourceProbeUserAgent identifies our link-validation probes. A default
+// Go-http-client User-Agent is frequently rejected outright; a descriptive
+// one fares better while staying honest about who is calling.
+const resourceProbeUserAgent = "PetraBot/1.0 (+https://github.com/myrjola/petrapp)"
 
 // exerciseJSONSchema is the JSON-schema description that the OpenAI
 // chat completion endpoint validates the AI's response against. The
@@ -40,7 +46,18 @@ type exerciseJSONSchema struct {
 //
 
 func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
-	schema := map[string]any{
+	result, err := json.Marshal(ejs.schemaMap())
+	if err != nil {
+		return nil, fmt.Errorf("marshal exercise schema: %w", err)
+	}
+	return result, nil
+}
+
+// schemaMap builds the JSON-schema object as a map so it can be passed
+// directly to the Responses API's structured-output Schema field, which is
+// typed map[string]any. MarshalJSON marshals this same map.
+func (ejs exerciseJSONSchema) schemaMap() map[string]any {
+	return map[string]any{
 		"type": "object", //nolint:goconst // JSON Schema keyword, not a shared constant.
 		"required": []string{
 			"id",
@@ -102,11 +119,6 @@ func (ejs exerciseJSONSchema) MarshalJSON() ([]byte, error) {
 		},
 		"additionalProperties": false,
 	}
-	result, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("marshal exercise schema: %w", err)
-	}
-	return result, nil
 }
 
 // exerciseGenerator generates exercises using OpenAI API.
@@ -214,37 +226,32 @@ Return only the valid JSON object with no additional text or explanation.`,
 func (eg *exerciseGenerator) generateBaseExercise(ctx context.Context, name string) (domain.Exercise, error) {
 	prompt := eg.baseExercisePrompt(name)
 
-	schemaParam := openai.ResponseFormatJSONSchemaJSONSchemaParam{
-		Name:        "exercise",
-		Description: openai.Opt("Detailed information about a fitness exercise"),
-		Schema:      openai.Opt(any(exerciseJSONSchema{muscleGroups: eg.muscleGroups})),
-		Strict:      openai.Bool(true),
-	}
-
-	// Query the OpenAI API with strict JSON mode
-	chat, err := eg.client.Chat.Completions.New(ctx,
-		openai.ChatCompletionNewParams{
-			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.UserMessage(prompt),
-			},
-			ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
-				OfText: nil,
-				OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
-					Type:       "json_schema",
-					JSONSchema: schemaParam,
-				},
-				OfJSONObject: nil,
-			},
+	// Query the Responses API with strict structured-output JSON schema.
+	resp, err := eg.client.Responses.New(ctx,
+		responses.ResponseNewParams{
 			Model: openai.ChatModelGPT5_4,
+			Input: responses.ResponseNewParamsInputUnion{
+				OfString: openai.String(prompt),
+			},
+			Text: responses.ResponseTextConfigParam{
+				Format: responses.ResponseFormatTextConfigUnionParam{
+					OfJSONSchema: &responses.ResponseFormatTextJSONSchemaConfigParam{
+						Name:        "exercise",
+						Description: openai.String("Detailed information about a fitness exercise"),
+						Schema:      exerciseJSONSchema{muscleGroups: eg.muscleGroups}.schemaMap(),
+						Strict:      openai.Bool(true),
+					},
+				},
+			},
 		})
 
 	if err != nil {
-		return domain.Exercise{}, fmt.Errorf("chat completion: %w", err)
+		return domain.Exercise{}, fmt.Errorf("responses completion: %w", err)
 	}
 
 	// Parse the response
 	var exercise domain.Exercise
-	err = json.Unmarshal([]byte(chat.Choices[0].Message.Content), &exercise)
+	err = json.Unmarshal([]byte(resp.OutputText()), &exercise)
 	if err != nil {
 		return domain.Exercise{}, fmt.Errorf("parse exercise response: %w", err)
 	}
@@ -293,24 +300,32 @@ Requirements:
 
 Return only the JSON object.`, exercise.Name)
 
-	// Use non-strict mode to enable web search
-	chat, err := eg.client.Chat.Completions.New(ctx,
-		openai.ChatCompletionNewParams{
-			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.UserMessage(prompt),
-			},
+	// Attach the built-in web_search tool so the model returns real, live URLs
+	// rather than ones recalled from training data.
+	resp, err := eg.client.Responses.New(ctx,
+		responses.ResponseNewParams{
 			Model: openai.ChatModelGPT5_4,
+			Input: responses.ResponseNewParamsInputUnion{
+				OfString: openai.String(prompt),
+			},
+			Tools: []responses.ToolUnionParam{
+				{OfWebSearch: &responses.WebSearchToolParam{
+					Type: responses.WebSearchToolTypeWebSearch,
+				}},
+			},
 		})
 
 	if err != nil {
 		return fmt.Errorf("web search completion: %w", err)
 	}
 
-	// Parse resources from response
+	// Parse resources from response. With a hosted tool in play the model may
+	// wrap the JSON in prose or a markdown code fence, so extract the object
+	// before unmarshalling.
 	var resourceResponse struct {
 		Resources []domain.Resource `json:"resources"`
 	}
-	err = json.Unmarshal([]byte(chat.Choices[0].Message.Content), &resourceResponse)
+	err = json.Unmarshal([]byte(extractJSONObject(resp.OutputText())), &resourceResponse)
 	if err != nil {
 		return fmt.Errorf("parse resources response: %w", err)
 	}
@@ -331,35 +346,81 @@ Return only the JSON object.`, exercise.Name)
 	return nil
 }
 
-// validateResourceURLs HEAD-checks each resource URL with the generator's
-// http client and returns the subset whose final response is 2xx or 3xx.
-// Failures (network errors, timeouts, 4xx, 5xx) are logged at debug level
-// and the resource is silently dropped. Best-effort: never returns an error.
+// accessRestrictedStatus reports whether status means the server is up and the
+// resource almost certainly exists but is refusing our automated probe
+// (unauthorized, forbidden, method-not-allowed, rate-limited). Reputable sites
+// such as Mayo Clinic and NASM return 403/405 to HEAD requests from
+// non-browser clients, so treating these as dead would discard good tutorial
+// links.
+func accessRestrictedStatus(status int) bool {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden,
+		http.StatusMethodNotAllowed, http.StatusTooManyRequests:
+		return true
+	default:
+		return false
+	}
+}
+
+// probeResourceURL issues a single request with the descriptive probe
+// User-Agent and returns the response status code. The body is closed
+// immediately (we never need it). A non-nil error means the request never
+// completed: malformed URL, network failure, or timeout.
+func (eg *exerciseGenerator) probeResourceURL(
+	ctx context.Context,
+	method, url string,
+) (int, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("build %s request: %w", method, err)
+	}
+	req.Header.Set("User-Agent", resourceProbeUserAgent)
+	resp, err := eg.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("%s %s: %w", method, url, err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// validateResourceURLs probes each resource URL with the generator's http
+// client and returns the subset that is reachable. It HEAD-checks first; when
+// a server answers with an access-restricted status (403/405/etc.) — common
+// for sites that block HEAD or non-browser clients — it retries once with GET
+// before deciding. 2xx/3xx responses are kept; access-restricted responses are
+// kept (the link exists, the server just won't let us probe it); genuine 4xx
+// (404/410) and 5xx responses, and network failures, are logged at debug level
+// and dropped. Best-effort: never returns an error.
 func (eg *exerciseGenerator) validateResourceURLs(
 	ctx context.Context,
 	resources []domain.Resource,
 ) []domain.Resource {
 	alive := make([]domain.Resource, 0, len(resources))
 	for _, r := range resources {
-		req, err := http.NewRequestWithContext(ctx, http.MethodHead, r.URL, nil)
-		if err != nil {
-			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad URL",
-				slog.String("url", r.URL), slog.Any("error", err))
-			continue
-		}
-		resp, err := eg.httpClient.Do(req)
+		status, err := eg.probeResourceURL(ctx, http.MethodHead, r.URL)
 		if err != nil {
 			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: request failed",
 				slog.String("url", r.URL), slog.Any("error", err))
 			continue
 		}
-		_ = resp.Body.Close()
-		if resp.StatusCode >= http.StatusBadRequest {
-			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad status",
-				slog.String("url", r.URL), slog.Int("status", resp.StatusCode))
-			continue
+		// A HEAD rejection may just mean the server dislikes HEAD or bots;
+		// a GET often succeeds where HEAD did not.
+		if accessRestrictedStatus(status) {
+			if getStatus, getErr := eg.probeResourceURL(ctx, http.MethodGet, r.URL); getErr == nil {
+				status = getStatus
+			}
 		}
-		alive = append(alive, r)
+		switch {
+		case status < http.StatusBadRequest:
+			alive = append(alive, r)
+		case accessRestrictedStatus(status):
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "keep resource: probe restricted",
+				slog.String("url", r.URL), slog.Int("status", status))
+			alive = append(alive, r)
+		default:
+			eg.logger.LogAttrs(ctx, slog.LevelDebug, "skip resource: bad status",
+				slog.String("url", r.URL), slog.Int("status", status))
+		}
 	}
 	return alive
 }
@@ -415,6 +476,44 @@ func containsResourcesHeading(lines []string) bool {
 		}
 	}
 	return false
+}
+
+// extractJSONObject returns the first complete top-level JSON object found in
+// s. It tolerates a surrounding markdown code fence (```json ... ```) and any
+// leading or trailing prose the model may emit alongside the object when a
+// hosted tool such as web search is active. When no object is found it returns
+// the trimmed input unchanged so the caller's json.Unmarshal surfaces the
+// original parse error.
+func extractJSONObject(s string) string {
+	start := strings.IndexByte(s, '{')
+	if start < 0 {
+		return strings.TrimSpace(s)
+	}
+	// Walk braces, ignoring those inside string literals, to find the match.
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case escaped:
+			escaped = false
+		case c == '\\' && inString:
+			escaped = true
+		case c == '"':
+			inString = !inString
+		case inString:
+			// other characters inside a string are literal
+		case c == '{':
+			depth++
+		case c == '}':
+			depth--
+			if depth == 0 {
+				return s[start : i+1]
+			}
+		}
+	}
+	return strings.TrimSpace(s)
 }
 
 // validateMuscleGroups checks if all muscle groups are in the allowed list.

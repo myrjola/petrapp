@@ -111,16 +111,24 @@ func TestExerciseGenerator_Generate(t *testing.T) {
 			t.Errorf("Got exercise category %q, want %q", got, want)
 		}
 
-		if !strings.Contains(exercise.DescriptionMarkdown, "Squat") {
-			t.Errorf("No 'Squat' in description %s", exercise.DescriptionMarkdown)
+		// Assert the prompt's structural contract rather than a verbatim
+		// mention of the name — the model may describe the movement without
+		// repeating "Squat".
+		if !strings.Contains(exercise.DescriptionMarkdown, "## Instructions") {
+			t.Errorf("description missing '## Instructions' heading: %s", exercise.DescriptionMarkdown)
 		}
 
 		if !slices.Contains(exercise.PrimaryMuscleGroups, "quadriceps") {
 			t.Errorf("Primary muscle groups %v does not contain 'quadriceps'", exercise.PrimaryMuscleGroups)
 		}
 
-		if !slices.Contains(exercise.SecondaryMuscleGroups, "core") {
-			t.Errorf("Secondary muscle groups %v does not contain 'core'", exercise.SecondaryMuscleGroups)
+		// A squat works the glutes and hamstrings; the core is an isometric
+		// stabilizer and the prompt's stabilizer-exclusion rule asks the model
+		// to omit it, so assert on a genuinely-worked secondary muscle instead.
+		if !slices.Contains(exercise.SecondaryMuscleGroups, "glutes") &&
+			!slices.Contains(exercise.SecondaryMuscleGroups, "hamstrings") {
+			t.Errorf("Secondary muscle groups %v contain neither 'glutes' nor 'hamstrings'",
+				exercise.SecondaryMuscleGroups)
 		}
 	})
 }
@@ -260,8 +268,11 @@ func TestExerciseGenerator_PromptDataQualityRules(t *testing.T) {
 
 // TestExerciseGenerator_validateResourceURLs spins up an httptest.Server with
 // handlers covering the response classes we care about: 200, 301→200, 404,
-// 500, and a slow handler that exceeds the client timeout. Only 200 and the
-// redirect chain that ends in 200 should survive.
+// 500, a slow handler that exceeds the client timeout, a server that forbids
+// every probe (403), and one that rejects HEAD with 405 but serves GET. The
+// 200, redirect-to-200, always-403 (access-restricted but live), and
+// HEAD-blocked-GET-OK resources should survive; 404, 500, and the timeout
+// should drop.
 func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
 	t.Parallel()
 
@@ -282,6 +293,18 @@ func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		w.WriteHeader(http.StatusOK)
 	})
+	// Forbids HEAD and GET alike — models a bot-blocking site like NASM.
+	mux.HandleFunc("/forbidden", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	})
+	// Rejects HEAD with 405 but serves GET — the GET retry should rescue it.
+	mux.HandleFunc("/headblocked", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 
@@ -296,11 +319,15 @@ func TestExerciseGenerator_validateResourceURLs(t *testing.T) {
 		{Title: "NotFound", URL: srv.URL + "/notfound"},
 		{Title: "Boom", URL: srv.URL + "/boom"},
 		{Title: "Slow", URL: srv.URL + "/slow"},
+		{Title: "Forbidden", URL: srv.URL + "/forbidden"},
+		{Title: "HeadBlocked", URL: srv.URL + "/headblocked"},
 	}
 
 	got := eg.validateResourceURLs(t.Context(), in)
 
-	wantTitles := map[string]bool{"OK": true, "Redirect": true}
+	wantTitles := map[string]bool{
+		"OK": true, "Redirect": true, "Forbidden": true, "HeadBlocked": true,
+	}
 	if len(got) != len(wantTitles) {
 		t.Fatalf("got %d surviving resources, want %d: %#v", len(got), len(wantTitles), got)
 	}
@@ -346,6 +373,55 @@ func TestExerciseGenerator_enhanceWithWebSearch_validatesURLs(t *testing.T) {
 	}
 	if strings.Contains(got, "[Dead]") {
 		t.Errorf("dead URL leaked through; got:\n%s", got)
+	}
+}
+
+// TestExtractJSONObject covers the Pass-2 hardening: the web_search-enabled
+// Responses call can wrap its JSON in a markdown fence or surround it with
+// prose, so extractJSONObject must recover the bare object in each case and
+// leave already-clean input untouched.
+func TestExtractJSONObject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "bare object",
+			in:   `{"resources":[]}`,
+			want: `{"resources":[]}`,
+		},
+		{
+			name: "fenced json block",
+			in:   "```json\n{\"resources\":[{\"title\":\"A\",\"url\":\"https://x\"}]}\n```",
+			want: `{"resources":[{"title":"A","url":"https://x"}]}`,
+		},
+		{
+			name: "prose wrapped",
+			in:   "Here are the resources I found:\n{\"resources\":[]}\nHope that helps!",
+			want: `{"resources":[]}`,
+		},
+		{
+			name: "brace inside string literal",
+			in:   `{"resources":[{"title":"a}b","url":"https://x"}]}`,
+			want: `{"resources":[{"title":"a}b","url":"https://x"}]}`,
+		},
+		{
+			name: "no object returns trimmed input",
+			in:   "  no json here  ",
+			want: "no json here",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := extractJSONObject(tt.in); got != tt.want {
+				t.Errorf("extractJSONObject(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 

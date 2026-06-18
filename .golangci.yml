@@ -153,6 +153,13 @@ linters:
         - ^github.com/playwright-community/playwright-go\..+Options$
         - ^github.com/playwright-community/playwright-go\..+Values$
         - ^github.com/openai/openai-go/v3.ChatCompletionNewParams$
+        - ^github.com/openai/openai-go/v3/responses\.ResponseNewParams$
+        - ^github.com/openai/openai-go/v3/responses\.ResponseNewParamsInputUnion$
+        - ^github.com/openai/openai-go/v3/responses\.ResponseTextConfigParam$
+        - ^github.com/openai/openai-go/v3/responses\.ResponseFormatTextConfigUnionParam$
+        - ^github.com/openai/openai-go/v3/responses\.ResponseFormatTextJSONSchemaConfigParam$
+        - ^github.com/openai/openai-go/v3/responses\.ToolUnionParam$
+        - ^github.com/openai/openai-go/v3/responses\.WebSearchToolParam$
     funlen:
       lines: 100
       statements: 50
