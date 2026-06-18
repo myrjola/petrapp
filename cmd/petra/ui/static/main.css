@@ -111,13 +111,21 @@
         --font-lineheight-4: 1.75;
         --font-lineheight-5: 2;
         --font-letterspacing-0: -.05em;
-        --font-letterspacing-1: .025em;
-        --font-letterspacing-2: .050em;
-        --font-letterspacing-3: .075em;
-        --font-letterspacing-4: .150em;
-        --font-letterspacing-5: .500em;
-        --font-letterspacing-6: .750em;
-        --font-letterspacing-7: 1em;
+        --font-letterspacing-1: -.025em;
+        --font-letterspacing-2: .025em;
+        --font-letterspacing-3: .050em;
+        --font-letterspacing-4: .075em;
+        --font-letterspacing-5: .150em;
+        --font-letterspacing-6: .500em;
+        --font-letterspacing-7: .750em;
+        --font-letterspacing-8: 1em;
+        /* Semantic type-voice aliases over the numbered ramp. Display tracking
+           (-0.025em) is the inserted index-1; overline/mono/leading reuse
+           existing rungs. See design-system.md "Three type voices". */
+        --font-letterspacing-display: var(--font-letterspacing-1);
+        --font-letterspacing-overline: var(--font-letterspacing-4);
+        --font-letterspacing-mono: var(--font-letterspacing-2);
+        --font-lineheight-display: var(--font-lineheight-00);
         --font-size-00: .5rem;
         --font-size-0: .75rem;
         --font-size-1: 1rem;
@@ -228,7 +236,7 @@
         font-family: var(--font-sans);
         font-size: var(--font-size-1);
         font-weight: var(--font-weight-7);
-        letter-spacing: var(--font-letterspacing-3);
+        letter-spacing: var(--font-letterspacing-4);
         --vertical-padding: 2.5em;
         padding: var(--size-2) var(--vertical-padding);
         border: none;
@@ -333,7 +341,7 @@
         padding: var(--size-1) var(--size-3);
         font-size: var(--font-size-0);
         font-weight: var(--font-weight-5);
-        letter-spacing: var(--font-letterspacing-1);
+        letter-spacing: var(--font-letterspacing-2);
         text-transform: none;
     }
 
@@ -372,7 +380,7 @@
         font-size: var(--font-size-0);
         font-weight: var(--font-weight-6);
         text-transform: uppercase;
-        letter-spacing: var(--font-letterspacing-2);
+        letter-spacing: var(--font-letterspacing-3);
         background: var(--stone-2);
         color: var(--stone-9);
     }
@@ -397,6 +405,46 @@
         color: var(--color-info);
     }
 
+    /* Type voices — the three formalized voices of the system. Display = serif,
+       Mono = annotation. (Body = system-ui, the unstyled default.) See
+       design-system.md "Three type voices". The numbered .display-* sizes share
+       the base tracking/leading; per-page heroes that need bespoke values stay
+       outside this scale by design. */
+    .display {
+        font-family: var(--font-serif);
+        font-weight: var(--font-weight-6);
+        letter-spacing: var(--font-letterspacing-display);
+        line-height: var(--font-lineheight-display);
+        color: var(--color-text-primary);
+    }
+
+    .display-xl {
+        font-size: var(--font-size-fluid-3);
+    }
+
+    .display-lg {
+        font-size: var(--font-size-fluid-2);
+    }
+
+    .display-md {
+        font-size: var(--font-size-6);
+    }
+
+    .display-sm {
+        font-size: var(--font-size-5);
+    }
+
+    /* Mono annotation voice: family + tracking only. Tabular figures are a
+       separate concern (.tabular-nums) applied only where numerals must align. */
+    .mono {
+        font-family: var(--font-mono);
+        letter-spacing: var(--font-letterspacing-mono);
+    }
+
+    .tabular-nums {
+        font-variant-numeric: tabular-nums;
+    }
+
     /* Editorial overline: mono + uppercase + terracotta, the small caption that
        sits above a serif display title. Promoted from per-page copies (ADR 0007).
        Pages may override letter-spacing / margin / grid placement as needed.
@@ -404,7 +452,7 @@
     .overline {
         font-family: var(--font-mono);
         font-size: var(--font-size-0);
-        letter-spacing: var(--font-letterspacing-3);
+        letter-spacing: var(--font-letterspacing-overline);
         text-transform: uppercase;
         font-weight: var(--font-weight-6);
         /* Clay-5 (5.7–6.1:1 on stone) is the AA-safe small-text accent.
