@@ -53,16 +53,11 @@
                     gap: var(--size-2) var(--size-3);
                 }
 
-                /* Serif day name — the editorial anchor. */
+                /* Serif day name — the editorial anchor. Type from .display
+                   .display-sm; only layout/reset live here. */
                 .day-name {
                     min-width: 0;
                     margin: 0;
-                    font-family: var(--font-serif);
-                    font-weight: var(--font-weight-6);
-                    font-size: var(--font-size-5);
-                    line-height: 1;
-                    letter-spacing: -0.02em;
-                    color: var(--color-text-primary);
                 }
 
                 .day-action {
@@ -79,9 +74,8 @@
                     align-items: center;
                     gap: var(--size-3);
                     padding-top: var(--size-1);
-                    font-family: var(--font-mono);
                     font-size: var(--font-size-0);
-                    letter-spacing: var(--font-letterspacing-2);
+                    /* mono family + tracking from .mono */
                     /* stone-7, not text-secondary (stone-6): the "N / M sets"
                        span is small mono text and stone-6 falls just under AA
                        4.5:1 here (caught by Test_playwright_axe_aa). */
@@ -249,7 +243,7 @@
                 </div>
 
                 <div class="day-headline">
-                    <h2 class="day-name">{{ .Name }}</h2>
+                    <h2 class="day-name display display-sm">{{ .Name }}</h2>
 
                     {{ if .Action }}
                         <div class="day-action">
@@ -273,7 +267,7 @@
                 </div>
 
                 {{ if .ShouldShowProgress }}
-                    <div class="day-progress">
+                    <div class="day-progress mono">
                         <div class="progress-rule" aria-hidden="true">
                             <div class="progress-fill"></div>
                         </div>
