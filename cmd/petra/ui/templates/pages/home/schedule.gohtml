@@ -67,14 +67,7 @@
                     outline-offset: 2px;
                 }
 
-                .week-title {
-                    font-family: var(--font-serif);
-                    font-weight: var(--font-weight-6);
-                    font-size: clamp(2.25rem, 9vw, 3rem);
-                    line-height: 0.95;
-                    letter-spacing: -0.025em;
-                    color: var(--color-text-primary);
-                }
+                /* .week-title type comes from .display .display-xl. */
             }
         </style>
 
@@ -100,7 +93,7 @@
                 {{ end }}
                 <a href="/preferences" class="settings-link">Settings</a>
             </div>
-            <h1 class="week-title">{{ .Header.Title }}</h1>
+            <h1 class="week-title display display-xl">{{ .Header.Title }}</h1>
         </header>
 
         {{ template "day-cards" . }}

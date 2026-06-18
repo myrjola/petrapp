@@ -46,13 +46,8 @@
                         flex-wrap: wrap;
                     }
 
+                    /* h2 type from .display .display-sm; only reset lives here. */
                     h2 {
-                        font-family: var(--font-serif);
-                        font-weight: var(--font-weight-6);
-                        font-size: var(--font-size-5);
-                        line-height: 1;
-                        letter-spacing: -0.02em;
-                        color: var(--color-text-primary);
                         margin: 0;
                     }
 
@@ -250,11 +245,9 @@
                     .row[data-status="no-target"] .bar-completed,
                     .legend-swatch[data-status="no-target"] { background: var(--color-info); }
 
+                    /* mono family + tracking from .mono, figures from .tabular-nums. */
                     .counts {
-                        font-family: var(--font-mono);
-                        font-variant-numeric: tabular-nums;
                         font-size: var(--font-size-0);
-                        letter-spacing: var(--font-letterspacing-2);
                         color: var(--color-text-secondary);
                         text-align: right;
                         white-space: nowrap;
@@ -285,7 +278,7 @@
             <header class="head">
                 <div class="eyebrow"><span>Weekly Volume</span></div>
                 <div class="title-row">
-                    <h2 id="muscle-balance-heading">Muscle balance</h2>
+                    <h2 id="muscle-balance-heading" class="display display-sm">Muscle balance</h2>
                     <details class="legend">
                         <summary>How to read</summary>
                         <div class="legend-body">
@@ -340,7 +333,7 @@
                                     <div class="bar-completed"></div>
                                     {{ if .HasTarget }}<div class="target-mark"></div>{{ end }}
                                 </div>
-                                <div class="counts">
+                                <div class="counts mono tabular-nums">
                                     {{ printf "%.1f / %.1f" .CompletedVolume .PlannedVolume }}
                                     {{ if .HasTarget }}<span class="target">target {{ .TargetSets }}</span>{{ end }}
                                 </div>
