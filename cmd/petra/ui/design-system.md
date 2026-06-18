@@ -34,14 +34,14 @@ element earns its space.
   rendering variance is intentional — the system aims for *native craft*
   per OS, not pixel-identical rendering. Don't propose a Google-fonted
   look or introduce a custom face.
-- **Signature page-header motif.** Uppercase mono overline in
-  `--clay-5` → serif display title (`clamp(2.25rem, 9vw, 3rem)`,
-  line-height `0.95`, tracking `-0.025em`) → meta row. The overline ends
-  with a 1px hairline fading right via
-  `linear-gradient(to right, var(--stone-3), transparent)`. Worked
-  example in `templates/pages/workout/workout.gohtml` and
-  `templates/pages/exerciseset/exercise-header.gohtml`. Reuse this
-  rhythm; don't reinvent it.
+- **Signature page-header motif.** Uppercase mono overline in `--clay-5`
+  → serif display title → meta row, the overline trailing a 1px hairline
+  fading right. Built from the type-voice utilities
+  (`.overline.overline--rule` → `.display .display-xl` → meta); the recipe
+  and worked examples (`workout.gohtml`, `exerciseset/exercise-header.gohtml`)
+  are under "Type-voice utilities" below. Reuse this rhythm; don't reinvent
+  it. Note the *simple* `components/page-header.gohtml` (sans `h1` + subtitle,
+  admin/utility pages) is a separate, quieter header voice — not this motif.
 - **State is never colour-only.** Every state carries a non-colour
   signal too: in-progress = amber wash *plus* a 3px left-edge tab;
   completed = sage wash *plus* a drawn strike-through; default =
@@ -105,6 +105,52 @@ retired page-by-page.
 - **Font weights**: `--font-weight-1` through `--font-weight-9`
 - **Font sizes**: `--font-size-00` (0.5rem) and `--font-size-0` through `--font-size-8`
 - **Fluid font sizes**: `--font-size-fluid-0` through `--font-size-fluid-3` (responsive via `clamp()`)
+- **Letterspacing**: numbered ramp `--font-letterspacing-0` through `-8`, with
+  semantic aliases `-display` / `-overline` / `-mono` layered on top (see
+  "Type-voice utilities").
+
+### Type-voice utilities
+
+The three voices are utility classes in `static/main.css` — prefer them over
+re-declaring `font-family: var(--font-serif)` / `var(--font-mono)` in a page's
+scoped `<style>`:
+
+- **Display (serif).** `.display` sets the serif family, weight 6, display
+  tracking, and `0.95` leading; pair it with a size modifier — `.display-xl`
+  (`--font-size-fluid-3`), `.display-lg` (`--font-size-fluid-2`), `.display-md`
+  (`--font-size-6`), `.display-sm` (`--font-size-5`). Markup uses both:
+  `<h1 class="display display-xl">`. The size modifiers share the base
+  tracking/leading; a heading that needs different metrics is, by definition,
+  not on this scale (see exemptions).
+- **Mono (annotation).** `.mono` sets the mono family + `--font-letterspacing-mono`
+  (the lowercase annotation tracking). It does *not* touch figures — pair it
+  with `.tabular-nums` (`font-variant-numeric: tabular-nums`, the one canonical
+  tabular spelling) where numerals must align in a column (counters, volume
+  readouts).
+- **Overline (uppercase mono caption).** `.overline` is the clay-5 uppercase
+  mono caption; `.overline.overline--rule` adds the trailing fading hairline.
+  This is its own voice — uppercase tracking (`--font-letterspacing-overline`,
+  `.075em`), not the `.mono` `.025em`.
+
+**Semantic letterspacing aliases.** `--font-letterspacing-display` (`-0.025em`),
+`-overline` (`.075em`), `-mono` (`.025em`) name the three tracking values over
+the numbered ramp. The display value is a first-class, sequential rung:
+`-0.025em` was inserted at `--font-letterspacing-1` and the old `1..7` shifted to
+`2..8` (a value-preserving renumber of every reference) so the ramp stays
+monotonic rather than aliasing an off-ramp literal.
+
+**Content-header recipe.** The signature motif is these utilities stacked:
+`.overline.overline--rule` eyebrow → `.display .display-xl` title → meta row.
+Each page keeps its own overline/meta *content* plus a thin scoped wrapper for
+layout (gaps, view-transition names); the type comes from the utilities. There
+is no shared Go partial for it.
+
+**Exemptions (intentionally off the scale).** The landing wordmark
+(`unauthenticated.gohtml`, an italic logotype) and the oversized exercise-info
+hero stay bespoke. Serif *numerals* — set figures, the active-set hero number,
+the exercise ordinal, the preferences eyebrow numeral — and sub-display panel
+titles (`.panel-title`, ~1.5rem) are bespoke too: they are not the display text
+voice, and folding them onto `.display` would change weight or size.
 
 ### Color Usage Patterns
 
