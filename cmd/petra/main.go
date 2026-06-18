@@ -239,7 +239,7 @@ func openDatabase(ctx context.Context, url string, logger *slog.Logger) (*sqlite
 		Schema:       auth.SchemaSQL + "\n" + repository.SchemaSQL,
 		Fixtures:     repository.FixturesSQL,
 		Logger:       logger,
-		Premigration: repository.PreMigrateExerciseContent,
+		Premigration: nil,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new database: %w", err)
