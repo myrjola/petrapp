@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # -------------------------------------------------------
 #  Build stage for Go binary compilation
 # -------------------------------------------------------
@@ -11,7 +12,7 @@ WORKDIR /app
 
 # Copy Go module files first for better layer caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
 # Copy the source code
 COPY . .
@@ -19,7 +20,13 @@ COPY . .
 # Build the Go binary. cmd/petra/ui is embedded into the binary via //go:embed
 # (see cmd/petra/assets.go), so the runtime image needs no ui/ directory and
 # assets are content-fingerprinted at startup rather than by a build-time sed.
-RUN go build -o ./bin/petrapp ./cmd/petra
+#
+# The BuildKit cache mounts persist the Go build and module caches on the
+# builder across builds, so a typical commit recompiles only the packages it
+# touched instead of the whole dependency graph from cold (~90s -> a few s).
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -o ./bin/petrapp ./cmd/petra
 
 # -----------------------------------------------------------------------------
 #  Dependency image for litestream
