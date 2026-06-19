@@ -4,8 +4,20 @@ permissions:
 on:
   - pull_request
   - workflow_call
+
+# The work is split across two parallel jobs so the deploy gate's wall-clock is
+# max(tests, checks) rather than their sum. The shuffled --race suite is the long
+# pole, so it gets its own runner; everything else (build, lint, govulncheck,
+# migration test) runs alongside it. Both must pass for the workflow — and thus
+# the prod deploy gate in main.yml — to succeed.
+#
+# setup-go's built-in cache is disabled (cache: false) because both jobs would
+# key it on go.sum and clobber each other's GOCACHE — the tests job holds
+# -race-instrumented objects, the checks job plain ones. Instead each job keeps
+# its own go-build cache (gobuild-tests-* / gobuild-checks-*) and they share the
+# module cache (identical for both).
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -14,6 +26,21 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: false
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: gomod-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-
+
+      - name: Cache Go build (race)
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: gobuild-tests-${{ hashFiles('go.sum') }}
+          restore-keys: gobuild-tests-
 
       - name: Cache Playwright browsers and driver
         uses: actions/cache@v5
@@ -22,6 +49,34 @@ jobs:
             ~/.cache/ms-playwright
             ~/.cache/ms-playwright-go
           key: playwright-${{ hashFiles('go.sum') }}
+
+      - name: Test (shuffled, race)
+        run: make test-shuffle
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Cache Go modules
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: gomod-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-
+
+      - name: Cache Go build
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/go-build
+          key: gobuild-checks-${{ hashFiles('go.sum') }}
+          restore-keys: gobuild-checks-
 
       - name: Cache golangci-lint binary
         uses: actions/cache@v5
@@ -37,8 +92,8 @@ jobs:
           restore-keys: |
             golangci-lint-${{ runner.os }}-
 
-      - name: Build
-        run: make ci-full
+      - name: Build, lint, vuln-check
+        run: make ci-checks
 
       - name: Install Litestream
         run: |

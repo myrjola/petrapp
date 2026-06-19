@@ -122,6 +122,13 @@ ci: ci-base test
 .PHONY: ci-full
 ci-full: ci-base test-shuffle sec
 
+# ci-checks is the non-test half of ci-full, run on its own CI runner in
+# parallel with the shuffled suite (.github/workflows/pull-request.yml splits
+# them across two jobs): build + lint + govulncheck. Together, `make ci-checks`
+# and `make test-shuffle` cover exactly what ci-full does, just on two runners.
+.PHONY: ci-checks
+ci-checks: ci-base sec
+
 .PHONY: clean
 clean:
 	@echo "Cleaning up..."
