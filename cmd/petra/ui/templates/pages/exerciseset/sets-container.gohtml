@@ -14,19 +14,7 @@
                     pointer-events: none;
                 }
 
-                /* ---------- Planned & Done rows (same grid, two skins) ---------- */
-                .exercise-set {
-                    display: grid;
-                    grid-template-columns: minmax(3rem, auto) 1fr auto;
-                    align-items: baseline;
-                    gap: var(--size-3);
-                    padding: var(--size-3);
-                    border-radius: var(--radius-3);
-                    background: var(--color-surface-elevated);
-                    box-shadow: var(--shadow-1);
-                    transition: background var(--duration-2) var(--ease-out-quiet);
-                }
-
+                /* Mono set counter, shared by the active-card header. */
                 .set-index {
                     font-family: var(--font-mono);
                     font-size: var(--font-size-0);
@@ -36,69 +24,18 @@
                     font-weight: var(--font-weight-6);
                 }
 
-                .set-figures {
-                    font-family: var(--font-serif);
-                    font-size: var(--font-size-2);
-                    color: var(--color-text-primary);
-                    font-variant-numeric: tabular-nums;
-                    display: inline-flex;
-                    align-items: baseline;
-                    gap: var(--size-2);
-                }
-
-                .set-figures .sep {
-                    color: var(--stone-4);
-                }
-
-                .set-trailing {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: var(--size-3);
-                    font-size: var(--font-size-0);
-                }
-
-                .set-status {
-                    color: var(--color-success);
-                    font-weight: var(--font-weight-7);
-                }
-
-                .set-signal {
-                    font-family: var(--font-mono);
-                    letter-spacing: var(--font-letterspacing-2);
-                    text-transform: uppercase;
-                    color: var(--color-success);
-                    font-weight: var(--font-weight-6);
-                }
-
-                .set-edit {
-                    color: var(--color-success);
-                    text-decoration: none;
-                    font-weight: var(--font-weight-6);
-                }
-
-                .set-edit:focus-visible {
-                    outline: 2px solid var(--color-border-focus);
-                    outline-offset: 2px;
-                    border-radius: var(--radius-1);
-                }
-
-                /* Done state — warm success wash; figures keep serif. */
-                .exercise-set.completed {
-                    background: var(--color-success-bg);
-                }
-
-                .exercise-set.completed .set-index,
-                .exercise-set.completed .set-figures {
-                    color: var(--color-success);
-                }
-
                 /* ---------- Active card — warm amber wash, hero numbers, in-card rest chip ---------- */
+                /* The active set is the "Focus mode" card — a dark stone panel
+                   that lifts the set being logged off the warm page. Ember is
+                   reserved for its primary CTA. */
                 .exercise-set.active {
                     display: block;
-                    background: var(--color-warning-bg);
-                    box-shadow: var(--shadow-2);
+                    background: var(--stone-10);
+                    box-shadow: var(--shadow-3);
                     padding: var(--size-4);
+                    border-radius: var(--radius-3);
                     position: relative;
+                    overflow: hidden;
                 }
 
                 .exercise-set.active::before {
@@ -108,8 +45,21 @@
                     top: var(--size-3);
                     bottom: var(--size-3);
                     width: 3px;
-                    background: var(--color-warning);
+                    background: var(--clay-3);
                     border-radius: 0 3px 3px 0;
+                }
+
+                /* Dark-card rest chip — the global .rest-chip is tuned for light
+                   surfaces, so recolor it for the focus panel. */
+                .exercise-set.active .rest-chip {
+                    background: var(--stone-8);
+                    color: var(--stone-3);
+                    border: var(--border-size-1) solid var(--stone-7);
+                }
+
+                .exercise-set.active .rest-chip [data-rest-time] {
+                    color: var(--clay-2);
+                    font-weight: var(--font-weight-7);
                 }
 
                 .exercise-set.active .active-head {
@@ -121,7 +71,7 @@
                 }
 
                 .exercise-set.active .active-head .set-index {
-                    color: var(--color-warning);
+                    color: var(--clay-2);
                     font-weight: var(--font-weight-7);
                 }
 
@@ -132,14 +82,14 @@
                     gap: var(--size-3);
                     font-family: var(--font-serif);
                     font-size: var(--font-size-fluid-3);
-                    color: var(--color-text-primary);
+                    color: var(--stone-0);
                     font-variant-numeric: tabular-nums;
                     line-height: 1;
                     padding: var(--size-3) 0 var(--size-4);
                 }
 
                 .exercise-set.active .active-hero .sep {
-                    color: var(--color-text-secondary);
+                    color: var(--stone-5);
                     font-size: 0.8em;
                 }
 
@@ -148,7 +98,7 @@
                     font-size: var(--font-size-1);
                     text-transform: uppercase;
                     letter-spacing: var(--font-letterspacing-4);
-                    color: var(--color-text-secondary);
+                    color: var(--stone-4);
                     margin-left: var(--size-1);
                 }
 
@@ -184,7 +134,7 @@
 
                 .exercise-set.active .input-field label {
                     font-size: var(--font-size-0);
-                    color: var(--color-text-secondary);
+                    color: var(--stone-4);
                     font-weight: var(--font-weight-6);
                     text-transform: uppercase;
                     letter-spacing: var(--font-letterspacing-4);
@@ -193,13 +143,13 @@
                 .exercise-set.active .input-field input {
                     width: 100%;
                     padding: var(--size-2) var(--size-3);
-                    border: 2px solid var(--stone-3);
+                    border: var(--border-size-2) solid var(--stone-6);
                     border-radius: var(--radius-2);
                     text-align: center;
                     font-size: var(--font-size-3);
                     font-weight: var(--font-weight-7);
                     font-family: var(--font-mono);
-                    background: var(--color-surface);
+                    background: var(--stone-0);
                     color: var(--color-text-primary);
                     transition: border-color var(--duration-2) var(--ease-out-quiet), box-shadow var(--duration-2) var(--ease-out-quiet);
                 }
@@ -231,7 +181,7 @@
                     align-items: center;
                     gap: var(--size-2);
                     font-size: var(--font-size-1);
-                    color: var(--color-text-primary);
+                    color: var(--stone-2);
                     font-weight: var(--font-weight-4);
                     text-transform: none;
                     letter-spacing: normal;
@@ -252,7 +202,7 @@
 
                 .exercise-set.active .assisted-field details {
                     font-size: var(--font-size-0);
-                    color: var(--color-text-secondary);
+                    color: var(--stone-3);
                 }
 
                 .exercise-set.active .assisted-field details summary {
@@ -278,7 +228,7 @@
                 .exercise-set.active .signal-group > legend {
                     font-size: var(--font-size-1);
                     font-weight: var(--font-weight-6);
-                    color: var(--color-text-primary);
+                    color: var(--stone-2);
                     padding: 0;
                     margin-bottom: var(--size-1);
                 }
@@ -316,8 +266,8 @@
 
                 .exercise-set.active .signal-btn.too-heavy-btn {
                     background: transparent;
-                    color: var(--color-text-secondary);
-                    border-color: var(--stone-3);
+                    color: var(--stone-2);
+                    border-color: var(--stone-6);
                 }
 
                 .exercise-set.active .signal-btn.too-heavy-btn:active {
@@ -343,8 +293,8 @@
 
                 .exercise-set.active .signal-btn.too-light-btn {
                     background: transparent;
-                    color: var(--color-text-secondary);
-                    border-color: var(--stone-3);
+                    color: var(--stone-2);
+                    border-color: var(--stone-6);
                 }
 
                 .exercise-set.active .signal-btn.too-light-btn:active {
@@ -355,6 +305,158 @@
                 /* Rest chip styles live in main.css @layer components — the chip
                    appears here and on the workout overview, so it's promoted to a
                    global component class. */
+
+                /* ---------- Progress set-track — horizontal scroll-snap strip ---------- */
+                .set-progress {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-3);
+                }
+
+                /* Bespoke variant of the overline rule: the hairline sits *between*
+                   the label and the trailing count, so it can't use .overline--rule
+                   (::after pins the rule to the end). */
+                .track-head {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-3);
+                }
+
+                .track-rule {
+                    flex: 1;
+                    height: 1px;
+                    background: linear-gradient(to right, var(--stone-3), transparent);
+                }
+
+                .track-count {
+                    text-transform: none;
+                    letter-spacing: var(--font-letterspacing-mono);
+                    color: var(--stone-7);
+                }
+
+                .set-track {
+                    display: flex;
+                    gap: var(--size-2);
+                    overflow-x: auto;
+                    scroll-snap-type: x mandatory;
+                    scrollbar-width: none;
+                    padding: 2px 2px var(--size-2);
+                }
+
+                .set-track::-webkit-scrollbar {
+                    display: none;
+                }
+
+                .set-card {
+                    scroll-snap-align: start;
+                    flex: none;
+                    width: 7.25rem;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: var(--size-1);
+                    padding: var(--size-3) var(--size-2);
+                    border: var(--border-size-2) solid transparent;
+                    border-radius: var(--radius-3);
+                    text-decoration: none;
+                }
+
+                .card-num {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-mono);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-6);
+                }
+
+                .card-figure {
+                    font-family: var(--font-serif);
+                    font-size: var(--font-size-3);
+                    font-variant-numeric: tabular-nums;
+                }
+
+                .card-status {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-1);
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-mono);
+                    text-transform: uppercase;
+                    font-weight: var(--font-weight-6);
+                }
+
+                /* Done — sage wash, tappable to re-open the set for editing. */
+                .set-card.done {
+                    background: var(--color-success-bg);
+                }
+
+                .set-card.done .card-num,
+                .set-card.done .card-figure,
+                .set-card.done .card-status {
+                    color: var(--color-success);
+                }
+
+                .set-card.done:focus-visible {
+                    outline: var(--border-size-2) solid var(--color-border-focus);
+                    outline-offset: 2px;
+                }
+
+                .set-card.done:active {
+                    background: color-mix(in oklab, var(--color-success-bg) 85%, var(--color-success));
+                }
+
+                /* Current — amber wash + ring, mirrors the active hero card. */
+                .set-card.current {
+                    background: var(--color-warning-bg);
+                    border-color: var(--color-warning);
+                }
+
+                .set-card.current .card-num,
+                .set-card.current .card-status {
+                    color: var(--color-warning);
+                    font-weight: var(--font-weight-7);
+                }
+
+                .set-card.current .card-figure {
+                    color: var(--color-text-primary);
+                }
+
+                /* Planned — dashed outline, low-emphasis stone. */
+                .set-card.planned {
+                    background: var(--color-surface-elevated);
+                    border-style: dashed;
+                    border-color: var(--stone-4);
+                }
+
+                .set-card.planned .card-num,
+                .set-card.planned .card-figure,
+                .set-card.planned .card-status {
+                    color: var(--stone-6);
+                }
+
+                /* ---------- Last time reference ---------- */
+                .last-time {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--size-2);
+                    flex-wrap: wrap;
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-mono);
+                    color: var(--stone-7);
+                }
+
+                .last-time .last-time-label {
+                    text-transform: uppercase;
+                    letter-spacing: var(--font-letterspacing-overline);
+                    font-weight: var(--font-weight-6);
+                    color: var(--clay-5);
+                }
+
+                .last-time .dot {
+                    color: var(--stone-4);
+                }
             }
         </style>
 
@@ -378,15 +480,16 @@
         </div>
         {{ end }}
 
+        {{/* Active card — only the single set currently being logged or edited.
+             The full per-set list lives in the set-track below. */}}
         {{ range $index, $setDisplay := .SetsDisplay }}
             {{ $set := $setDisplay.Set }}
-            {{ $isActive := $setDisplay.IsActive }}
-            <div class="exercise-set{{ if $set.CompletedValue }} completed{{ end }}{{ if $isActive }} active{{ end }}"
+            {{ if $setDisplay.IsActive }}
+            <div class="exercise-set active"
                  role="group"
-                 {{ if $isActive }}aria-current="step"{{ end }}
-                 aria-label="{{ if $set.CompletedValue }}Completed set{{ else if $isActive }}Current set{{ else }}Upcoming set{{ end }}">
+                 aria-current="step"
+                 aria-label="Current set">
 
-                {{ if $isActive }}
                     {{/* Active card ---------------------------------- */}}
                     <div class="active-head">
                         <span class="set-index">Set {{ $setDisplay.Number }}</span>
@@ -485,16 +588,18 @@
                                 data-timed-runner-start hidden>Start timer</button>
                         <style {{ $.Nonce }}>
                             @scope (.timed-runner) {
+                                /* Lives inside the dark focus card: the hold
+                                   countdown reads in ember on the dark panel,
+                                   no light box. */
                                 :scope {
                                     display: flex;
                                     flex-direction: column;
                                     align-items: center;
-                                    gap: var(--size-3);
-                                    padding: var(--size-4);
+                                    gap: var(--size-1);
+                                    padding: var(--size-4) 0;
                                     margin-bottom: var(--size-3);
-                                    background: var(--color-info-bg);
-                                    color: var(--color-info);
-                                    border-radius: var(--radius-3);
+                                    background: transparent;
+                                    color: var(--clay-2);
                                 }
                                 .timed-runner-display {
                                     display: flex;
@@ -507,6 +612,7 @@
                                     text-transform: uppercase;
                                     letter-spacing: var(--font-letterspacing-4);
                                     font-weight: var(--font-weight-7);
+                                    color: var(--clay-2);
                                 }
                                 .timed-runner-time {
                                     font-family: var(--font-mono);
@@ -514,16 +620,16 @@
                                     font-weight: var(--font-weight-8);
                                     line-height: 1;
                                     font-variant-numeric: tabular-nums;
-                                }
-                                .timed-runner-display[data-phase="exercise"] {
-                                    color: var(--color-success);
+                                    color: var(--ember);
                                 }
                                 .timed-runner-cancel {
-                                    padding: var(--size-1) var(--size-3);
+                                    width: 100%;
+                                    padding: var(--size-2) var(--size-3);
                                     background: transparent;
-                                    color: inherit;
-                                    border: var(--border-size-1) solid currentColor;
+                                    color: var(--stone-2);
+                                    border: var(--border-size-2) solid var(--stone-6);
                                     border-radius: var(--radius-2);
+                                    min-height: 3rem;
                                     font-size: var(--font-size-0);
                                     text-transform: uppercase;
                                     letter-spacing: var(--font-letterspacing-4);
@@ -719,40 +825,69 @@
                             <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                         </form>
                     {{ end }}
-                {{ else }}
-                    {{/* Planned & Done rows ------------------------------ */}}
-                    <span class="set-index">Set {{ $setDisplay.Number }}</span>
-                    <span class="set-figures">
-                        {{ if or (eq $.ExerciseSlot.Exercise.ExerciseType "weighted") (eq $.ExerciseSlot.Exercise.ExerciseType "assisted") }}
-                            {{ if $set.CompletedValue }}
-                                <span class="set-weight">{{ formatFloat $set.WeightKg }} kg</span>
-                                <span class="sep">·</span>
-                                <span class="set-reps">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
-                            {{ else }}
-                                <span class="set-weight">{{ formatFloat $.CurrentSetTarget.WeightKg }} kg</span>
-                                <span class="sep">·</span>
-                                <span class="set-reps">{{ $.CurrentSetTarget.TargetValue }}</span>
-                            {{ end }}
-                        {{ else }}
-                            {{ if $set.CompletedValue }}
-                                <span class="set-reps">{{ $setDisplay.CompletedStr }} {{ $setDisplay.Unit }}</span>
-                            {{ else }}
-                                <span class="set-reps">{{ $setDisplay.TargetStr }} {{ $setDisplay.Unit }}</span>
-                            {{ end }}
-                        {{ end }}
-                    </span>
-                    {{ if $set.CompletedValue }}
-                        <span class="set-trailing">
-                            <span class="set-status" aria-hidden="true">✓</span>
-                            {{ if $setDisplay.SignalLabel }}
-                                <span class="set-signal" aria-label="Signal">{{ $setDisplay.SignalGlyph }} {{ $setDisplay.SignalLabel }}</span>
-                            {{ end }}
-                            <a href="?edit={{ $index }}" class="set-edit" aria-label="Edit set {{ $setDisplay.Number }}">edit</a>
-                        </span>
+            </div>
+            {{ end }}
+        {{ end }}
+
+        {{/* Progress set-track — every set as a compact card: done (tappable to
+             edit) · current · planned. Mirrors the per-state washes of the hero. */}}
+        <div class="set-progress">
+            <div class="overline track-head">
+                <span>Progress</span>
+                <span class="track-rule" aria-hidden="true"></span>
+                <span class="track-count">{{ .CompletedCount }} / {{ .TotalSetCount }} done</span>
+            </div>
+            <div class="set-track" data-set-track aria-label="All sets">
+                {{ range $index, $setDisplay := .SetsDisplay }}
+                    {{ $set := $setDisplay.Set }}
+                    {{ $weighted := or (eq $.ExerciseSlot.Exercise.ExerciseType "weighted") (eq $.ExerciseSlot.Exercise.ExerciseType "assisted") }}
+                    {{ $timed := eq $.ExerciseSlot.Exercise.ExerciseType "time_based" }}
+                    {{ if $setDisplay.IsActive }}
+                        <div class="set-card current" data-current
+                             aria-label="Set {{ $setDisplay.Number }}, current">
+                            <span class="card-num">{{ printf "%02d" $setDisplay.Number }}</span>
+                            <span class="card-figure">{{ if $weighted }}{{ formatFloat $.CurrentSetTarget.WeightKg }}×{{ $.CurrentSetTarget.TargetValue }}{{ else if $timed }}{{ $.CurrentSetTarget.TargetValue }}s{{ else }}{{ $.CurrentSetTarget.TargetValue }} reps{{ end }}</span>
+                            <span class="card-status">now</span>
+                        </div>
+                    {{ else if $set.CompletedValue }}
+                        <a class="set-card done" href="?edit={{ $index }}"
+                           aria-label="Set {{ $setDisplay.Number }}, completed — edit">
+                            <span class="card-num">{{ printf "%02d" $setDisplay.Number }}</span>
+                            <span class="card-figure">{{ if $weighted }}{{ formatFloat $set.WeightKg }}×{{ $setDisplay.CompletedStr }}{{ else if $timed }}{{ $setDisplay.CompletedStr }}{{ else }}{{ $setDisplay.CompletedStr }} reps{{ end }}</span>
+                            <span class="card-status">
+                                <span aria-hidden="true">✓</span>
+                                {{ if $setDisplay.SignalLabel }}{{ $setDisplay.SignalLabel }}{{ else if or $weighted $timed }}on target{{ else }}done{{ end }}
+                            </span>
+                        </a>
+                    {{ else }}
+                        <div class="set-card planned" aria-label="Set {{ $setDisplay.Number }}, planned">
+                            <span class="card-num">{{ printf "%02d" $setDisplay.Number }}</span>
+                            <span class="card-figure">{{ if $weighted }}{{ formatFloat $.CurrentSetTarget.WeightKg }}×{{ $.CurrentSetTarget.TargetValue }}{{ else if $timed }}{{ $setDisplay.TargetStr }}{{ else }}{{ $setDisplay.TargetStr }} reps{{ end }}</span>
+                            <span class="card-status">planned</span>
+                        </div>
                     {{ end }}
                 {{ end }}
             </div>
+            {{ if .HasLastTime }}
+                <div class="last-time">
+                    <span class="last-time-label">Last time</span>
+                    <span class="dot" aria-hidden="true">·</span>
+                    <span>{{ .LastTimeDate.Format "Mon · Jan 2" }} · {{ .LastTimeSummary }}</span>
+                </div>
+            {{ end }}
+        </div>
 
-        {{ end }}
+        <script {{ $.Nonce }}>
+            (() => {
+                // Park each set-track so its current card sits near the start with
+                // the just-finished card peeking in for context.
+                document.querySelectorAll('[data-set-track]').forEach((track) => {
+                    const current = track.querySelector('[data-current]');
+                    if (current) {
+                        track.scrollLeft = Math.max(0, current.offsetLeft - track.offsetLeft - 64);
+                    }
+                });
+            })();
+        </script>
     </div>
 {{ end }}

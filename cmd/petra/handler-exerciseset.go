@@ -43,6 +43,36 @@ type exerciseSetTemplateData struct {
 	RestEndAtMs          int64            // 0 when no rest chip should be shown.
 	CurrentSetNumber     int              // 1-based number of the first incomplete set, clamped to TotalSetCount when all done.
 	TotalSetCount        int              // len(ExerciseSlot.Sets), for the "Set N of M" overline.
+	CompletedCount       int              // Number of completed sets, for the "N / M done" progress label.
+	LastTimeDate         time.Time        // Date of the most recent prior session; zero when no history.
+	LastTimeSummary      string           // Pre-formatted prior-session figures (e.g. "58 kg × 12"); "" hides the line.
+	HasLastTime          bool             // Whether to render the "Last time" reference line.
+}
+
+// formatLastTimeSummary renders the figures for the "Last time" reference line
+// from a prior session's sets, matching the load model's units: weighted →
+// "58 kg × 12", bodyweight → "16 reps", timed → "held 32s". It summarizes the
+// last completed set of the session (the working set the user finished on).
+// Returns "" when the session has no completed set.
+func formatLastTimeSummary(exercise domain.Exercise, sets []domain.Set) string {
+	var last *domain.Set
+	for i := range sets {
+		if sets[i].CompletedValue != nil {
+			last = &sets[i]
+		}
+	}
+	if last == nil {
+		return ""
+	}
+	value := exercise.FormatSetValue(*last.CompletedValue) // "12" (reps) or "32s" (timed)
+	switch {
+	case exercise.HasWeight() && last.WeightKg != nil:
+		return fmt.Sprintf("%s kg × %s", formatFloat(*last.WeightKg), value)
+	case exercise.IsTimed():
+		return "held " + value
+	default:
+		return value + " reps"
+	}
 }
 
 func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDisplay {
@@ -72,6 +102,18 @@ func prepareSetsDisplay(exercise domain.Exercise, sets []domain.Set) []setDispla
 	return displays
 }
 
+// countCompletedSets returns how many sets have a recorded completed value,
+// for the set-track "N / M done" progress label.
+func countCompletedSets(sets []domain.Set) int {
+	n := 0
+	for i := range sets {
+		if sets[i].CompletedValue != nil {
+			n++
+		}
+	}
+	return n
+}
+
 func getFirstIncompleteIndex(sets []domain.Set) int {
 	for i, set := range sets {
 		if set.CompletedValue == nil {
@@ -82,9 +124,11 @@ func getFirstIncompleteIndex(sets []domain.Set) int {
 }
 
 // computeSetActive reports whether a set row should render its completion form.
-// A row is active when the warmup is done and it is either the first incomplete
-// set or the set explicitly being edited. This is a multi-field derived value, so
-// it lives in the handler rather than the template.
+// A row is active when the warmup is done and it is the one set in focus. In
+// edit mode that is solely the set being edited — the natural current-target
+// set steps aside so exactly one active card ever shows; otherwise it is the
+// first incomplete set. This is a multi-field derived value, so it lives in the
+// handler rather than the template.
 func computeSetActive(
 	warmupComplete, completed bool,
 	index, firstIncompleteIndex, editingIndex int,
@@ -93,9 +137,10 @@ func computeSetActive(
 	if !warmupComplete {
 		return false
 	}
-	isCurrentTarget := !completed && firstIncompleteIndex == index
-	isEditingThis := isEditing && editingIndex == index
-	return isCurrentTarget || isEditingThis
+	if isEditing {
+		return editingIndex == index
+	}
+	return !completed && firstIncompleteIndex == index
 }
 
 func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +181,13 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	}
 	exerciseSlot := session.Slots[pos]
 
+	// A stale or out-of-range ?edit= must not suppress the natural active set —
+	// fall back to the normal view rather than rendering no active card.
+	if isEditing && (editingIndex < 0 || editingIndex >= len(exerciseSlot.Sets)) {
+		isEditing = false
+		editingIndex = -1
+	}
+
 	currentSetTarget, err := app.service.NextSetTarget(r.Context(), date, exerciseSlot.Exercise.ID)
 	if err != nil {
 		app.serverError(w, r, err)
@@ -149,6 +201,19 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 	var restEndAtMs int64
 	if restEnd, restActive := exerciseSlot.RestEndAt(session.Goal, session.IsDeload); restActive {
 		restEndAtMs = restEnd.UnixMilli()
+	}
+
+	// "Last time" reference — the most recent prior session for this exercise.
+	// Absent history is normal (first-ever performance), so a miss hides the
+	// line rather than erroring.
+	lastHistory, hasLast, err := app.service.PreviousPerformance(r.Context(), date, exerciseSlot.Exercise.ID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	lastSummary := ""
+	if hasLast {
+		lastSummary = formatLastTimeSummary(exerciseSlot.Exercise, lastHistory.Sets)
 	}
 
 	data := exerciseSetTemplateData{
@@ -165,6 +230,10 @@ func (app *application) exerciseSetGET(w http.ResponseWriter, r *http.Request) {
 		RestEndAtMs:          restEndAtMs,
 		CurrentSetNumber:     min(getFirstIncompleteIndex(exerciseSlot.Sets)+1, len(exerciseSlot.Sets)),
 		TotalSetCount:        len(exerciseSlot.Sets),
+		CompletedCount:       countCompletedSets(exerciseSlot.Sets),
+		LastTimeDate:         lastHistory.Date,
+		LastTimeSummary:      lastSummary,
+		HasLastTime:          hasLast && lastSummary != "",
 	}
 
 	for i := range data.SetsDisplay {

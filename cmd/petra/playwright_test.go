@@ -252,7 +252,7 @@ func Test_playwright_smoketest(t *testing.T) {
 	// handled — weighted forms auto-submit when a signal radio is selected, bodyweight forms
 	// require filling the reps input and pressing the submit button.
 	currentSet := page.GetByRole("group", playwright.PageGetByRoleOptions{Name: "Current set"})
-	completedSets := page.Locator(".exercise-set.completed")
+	completedSets := page.Locator(".set-card.done")
 	const maxSetsPerExercise = 10
 	for range maxSetsPerExercise {
 		var visible bool
@@ -563,7 +563,7 @@ func Test_playwright_stacknav(t *testing.T) {
 	// the first set now shows as completed. This is more reliable than
 	// WaitForURL (URL unchanged) or WaitForLoadState (already-load resolves
 	// immediately).
-	if err = page.Locator(".exercise-set.completed").First().WaitFor(); err != nil {
+	if err = page.Locator(".set-card.done").First().WaitFor(); err != nil {
 		t.Fatalf("Flow 1: expected first set completed after set update: %v", err)
 	}
 	if got, want := page.URL(), detailURL; got != want {

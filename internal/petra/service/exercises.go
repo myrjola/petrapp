@@ -109,28 +109,48 @@ func (s *Service) SwapExercise(
 	return nil
 }
 
-// findHistoricalSets retrieves set data from the most recent usage of an
-// exercise within the last three months, excluding date's own session.
+// PreviousPerformance returns the date and sets from the most recent session
+// before date where exerciseID was performed, within the last three months.
+// ok is false when there is no usable history — a first-ever performance is
+// normal, not an error.
+//
 // ListSetsForExerciseSince inner-joins exercise_sets, so dates whose slot
 // survived but whose sets were dropped (time-based premigration) never
-// appear — no empty-set entries to skip. Returns nil when no usable history
-// is found. Sets are returned as-is; domain.BuildSetsForAdd reads only
-// WeightKg from them.
-func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]domain.Set, error) {
+// appear — no empty-set entries to skip. It returns histories most-recent-first.
+func (s *Service) PreviousPerformance(
+	ctx context.Context,
+	date time.Time,
+	exerciseID int,
+) (domain.ExerciseSetHistory, bool, error) {
 	threeMonthsAgo := date.AddDate(0, -3, 0)
 	histories, err := s.repos.Sessions.ListSetsForExerciseSince(ctx, exerciseID, threeMonthsAgo)
 	if err != nil {
-		return nil, fmt.Errorf("list sets for exercise: %w", err)
+		return domain.ExerciseSetHistory{}, false, fmt.Errorf("list sets for exercise: %w", err)
 	}
 
 	for _, h := range histories {
 		if h.Date.Equal(date) {
 			continue
 		}
-		return h.Sets, nil
+		return h, true, nil
 	}
 
-	return nil, nil
+	return domain.ExerciseSetHistory{}, false, nil
+}
+
+// findHistoricalSets retrieves set data from the most recent usage of an
+// exercise within the last three months, excluding date's own session.
+// Returns nil when no usable history is found. Sets are returned as-is;
+// domain.BuildSetsForAdd reads only WeightKg from them.
+func (s *Service) findHistoricalSets(ctx context.Context, date time.Time, exerciseID int) ([]domain.Set, error) {
+	history, ok, err := s.PreviousPerformance(ctx, date, exerciseID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil
+	}
+	return history.Sets, nil
 }
 
 // ListSwapCandidates returns the exercises eligible to replace the slot at

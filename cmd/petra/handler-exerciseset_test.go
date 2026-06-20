@@ -81,14 +81,14 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Error("Expected exercise name heading")
 	}
 
-	// Check for set information
-	if doc.Find(".exercise-set").Length() == 0 {
+	// Check for set information (the set-track lists every set as a card)
+	if doc.Find(".set-card").Length() == 0 {
 		t.Error("Expected to find sets on the page")
 	}
 
-	// Check for weight and reps information
-	if doc.Find(".set-weight").Length() == 0 || doc.Find(".set-reps").Length() == 0 {
-		t.Error("Expected to find weight and reps information")
+	// Check for the figures (weight×reps / reps / seconds) on the set cards
+	if doc.Find(".card-figure").Length() == 0 {
+		t.Error("Expected to find set figures")
 	}
 
 	// Check for the form to complete a set
@@ -163,8 +163,8 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Error("Expected to find heading on exercise set page")
 	}
 
-	// Check that the set is now marked as completed
-	if doc.Find(".exercise-set.completed").Length() == 0 {
+	// Check that the set is now marked as completed (a "done" card in the set-track)
+	if doc.Find(".set-card.done").Length() == 0 {
 		t.Error("Expected to find a completed set")
 	}
 
@@ -194,8 +194,8 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Fatalf("Failed to get exercise set page: %v", err)
 	}
 
-	// Find the "Edit" link in the first completed set
-	editLink := doc.Find(".exercise-set.completed .set-edit").First()
+	// The completed set-track card is itself the edit link (tap to re-open).
+	editLink := doc.Find(".set-card.done").First()
 	if editLink.Length() == 0 {
 		t.Fatalf("No edit button found for completed set")
 	}
@@ -248,22 +248,14 @@ func Test_application_exerciseSet(t *testing.T) {
 		t.Error("Expected to find heading on exercise set page")
 	}
 
-	// Verify the updated values are shown
-	// Extract the first completed set's weight
-	setWeight := doc.Find(".exercise-set.completed .set-weight").First().Text()
-	if setWeight == "" {
-		t.Error("Expected to find weight in completed set")
+	// Verify the updated values are shown in the completed set-track card.
+	// Weighted cards render figures as "<weight>×<reps>" (e.g. "23×12").
+	setFigure := strings.TrimSpace(doc.Find(".set-card.done .card-figure").First().Text())
+	if setFigure == "" {
+		t.Error("Expected to find figures in completed set card")
 	}
-
-	// Extract the reps value
-	setReps := doc.Find(".exercise-set.completed .set-reps").First().Text()
-	if setReps == "" {
-		t.Error("Expected to find reps in completed set")
-	}
-
-	// Check if the reps have been updated (should contain "12")
-	if setReps != "12 reps" {
-		t.Errorf("Expected reps to be updated to 12, got %s", setReps)
+	if !strings.HasSuffix(setFigure, "×12") {
+		t.Errorf("Expected completed figure to end with the updated reps ×12, got %q", setFigure)
 	}
 }
 
@@ -343,7 +335,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 	}); err != nil {
 		t.Fatalf("Submit set: %v", err)
 	}
-	if doc.Find(".exercise-set.completed").Length() == 0 {
+	if doc.Find(".set-card.done").Length() == 0 {
 		t.Fatal("Expected a completed set before swap")
 	}
 
@@ -386,7 +378,7 @@ func Test_application_exerciseSet_swap_preserves_url_and_drops_completed_sets(t 
 	if doc, err = client.GetDoc(ctx, slotURL); err != nil {
 		t.Fatalf("Get slot page after swap: %v", err)
 	}
-	if doc.Find(".exercise-set.completed").Length() != 0 {
+	if doc.Find(".set-card.done").Length() != 0 {
 		t.Error("Completed sets from the pre-swap exercise must not carry over")
 	}
 }
@@ -1540,9 +1532,9 @@ func Test_application_exerciseSet_time_based_active_oversized_layout(t *testing.
 	}
 
 	// Time-based heroes carry a single figure: no weight/reps grid, and no
-	// .set-weight cell from the planned-row markup either.
-	if activeCard.Find(".set-weight").Length() != 0 {
-		t.Errorf("active time-based card should not render a .set-weight cell")
+	// weight input either.
+	if activeCard.Find("input[name='weight']").Length() != 0 {
+		t.Errorf("active time-based card should not render a weight input")
 	}
 	if hero.Children().Length() != 1 {
 		t.Errorf("active time-based hero should have exactly 1 child span, got %d",
