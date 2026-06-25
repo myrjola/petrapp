@@ -1726,3 +1726,134 @@ func Test_application_exerciseSet_overline_clamps_when_all_sets_complete(t *test
 			suffix, "Set 1 of 1")
 	}
 }
+
+// Test_application_exerciseSet_edit_completed_bodyweight_set guards against a
+// regression where re-opening a completed bodyweight set for editing (?edit=)
+// rendered its completed_value input as disabled. Browsers don't submit
+// disabled fields, so tapping "Done!" posted no completed_value and the handler
+// returned a 500 ("completed_value not provided"). The active card is only ever
+// shown for the set being logged or explicitly edited, so the input must always
+// be editable.
+//
+// The assertion is on the rendered markup rather than a form re-submit: the
+// e2etest client serialises whatever fields the test passes regardless of the
+// disabled attribute, so it cannot model the browser's drop-disabled-fields
+// behaviour that produced the bug. Asserting the attribute's absence is the
+// faithful guard.
+func Test_application_exerciseSet_edit_completed_bodyweight_set(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx = t.Context()
+		doc *goquery.Document
+		err error
+	)
+
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	client := server.Client()
+
+	if _, err = client.Register(ctx); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	formData := map[string]string{time.Now().Weekday().String(): "60"}
+	if doc, err = client.GetDoc(ctx, "/preferences"); err != nil {
+		t.Fatalf("get preferences: %v", err)
+	}
+	if doc, err = client.SubmitForm(ctx, doc, "/preferences/schedule", formData); err != nil {
+		t.Fatalf("submit preferences: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	if _, err = client.SubmitForm(ctx, doc, "/workouts/"+today+"/start", nil); err != nil {
+		t.Fatalf("start workout: %v", err)
+	}
+
+	// Pick any seeded bodyweight (reps-only) exercise not already in the
+	// generated session — its completion form is the bodyweight variant carrying
+	// the completed_value input. Avoiding already-slotted exercises sidesteps the
+	// (user, date, exercise) uniqueness constraint on the insert below.
+	db := server.DB()
+	var bodyweightID int
+	if err = db.QueryRowContext(ctx,
+		`SELECT e.id FROM exercises e
+         WHERE e.exercise_type = 'bodyweight'
+           AND NOT EXISTS (
+               SELECT 1 FROM exercise_slots s
+               WHERE s.workout_date = ? AND s.exercise_id = e.id)
+         ORDER BY e.id LIMIT 1`, today).Scan(&bodyweightID); err != nil {
+		t.Fatalf("get unused bodyweight exercise id: %v", err)
+	}
+
+	var (
+		slotUserID int
+		slotPos    int
+	)
+	if err = db.QueryRowContext(ctx,
+		`INSERT INTO exercise_slots (workout_user_id, workout_date, position, exercise_id,
+            warmup_completed_at)
+         SELECT user_id, workout_date,
+                COALESCE((SELECT MAX(position)+1 FROM exercise_slots
+                          WHERE workout_user_id = ws.user_id AND workout_date = ws.workout_date), 0),
+                ?, STRFTIME('%Y-%m-%dT%H:%M:%fZ')
+         FROM workout_sessions ws WHERE workout_date = ?
+         RETURNING workout_user_id, position`, bodyweightID, today,
+	).Scan(&slotUserID, &slotPos); err != nil {
+		t.Fatalf("insert bodyweight slot: %v", err)
+	}
+
+	// Seed set 1 already completed (completed_value set) plus a second planned
+	// set, so the first set can be re-opened for editing.
+	if _, err = db.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
+            weight_kg, target_value, completed_value, completed_at)
+         VALUES (?, ?, ?, 1, 0.0, 10, 8, STRFTIME('%Y-%m-%dT%H:%M:%fZ'))`,
+		slotUserID, today, slotPos); err != nil {
+		t.Fatalf("insert completed push-up set: %v", err)
+	}
+	if _, err = db.ExecContext(ctx,
+		`INSERT INTO exercise_sets (workout_user_id, workout_date, position, set_number,
+            weight_kg, target_value)
+         VALUES (?, ?, ?, 2, 0.0, 10)`,
+		slotUserID, today, slotPos); err != nil {
+		t.Fatalf("insert planned push-up set: %v", err)
+	}
+
+	slotPath := "/workouts/" + today + "/exercises/" + strconv.Itoa(slotPos)
+
+	// Re-open the completed first set (0-based index 0) for editing.
+	if doc, err = client.GetDoc(ctx, slotPath+"?edit=0"); err != nil {
+		t.Fatalf("get edit page: %v", err)
+	}
+
+	input := doc.Find(".exercise-set.active input[name='completed_value']")
+	if input.Length() != 1 {
+		t.Fatalf("expected exactly one completed_value input in the active card, got %d", input.Length())
+	}
+	if _, disabled := input.Attr("disabled"); disabled {
+		t.Error("completed_value input is disabled when editing a completed bodyweight set; " +
+			"browsers drop disabled fields, so the update POST would 500 with " +
+			"\"completed_value not provided\"")
+	}
+
+	// Editing through to a persisted new value confirms the round-trip works.
+	editAction := slotPath + "/sets/0/update"
+	if _, err = client.SubmitForm(ctx, doc, editAction, map[string]string{
+		"completed_value": "12",
+	}); err != nil {
+		t.Fatalf("submit edited bodyweight set: %v", err)
+	}
+
+	var completed sql.NullInt64
+	if err = db.QueryRowContext(ctx,
+		`SELECT completed_value FROM exercise_sets
+         WHERE workout_user_id = ? AND workout_date = ? AND position = ? AND set_number = 1`,
+		slotUserID, today, slotPos).Scan(&completed); err != nil {
+		t.Fatalf("query edited completed_value: %v", err)
+	}
+	if !completed.Valid || completed.Int64 != 12 {
+		t.Errorf("completed_value = %v, want 12 after edit", completed)
+	}
+}
