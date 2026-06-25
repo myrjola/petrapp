@@ -34,6 +34,119 @@
           })
         </script>
 
+        <style {{ $.Nonce }}>
+            /* Carousel paging of the focus (current set) card on set advance.
+               Completing a set, finishing the warmup, and finishing the last set
+               all navigate to the same exercise URL via a *replace* navigation
+               (see the stack-navigator in ui/static/main.js). The page-local
+               script below opts that replace into a 'set-advance' view-transition
+               type and flags body[data-vt="set-advance"], which promotes the
+               active card to its own snapshot (focus-card) on both sides of the
+               transition. The old card then slides out to the left while the next
+               set's card slides in from the right — a horizontal pager through the
+               sets — instead of the default whole-page cross-fade.
+
+               Gated on the data-vt flag so the card stays part of the page
+               snapshot for ordinary forward/backward navigations (entering the
+               exercise from the overview, or ?edit=), where the page slide should
+               still dominate. */
+            body[data-vt="set-advance"] .exercise-set.active {
+                view-transition-name: focus-card;
+            }
+
+            html:active-view-transition-type(set-advance) {
+                /* Hold the surrounding chrome (header, progress track) still so
+                   the card is the only thing that moves. */
+                &::view-transition-old(page),
+                &::view-transition-new(page) {
+                    animation: none;
+                }
+
+                &::view-transition-old(focus-card) {
+                    animation: focus-card-out var(--duration-3) var(--ease-out-quiet) both;
+                }
+
+                &::view-transition-new(focus-card) {
+                    animation: focus-card-in var(--duration-3) var(--ease-out-quiet) both;
+                }
+            }
+
+            @keyframes focus-card-out {
+                to {
+                    transform: translateX(-100%);
+                    opacity: 0;
+                }
+            }
+
+            @keyframes focus-card-in {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                html:active-view-transition-type(set-advance) {
+                    &::view-transition-old(focus-card),
+                    &::view-transition-new(focus-card) {
+                        animation-duration: 0.001ms;
+                    }
+                }
+            }
+        </style>
+
+        <script {{ $.Nonce }}>
+          // Drives the focus-card carousel paging declared in the <style> above.
+          // Set completion, warmup completion, and finishing the last set each
+          // issue a same-URL *replace* navigation through the stack-navigator
+          // (ui/static/main.js). We opt that replace into a 'set-advance'
+          // view-transition and flag the body so the active card is captured as
+          // its own pseudo (focus-card) on both the outgoing and incoming
+          // snapshots; the paired slide itself is pure CSS. Everything is gated
+          // on the Navigation API + View Transitions — without them the next set
+          // just renders with no animation.
+          (() => {
+            // True when the navigation is a same-page replace (set advance),
+            // i.e. the kind we want to page. `dest` is the destination URL.
+            const isSamePageReplace = (activation, dest) =>
+              !!activation
+              && activation.navigationType === 'replace'
+              && !!dest
+              && new URL(dest).pathname === location.pathname
+
+            // Outgoing snapshot: the navigation is issued by main.js, not here,
+            // so the flag for the *old* snapshot must be set in pageswap, before
+            // the browser captures it.
+            window.addEventListener('pageswap', (e) => {
+              if (!e.viewTransition) return
+              const act = e.activation
+              if (!isSamePageReplace(act, act && act.entry && act.entry.url)) return
+              document.body.dataset.vt = 'set-advance'
+            })
+
+            // Incoming snapshot: add the transition type (which gates the CSS)
+            // and flag the body so the *new* snapshot captures the card as its
+            // own pseudo. Clear the flag once the transition settles.
+            window.addEventListener('pagereveal', (e) => {
+              if (!e.viewTransition || !('navigation' in window)) return
+              const act = navigation.activation
+              if (!isSamePageReplace(act, act && act.from && act.from.url)) return
+              e.viewTransition.types.add('set-advance')
+              document.body.dataset.vt = 'set-advance'
+              e.viewTransition.finished
+                .catch(() => { /* aborted or skipped */ })
+                .finally(() => { delete document.body.dataset.vt })
+            })
+
+            // The outgoing pageswap leaves the flag set on a document that may be
+            // bfcached; strip it on restore so a stale flag can't promote the
+            // card to its own pseudo during an unrelated later transition.
+            window.addEventListener('pageshow', (e) => {
+              if (e.persisted) delete document.body.dataset.vt
+            })
+          })()
+        </script>
+
         {{ template "exercise-header" . }}
         {{ template "warmup" . }}
         {{ template "sets-container" . }}
