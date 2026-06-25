@@ -171,6 +171,19 @@ alike) and `:focus-visible` (keyboard). Don't reintroduce `:hover`,
 `cursor: pointer`, `@media (hover: hover)` gates, or `mouseenter` /
 `mouseleave` listeners.
 
+### No `display: flex` / `grid` on `<fieldset>` — iOS Safari
+
+iOS Safari mis-lays-out a `<fieldset>` that is itself a flex or grid
+container: it leaves a phantom block of space below the content that
+collapses on the next reflow (e.g. when a descendant button enters its
+loading state), so the box visibly jumps. Desktop browsers — **including
+desktop WebKit** — render it correctly, so this only shows on a real
+device. Group form controls with a `<div role="group">` labelled via
+`aria-labelledby` (or `aria-label`) and a plain `<span>` legend; flex/grid
+the div, never the fieldset. Same engine family as the sticky `:hover`
+bug above — assume mobile-Safari diverges and verify on-device
+(`make dev-tailnet`) before trusting a clean desktop render.
+
 ### Focus rings — outline, never a glow
 
 Focus-visible is a **2px `--color-border-focus` (clay-4) outline at 2px
