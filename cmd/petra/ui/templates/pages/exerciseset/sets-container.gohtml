@@ -215,22 +215,22 @@
                 }
 
                 /* Signal group + buttons ----------------------------------------- */
+                /* A plain div, not a <fieldset>: iOS Safari mis-lays-out a
+                   display:flex fieldset, leaving a phantom block of space below
+                   the button row that collapses on the next reflow (e.g. when a
+                   tapped button enters its loading state). A div with role=group
+                   carries the same grouping semantics without the quirk. */
                 .exercise-set.active .signal-group {
                     display: flex;
                     flex-direction: column;
                     gap: var(--size-2);
-                    border: none;
-                    padding: 0;
-                    margin: 0;
                     min-width: 0;
                 }
 
-                .exercise-set.active .signal-group > legend {
+                .exercise-set.active .signal-group > .signal-legend {
                     font-size: var(--font-size-1);
                     font-weight: var(--font-weight-6);
                     color: var(--stone-2);
-                    padding: 0;
-                    margin-bottom: var(--size-1);
                 }
 
                 .exercise-set.active .signal-buttons {
@@ -555,8 +555,9 @@
                             {{ if $.IsDeload }}
                                 <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                             {{ else }}
-                                <fieldset class="signal-group">
-                                    <legend>How did {{ $.CurrentSetTarget.TargetValue }} reps feel?</legend>
+                                <div class="signal-group" role="group"
+                                     aria-labelledby="signal-legend-{{ $index }}">
+                                    <span class="signal-legend" id="signal-legend-{{ $index }}">How did {{ $.CurrentSetTarget.TargetValue }} reps feel?</span>
                                     <div class="signal-buttons">
                                         <button type="submit" name="signal" value="too_heavy"
                                                 class="signal-btn too-heavy-btn"
@@ -568,7 +569,7 @@
                                                 class="signal-btn too-light-btn"
                                                 aria-label="Easy — could have done more reps">easy</button>
                                     </div>
-                                </fieldset>
+                                </div>
                             {{ end }}
                         </form>
                     {{ else if eq $.ExerciseSlot.Exercise.ExerciseType "time_based" }}
@@ -656,8 +657,9 @@
                             {{ if $.IsDeload }}
                                 <button type="submit" class="btn btn--focus btn--block" aria-label="Complete set">Done!</button>
                             {{ else }}
-                                <fieldset class="signal-group">
-                                    <legend>How did {{ $.CurrentSetTarget.TargetValue }}s feel?</legend>
+                                <div class="signal-group" role="group"
+                                     aria-labelledby="signal-legend-{{ $index }}">
+                                    <span class="signal-legend" id="signal-legend-{{ $index }}">How did {{ $.CurrentSetTarget.TargetValue }}s feel?</span>
                                     <div class="signal-buttons">
                                         <button type="submit" name="signal" value="too_heavy"
                                                 class="signal-btn too-heavy-btn"
@@ -669,7 +671,7 @@
                                                 class="signal-btn too-light-btn"
                                                 aria-label="Easy — could have held longer">easy</button>
                                     </div>
-                                </fieldset>
+                                </div>
                             {{ end }}
                         </form>
                         <script {{ $.Nonce }}>
