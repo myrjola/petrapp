@@ -23,6 +23,12 @@ earlier `err` variable instead of introducing a new name.
 
 - Ship with `git push origin HEAD:main` once `make ci` passes — fix failures,
   never push around them.
+- `make ci` is fast because it skips what server CI adds: shuffled tests,
+  `govulncheck`, and `migratetest`. Before a *risky* push — anything touching
+  test ordering, `schema.sql`/migrations, or `go.mod` — run `make ci-full`
+  (and `make migratetest` for schema changes) locally first, so an
+  order-dependent flake or vuln regression fails on your machine, not on the
+  deploy gate.
 - If the push is rejected because main moved: `git fetch origin && git rebase
   origin/main`, re-run `make ci`, push again. Never force-push.
 

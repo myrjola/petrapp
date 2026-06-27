@@ -91,6 +91,12 @@ Petra is trunk-based: once `make ci` passes, push to `main`. Every push runs
 `make ci-full` (adds shuffled tests + govulncheck) plus `make migratetest`
 (restores the latest production backup and migrates it) in GitHub Actions,
 deploys to staging, and promotes to production only when staging is healthy.
+
+`make ci` is the fast local gate and deliberately skips the shuffle,
+`govulncheck`, and `migratetest` that server CI adds — so a green `make ci`
+can still fail the deploy gate. Before a risky push (test-ordering changes,
+`schema.sql`/migrations, or `go.mod` bumps) run `make ci-full` locally —
+and `make migratetest` for schema changes — to catch it on your machine.
 Opening a PR instead provisions a production-like per-PR review app — useful
 for infrastructure-level changes. Details in
 [`docs/operations.md`](docs/operations.md).
