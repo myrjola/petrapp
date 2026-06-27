@@ -345,9 +345,20 @@
         text-transform: none;
     }
 
-    /* The 32px visual stays small; an invisible centred ::before lifts the
-       tap target to 48px so .btn--sm clears the touch-target minimum. */
-    .btn--sm::before {
+    /* Touch-target expander. An invisible, centred ::before lifts the tap
+       target to the 48px touch minimum WITHOUT enlarging the visual box; a tap
+       on it falls through to the host control. Reach for .tap-target on any
+       interactive element whose rendered size is intentionally below 48px —
+       quiet text actions, compact links, the small button. .btn--sm bakes it
+       in. Enforced by Test_playwright_touch_targets (cmd/petra/playwright_test.go).
+       Note: ::before is not generated on replaced form controls (<select>,
+       <input>); give those a real min-height instead. */
+    .tap-target {
+        position: relative;
+    }
+
+    .btn--sm::before,
+    .tap-target::before {
         content: "";
         position: absolute;
         inset: 50%;

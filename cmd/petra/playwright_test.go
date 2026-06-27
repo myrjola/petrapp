@@ -1214,3 +1214,129 @@ func Test_playwright_axe_aa(t *testing.T) {
 	}
 	runAxeAA(t, page, "workout")
 }
+
+// minTouchTargetPx is the design system's tap-target floor. Petra sizes every
+// interactive control to at least 48 CSS px in both dimensions — `.btn` via
+// `min-height: 3rem`, and the visually-small `.btn--sm` via a centred 48×48
+// `::before` hit-area expander (see ui/static/main.css). This is stricter than
+// WCAG 2.5.8 (AA, 24px) and clears WCAG 2.5.5 (AAA, 44px). axe-core only checks
+// the 24px floor, so this dedicated scan guards the 48px rule the CSS documents
+// but nothing else asserts.
+const minTouchTargetPx = 48
+
+// assertTouchTargets measures the effective tap area of every visible
+// interactive control on the current page and fails for any below
+// minTouchTargetPx in either dimension. "Effective" area is the larger of the
+// element's own border box and its ::before/::after pseudo boxes, so the
+// .btn--sm expander is measured the way a finger actually lands on it. Inline
+// links (the WCAG 2.5.5/2.5.8 running-text exception) and visually-hidden or
+// non-interactive (pointer-events:none) helpers are excluded.
+func assertTouchTargets(t *testing.T, page playwright.Page, label string) {
+	t.Helper()
+
+	raw, err := page.Evaluate(`(min) => {
+		const TOL = 0.5; // tolerate sub-pixel rounding on a 3rem (48px) box
+		const sel = [
+			'a[href]', 'button', 'input:not([type="hidden"])', 'select',
+			'textarea', 'summary', '[role="button"]', '[role="link"]',
+			'[role="checkbox"]', '[role="switch"]', '[role="tab"]', '[role="menuitem"]',
+		].join(', ');
+		const px = (v) => { const n = parseFloat(v); return Number.isNaN(n) ? 0 : n; };
+		const pseudo = (el, which) => {
+			const cs = getComputedStyle(el, which);
+			if (!cs || cs.content === 'none' || cs.content === 'normal') return { w: 0, h: 0 };
+			return { w: Math.max(px(cs.width), px(cs.minWidth)), h: Math.max(px(cs.height), px(cs.minHeight)) };
+		};
+		const out = [];
+		for (const el of document.querySelectorAll(sel)) {
+			const cs = getComputedStyle(el);
+			if (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse') continue;
+			if (cs.pointerEvents === 'none') continue;
+			// WCAG 2.5.5 / 2.5.8 inline exception: links flowing inside running text.
+			if (el.tagName === 'A' && cs.display === 'inline') continue;
+			const r = el.getBoundingClientRect();
+			if (r.width < 1 || r.height < 1) continue; // visually-hidden / collapsed helpers
+			const before = pseudo(el, '::before');
+			const after = pseudo(el, '::after');
+			const w = Math.max(r.width, before.w, after.w);
+			const h = Math.max(r.height, before.h, after.h);
+			if (w < min - TOL || h < min - TOL) {
+				const cls = (el.className && el.className.toString) ? el.className.toString() : '';
+				out.push({
+					tag: el.tagName.toLowerCase(),
+					type: el.getAttribute('type') || '',
+					id: el.id || '',
+					cls: cls,
+					text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+					// Emit as strings: playwright-go decodes whole-number JS values
+					// as int and fractional ones as float64, so a numeric field
+					// can't be read with a single type assertion.
+					w: w.toFixed(1),
+					h: h.toFixed(1),
+				});
+			}
+		}
+		return out;
+	}`, minTouchTargetPx)
+	if err != nil {
+		t.Fatalf("[%s] measure touch targets: %v", label, err)
+	}
+
+	targets, _ := raw.([]any)
+	if len(targets) == 0 {
+		return
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "[%s] %d interactive element(s) below the %dpx tap-target minimum:",
+		label, len(targets), minTouchTargetPx)
+	for _, tgt := range targets {
+		m, _ := tgt.(map[string]any)
+		tag, _ := m["tag"].(string)
+		if typ, _ := m["type"].(string); typ != "" {
+			tag = fmt.Sprintf("%s type=%s", tag, typ)
+		}
+		w, _ := m["w"].(string)
+		h, _ := m["h"].(string)
+		fmt.Fprintf(&b, "\n  - <%s> %s×%s px", tag, w, h)
+		if id, _ := m["id"].(string); id != "" {
+			fmt.Fprintf(&b, " #%s", id)
+		}
+		if cls, _ := m["cls"].(string); cls != "" {
+			fmt.Fprintf(&b, " class=%q", cls)
+		}
+		if txt, _ := m["text"].(string); txt != "" {
+			fmt.Fprintf(&b, " text=%q", txt)
+		}
+	}
+	t.Error(b.String())
+}
+
+// Test_playwright_touch_targets asserts that every visible interactive control
+// on the pages the suite drives meets Petra's 48px tap-target minimum. axe-core
+// (Test_playwright_axe_aa) only enforces WCAG 2.5.8's 24px AA floor, so this
+// guards the stricter design-system rule. It runs at the iPhone-13 viewport the
+// fixtures default to and reuses the same navigation helpers, so it adds
+// coverage without new scaffolding.
+func Test_playwright_touch_targets(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		t.Skip("skipping slow playwright touch-target scan")
+	}
+
+	page, serverURL := setupPlaywrightPage(t)
+
+	assertTouchTargets(t, page, "home (unauthenticated)")
+
+	registerAndWaitSchedule(t, page, serverURL)
+	assertTouchTargets(t, page, "schedule")
+
+	selectAndSubmitSchedule(t, page, serverURL, allWeekdays())
+	assertTouchTargets(t, page, "home (authenticated)")
+
+	workoutURL := serverURL + "/workouts/" + time.Now().Format("2006-01-02")
+	if _, err := page.Goto(workoutURL); err != nil {
+		t.Fatalf("goto today's workout: %v", err)
+	}
+	assertTouchTargets(t, page, "workout")
+}

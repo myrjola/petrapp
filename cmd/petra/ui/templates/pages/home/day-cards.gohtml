@@ -249,16 +249,16 @@
                         <div class="day-action">
                             {{ if .Action.IsCTA }}
                                 <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                                    <button type="submit" class="btn day-cta">{{ .Action.Label }}</button>
+                                    <button type="submit" class="btn day-cta tap-target">{{ .Action.Label }}</button>
                                 </form>
                             {{ else if .Action.StartWorkout }}
                                 <form method="post" action="/workouts/{{ .Date.Format "2006-01-02" }}/start">
-                                    <button type="submit" class="day-text-action">
+                                    <button type="submit" class="day-text-action tap-target">
                                         {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
                                     </button>
                                 </form>
                             {{ else }}
-                                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="day-text-action">
+                                <a href="/workouts/{{ .Date.Format "2006-01-02" }}" class="day-text-action tap-target">
                                     {{ .Action.Label }}<span class="arrow" aria-hidden="true">→</span>
                                 </a>
                             {{ end }}

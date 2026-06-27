@@ -65,6 +65,10 @@
                             color: var(--color-text-primary);
                             font-size: var(--font-size-1);
                             min-width: 8rem;
+                            /* 48px clears the touch-target minimum (a <select> is a
+                               replaced control, so it can't use the .tap-target
+                               ::before expander). Asserted by Test_playwright_touch_targets. */
+                            min-height: 3rem;
 
                             &:focus {
                                 outline: 2px solid var(--color-border-focus);
