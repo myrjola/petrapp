@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -266,13 +265,7 @@ func (app *application) adminExerciseUpdatePOST(w http.ResponseWriter, r *http.R
 
 	editPath := fmt.Sprintf("/admin/exercises/%d", id)
 	if err = app.service.UpdateExercise(r.Context(), exercise); err != nil {
-		var ve domain.ValidationError
-		if errors.As(err, &ve) {
-			app.putFlashError(r.Context(), ve.Message)
-			redirect(w, r, editPath)
-			return
-		}
-		app.serverError(w, r, err)
+		app.userError(w, r, err, editPath)
 		return
 	}
 
@@ -292,13 +285,7 @@ func (app *application) adminExerciseGeneratePOST(w http.ResponseWriter, r *http
 	name := r.PostForm.Get("name")
 	exercise, err := app.service.GenerateExercise(r.Context(), name)
 	if err != nil {
-		var ve domain.ValidationError
-		if errors.As(err, &ve) {
-			app.putFlashError(r.Context(), ve.Message)
-			redirect(w, r, "/admin/exercises")
-			return
-		}
-		app.serverError(w, r, err)
+		app.userError(w, r, err, "/admin/exercises")
 		return
 	}
 

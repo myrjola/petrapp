@@ -128,13 +128,7 @@ func (app *application) workoutCompletePOST(w http.ResponseWriter, r *http.Reque
 
 	// First mark the workout as completed
 	if err := app.service.CompleteSession(r.Context(), date); err != nil {
-		var ve domain.ValidationError
-		if errors.As(err, &ve) {
-			app.putFlashError(r.Context(), ve.Message)
-			redirect(w, r, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
-			return
-		}
-		app.serverError(w, r, err)
+		app.userError(w, r, err, fmt.Sprintf("/workouts/%s", date.Format("2006-01-02")))
 		return
 	}
 

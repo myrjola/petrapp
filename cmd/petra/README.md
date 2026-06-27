@@ -127,9 +127,9 @@ Difficulties: []difficultyOption{
 Parse, build a domain value, hand it to the service. Validation lives on the
 domain type (`Exercise.Validate()` and friends) and surfaces as a
 `domain.ValidationError` — see "User-facing validation errors" below for the
-flash/redirect plumbing. The handler's only job is to detect `ValidationError`
-with `errors.As` and route it to the form; everything else is a
-`serverError`.
+flash/redirect plumbing. The handler hands the service error to `userError`,
+which routes `ValidationError` to the form and everything else to
+`serverError`; the handler never inspects the error type itself.
 
 ```go
 if err = r.ParseForm(); err != nil {
@@ -146,13 +146,7 @@ exercise := domain.Exercise{
 
 editPath := fmt.Sprintf("/admin/exercises/%d", id)
 if err = app.service.UpdateExercise(r.Context(), exercise); err != nil {
-  var ve domain.ValidationError
-  if errors.As(err, &ve) {
-    app.putFlashError(r.Context(), ve.Message)
-    redirect(w, r, editPath)
-    return
-  }
-  app.serverError(w, r, err)
+  app.userError(w, r, err, editPath)
   return
 }
 
@@ -235,17 +229,19 @@ easily forged) or to the request URL (wrong for action endpoints like
 Pointing `safeURL` at an action endpoint or another broken handler will
 produce a redirect loop.
 
-#### Existing handlers may still use inline `errors.As(&ve)` boilerplate
+#### `userError` vs a handler-local guard
 
-> Go-forward convention for new and migrating handlers. Existing
-> handlers predate `userError` and may still use the inline
-> `errors.As(&ve) { putFlashError(ve.Message); redirect(formURL) }`
-> + trailing `app.serverError(w, r, err)` pattern. Under the
-> shim-aware `serverError`, that inline pattern is now
-> *functionally equivalent* to calling `userError` — both route
-> `ValidationError` to the banner and non-validation to the
-> catastrophic-failure page. Migrate opportunistically when next
-> touching the handler; there is no UX gap remaining.
+There is exactly one way to route a *service* error: pass it to `userError`.
+Do not hand-roll the `errors.As(&ve) { putFlashError; redirect } / serverError`
+block inline — that is what `userError` is. The only `errors.As(&ve)` in the
+package lives inside `userError` itself.
+
+A handler-local guard is different and stays inline: when the *handler* rejects
+input before any service call (e.g. `prefs.IsEmpty()` in `scheduleGET`/
+`preferencesGET`), there is no error value to route, so it flashes the fixed
+message directly with `putFlashError` (or `putFlashErrorWithAnchor` for a
+panel-anchored banner, which `userError` does not express) and redirects. Reach
+for `userError` only when a service/domain call returned an `error`.
 
 #### Other patterns
 
