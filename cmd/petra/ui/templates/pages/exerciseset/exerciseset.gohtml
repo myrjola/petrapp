@@ -144,14 +144,23 @@
 
         <script {{ $.Nonce }}>
           // Drives the focus-card carousel paging declared in the <style> above.
-          // Set completion, warmup completion, and finishing the last set each
-          // issue a same-URL *replace* navigation through the stack-navigator
-          // (ui/static/main.js). We opt that replace into a 'set-advance'
-          // view-transition and flag the body so the active card is captured as
-          // its own pseudo (focus-card) on both the outgoing and incoming
-          // snapshots; the paired slide itself is pure CSS. Everything is gated
-          // on the Navigation API + View Transitions — without them the next set
-          // just renders with no animation.
+          // Completing a set and finishing the last set issue a same-URL
+          // *replace* navigation through the stack-navigator (ui/static/main.js).
+          // We opt that replace into a 'set-advance' view-transition and flag the
+          // body so the active card is captured as its own pseudo (focus-card) on
+          // both the outgoing and incoming snapshots; the paired slide itself is
+          // pure CSS. Everything is gated on the Navigation API + View
+          // Transitions — without them the next set just renders with no
+          // animation.
+          //
+          // Completing the *warmup* is also a same-URL replace, but it swaps the
+          // warmup prompt for set 1 — a genuine layout change with no outgoing
+          // focus card. Paging that under pinned chrome would hard-cut the
+          // collapsing warmup row; the default full-page cross-fade (a same-URL
+          // replace gets no slide direction, see main.js) reads far cleaner. We
+          // detect it by the absence of an active card on the *outgoing* page and
+          // skip the opt-in. pageswap sees the old DOM but pagereveal can't, so
+          // the decision is relayed through sessionStorage.
           (() => {
             // True when the navigation is a same-page replace (set advance),
             // i.e. the kind we want to page. `dest` is the destination URL.
@@ -161,6 +170,8 @@
               && !!dest
               && new URL(dest).pathname === location.pathname
 
+            const SKIP_KEY = 'skip-set-advance'
+
             // Outgoing snapshot: the navigation is issued by main.js, not here,
             // so the flag for the *old* snapshot must be set in pageswap, before
             // the browser captures it.
@@ -168,6 +179,15 @@
               if (!e.viewTransition) return
               const act = e.activation
               if (!isSamePageReplace(act, act && act.entry && act.entry.url)) return
+              // Clear first so a flag stranded by an earlier skipped reveal can't
+              // suppress this advance.
+              sessionStorage.removeItem(SKIP_KEY)
+              // Warmup completion: no active card here → let the default page
+              // cross-fade run and tell the incoming page to do the same.
+              if (!document.querySelector('.exercise-set.active')) {
+                sessionStorage.setItem(SKIP_KEY, '1')
+                return
+              }
               document.body.dataset.vt = 'set-advance'
             })
 
@@ -178,6 +198,10 @@
               if (!e.viewTransition || !('navigation' in window)) return
               const act = navigation.activation
               if (!isSamePageReplace(act, act && act.from && act.from.url)) return
+              if (sessionStorage.getItem(SKIP_KEY)) {
+                sessionStorage.removeItem(SKIP_KEY)
+                return // warmup → set 1: ride the default page cross-fade
+              }
               e.viewTransition.types.add('set-advance')
               document.body.dataset.vt = 'set-advance'
               e.viewTransition.finished
