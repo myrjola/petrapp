@@ -1,9 +1,15 @@
 # StackNav — TLA+ Model of the MPA Stack Navigator
 
 A formal model of the navigation, bfcache, prefetch, and cache-invalidation
-behavior implemented in `ui/static/main.js` and its server-side counterparts
-(`cmd/web/helpers.go`, `cmd/web/middleware.go`, `cmd/web/templates.go`,
-`ui/templates/base.gohtml`, and `ui/templates/pages/workout/workout.gohtml`).
+behavior implemented in `cmd/petra/ui/static/main.js` and its server-side
+counterparts (`cmd/petra/helpers.go`, `cmd/petra/middleware.go`,
+`cmd/petra/templates.go`, `cmd/petra/ui/templates/base.gohtml`, and
+`cmd/petra/ui/templates/pages/workout/workout.gohtml`).
+
+The three bugs this model found have all shipped fixes; the production
+code now matches `StackNav_PrefetchMitigated.cfg` (session cookie, prefetch
+on, `pagereveal` staleness check, no `.committed.catch`). The counterexample
+sections below are kept as the historical record that justified each fix.
 
 ## Why this exists
 
@@ -34,8 +40,9 @@ after submitting a form.
   violated; 6-state trace.
 - `StackNav_Prefetch.cfg` — enables Speculation Rules prefetch with no
   mitigation. Invariant violated; 6-state trace.
-- `StackNav_PrefetchMitigated.cfg` — enables prefetch AND the proposed
-  `EagerPagerevealCheck` mitigation. Invariant holds across 825k states.
+- `StackNav_PrefetchMitigated.cfg` — enables prefetch AND the shipped
+  `EagerPagerevealCheck` mitigation. This is the production configuration.
+  Invariant holds across 825k states.
 
 ## Running
 
@@ -160,11 +167,11 @@ no-op.
 ## Counterexample 2: Speculation Rules prefetch
 
 The Speculation Rules block in `base.gohtml` prefetches every `/*`
-link at `conservative` eagerness. The prefetched response is baked with
+link at `moderate` eagerness. The prefetched response is baked with
 the cookie value *at prefetch time* and parked in a per-URL cache. The
-existing `pageshow.persisted` handler in `main.js:327` only fires on
-bfcache restore, so a promoted prefetch slips through. TLC finds the
-trace in 6 steps with `PrefetchEnabled = TRUE`:
+pre-fix `pageshow.persisted` handler only fired on bfcache restore, so a
+promoted prefetch slipped through. TLC finds the trace in 6 steps with
+`PrefetchEnabled = TRUE`:
 
 ```
 State 1  Init               u1@0 [Loaded, srv=0]
@@ -191,21 +198,21 @@ Not configured (would need both `CookieMayExpire = TRUE` and
 of counterexample 1 — the rendered/cookie comparison stays a no-op when
 both sides expire to `""`. Both fixes need to be in place.
 
-## Proposed code changes
+## Code changes (shipped)
 
-### Fix counterexample 2 (prefetch staleness): move the check to `pagereveal`
+### Fix for counterexample 2 (prefetch staleness): move the check to `pagereveal`
 
-`main.js:327` currently gates the staleness check on `event.persisted`
-(bfcache restore only). The `pagereveal` event fires on every navigation
-— fresh load, prefetch promotion, bfcache restore — and runs before the
-first paint. Moving the check there subsumes the existing one and closes
-the prefetch hole. The workout-page handler already does this; the
-default needs to too.
+The pre-fix code gated the staleness check on `event.persisted` (bfcache
+restore only). The fix (commit `065c887`) moved it to a `pagereveal`
+listener — now `main.js:633` — because `pagereveal` fires on every
+navigation (fresh load, prefetch promotion, bfcache restore) before the
+first paint. That subsumes the old handler and closes the prefetch hole.
+The workout-page handler already did this; the global default now does
+too.
 
-Sketch:
+Shipped handler (`main.js:633`):
 
 ```js
-// Replace the existing pageshow listener with a pagereveal one.
 window.addEventListener('pagereveal', () => {
     if (document.body.dataset.bfcacheHandler === 'page-local') return
     const meta = document.querySelector('meta[name="invalidation-token"]')
@@ -213,22 +220,21 @@ window.addEventListener('pagereveal', () => {
     const m = document.cookie.match(/(?:^|;\s*)inv_bfcache=([^;]+)/)
     const current = m ? m[1] : ''
     if (rendered === current) return
-    if ('navigation' in window) navigation.reload()
-    else location.reload()
+    navigation.reload()
 })
 ```
 
-`clearLoad()` from the existing bfcache handler still needs to run on
-bfcache restore — keep a small `pageshow` listener for that:
+`clearLoad()` from the bfcache handler still needs to run on bfcache
+restore — a small `pageshow` listener does that (`main.js:369`):
 
 ```js
-window.addEventListener('pageshow', (e) => { if (e.persisted) clearLoad() })
+window.addEventListener('pageshow', (event) => { if (event.persisted) clearLoad() })
 ```
 
 This is verified by `StackNav_PrefetchMitigated.cfg`
 (`EagerPagerevealCheck = TRUE`): 825,386 reachable states, no violation.
 
-### Fix counterexample 1 (cookie expiration): make the freshness signal not depend on cookie presence
+### Fix for counterexample 1 (cookie expiration): make the freshness signal not depend on cookie presence
 
 The finite `MaxAge` on `inv_bfcache` in `middleware.go` was the root
 cause. Three options were considered, in increasing invasiveness:
@@ -261,12 +267,11 @@ cause. Three options were considered, in increasing invasiveness:
    bfcache, and bfcache is fundamentally a "saved render, may be
    stale" optimization. Saves all the cookie machinery.
 
-**Chosen: Option 1 in its session-cookie form.** Smallest patch
-(`middleware.go` drops the `MaxAge` line) and pins
-`CookieMayExpire = FALSE` in practice. Option 2 remains overkill;
-Option 3 (cleanest in the abstract) was rejected because it would
-forfeit bfcache's instant back-navigation benefit on every non-opted-
-out page.
+**Shipped: Option 1 in its session-cookie form** (`middleware.go:329`
+emits the cookie with no `MaxAge` / no `Expires`), which pins
+`CookieMayExpire = FALSE` in practice. Option 2 was overkill; Option 3
+(cleanest in the abstract) was rejected because it would forfeit
+bfcache's instant back-navigation benefit on every non-opted-out page.
 
 ### Tighten what the model proved is unnecessary
 

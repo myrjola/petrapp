@@ -9,14 +9,14 @@
 (*   1. Browser history -- a sequence of entries [url, bakedToken].       *)
 (*      bakedToken is the value of the inv_bfcache cookie at the moment   *)
 (*      the page was rendered (baked into <meta name="invalidation-token">*)
-(*      by newBaseTemplateData in cmd/web/templates.go).                  *)
+(*      by newBaseTemplateData in cmd/petra/templates.go).                *)
 (*                                                                         *)
 (*   2. bfcache -- a parallel sequence; bfcache[i] holds the bakedToken   *)
 (*      of a cached document for entry i, or NIL if not cached.           *)
 (*                                                                         *)
 (*   3. serverToken / cookieToken -- the canonical server-side cookie     *)
 (*      value (rotated on every POST by setInvalidationCookieOnPost in    *)
-(*      cmd/web/middleware.go) and the browser's view of it.              *)
+(*      cmd/petra/middleware.go) and the browser's view of it.            *)
 (*                                                                         *)
 (*   4. Document state -- one of "Loading", "Loaded", "Bfcached" --       *)
 (*      tracks what the user sees right now.                              *)
@@ -42,13 +42,15 @@ CONSTANTS
                           \* Models the 60s MaxAge in middleware.go.
     PrefetchEnabled,      \* TRUE iff the browser-prefetch action is
                           \* enabled. Models the Speculation Rules block
-                          \* in ui/templates/base.gohtml that prefetches
-                          \* every /* link at conservative eagerness.
+                          \* in cmd/petra/ui/templates/base.gohtml that
+                          \* prefetches every /* link at moderate eagerness.
     EagerPagerevealCheck, \* TRUE iff the staleness check runs on every
                           \* page reveal (not just pageshow.persisted).
-                          \* This is the proposed mitigation -- today's
-                          \* main.js only checks on bfcache restore, so
-                          \* prefetch-promoted loads slip through.
+                          \* This mitigation SHIPPED: the global handler in
+                          \* main.js:633 checks on every pagereveal. The
+                          \* FALSE setting models the pre-fix main.js that
+                          \* only checked on bfcache restore, so prefetch-
+                          \* promoted loads slipped through.
     EnableForwardMisroute, \* TRUE iff PagerevealMisrouteOnForward is
                            \* enabled. Models a HYPOTHESIS that was
                            \* explored and DISPROVEN by the production
@@ -336,7 +338,7 @@ GoForward == Traverse(idx + 1)
 (*   - the new value lands in the browser's inv_bfcache cookie            *)
 (*   - the response carries X-Location (and optionally X-Replace-Url)     *)
 (*                                                                         *)
-(* The client then runs popOrPushTo(target, {replace}) (main.js:230).     *)
+(* The client then runs popOrPushTo(target, {replace}) (main.js:238).     *)
 (* Three branches:                                                         *)
 (*   A. Replace mode: explicit X-Replace-Url OR target == currentUrl      *)
 (*      (the client's auto-detect for same-URL submits).                  *)
@@ -400,8 +402,8 @@ SubmitForm(targetUrl, isReplace) ==
     /\ lastForwardTargetIdx' = 0
 
 (***************************************************************************)
-(* On bfcache restore, the global pageshow.persisted handler runs         *)
-(* (main.js:327). If rendered token equals current cookie value, do       *)
+(* On bfcache restore, the global staleness handler runs (main.js:633,    *)
+(* on pagereveal). If rendered token equals current cookie value, do      *)
 (* nothing; the document is presumed fresh.                                *)
 (*                                                                         *)
 (* NOTE: in the JS code, the comparison is between two strings -- both    *)
@@ -450,10 +452,12 @@ PageLocalReplace ==
                    lastForwardTargetIdx, pendingCatch>>
 
 (***************************************************************************)
-(* Cookie expiration. The inv_bfcache cookie has MaxAge 60s in production *)
-(* (cmd/web/middleware.go:313). When CookieMayExpire is TRUE this action  *)
-(* is enabled to expose the staleness window that opens once the cookie  *)
-(* is gone.                                                                *)
+(* Cookie expiration. The inv_bfcache cookie USED to carry a 60s MaxAge,  *)
+(* which opened the staleness window this action models. The fix shipped  *)
+(* a session cookie (no MaxAge / no Expires; cmd/petra/middleware.go:329),*)
+(* so in production CookieMayExpire is FALSE and this action never fires. *)
+(* It stays enabled only in StackNav_CookieExpire.cfg to keep the         *)
+(* counterexample reproducible.                                           *)
 (***************************************************************************)
 CookieExpire ==
     /\ CookieMayExpire
@@ -477,7 +481,7 @@ BfcacheEvict ==
 
 (***************************************************************************)
 (* Speculation Rules prefetch. The browser fires a GET for `url` at       *)
-(* `eagerness: conservative` (touchstart/pointerdown). The response,      *)
+(* `eagerness: moderate` (hover/pointerdown). The response,               *)
 (* baked with whatever inv_bfcache cookie the request carried, is parked  *)
 (* in the prefetch cache.                                                  *)
 (***************************************************************************)
@@ -518,7 +522,7 @@ PromotedSettleNoCheck ==
                    cookieToken, inFlight, lastForwardTargetIdx, pendingCatch>>
 
 (***************************************************************************)
-(* With EagerPagerevealCheck (proposed mitigation: move the check from   *)
+(* With EagerPagerevealCheck (shipped mitigation: move the check from    *)
 (* `pageshow.persisted` to `pagereveal`, which fires on every navigation),*)
 (* the staleness comparison runs after every load. If meta == cookie the *)
 (* page is presumed fresh and settles.                                    *)
@@ -566,7 +570,7 @@ PromotedPageLocalReplace ==
 (* Bug hypothesis (gated by EnableForwardMisroute):                        *)
 (*                                                                         *)
 (* On a forward traverse to a bfcached, stale page, the new global         *)
-(* pagereveal handler in main.js:351 calls navigation.reload()             *)
+(* pagereveal handler in main.js:633 calls navigation.reload()             *)
 (* synchronously inside the pagereveal event -- i.e. while the traverse    *)
 (* is still committing. Chromium (per the workout.gohtml inline comment    *)
 (* at line 451-453) is known to "reclassify" same-URL navigations fired   *)
@@ -641,7 +645,7 @@ BackButtonClick ==
 (* THE PRODUCTION NAVBUG (gated by EnableBackCatchBug).                   *)
 (*                                                                         *)
 (* On a stale-bfcache restore of the same doc that previously issued an   *)
-(* in-page back-button click, the new pagereveal handler in main.js:351   *)
+(* in-page back-button click, the new pagereveal handler in main.js:633   *)
 (* fires navigation.reload(). The reload supersedes the long-pending     *)
 (* .committed promise from the back-button click closure; the promise    *)
 (* rejects with AbortError; the .catch fires location.assign(link.href). *)
