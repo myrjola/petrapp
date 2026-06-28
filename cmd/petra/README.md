@@ -294,6 +294,33 @@ server messages. Markup, accessibility, and Trusted-Types detail live in
 [`ui/templates/README.md`](ui/templates/README.md) under "Client-only
 error surface".
 
+### Banner announcement & focus (`BannerData.Live`)
+
+The server-rendered flash path is a *full document load* (flash → redirect →
+the shim's same-URL `location.replace`). A live region (`role="alert"` /
+`role="status"`) that is already present in a freshly-parsed document is **not**
+announced by screen readers — assistive tech only narrates changes made *after*
+the region is registered. So a server banner that just sits in the initial HTML
+is silent.
+
+`BannerData.Live` opts a banner into a small nonce'd enhancement in the `banner`
+component that fixes this on load:
+
+- **error** → the banner is `tabindex="-1"` and receives `focus()`, which both
+  announces the message (assertive) and scrolls it into view. This is the
+  GOV.UK error-summary focus-on-load pattern.
+- **success / info** → the text is re-asserted into the `role="status"` region
+  (cleared, then set on the next frame) so it announces, *without* stealing
+  focus — confirmations don't demand action.
+
+Set `Live: true` on banners built from a popped session flash (a real
+just-happened action). Leave it `false` for static reference galleries
+(styleguide, the `/dev/error-ux` variant catalog) — multiple live banners on one
+page would fight over focus. The `#js-flash` client path needs none of this: its
+region ships empty and is populated later, so the mutation announces naturally
+(it only adds `scrollIntoView` for sighted users). Exercise every path live at
+`/dev/error-ux` (dev mode).
+
 ## Redirects and Navigation
 
 Why the app is an MPA with a navigation shim at all — rather than an SPA or

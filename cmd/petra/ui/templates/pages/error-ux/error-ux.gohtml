@@ -97,6 +97,12 @@
                     padding-bottom: var(--size-2);
                     border-bottom: var(--border-size-1) solid var(--color-border);
                 }
+
+                /* Offset the fragment scroll so the anchored panel title clears
+                   the top of the viewport instead of butting against it. */
+                .panel-title {
+                    scroll-margin-top: var(--size-5);
+                }
             }
         </style>
 
@@ -125,7 +131,8 @@
                         Service returns <code>domain.ValidationError</code>;
                         <code>userError</code> flashes the message verbatim and
                         redirects to <code>safeURL</code>. The banner re-renders
-                        with <code>role="alert"</code>.
+                        with <code>role="alert"</code>, receives focus on load
+                        (so screen readers announce it and it scrolls into view).
                     </p>
                     <form class="action" method="post" action="/dev/error-ux/trigger/validation">
                         <button type="submit" class="btn btn--block">
@@ -190,6 +197,7 @@
                           flash.textContent =
                             'Connection lost. Check your network and try again.'
                           flash.hidden = false
+                          flash.scrollIntoView({block: 'nearest'})
                         })
                       })()
                     </script>
@@ -210,7 +218,55 @@
                     </a>
                 </article>
 
+                <article class="card">
+                    <span class="tag">F · Success</span>
+                    <h2>Success confirmation</h2>
+                    <p>
+                        <code>putFlashSuccess</code> + redirect. The banner
+                        renders with <code>role="status"</code> and is announced
+                        on load <em>without</em> stealing focus — confirmations
+                        don't demand action.
+                    </p>
+                    <form class="action" method="post" action="/dev/error-ux/trigger/success">
+                        <button type="submit" class="btn btn--block">
+                            Trigger success banner
+                        </button>
+                    </form>
+                </article>
+
+                <article class="card">
+                    <span class="tag">G · Info</span>
+                    <h2>Informational notice</h2>
+                    <p>
+                        <code>putFlash</code> with the <code>info</code> variant.
+                        Same <code>role="status"</code> announce-without-focus
+                        path as success.
+                    </p>
+                    <form class="action" method="post" action="/dev/error-ux/trigger/info">
+                        <button type="submit" class="btn btn--block">
+                            Trigger info banner
+                        </button>
+                    </form>
+                </article>
+
             </div>
+        </section>
+
+        <section class="variants">
+            <h2 id="demo-panel" class="panel-title">Panel-anchored flash</h2>
+            {{ template "banner" .PanelFlash }}
+            <p class="lead">
+                <code>putFlashErrorWithAnchor</code> + redirect to
+                <code>#demo-panel</code>. The fragment scrolls the panel into
+                view and the error banner takes focus — the pattern the
+                preferences page uses to point at the panel that failed, rather
+                than a generic page-top banner.
+            </p>
+            <form class="action" method="post" action="/dev/error-ux/trigger/anchored">
+                <button type="submit" class="btn btn--block btn--danger">
+                    Trigger panel-anchored error
+                </button>
+            </form>
         </section>
 
         <section class="variants">

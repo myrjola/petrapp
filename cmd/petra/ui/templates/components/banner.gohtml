@@ -34,8 +34,39 @@
             }
         </style>
         <div class="banner banner--{{ .Variant }}"
-             {{ if eq .Variant "error" }}role="alert"{{ else }}role="status"{{ end }}>
+             {{- if eq .Variant "error" }} role="alert"{{ else }} role="status"{{ end }}
+             {{- if and .Live (eq .Variant "error") }} tabindex="-1"{{ end }}>
             {{ .Message }}
         </div>
+        {{- if .Live }}
+            <script {{ .Nonce }}>
+                // A live region present in a freshly-loaded document is NOT
+                // announced by screen readers — the AT only narrates changes
+                // made after the region is registered. This script re-surfaces
+                // a server-rendered flash so it reaches assistive tech.
+                (() => {
+                    const el = document.currentScript.previousElementSibling;
+                    if (!el || !el.classList.contains('banner')) return;
+                    const reveal = () => {
+                        if (el.classList.contains('banner--error')) {
+                            // Move focus: announces the message (assertive) and
+                            // scrolls it into view. GOV.UK error-summary pattern.
+                            el.focus();
+                        } else {
+                            // Non-error: announce without stealing focus by
+                            // re-asserting the text into the role="status" region.
+                            const msg = el.textContent;
+                            el.textContent = '';
+                            requestAnimationFrame(() => { el.textContent = msg; });
+                        }
+                    };
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', reveal, {once: true});
+                    } else {
+                        reveal();
+                    }
+                })();
+            </script>
+        {{- end }}
     {{- end -}}
 {{- end }}

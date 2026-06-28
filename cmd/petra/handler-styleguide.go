@@ -119,16 +119,19 @@ func styleguideBannerExamples(nonce template.HTMLAttr) []BannerData {
 		{
 			Variant: BannerVariantError,
 			Message: "Something went wrong. Please try again.",
+			Live:    false, // static reference — must not steal focus
 			Nonce:   nonce,
 		},
 		{
 			Variant: BannerVariantSuccess,
 			Message: "Your changes have been saved.",
+			Live:    false,
 			Nonce:   nonce,
 		},
 		{
 			Variant: BannerVariantInfo,
 			Message: "Heads up — this is informational.",
+			Live:    false,
 			Nonce:   nonce,
 		},
 	}

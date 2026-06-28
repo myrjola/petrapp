@@ -121,10 +121,10 @@ func (app *application) preferencesGET(w http.ResponseWriter, r *http.Request) {
 
 	base := newBaseTemplateData(r)
 	flash := app.popFlash(ctx)
-	pageTopFlash := BannerData{Variant: "", Message: "", Nonce: base.Nonce}
+	pageTopFlash := BannerData{Variant: "", Message: "", Live: false, Nonce: base.Nonce}
 	flashByPanel := map[string]BannerData{}
 	if flash.Message != "" {
-		bd := BannerData{Variant: flash.Variant, Message: flash.Message, Nonce: base.Nonce}
+		bd := BannerData{Variant: flash.Variant, Message: flash.Message, Live: true, Nonce: base.Nonce}
 		if flash.Anchor == "" {
 			pageTopFlash = bd
 		} else {

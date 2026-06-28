@@ -119,6 +119,93 @@ func Test_application_devErrorUX_triggerValidation_surfacesMessage(t *testing.T)
 	if !strings.Contains(banner.Text(), "Name must be") {
 		t.Errorf("validation banner missing expected message; got %q", banner.Text())
 	}
+	// The live flash is focusable (tabindex=-1) so it can take focus on load —
+	// a live region present in a freshly-loaded document is otherwise silent to
+	// screen readers. The static reference banners must NOT be focusable.
+	if doc.Find(".banner.banner--error[role='alert'][tabindex='-1']").Length() == 0 {
+		t.Error("expected the live error banner to carry tabindex=-1 for focus-on-load")
+	}
+}
+
+func Test_application_devErrorUX_staticBanners_notFocusable(t *testing.T) {
+	t.Parallel()
+
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+
+	// Plain GET: no live flash, so the only banners are the static reference
+	// gallery. None of them should be focusable or they would steal focus.
+	doc, err := server.Client().GetDoc(t.Context(), "/dev/error-ux")
+	if err != nil {
+		t.Fatalf("Failed to get /dev/error-ux: %v", err)
+	}
+	if n := doc.Find(".banner[tabindex]").Length(); n != 0 {
+		t.Errorf("static reference banners must not be focusable; found %d with tabindex", n)
+	}
+}
+
+func Test_application_devErrorUX_triggerSuccess_surfacesStatusBanner(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	doc, err := client.GetDoc(ctx, "/dev/error-ux")
+	if err != nil {
+		t.Fatalf("Failed to get /dev/error-ux: %v", err)
+	}
+	doc, err = client.SubmitForm(ctx, doc, "/dev/error-ux/trigger/success", nil)
+	if err != nil {
+		t.Fatalf("Failed to submit success trigger: %v", err)
+	}
+
+	banner := doc.Find(".banner.banner--success[role='status']")
+	if banner.Length() == 0 {
+		t.Fatal("expected a success banner with role=status after success trigger")
+	}
+	if !strings.Contains(banner.Text(), "have been saved") {
+		t.Errorf("success banner missing expected message; got %q", banner.Text())
+	}
+	// Success confirmations announce but do not steal focus.
+	if doc.Find(".banner.banner--success[tabindex]").Length() != 0 {
+		t.Error("success banner must not be focusable")
+	}
+}
+
+func Test_application_devErrorUX_triggerAnchored_surfacesPanelBanner(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	server, err := e2etest.StartServer(t, testkit.NewWriter(t), testLookupEnv, run)
+	if err != nil {
+		t.Fatalf("Failed to start server: %v", err)
+	}
+	client := server.Client()
+
+	doc, err := client.GetDoc(ctx, "/dev/error-ux")
+	if err != nil {
+		t.Fatalf("Failed to get /dev/error-ux: %v", err)
+	}
+	doc, err = client.SubmitForm(ctx, doc, "/dev/error-ux/trigger/anchored", nil)
+	if err != nil {
+		t.Fatalf("Failed to submit anchored trigger: %v", err)
+	}
+
+	// The anchored error renders inside the demo panel, not at the page top:
+	// it is a sibling that follows the panel title.
+	panel := doc.Find("h2#demo-panel").NextAll().Filter(".banner.banner--error[role='alert']")
+	if panel.Length() == 0 {
+		t.Fatal("expected an error banner following the #demo-panel title")
+	}
+	if !strings.Contains(panel.Text(), "needs your attention") {
+		t.Errorf("anchored banner missing expected message; got %q", panel.Text())
+	}
 }
 
 func Test_application_devErrorUX_triggerSystem_navigatesToErrorPage(t *testing.T) {

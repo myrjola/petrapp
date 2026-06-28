@@ -213,6 +213,10 @@ async function submitForm(e) {
         if (flash) {
             flash.textContent = 'Connection lost. Check your network and try again.'
             flash.hidden = false
+            // role="alert" already announces the change; scroll it into view
+            // for sighted users who may have submitted from down the page.
+            // No focus() — that would double-announce against the live region.
+            flash.scrollIntoView({block: 'nearest'})
         }
         clearLoad()
         return

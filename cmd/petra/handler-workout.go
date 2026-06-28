@@ -79,6 +79,7 @@ func newWorkoutNotFoundTemplateData(
 		Flash: BannerData{
 			Variant: BannerVariantError,
 			Message: flashMessage,
+			Live:    true,
 			Nonce:   base.Nonce,
 		},
 	}
@@ -246,6 +247,7 @@ func newWorkoutTemplateData(
 		Flash: BannerData{
 			Variant: BannerVariantError,
 			Message: flashMessage,
+			Live:    true,
 			Nonce:   base.Nonce,
 		},
 	}

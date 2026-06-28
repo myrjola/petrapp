@@ -10,10 +10,16 @@ import (
 
 const devErrorUXPath = "/dev/error-ux"
 
+// devErrorUXPanelAnchor is the id of the demo's anchored panel. An anchored
+// flash redirects to devErrorUXPath+"#"+devErrorUXPanelAnchor so the browser
+// scrolls the panel into view (mirrors the preferences panel-flash pattern).
+const devErrorUXPanelAnchor = "demo-panel"
+
 type errorUXTemplateData struct {
 	BaseTemplateData
 
-	Flash          BannerData
+	Flash          BannerData // page-top flash (anchor "")
+	PanelFlash     BannerData // flash anchored to the demo panel
 	BannerVariants []BannerData
 }
 
@@ -28,28 +34,43 @@ func (app *application) devErrorUXGET(w http.ResponseWriter, r *http.Request) {
 
 	base := newBaseTemplateData(r)
 	popped := app.popFlash(r.Context())
-	flash := BannerData{
-		Variant: popped.Variant,
-		Message: popped.Message,
-		Nonce:   base.Nonce,
+	// Route the popped flash either to the page top or the anchored panel,
+	// matching the anchor the trigger handler stored it under.
+	var pageTopFlash, panelFlash BannerData
+	if popped.Message != "" {
+		bd := BannerData{
+			Variant: popped.Variant,
+			Message: popped.Message,
+			Live:    true,
+			Nonce:   base.Nonce,
+		}
+		if popped.Anchor == devErrorUXPanelAnchor {
+			panelFlash = bd
+		} else {
+			pageTopFlash = bd
+		}
 	}
 	data := errorUXTemplateData{
 		BaseTemplateData: base,
-		Flash:            flash,
+		Flash:            pageTopFlash,
+		PanelFlash:       panelFlash,
 		BannerVariants: []BannerData{
 			{
 				Variant: BannerVariantError,
 				Message: "Something went wrong. Please try again.",
+				Live:    false, // static reference — must not steal focus
 				Nonce:   base.Nonce,
 			},
 			{
 				Variant: BannerVariantSuccess,
 				Message: "Your changes have been saved.",
+				Live:    false,
 				Nonce:   base.Nonce,
 			},
 			{
 				Variant: BannerVariantInfo,
 				Message: "Heads up — this is informational.",
+				Live:    false,
 				Nonce:   base.Nonce,
 			},
 		},
@@ -64,6 +85,25 @@ func (app *application) devErrorUXGET(w http.ResponseWriter, r *http.Request) {
 func (app *application) devErrorUXTriggerPOST(w http.ResponseWriter, r *http.Request) {
 	if !app.devMode {
 		http.NotFound(w, r)
+		return
+	}
+
+	// Confirmation flashes (success / info) and the panel-anchored error do
+	// not represent a failed service call, so they flash + redirect directly
+	// rather than routing through userError (which is for service errors only).
+	switch r.PathValue("kind") {
+	case "success":
+		app.putFlashSuccess(r.Context(), "Your changes have been saved.", "")
+		redirect(w, r, devErrorUXPath)
+		return
+	case "info":
+		app.putFlash(r.Context(), BannerVariantInfo, "Heads up — this is informational.", "")
+		redirect(w, r, devErrorUXPath)
+		return
+	case "anchored":
+		app.putFlashErrorWithAnchor(r.Context(),
+			"This panel needs your attention before you can continue.", devErrorUXPanelAnchor)
+		redirect(w, r, devErrorUXPath+"#"+devErrorUXPanelAnchor)
 		return
 	}
 

@@ -23,9 +23,17 @@ const (
 // BannerData is the dot for the `banner` component. Variant is one of
 // BannerVariantError, BannerVariantSuccess, or BannerVariantInfo; the
 // component renders nothing when Message is empty.
+//
+// Live marks a banner that is the result of an action the user just took (a
+// popped session flash) rather than a static reference example. Live banners
+// are announced to assistive tech on load and, for the error variant, receive
+// focus — a live region present in the initial HTML of a freshly-loaded
+// document is otherwise NOT announced by screen readers. Leave Live false for
+// styleguide / demo galleries so they don't steal focus.
 type BannerData struct {
 	Variant string
 	Message string
+	Live    bool
 	Nonce   template.HTMLAttr
 }
 

@@ -100,6 +100,7 @@ func (app *application) adminExercisesGET(w http.ResponseWriter, r *http.Request
 		Flash: BannerData{
 			Variant: flash.Variant,
 			Message: flash.Message,
+			Live:    true,
 			Nonce:   base.Nonce,
 		},
 		AdminNav: AdminNavData{
@@ -166,6 +167,7 @@ func (app *application) adminExerciseEditGET(w http.ResponseWriter, r *http.Requ
 		Flash: BannerData{
 			Variant: flash.Variant,
 			Message: flash.Message,
+			Live:    true,
 			Nonce:   base.Nonce,
 		},
 		AdminNav: AdminNavData{

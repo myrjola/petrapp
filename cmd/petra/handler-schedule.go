@@ -37,6 +37,7 @@ func (app *application) scheduleGET(w http.ResponseWriter, r *http.Request) {
 		Flash: BannerData{
 			Variant: flash.Variant,
 			Message: flash.Message,
+			Live:    true,
 			Nonce:   base.Nonce,
 		},
 	}
