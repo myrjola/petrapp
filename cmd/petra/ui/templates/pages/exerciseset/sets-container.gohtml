@@ -302,6 +302,52 @@
                     box-shadow: 0 0 0 3px var(--color-info);
                 }
 
+                /* ---------- Completion card ---------- */
+                /* When every set is logged there is no active set, so the focus
+                   slot would otherwise vanish — leaving the last set-advance to
+                   page a card out into nothing while the progress track snaps up.
+                   This terminal card keeps the slot filled so the final advance
+                   stays a clean card→card slide, and gives a forward action. It
+                   reuses the .exercise-set.active shell (dark panel, clay tab,
+                   and the focus-card view-transition-name under set-advance). */
+                .exercise-set.active.complete {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-4);
+                    text-align: center;
+                }
+
+                .exercise-set.active .complete-body {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: var(--size-1);
+                    padding: var(--size-3) 0;
+                }
+
+                .exercise-set.active .complete-check {
+                    /* Light sage reads as "done" and clears contrast on the dark
+                       panel, where --color-success (mid olive) would not. */
+                    color: var(--color-success-bg);
+                    font-size: var(--font-size-6);
+                    line-height: 1;
+                }
+
+                .exercise-set.active .complete-title {
+                    font-family: var(--font-serif);
+                    font-size: var(--font-size-fluid-2);
+                    line-height: 1;
+                    color: var(--stone-0);
+                }
+
+                .exercise-set.active .complete-sub {
+                    font-family: var(--font-mono);
+                    font-size: var(--font-size-0);
+                    letter-spacing: var(--font-letterspacing-mono);
+                    text-transform: uppercase;
+                    color: var(--stone-4);
+                }
+
                 /* Rest chip styles live in main.css @layer components — the chip
                    appears here and on the workout overview, so it's promoted to a
                    global component class. */
@@ -828,6 +874,23 @@
                     {{ end }}
             </div>
             {{ end }}
+        {{ end }}
+
+        {{/* Terminal card — fills the focus slot once every set is logged (and
+             not mid-edit), so the final set-advance pages card→card instead of
+             card→nothing. Warmup is necessarily done by the time any set is
+             complete, so this only shows in the enabled state. */}}
+        {{ if and .ExerciseSlot.WarmupCompletedAt (not .IsEditing) (gt .TotalSetCount 0) (eq .CompletedCount .TotalSetCount) }}
+            <div class="exercise-set active complete" role="status" aria-label="All sets complete">
+                <div class="complete-body">
+                    <span class="complete-check" aria-hidden="true">✓</span>
+                    <span class="complete-title">All sets done</span>
+                    <span class="complete-sub">{{ .CompletedCount }} of {{ .TotalSetCount }} logged</span>
+                </div>
+                <a class="btn btn--focus btn--block"
+                   href="/workouts/{{ .Date.Format "2006-01-02" }}"
+                   aria-label="Back to workout">Back to workout</a>
+            </div>
         {{ end }}
 
         {{/* Progress set-track — every set as a compact card: done (tappable to

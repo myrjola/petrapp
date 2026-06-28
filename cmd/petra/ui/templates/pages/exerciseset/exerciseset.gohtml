@@ -20,18 +20,55 @@
         </style>
 
         <script {{ $.Nonce }}>
-          document.addEventListener("DOMContentLoaded", function () {
-            const form = document.getElementById(`form-{{ $.EditingIndex }}`)
-            if (form) {
-              const repsInput = form.querySelector('.reps-input')
-              if (repsInput) {
-                setTimeout(() => {
-                  repsInput.focus()
-                  repsInput.select()
-                }, 100)
+          // Re-opening a completed set (?edit=N) drops the user straight onto
+          // its reps field. EditingIndex is -1 on the primary logging path, so
+          // form--1 is absent and this no-ops there — the keyboard stays out of
+          // the way of the signal buttons until the user explicitly edits.
+          //
+          // When the edit page arrives via a cross-document view transition,
+          // wait for it to finish before grabbing focus: pulling up the keyboard
+          // and scrolling the input into view mid-slide fights the page
+          // animation. pagereveal carries the in-flight transition; fall back to
+          // immediate focus when there isn't one (direct load / no VT support).
+          (() => {
+            // Lazy + idempotent: this script runs while parsing, before the
+            // form further down the document exists, so the lookup must happen
+            // at focus time, not now.
+            let focused = false
+            const focusReps = () => {
+              if (focused) return
+              const form = document.getElementById(`form-{{ $.EditingIndex }}`)
+              const repsInput = form && form.querySelector('.reps-input')
+              if (!repsInput) return
+              focused = true
+              repsInput.focus()
+              repsInput.select()
+            }
+
+            if ('onpagereveal' in window) {
+              // VT-capable browsers fire pagereveal for every navigation (after
+              // DOMContentLoaded). Drive focus solely from it so we always wait
+              // out the page slide before the keyboard pops.
+              window.addEventListener('pagereveal', (e) => {
+                if (e.viewTransition) {
+                  // Focus once the slide settles; the timeout only guards
+                  // against a transition that never settles (it fires well past
+                  // the 240ms slide, so finished normally wins the race).
+                  e.viewTransition.finished.catch(() => {}).finally(focusReps)
+                  setTimeout(focusReps, 400)
+                } else {
+                  focusReps()
+                }
+              })
+            } else {
+              // No View Transitions: nothing to wait out, focus when ready.
+              if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', focusReps)
+              } else {
+                focusReps()
               }
             }
-          })
+          })()
         </script>
 
         <style {{ $.Nonce }}>
@@ -68,6 +105,16 @@
 
                 &::view-transition-new(focus-card) {
                     animation: focus-card-in var(--duration-3) var(--ease-out-quiet) both;
+                }
+
+                /* The "· Set N of M" counter is its own snapshot, so it
+                   cross-fades its changing value while the rest of the chrome
+                   holds still. Pull that fade onto the app curve/duration so it
+                   matches the card paging instead of the UA default. */
+                &::view-transition-old(overline-suffix),
+                &::view-transition-new(overline-suffix) {
+                    animation-duration: var(--duration-3);
+                    animation-timing-function: var(--ease-out-quiet);
                 }
             }
 
