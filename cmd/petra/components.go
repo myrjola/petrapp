@@ -51,6 +51,12 @@ type PageHeaderData struct {
 // and Pattern are native-validation attributes, passed through verbatim and
 // omitted from the output when empty (they are strings so "0" can be set
 // explicitly). Hint, when set, is rendered and wired via aria-describedby.
+//
+// Error, when non-empty, marks the input invalid: aria-invalid="true", an
+// error message wired into aria-describedby, and a non-colour-only treatment
+// (error border + a leading marker glyph) per the design-system rule "state is
+// never colour-only". The `select` and `textarea` components share this error
+// contract so a form mixes control types without each re-inventing it.
 type FieldData struct {
 	Label    string
 	Name     string
@@ -58,11 +64,70 @@ type FieldData struct {
 	Value    string
 	Required bool
 	Hint     string
+	Error    string
 	Min      string
 	Max      string
 	Step     string
 	Pattern  string
 	Nonce    template.HTMLAttr
+}
+
+// selectOption is one <option> of a select, with its selected state resolved
+// by the handler. Shared by the `select` component and its callers.
+type selectOption struct {
+	Value    string
+	Label    string
+	Selected bool
+}
+
+// SelectData is the dot for the `select` component — a labelled <select>,
+// single or (with Multiple) multi-value. Options carry their own Selected
+// state. Hint and Error share the field component's contract (label↔id,
+// aria-describedby, aria-invalid + error span). Name is both id and name.
+type SelectData struct {
+	Label    string
+	Name     string
+	Options  []selectOption
+	Multiple bool
+	Required bool
+	Hint     string
+	Error    string
+	Nonce    template.HTMLAttr
+}
+
+// TextareaData is the dot for the `textarea` component — a labelled multi-line
+// input. Value is the body; Rows sizes it (a string like FieldData.Min, so it
+// can be omitted with ""). Hint and Error share the field component's contract.
+// Name is both id and name.
+type TextareaData struct {
+	Label string
+	Name  string
+	Value string
+	Rows  string
+	Hint  string
+	Error string
+	Nonce template.HTMLAttr
+}
+
+// ErrorSummaryData is the dot for the `error-summary` component — the GOV.UK
+// error summary: a role="alert", focus-on-load panel listing every field error
+// as a link to #<fieldname> (so it jumps to the offending input), plus any
+// form-level messages. Renders nothing when Items and Form are both empty.
+// Live mirrors BannerData.Live (focus on load); leave it false on styleguide
+// demos so they don't steal focus.
+type ErrorSummaryData struct {
+	Title string
+	Items []ErrorSummaryItem
+	Form  []string
+	Live  bool
+	Nonce template.HTMLAttr
+}
+
+// ErrorSummaryItem is one row of the error summary: a message and the field
+// name it anchors to (Anchor == the input id == its form name attribute).
+type ErrorSummaryItem struct {
+	Anchor  string
+	Message string
 }
 
 // ExerciseResultCardData drives the components/exercise-result-card partial,

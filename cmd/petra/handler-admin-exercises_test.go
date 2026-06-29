@@ -242,6 +242,17 @@ func Test_application_adminExercises(t *testing.T) {
 		if !strings.Contains(doc.Find("[role=alert]").Text(), "Name is required") {
 			t.Errorf("Expected 'Name is required' in alert, got: %s", doc.Find("[role=alert]").Text())
 		}
+		// Field-level: the name input is marked invalid with its own message.
+		if doc.Find(`input[name='name'][aria-invalid='true']`).Length() == 0 {
+			t.Error("expected the name input to be marked aria-invalid")
+		}
+		if !strings.Contains(doc.Find("#name-error").Text(), "Name is required") {
+			t.Errorf("expected #name-error to carry the message, got %q", doc.Find("#name-error").Text())
+		}
+		// The summary links to the offending field.
+		if doc.Find(`.error-summary a[href='#name']`).Length() == 0 {
+			t.Error("expected the error summary to link to #name")
+		}
 	})
 
 	// Verifies the form size limit (largeMaxFormSize) is large enough to
@@ -335,6 +346,87 @@ func Test_application_adminExercises(t *testing.T) {
 		}
 		if !strings.Contains(doc.Find("[role=alert]").Text(), "less than or equal to") {
 			t.Errorf("Expected min<=max message in alert, got: %s", doc.Find("[role=alert]").Text())
+		}
+		// Field-level: the rep_min input is marked invalid and the summary links to it.
+		if doc.Find(`input[name='rep_min'][aria-invalid='true']`).Length() == 0 {
+			t.Error("expected the rep_min input to be marked aria-invalid")
+		}
+		if doc.Find(`.error-summary a[href='#rep_min']`).Length() == 0 {
+			t.Error("expected the error summary to link to #rep_min")
+		}
+	})
+
+	// Field-level validation: one submit reports every failing field, the user's
+	// edits survive the bounce, the focusable summary links to each field, and
+	// the page-top banner stays empty so only the summary takes focus.
+	t.Run("Field errors collect, preserve values, and focus a summary", func(t *testing.T) {
+		if doc, err = client.GetDoc(ctx, "/admin/exercises"); err != nil {
+			t.Fatalf("Failed to get admin exercises page: %v", err)
+		}
+		var editURL string
+		doc.Find("tr:contains('Updated Test Squat') td a:contains('Edit')").Each(
+			func(_ int, s *goquery.Selection) {
+				if href, exists := s.Attr("href"); exists {
+					editURL = href
+				}
+			})
+		if editURL == "" {
+			t.Fatalf("Edit link for Updated Test Squat not found")
+		}
+		if doc, err = client.GetDoc(ctx, editURL); err != nil {
+			t.Fatalf("Failed to get exercise edit page: %v", err)
+		}
+
+		// Valid name (must round-trip), changed category (must round-trip),
+		// invalid rep range AND no primary muscles (two field errors at once).
+		formData := map[string]string{
+			"name":              "Keep Me Squat",
+			"category":          "upper",
+			"exercise_type":     "weighted",
+			"primary_muscles":   "",
+			"secondary_muscles": "Hamstrings,Calves",
+			"instructions":      "Brace hard",
+			"rep_min":           "12",
+			"rep_max":           "8",
+		}
+		if doc, err = client.SubmitForm(ctx, doc, editURL, formData); err != nil {
+			t.Fatalf("Failed to submit multi-error update: %v", err)
+		}
+
+		// Both failing fields are marked invalid in one bounce.
+		if doc.Find(`input[name='rep_min'][aria-invalid='true']`).Length() == 0 {
+			t.Error("expected rep_min to be aria-invalid")
+		}
+		if doc.Find(`select[name='primary_muscles'][aria-invalid='true']`).Length() == 0 {
+			t.Error("expected primary_muscles to be aria-invalid")
+		}
+		// The summary is focusable and links to each offending field.
+		if doc.Find(`.error-summary[role='alert'][tabindex='-1']`).Length() == 0 {
+			t.Error("expected a focusable error summary with role=alert")
+		}
+		for _, anchor := range []string{"#rep_min", "#primary_muscles"} {
+			if doc.Find(".error-summary a[href='"+anchor+"']").Length() == 0 {
+				t.Errorf("expected the error summary to link to %s", anchor)
+			}
+		}
+		// Submitted values survive the bounce instead of reverting to the DB.
+		if got, _ := doc.Find("input[name='name']").Attr("value"); got != "Keep Me Squat" {
+			t.Errorf("expected name to round-trip as %q, got %q", "Keep Me Squat", got)
+		}
+		if doc.Find(`select[name='category'] option[value='upper'][selected]`).Length() == 0 {
+			t.Error("expected the changed category 'upper' to round-trip as selected")
+		}
+		for _, m := range []string{"Hamstrings", "Calves"} {
+			if doc.Find("select[name='secondary_muscles'] option[value='"+m+"'][selected]").Length() == 0 {
+				t.Errorf("expected secondary muscle %q to round-trip as selected", m)
+			}
+		}
+		if got := doc.Find("textarea[name='instructions']").Text(); got != "Brace hard" {
+			t.Errorf("expected instructions to round-trip as %q, got %q", "Brace hard", got)
+		}
+		// Exactly one element takes focus: the page-top banner stays empty.
+		if doc.Find(".banner").Length() != 0 {
+			t.Error("expected no page-top banner on a field-error bounce (summary owns focus)")
 		}
 	})
 

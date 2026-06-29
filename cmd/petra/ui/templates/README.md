@@ -161,15 +161,23 @@ they're touched, so the bar to escape the primitives is highest there.
   {{ template "back-link" (backLink (printf "/workouts/%s" (.Date.Format "2006-01-02")) $.Nonce) }}
   ```
 - `banner` — server-message display (flash errors, notices). Dot:
-  `cmd/petra.BannerData` (`Variant` ∈ `error`/`success`/`info`, `Message`).
-  Renders nothing when `Message` is empty.
+  `cmd/petra.BannerData` (`Variant` ∈ `error`/`success`/`info`, `Message`,
+  `Live`). Renders nothing when `Message` is empty.
 - `page-header` — a page's single `<h1>` with optional subtitle. Dot:
   `cmd/petra.PageHeaderData` (`Title`, `Subtitle`). Render meta/badges as
   siblings after it, not inside it.
-- `field` — a labelled single text input; guarantees the `<label for>` ↔
-  `<input id>` binding and `aria-describedby` → hint wiring. Dot:
-  `cmd/petra.FieldData`. Covers `<input>` only — `<select>`, `<textarea>` and
-  checkbox/radio groups stay as inline markup.
+- `field` / `select` / `textarea` — labelled form controls sharing one **error
+  contract**: each guarantees the `<label for>` ↔ control-`id` binding,
+  `aria-describedby` → hint/error wiring, and — when its dot's `Error` is set —
+  `aria-invalid="true"` plus a non-colour-only invalid treatment (error border
+  + leading marker). Dots: `cmd/petra.FieldData` (`<input>`), `SelectData`
+  (single or `Multiple` `<select>`), `TextareaData` (`<textarea>`). `Value`
+  /`Options` round-trip the user's submission on a validation bounce.
+- `error-summary` — the GOV.UK error summary: a `role="alert"`, focus-on-load
+  (`Live`) panel listing every field error as a link to `#<fieldname>`, plus any
+  form-level messages. Dot: `cmd/petra.ErrorSummaryData`. Renders nothing when
+  empty. Pair with the `field`/`select`/`textarea` `Error` contract for the
+  field-level validation flow (see `cmd/petra/README.md` "Error Handling").
 
 **Class-components** (`main.css @layer components`):
 

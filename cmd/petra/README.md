@@ -125,11 +125,13 @@ Difficulties: []difficultyOption{
 ### Form Processing Pattern
 
 Parse, build a domain value, hand it to the service. Validation lives on the
-domain type (`Exercise.Validate()` and friends) and surfaces as a
-`domain.ValidationError` — see "User-facing validation errors" below for the
-flash/redirect plumbing. The handler hands the service error to `userError`,
-which routes `ValidationError` to the form and everything else to
-`serverError`; the handler never inspects the error type itself.
+domain type (`Exercise.Validate()` and friends). A form whose fields each need
+their own message returns a `domain.FieldErrors` (keyed by HTML field name); a
+single page-level message returns a `domain.ValidationError` — see "User-facing
+validation errors" below for the plumbing. The handler hands the service error
+to `userError`, which routes `FieldErrors` and `ValidationError` to the form and
+everything else to `serverError`; the handler never inspects the error type
+itself.
 
 ```go
 if err = r.ParseForm(); err != nil {
@@ -167,7 +169,7 @@ Every POST handler ends in exactly one of:
 | Call | When | Effect |
 |---|---|---|
 | `redirect(w, r, url)` | Success | 200 + `X-Location` (stacknav) or 303 (plain); client navigates |
-| `app.userError(w, r, err, safeURL)` | Any failure on an in-flight POST | `ValidationError` → `putFlashError(ve.Message)` + `redirect(safeURL)`; anything else → delegates to `serverError` |
+| `app.userError(w, r, err, safeURL)` | Any failure on an in-flight POST | `FieldErrors` → stash per-field messages + submitted values, `redirect(safeURL)`; `ValidationError` → `putFlashError(ve.Message)` + `redirect(safeURL)`; anything else → delegates to `serverError` |
 | `app.serverError(w, r, err)` | Catastrophic failures: panics, template render errors, escape hatch when no safe URL fits | Logs. On a shim POST navigates to `/error?from=<sanitised>`; on GET / non-shim renders `error.gohtml` with 500 |
 
 #### `serverError` on POST navigates to `/error`
@@ -196,12 +198,21 @@ delegates everything else back to `serverError`.
 
 #### `userError` semantics
 
-`userError` routes by error type:
+`userError` routes by error type (first match wins):
 
+- `errors.As(err, &fe)` matching `domain.FieldErrors` → stash the per-field
+  messages **and** the submitted form values (`r.PostForm`, populated by
+  `parseForm` before the service call) via `app.putFormError(...)`, then
+  `redirect(safeURL)`. The form's GET handler pops them with
+  `app.popFormError(...)` and re-renders each control with its own `Error`,
+  the user's submitted `Value` (so edits survive the bounce), and an
+  `error-summary` component listing every error as a link to its field. This is
+  the field-level path — use it for forms whose fields each need a message.
 - `errors.As(err, &ve)` matching `domain.ValidationError` → flash with
   `ve.Message` verbatim and `redirect(safeURL)`. The form's GET handler
   pops the flash with `app.popFlash(...)`, reads the `.Message` field,
-  and renders the `banner` component.
+  and renders the `banner` component. This is the page-level path — one
+  message, no field anchoring (service business errors use it).
 - Anything else → delegate to `serverError`. The non-validation case
   produces the catastrophic-failure UX (shim navigation to `/error`,
   or inline 500 for non-shim clients). `userError` does not
@@ -209,9 +220,14 @@ delegates everything else back to `serverError`.
   banner UX is reserved for failures the user can act on by adjusting
   their input.
 
-`safeURL` is only consulted on the validation branch. It must point at
-a GET handler known to render successfully AND that pops + renders the
-flash banner. See the `safeURL` requirements below.
+On a `FieldErrors` bounce render the **error-summary** (which is `Live`,
+focus-on-load) and leave the page-top `banner` empty; on a `ValidationError`
+bounce render the `banner` (`Live`) and an empty summary. Exactly one element
+takes focus per load, so they never contend — see "Banner announcement & focus".
+
+`safeURL` is consulted on both validation branches. It must point at a GET
+handler known to render successfully AND that pops + renders the flash banner
+(and, for field errors, the form-error payload). See the requirements below.
 
 #### `safeURL` is mandatory, must pop + render the flash
 
@@ -232,9 +248,9 @@ produce a redirect loop.
 #### `userError` vs a handler-local guard
 
 There is exactly one way to route a *service* error: pass it to `userError`.
-Do not hand-roll the `errors.As(&ve) { putFlashError; redirect } / serverError`
-block inline — that is what `userError` is. The only `errors.As(&ve)` in the
-package lives inside `userError` itself.
+Do not hand-roll the `errors.As(&fe / &ve) { … ; redirect } / serverError`
+block inline — that is what `userError` is. The only `errors.As` for
+`FieldErrors` / `ValidationError` in the package lives inside `userError` itself.
 
 A handler-local guard is different and stays inline: when the *handler* rejects
 input before any service call (e.g. `prefs.IsEmpty()` in `scheduleGET`/

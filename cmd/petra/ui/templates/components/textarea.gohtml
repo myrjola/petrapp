@@ -1,0 +1,74 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/petra.TextareaData*/ -}}
+{{- /*
+    textarea: a labelled multi-line input. Dot: cmd/web.TextareaData. Shares the
+    `field` component's contract — <label for> ↔ <textarea id> binding,
+    aria-describedby → hint/error wiring, aria-invalid + a non-colour-only
+    border/marker when .Error is set. Value round-trips so the user keeps their
+    edit. Hint is plain text only.
+
+    Usage:
+        {{ template "textarea" .InstructionsField }}
+*/ -}}
+{{- define "textarea" -}}
+    <style {{ .Nonce }}>
+        @scope (.textarea-field) {
+            :scope {
+                display: flex;
+                flex-direction: column;
+                gap: var(--size-1);
+            }
+
+            label {
+                font-weight: var(--font-weight-6);
+                color: var(--color-text-primary);
+            }
+
+            textarea {
+                padding: var(--size-2);
+                border: var(--border-size-1) solid var(--color-border);
+                border-radius: var(--radius-2);
+                background: var(--color-surface-elevated);
+                font: inherit;
+            }
+
+            textarea:focus-visible {
+                outline: var(--color-border-focus) solid 2px;
+                outline-offset: 1px;
+            }
+
+            :scope.textarea-field--invalid textarea {
+                border-color: var(--color-error);
+                border-width: var(--border-size-2);
+            }
+
+            .field-hint {
+                font-size: var(--font-size-0);
+                color: var(--color-text-secondary);
+            }
+
+            .field-error {
+                font-size: var(--font-size-0);
+                font-weight: var(--font-weight-6);
+                color: var(--color-error);
+            }
+
+            .field-error::before {
+                content: "⚠ ";
+            }
+        }
+    </style>
+    <div class="textarea-field{{ if .Error }} textarea-field--invalid{{ end }}">
+        <label for="{{ .Name }}">{{ .Label }}</label>
+        <textarea id="{{ .Name }}"
+                  name="{{ .Name }}"
+                  {{- if .Rows }} rows="{{ .Rows }}"{{ end }}
+                  {{- if .Error }} aria-invalid="true"{{ end }}
+                  {{- if or .Hint .Error }} aria-describedby="{{ if .Hint }}{{ .Name }}-hint{{ end }}{{ if and .Hint .Error }} {{ end }}{{ if .Error }}{{ .Name }}-error{{ end }}"{{ end }}>{{ .Value }}</textarea>
+        {{- if .Hint }}
+            <span id="{{ .Name }}-hint" class="field-hint">{{ .Hint }}</span>
+        {{- end }}
+        {{- if .Error }}
+            <span id="{{ .Name }}-error" class="field-error">{{ .Error }}</span>
+        {{- end }}
+    </div>
+{{- end }}

@@ -4,27 +4,12 @@
         {{ template "page-header" .Header }}
         {{ template "admin-nav" .AdminNav }}
         {{ template "banner" .Flash }}
+        {{ template "error-summary" .ErrorSummary }}
 
         <form method="post" action="/admin/exercises/{{ .Exercise.ID }}" class="card stack">
             {{ template "field" .NameField }}
-
-            <div>
-                <label for="category">Category:</label>
-                <select id="category" name="category" required>
-                    {{ range .CategoryOptions }}
-                        <option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>
-                    {{ end }}
-                </select>
-            </div>
-
-            <div>
-                <label for="exercise_type">Exercise Type:</label>
-                <select id="exercise_type" name="exercise_type" required>
-                    {{ range .TypeOptions }}
-                        <option value="{{ .Value }}"{{ if .Selected }} selected{{ end }}>{{ .Label }}</option>
-                    {{ end }}
-                </select>
-            </div>
+            {{ template "select" .CategorySelect }}
+            {{ template "select" .TypeSelect }}
 
             <div id="default-starting-seconds-field"{{ if not .Exercise.IsTimed }} hidden{{ end }}>
                 {{ template "field" .SecondsField }}
@@ -59,43 +44,11 @@
                 })();
             </script>
 
-            <div>
-                <label for="primary_muscles">Primary Muscle Groups:</label>
-                <select id="primary_muscles" name="primary_muscles" multiple required>
-                    {{ range .PrimaryMuscleOptions }}
-                        <option value="{{ .Name }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
-                    {{ end }}
-                </select>
-                <small>Hold Ctrl/Cmd to select multiple</small>
-            </div>
-
-            <div>
-                <label for="secondary_muscles">Secondary Muscle Groups:</label>
-                <select id="secondary_muscles" name="secondary_muscles" multiple>
-                    {{ range .SecondaryMuscleOptions }}
-                        <option value="{{ .Name }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
-                    {{ end }}
-                </select>
-                <small>Hold Ctrl/Cmd to select multiple</small>
-            </div>
-
-            <div>
-                <label for="instructions">Instructions:</label>
-                <textarea id="instructions" name="instructions" rows="8">{{ .InstructionsText }}</textarea>
-                <small>One step per line.</small>
-            </div>
-
-            <div>
-                <label for="common_mistakes">Common Mistakes:</label>
-                <textarea id="common_mistakes" name="common_mistakes" rows="6">{{ .CommonMistakesText }}</textarea>
-                <small>One mistake per line.</small>
-            </div>
-
-            <div>
-                <label for="resources">Resources:</label>
-                <textarea id="resources" name="resources" rows="4">{{ .ResourcesText }}</textarea>
-                <small>One per line, as <code>Title | https://example.com</code>.</small>
-            </div>
+            {{ template "select" .PrimaryMuscleSelect }}
+            {{ template "select" .SecondaryMuscleSelect }}
+            {{ template "textarea" .InstructionsField }}
+            {{ template "textarea" .CommonMistakesField }}
+            {{ template "textarea" .ResourcesField }}
 
             <button type="submit">Update Exercise</button>
         </form>

@@ -400,6 +400,35 @@
         </section>
 
         <section>
+            <h2>Select</h2>
+            <div class="component-sample">
+                <div class="stack">
+                    {{ range .SelectExamples }}
+                        {{ template "select" . }}
+                    {{ end }}
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Textarea</h2>
+            <div class="component-sample">
+                <div class="stack">
+                    {{ range .TextareaExamples }}
+                        {{ template "textarea" . }}
+                    {{ end }}
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Error summary</h2>
+            <div class="component-sample">
+                {{ template "error-summary" .ErrorSummaryExample }}
+            </div>
+        </section>
+
+        <section>
             <h2>Admin nav</h2>
             <div class="component-sample">
                 <div class="stack">

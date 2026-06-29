@@ -1,0 +1,84 @@
+{{- /*gotype: github.com/myrjola/petrapp/cmd/petra.ErrorSummaryData*/ -}}
+{{- /*
+    error-summary: the GOV.UK error summary. Dot: cmd/web.ErrorSummaryData.
+    Lists every field error as a link to #<fieldname> (the input id), so the
+    user jumps straight to the control that failed, plus any form-level
+    messages. Renders nothing when there are no items.
+
+    role="alert" + focus-on-load (when .Live) so screen readers announce it and
+    it scrolls into view — the same mechanism the `banner` component uses,
+    because a live region present at full-document load is otherwise silent
+    (see cmd/petra README "Banner announcement & focus"). Exactly one element
+    should take focus per load: render the summary OR the page-top banner, not
+    both Live at once.
+
+    Usage:
+        {{ template "error-summary" .ErrorSummary }}
+*/ -}}
+{{- define "error-summary" -}}
+    {{- if or .Items .Form -}}
+        <style {{ .Nonce }}>
+            @scope (.error-summary) {
+                :scope {
+                    padding: var(--size-3) var(--size-4);
+                    border: var(--border-size-2) solid var(--color-error);
+                    border-radius: var(--radius-2);
+                    background: var(--color-error-bg);
+                    color: var(--color-error);
+                }
+
+                :scope:focus-visible {
+                    outline: var(--color-border-focus) solid 2px;
+                    outline-offset: 1px;
+                }
+
+                .error-summary__title {
+                    font-size: var(--font-size-2);
+                    font-weight: var(--font-weight-7);
+                    margin: 0 0 var(--size-2);
+                }
+
+                ul {
+                    margin: 0;
+                    padding-left: var(--size-4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--size-1);
+                }
+
+                a {
+                    color: var(--color-error);
+                    font-weight: var(--font-weight-6);
+                }
+            }
+        </style>
+        <div class="error-summary" role="alert" tabindex="-1">
+            <h2 class="error-summary__title">{{ if .Title }}{{ .Title }}{{ else }}There is a problem{{ end }}</h2>
+            <ul>
+                {{- range .Items }}
+                    <li><a href="#{{ .Anchor }}">{{ .Message }}</a></li>
+                {{- end }}
+                {{- range .Form }}
+                    <li>{{ . }}</li>
+                {{- end }}
+            </ul>
+        </div>
+        {{- if .Live }}
+            <script {{ .Nonce }}>
+                // Focus the summary on load: announces it (role=alert is silent
+                // for content already present at full-document load) and scrolls
+                // it into view. Same mechanism as the banner component.
+                (() => {
+                    const el = document.currentScript.previousElementSibling;
+                    if (!el || !el.classList.contains('error-summary')) return;
+                    const focus = () => el.focus();
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', focus, {once: true});
+                    } else {
+                        focus();
+                    }
+                })();
+            </script>
+        {{- end }}
+    {{- end -}}
+{{- end }}

@@ -219,51 +219,58 @@ func (e Exercise) FormatSetDescription(set Set) string {
 }
 
 // Validate reports whether the exercise's fields form a persistable record.
-// It returns a ValidationError carrying a user-facing message on the first
-// rule it fails, and nil when every rule passes. It is the single source of
-// truth for exercise-form validation; handlers detect the ValidationError
-// with errors.As and surface it via the flash + banner flow. Validate checks
-// only that the populated fields are valid and that the fields required for
-// the exercise type are present — it does not cross-check that a timed
-// exercise lacks a rep range, because handler struct-shaping guarantees it.
+// It returns a FieldErrors carrying a user-facing message for every rule it
+// fails, keyed by the HTML form field name, and nil when every rule passes. It
+// is the single source of truth for exercise-form validation; handlers detect
+// the FieldErrors with errors.As and surface each message next to its input
+// (plus an error summary). Validate checks only that the populated fields are
+// valid and that the fields required for the exercise type are present — it
+// does not cross-check that a timed exercise lacks a rep range, because handler
+// struct-shaping guarantees it. Field keys MUST match the form input names.
 func (e Exercise) Validate() error {
 	const (
 		repBoundMin = 1
 		repBoundMax = 50
 	)
+	var fe FieldErrors
+
 	if e.Name == "" {
-		return ValidationError{Message: "Name is required."}
+		fe.Add("name", "Name is required.")
 	}
 	if !e.Category.IsValid() {
-		return ValidationError{Message: "Category must be one of full body, upper, or lower."}
+		fe.Add("category", "Category must be one of full body, upper, or lower.")
 	}
 	if !e.ExerciseType.IsValid() {
-		return ValidationError{Message: "Exercise type must be weighted, bodyweight, assisted, or time_based."}
+		fe.Add("exercise_type", "Exercise type must be weighted, bodyweight, assisted, or time_based.")
 	}
 	if e.IsTimed() && (e.DefaultStartingSeconds == nil || *e.DefaultStartingSeconds <= 0) {
-		return ValidationError{
-			Message: "Default starting seconds must be a positive integer for time-based exercises.",
-		}
+		fe.Add("default_starting_seconds",
+			"Default starting seconds must be a positive integer for time-based exercises.")
 	}
 	if len(e.PrimaryMuscleGroups) == 0 {
-		return ValidationError{Message: "At least one primary muscle group is required."}
+		fe.Add("primary_muscles", "At least one primary muscle group is required.")
 	}
 	for _, res := range e.Resources {
 		if res.Title == "" || res.URL == "" {
-			return ValidationError{Message: "Each resource needs both a title and a URL."}
+			fe.Add("resources", "Each resource needs both a title and a URL.")
+			break
 		}
 	}
 	if !e.IsTimed() {
-		if e.RepMin == nil || e.RepMax == nil ||
+		switch {
+		case e.RepMin == nil || e.RepMax == nil ||
 			*e.RepMin < repBoundMin || *e.RepMin > repBoundMax ||
-			*e.RepMax < repBoundMin || *e.RepMax > repBoundMax {
-			return ValidationError{Message: "Min and max reps must be whole numbers between 1 and 50."}
-		}
-		if *e.RepMin > *e.RepMax {
-			return ValidationError{Message: "Min reps must be less than or equal to max reps."}
+			*e.RepMax < repBoundMin || *e.RepMax > repBoundMax:
+			// Mark both inputs so each shows its border + marker; the summary
+			// de-dupes by field, so the repeated message reads once there.
+			const repRangeMsg = "Min and max reps must be whole numbers between 1 and 50."
+			fe.Add("rep_min", repRangeMsg)
+			fe.Add("rep_max", repRangeMsg)
+		case *e.RepMin > *e.RepMax:
+			fe.Add("rep_min", "Min reps must be less than or equal to max reps.")
 		}
 	}
-	return nil
+	return fe.OrNil()
 }
 
 // behavior returns the registered rules for this exercise's type, or the

@@ -185,14 +185,14 @@ func Test_UpdateExercise_RejectsInvalidExercise(t *testing.T) {
 	}
 	err = svc.UpdateExercise(ctx, invalid)
 	if err == nil {
-		t.Fatal("UpdateExercise() = nil, want ValidationError")
+		t.Fatal("UpdateExercise() = nil, want FieldErrors")
 	}
-	var ve domain.ValidationError
-	if !errors.As(err, &ve) {
-		t.Fatalf("UpdateExercise() error is not a ValidationError: %v", err)
+	var fe *domain.FieldErrors
+	if !errors.As(err, &fe) {
+		t.Fatalf("UpdateExercise() error is not a FieldErrors: %v", err)
 	}
-	if ve.Message != "Name is required." {
-		t.Errorf("message = %q, want %q", ve.Message, "Name is required.")
+	if got := fe.Fields["name"]; got != "Name is required." {
+		t.Errorf("Fields[name] = %q, want %q", got, "Name is required.")
 	}
 }
 

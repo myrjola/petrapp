@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/myrjola/petrapp/internal/petra/domain"
@@ -47,20 +48,34 @@ func (app *application) serverError(w http.ResponseWriter, r *http.Request, err 
 
 // userError surfaces a failure of an in-flight user action.
 //
-// Routing:
+// Routing (first match wins):
+//   - domain.FieldErrors → stash the per-field messages AND the submitted form
+//     values (r.PostForm) for the next GET of safeURL, then redirect. The safe
+//     URL's GET handler pops them, re-renders each input with its own error and
+//     the user's submitted value, and shows an error summary.
 //   - domain.ValidationError → flash with ve.Message and redirect to safeURL.
 //     The safe URL's GET handler pops the flash and renders the banner.
 //   - any other error → delegate to serverError. On the shim path that
 //     navigates the user to /error (catastrophic-failure UX); on the
 //     non-shim path it renders error.gohtml with a 500.
 //
-// safeURL is only used on the validation branch. It must point at a GET
-// handler known to render successfully AND that pops + renders the flash.
-// See cmd/petra/CLAUDE.md "userError semantics" for the rationale and the
-// list of currently-supported safe URLs.
+// safeURL is only used on the two validation branches. It must point at a GET
+// handler known to render successfully AND that pops + renders the flash /
+// form-error payload. See cmd/petra/CLAUDE.md "userError semantics" for the
+// rationale and the list of currently-supported safe URLs.
 func (app *application) userError(
 	w http.ResponseWriter, r *http.Request, err error, safeURL string,
 ) {
+	var fe *domain.FieldErrors
+	if errors.As(err, &fe) {
+		app.putFormError(r.Context(), formErrorPayload{
+			Fields:      fe.Fields,
+			FormMessage: strings.Join(fe.Form, " "),
+			Values:      r.PostForm, // populated by parseForm before the service call
+		})
+		redirect(w, r, safeURL)
+		return
+	}
 	var ve domain.ValidationError
 	if errors.As(err, &ve) {
 		app.putFlashError(r.Context(), ve.Message)
@@ -162,6 +177,63 @@ func (app *application) popFlash(ctx context.Context) flashEntry {
 		return flashEntry{}
 	}
 	return entry
+}
+
+const formErrorKey = "formError"
+
+// formErrorPayload carries a multi-field validation failure across the
+// Post-Redirect-Get bounce: the per-field messages, any form-level message,
+// and the values the user submitted — so the re-rendered form shows their
+// edits, not the database state. Session-backed and gob-registered (see
+// main.go); url.Values is gob-encodable.
+type formErrorPayload struct {
+	Fields      map[string]string
+	FormMessage string
+	Values      url.Values
+}
+
+// putFormError stashes a form-error payload for the next GET of the form page.
+func (app *application) putFormError(ctx context.Context, p formErrorPayload) {
+	app.sessionManager.Put(ctx, formErrorKey, p)
+}
+
+// popFormError retrieves and removes the form-error payload, returning a
+// zero-value payload (has() == false) when nothing is stored.
+func (app *application) popFormError(ctx context.Context) formErrorPayload {
+	raw := app.sessionManager.Pop(ctx, formErrorKey)
+	p, ok := raw.(formErrorPayload)
+	if !ok {
+		return formErrorPayload{}
+	}
+	return p
+}
+
+// has reports whether a payload is present — i.e. this GET is a validation
+// bounce. When false the form handler renders pure database state.
+func (p formErrorPayload) has() bool { return p.Values != nil }
+
+// value returns the submitted value for a single-value field when a payload is
+// present (so the user sees their edit), else the database-derived fallback.
+func (p formErrorPayload) value(name, fallback string) string {
+	if p.Values == nil {
+		return fallback
+	}
+	if vs, ok := p.Values[name]; ok {
+		return strings.Join(vs, "")
+	}
+	return fallback
+}
+
+// multi returns the submitted values for a multi-value field (e.g. a
+// <select multiple>) when a payload is present, else the fallback.
+func (p formErrorPayload) multi(name string, fallback []string) []string {
+	if p.Values == nil {
+		return fallback
+	}
+	if vs, ok := p.Values[name]; ok {
+		return vs
+	}
+	return fallback
 }
 
 // parseDateParam parses the "date" path parameter from the request URL.

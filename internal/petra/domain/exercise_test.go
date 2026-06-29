@@ -372,54 +372,57 @@ func Test_Exercise_Validate(t *testing.T) {
 		name        string
 		exercise    domain.Exercise
 		wantErr     bool
+		wantField   string // field key the message must be attached to
 		wantMessage string
 	}{
-		{"valid weighted", validWeighted(), false, ""},
-		{"valid timed", validTimed(), false, ""},
+		{"valid weighted", validWeighted(), false, "", ""},
+		{"valid timed", validTimed(), false, "", ""},
 		{
 			"empty name",
 			func() domain.Exercise { e := validWeighted(); e.Name = ""; return e }(),
-			true, "Name is required.",
+			true, "name", "Name is required.",
 		},
 		{
 			"invalid category",
 			func() domain.Exercise { e := validWeighted(); e.Category = domain.Category("bogus"); return e }(),
-			true, "Category must be one of full body, upper, or lower.",
+			true, "category", "Category must be one of full body, upper, or lower.",
 		},
 		{
 			"invalid type",
 			func() domain.Exercise { e := validWeighted(); e.ExerciseType = domain.ExerciseType("bogus"); return e }(),
-			true, "Exercise type must be weighted, bodyweight, assisted, or time_based.",
+			true, "exercise_type", "Exercise type must be weighted, bodyweight, assisted, or time_based.",
 		},
 		{
 			"timed without seconds",
 			func() domain.Exercise { e := validTimed(); e.DefaultStartingSeconds = nil; return e }(),
-			true, "Default starting seconds must be a positive integer for time-based exercises.",
+			true, "default_starting_seconds",
+			"Default starting seconds must be a positive integer for time-based exercises.",
 		},
 		{
 			"timed with zero seconds",
 			func() domain.Exercise { e := validTimed(); e.DefaultStartingSeconds = intPtr(0); return e }(),
-			true, "Default starting seconds must be a positive integer for time-based exercises.",
+			true, "default_starting_seconds",
+			"Default starting seconds must be a positive integer for time-based exercises.",
 		},
 		{
 			"no primary muscles",
 			func() domain.Exercise { e := validWeighted(); e.PrimaryMuscleGroups = nil; return e }(),
-			true, "At least one primary muscle group is required.",
+			true, "primary_muscles", "At least one primary muscle group is required.",
 		},
 		{
 			"missing rep range",
 			func() domain.Exercise { e := validWeighted(); e.RepMin = nil; e.RepMax = nil; return e }(),
-			true, "Min and max reps must be whole numbers between 1 and 50.",
+			true, "rep_min", "Min and max reps must be whole numbers between 1 and 50.",
 		},
 		{
 			"rep range out of bounds",
 			func() domain.Exercise { e := validWeighted(); e.RepMax = intPtr(99); return e }(),
-			true, "Min and max reps must be whole numbers between 1 and 50.",
+			true, "rep_min", "Min and max reps must be whole numbers between 1 and 50.",
 		},
 		{
 			"rep min greater than max",
 			func() domain.Exercise { e := validWeighted(); e.RepMin = intPtr(12); e.RepMax = intPtr(8); return e }(),
-			true, "Min reps must be less than or equal to max reps.",
+			true, "rep_min", "Min reps must be less than or equal to max reps.",
 		},
 	}
 
@@ -436,13 +439,39 @@ func Test_Exercise_Validate(t *testing.T) {
 			if err == nil {
 				t.Fatalf("Validate() = nil, want error %q", tc.wantMessage)
 			}
-			var ve domain.ValidationError
-			if !errors.As(err, &ve) {
-				t.Fatalf("Validate() error is not a ValidationError: %v", err)
+			var fe *domain.FieldErrors
+			if !errors.As(err, &fe) {
+				t.Fatalf("Validate() error is not a FieldErrors: %v", err)
 			}
-			if ve.Message != tc.wantMessage {
-				t.Errorf("Validate() message = %q, want %q", ve.Message, tc.wantMessage)
+			if got := fe.Fields[tc.wantField]; got != tc.wantMessage {
+				t.Errorf("Validate() Fields[%q] = %q, want %q", tc.wantField, got, tc.wantMessage)
 			}
 		})
+	}
+}
+
+// Test_Exercise_Validate_collectsAllErrors verifies the multi-field contract:
+// one Validate call reports every failing field, not just the first.
+func Test_Exercise_Validate_collectsAllErrors(t *testing.T) {
+	t.Parallel()
+
+	// Wrong on name (empty), primary muscles (none), and rep range (min>max).
+	bad := domain.Exercise{ //nolint:exhaustruct // intentionally invalid on several fields.
+		Name:         "",
+		Category:     domain.CategoryUpper,
+		ExerciseType: domain.ExerciseTypeWeighted,
+		RepMin:       func() *int { n := 12; return &n }(),
+		RepMax:       func() *int { n := 8; return &n }(),
+	}
+
+	err := bad.Validate()
+	var fe *domain.FieldErrors
+	if !errors.As(err, &fe) {
+		t.Fatalf("Validate() error is not a FieldErrors: %v", err)
+	}
+	for _, field := range []string{"name", "primary_muscles", "rep_min"} {
+		if _, ok := fe.Fields[field]; !ok {
+			t.Errorf("expected an error for field %q; got fields %v", field, fe.Fields)
+		}
 	}
 }

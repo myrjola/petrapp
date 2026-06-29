@@ -405,7 +405,8 @@ func buildNotificationStack(
 
 func initializeSessionManager(dbs *sqlitekit.Database) *scs.SessionManager {
 	// gob.Register is idempotent, so calling it per initializeSessionManager is safe.
-	gob.Register(flashEntry{}) //nolint:exhaustruct // gob.Register only needs the type, value fields are unused.
+	gob.Register(flashEntry{})       //nolint:exhaustruct // gob.Register only needs the type, value fields are unused.
+	gob.Register(formErrorPayload{}) //nolint:exhaustruct // gob.Register only needs the type, value fields are unused.
 	sessionManager := scs.New()
 	sessionManager.Store = sqlite3store.NewWithCleanupInterval(dbs.ReadWrite, sessionStoreCleanupInterval)
 	sessionManager.Lifetime = sessionLifetime

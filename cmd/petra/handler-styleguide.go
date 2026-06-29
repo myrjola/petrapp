@@ -42,6 +42,12 @@ type styleguideTemplateData struct {
 	PageHeaderExample PageHeaderData
 	// FieldExamples drives the Field section of the styleguide.
 	FieldExamples []FieldData
+	// SelectExamples drives the Select section of the styleguide.
+	SelectExamples []SelectData
+	// TextareaExamples drives the Textarea section of the styleguide.
+	TextareaExamples []TextareaData
+	// ErrorSummaryExample drives the Error summary section of the styleguide.
+	ErrorSummaryExample ErrorSummaryData
 	// AdminNavExamples drives the Admin nav section of the styleguide.
 	AdminNavExamples []AdminNavData
 }
@@ -94,21 +100,24 @@ func (app *application) styleguideGET(w http.ResponseWriter, r *http.Request) {
 
 	base := newBaseTemplateData(r)
 	data := styleguideTemplateData{
-		BaseTemplateData:  base,
-		Grays:             grays,
-		Stones:            stones,
-		Clays:             clays,
-		SemanticColors:    semantics,
-		ColorTokens:       colorTokens,
-		Sizes:             rangeNames("size", 1, scaleSizeMax),
-		FontSizes:         append([]string{"font-size-00"}, rangeNames("font-size", 0, scaleFontSizeMax)...),
-		FluidFontSizes:    rangeNames("font-size-fluid", 0, scaleFluidFontMax),
-		FontWeights:       rangeNames("font-weight", 1, scaleFontWeightMax),
-		Radii:             append(rangeNames("radius", 1, scaleRadiusMax), "radius-round"),
-		BannerExamples:    styleguideBannerExamples(base.Nonce),
-		PageHeaderExample: styleguidePageHeaderExample(base.Nonce),
-		FieldExamples:     styleguideFieldExamples(base.Nonce),
-		AdminNavExamples:  styleguideAdminNavExamples(base.Nonce),
+		BaseTemplateData:    base,
+		Grays:               grays,
+		Stones:              stones,
+		Clays:               clays,
+		SemanticColors:      semantics,
+		ColorTokens:         colorTokens,
+		Sizes:               rangeNames("size", 1, scaleSizeMax),
+		FontSizes:           append([]string{"font-size-00"}, rangeNames("font-size", 0, scaleFontSizeMax)...),
+		FluidFontSizes:      rangeNames("font-size-fluid", 0, scaleFluidFontMax),
+		FontWeights:         rangeNames("font-weight", 1, scaleFontWeightMax),
+		Radii:               append(rangeNames("radius", 1, scaleRadiusMax), "radius-round"),
+		BannerExamples:      styleguideBannerExamples(base.Nonce),
+		PageHeaderExample:   styleguidePageHeaderExample(base.Nonce),
+		FieldExamples:       styleguideFieldExamples(base.Nonce),
+		SelectExamples:      styleguideSelectExamples(base.Nonce),
+		TextareaExamples:    styleguideTextareaExamples(base.Nonce),
+		ErrorSummaryExample: styleguideErrorSummaryExample(base.Nonce),
+		AdminNavExamples:    styleguideAdminNavExamples(base.Nonce),
 	}
 	app.render(w, r, http.StatusOK, "styleguide", data)
 }
@@ -167,6 +176,88 @@ func styleguideFieldExamples(nonce template.HTMLAttr) []FieldData {
 			Step:  "1",
 			Nonce: nonce,
 		},
+		{ //nolint:exhaustruct // Styleguide example only sets the fields it demonstrates.
+			Label:    "Exercise name",
+			Name:     "styleguide-name-invalid",
+			Type:     inputTypeText,
+			Required: true,
+			Error:    "Name is required.", // demonstrates the invalid state
+			Nonce:    nonce,
+		},
+	}
+}
+
+// styleguideSelectExamples returns the select examples (single + multiple, one
+// invalid) demoed on the styleguide page.
+func styleguideSelectExamples(nonce template.HTMLAttr) []SelectData {
+	return []SelectData{
+		{
+			Label: "Category",
+			Name:  "styleguide-category",
+			Options: []selectOption{
+				{Value: "full_body", Label: "Full body", Selected: true},
+				{Value: "upper", Label: "Upper", Selected: false},
+				{Value: "lower", Label: "Lower", Selected: false},
+			},
+			Multiple: false,
+			Required: true,
+			Hint:     "",
+			Error:    "",
+			Nonce:    nonce,
+		},
+		{
+			Label: "Muscle groups",
+			Name:  "styleguide-muscles",
+			Options: []selectOption{
+				{Value: "Chest", Label: "Chest", Selected: true},
+				{Value: "Back", Label: "Back", Selected: false},
+			},
+			Multiple: true,
+			Required: true,
+			Hint:     "Hold Ctrl/Cmd to select multiple.",
+			Error:    "Select at least one muscle group.", // demonstrates the invalid state
+			Nonce:    nonce,
+		},
+	}
+}
+
+// styleguideTextareaExamples returns the textarea examples (plain + invalid)
+// demoed on the styleguide page.
+func styleguideTextareaExamples(nonce template.HTMLAttr) []TextareaData {
+	return []TextareaData{
+		{
+			Label: "Instructions",
+			Name:  "styleguide-instructions",
+			Value: "Set up.\nBrace.\nLift.",
+			Rows:  "4",
+			Hint:  "One step per line.",
+			Error: "",
+			Nonce: nonce,
+		},
+		{
+			Label: "Resources",
+			Name:  "styleguide-resources-invalid",
+			Value: "Bad line without a URL",
+			Rows:  "3",
+			Hint:  "One per line, as Title | https://example.com",
+			Error: "Each resource needs both a title and a URL.", // demonstrates the invalid state
+			Nonce: nonce,
+		},
+	}
+}
+
+// styleguideErrorSummaryExample returns the error-summary example demoed on the
+// styleguide page. Live is false so it does not steal focus on the styleguide.
+func styleguideErrorSummaryExample(nonce template.HTMLAttr) ErrorSummaryData {
+	return ErrorSummaryData{
+		Title: "",
+		Items: []ErrorSummaryItem{
+			{Anchor: "styleguide-name-invalid", Message: "Name is required."},
+			{Anchor: "styleguide-muscles", Message: "Select at least one muscle group."},
+		},
+		Form:  nil,
+		Live:  false,
+		Nonce: nonce,
 	}
 }
 

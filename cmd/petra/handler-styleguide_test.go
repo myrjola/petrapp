@@ -139,6 +139,50 @@ func Test_application_styleguide(t *testing.T) {
 		t.Errorf("expected an element with id %q for aria-describedby", describedBy)
 	}
 
+	// Select component — label/select binding + invalid state guarantee.
+	if doc.Find("h2:contains('Select')").Length() == 0 {
+		t.Error("expected a 'Select' section")
+	}
+	if doc.Find(".select-field select").Length() == 0 {
+		t.Error("expected a select example with a .select-field select")
+	}
+	if doc.Find(".select-field select[multiple]").Length() == 0 {
+		t.Error("expected a multi-select example")
+	}
+	if doc.Find(`.select-field--invalid select[aria-invalid="true"]`).Length() == 0 {
+		t.Error("expected an invalid select example with aria-invalid")
+	}
+
+	// Textarea component — label/textarea binding + invalid state guarantee.
+	if doc.Find("h2:contains('Textarea')").Length() == 0 {
+		t.Error("expected a 'Textarea' section")
+	}
+	if doc.Find(".textarea-field textarea").Length() == 0 {
+		t.Error("expected a textarea example with a .textarea-field textarea")
+	}
+	if doc.Find(`.textarea-field--invalid textarea[aria-invalid="true"]`).Length() == 0 {
+		t.Error("expected an invalid textarea example with aria-invalid")
+	}
+
+	// Error summary component — role=alert, focusable, links to fields.
+	if doc.Find("h2:contains('Error summary')").Length() == 0 {
+		t.Error("expected an 'Error summary' section")
+	}
+	if doc.Find(`.error-summary[role="alert"][tabindex="-1"]`).Length() == 0 {
+		t.Error("expected a focusable error-summary with role=alert")
+	}
+	if doc.Find(`.error-summary a[href="#styleguide-name-invalid"]`).Length() == 0 {
+		t.Error("expected the error-summary to link to the offending field")
+	}
+
+	// A field example exercises the invalid state with a wired error message.
+	if doc.Find(`.field--invalid input[aria-invalid="true"]`).Length() == 0 {
+		t.Error("expected an invalid field example with aria-invalid")
+	}
+	if doc.Find("#styleguide-name-invalid-error").Length() == 0 {
+		t.Error("expected a wired error message span for the invalid field example")
+	}
+
 	// Button variants — every variant + modifier renders on the styleguide.
 	if doc.Find("h3:contains('Button variants')").Length() == 0 {
 		t.Error("expected a 'Button variants' section on the styleguide")
